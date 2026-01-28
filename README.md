@@ -127,7 +127,7 @@ If you encounter any bugs or issues, please feel free to open an **Issue** here 
 
 Developed by **Mohammad Alqarni**.
 
-* **LinkedIn:** [Mohammad Alqarni](https://www.google.com/search?q=https://www.linkedin.com/in/mohammad-alqarni-sec)
+* **LinkedIn:** [Mohammad Alqarni](https://www.google.com/search?q=https://www.linkedin.com/in/mohammad-alqarni-994690334?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=ios_app)
 * **Email:** mohammad.aqarni.10@gmail.com
 
 All Rights Reserved © 2025 SOCify
