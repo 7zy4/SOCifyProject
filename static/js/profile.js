@@ -330,13 +330,7 @@ function handleChangePassword(e) {
         return;
     }
 
-    // In a real implementation, validate current password and update
-    closeModal('changePasswordModal');
-
-    // Add to activity log
-    addActivityLog('password', 'تغيير كلمة المرور', 'تم تغيير كلمة المرور بنجاح');
-
-    showNotification('تم تغيير كلمة المرور بنجاح', 'success');
+    showNotification('تغيير كلمة المرور غير مفعّل بعد؛ لم تُحفظ أي تغييرات.', 'error');
 }
 
 // Preference updates
