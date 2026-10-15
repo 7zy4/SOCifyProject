@@ -10,9 +10,11 @@ import bcrypt
 import os
 from functools import wraps
 import logging
+from detection_engine import evaluate_rules
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'socify-secret-key-change-in-production'
+app.config['SECRET_KEY'] = os.environ.get('SOCIFY_SECRET_KEY') or os.urandom(32)
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax', SESSION_COOKIE_SECURE=os.environ.get('SOCIFY_HTTPS') == '1')
 app.config['DATABASE'] = 'socify.db'
 
 # Initialize extensions
@@ -30,36 +32,69 @@ def get_db_connection():
     return conn
 
 def init_db():
-    """Initialize database with schema"""
+    """Initialize database only if absent; never discard existing investigation data."""
+    if os.path.exists(app.config['DATABASE']):
+        return
+    conn = get_db_connection()
     try:
-        # Import the database creation script
-        import create_db
-        create_db.create_database()
-    except Exception as e:
-        print(f"خطأ في إنشاء قاعدة البيانات: {e}")
-        # Fallback to manual creation
-        conn = get_db_connection()
-        try:
-            with open('schema.sql', 'r', encoding='utf-8') as f:
-                schema_sql = f.read()
-            statements = schema_sql.split(';')
-            for statement in statements:
-                statement = statement.strip()
-                if statement:
-                    conn.execute(statement)
-            conn.commit()
-            print("تم إنشاء قاعدة البيانات بنجاح")
-        except Exception as e2:
-            print(f"خطأ في تنفيذ SQL: {e2}")
-        finally:
-            conn.close()
+        with open(os.path.join(os.path.dirname(__file__), 'schema.sql'), encoding='utf-8') as file:
+            conn.executescript(file.read())
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def ensure_phase1_schema():
+    """Apply non-destructive migrations to legacy database installations."""
+    conn = get_db_connection()
+    try:
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS detection_matches (
+            id INTEGER PRIMARY KEY, rule_id INTEGER NOT NULL REFERENCES rules(id),
+            event_id INTEGER NOT NULL REFERENCES security_events(id),
+            alert_event_id INTEGER NOT NULL REFERENCES security_events(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(rule_id, event_id));
+        CREATE TABLE IF NOT EXISTS incidents (
+            id INTEGER PRIMARY KEY, title VARCHAR(255) NOT NULL, description TEXT DEFAULT '',
+            severity VARCHAR(20) NOT NULL DEFAULT 'medium',
+            status VARCHAR(20) NOT NULL DEFAULT 'open',
+            assigned_to INTEGER REFERENCES users(id),
+            created_by INTEGER NOT NULL REFERENCES users(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+        CREATE TABLE IF NOT EXISTS incident_events (
+            incident_id INTEGER NOT NULL REFERENCES incidents(id),
+            event_id INTEGER NOT NULL REFERENCES security_events(id),
+            PRIMARY KEY(incident_id, event_id));
+        CREATE TABLE IF NOT EXISTS incident_notes (
+            id INTEGER PRIMARY KEY, incident_id INTEGER NOT NULL REFERENCES incidents(id),
+            user_id INTEGER NOT NULL REFERENCES users(id), note TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+        """)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def valid_event_data(data):
+    return isinstance(data, dict) and all(
+        isinstance(data.get(k), str) and data[k].strip()
+        for k in ('source', 'severity', 'category', 'title', 'description')
+    ) and data['severity'] in ('critical', 'high', 'medium', 'low')
+
+
+def valid_assignee(conn, assignee):
+    return assignee is None or (type(assignee) is int and conn.execute(
+        'SELECT 1 FROM users WHERE id = ? AND is_active = 1', (assignee,)
+    ).fetchone() is not None)
+
 
 def login_required(f):
     """Decorator to require login"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
-            if request.is_json:
+            if request.path.startswith('/api/') or request.is_json:
                 return jsonify({'error': 'Authentication required'}), 401
             return redirect(url_for('login'))
         return f(*args, **kwargs)
@@ -71,7 +106,7 @@ def role_required(required_role):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             if 'user_id' not in session:
-                if request.is_json:
+                if request.path.startswith('/api/') or request.is_json:
                     return jsonify({'error': 'Authentication required'}), 401
                 return redirect(url_for('login'))
             
@@ -80,7 +115,7 @@ def role_required(required_role):
             conn.close()
             
             if not user or user['role'] not in required_role:
-                if request.is_json:
+                if request.path.startswith('/api/') or request.is_json:
                     return jsonify({'error': 'Insufficient permissions'}), 403
                 flash('Insufficient permissions', 'error')
                 return redirect(url_for('dashboard'))
@@ -262,8 +297,11 @@ def get_events():
     severity = request.args.get('severity')
     status = request.args.get('status')
     source = request.args.get('source')
-    limit = int(request.args.get('limit', 50))
-    offset = int(request.args.get('offset', 0))
+    try:
+        limit = min(max(int(request.args.get('limit', 50)), 1), 500)
+        offset = max(int(request.args.get('offset', 0)), 0)
+    except ValueError:
+        return jsonify({'error': 'Invalid pagination'}), 400
     
     # Build query
     query = '''
@@ -299,10 +337,8 @@ def get_events():
 @login_required
 def create_event():
     """Create new security event"""
-    data = request.get_json()
-    
-    required_fields = ['source', 'severity', 'category', 'title', 'description']
-    if not all(field in data for field in required_fields):
+    data = request.get_json(silent=True)
+    if not valid_event_data(data):
         return jsonify({'error': 'Missing required fields'}), 400
     
     conn = get_db_connection()
@@ -314,15 +350,14 @@ def create_event():
     ''', (event_id, data['source'], data['severity'], data['category'], 
           data['title'], data['description'], data.get('raw_data', ''), session['user_id']))
     
-    # Get the created event ID before committing
     event_db_id = cursor.lastrowid
-    
+    detections = evaluate_rules(conn, event_db_id)
     conn.commit()
     conn.close()
     
     log_audit(session['user_id'], 'create', 'security_events', event_db_id, None, json.dumps(data))
     
-    return jsonify({'message': 'Event created successfully', 'event_id': event_id, 'id': event_db_id})
+    return jsonify({'message': 'Event created successfully', 'event_id': event_id, 'id': event_db_id, 'detections': detections})
 
 @app.route('/api/events/<int:event_id>', methods=['PUT'])
 @login_required
@@ -342,6 +377,9 @@ def update_event(event_id):
     update_fields = []
     params = []
     
+    if not isinstance(data, dict) or ('status' in data and data['status'] not in ('open', 'investigating', 'resolved', 'false_positive')) or ('severity' in data and data['severity'] not in ('critical', 'high', 'medium', 'low')) or ('assigned_to' in data and not valid_assignee(conn, data['assigned_to'])):
+        conn.close()
+        return jsonify({'error': 'Invalid event update'}), 400
     updatable_fields = ['status', 'assigned_to', 'severity', 'title', 'description']
     for field in updatable_fields:
         if field in data:
@@ -365,7 +403,7 @@ def update_event(event_id):
     return jsonify({'message': 'Event updated successfully'})
 
 @app.route('/api/events/<int:event_id>', methods=['DELETE'])
-@login_required
+@role_required(['soc_manager', 'admin'])
 def delete_event(event_id):
     """Delete security event"""
     conn = get_db_connection()
@@ -393,8 +431,11 @@ def get_audit_logs():
     conn = get_db_connection()
     
     # Get query parameters
-    limit = int(request.args.get('limit', 100))
-    offset = int(request.args.get('offset', 0))
+    try:
+        limit = min(max(int(request.args.get('limit', 100)), 1), 500)
+        offset = max(int(request.args.get('offset', 0)), 0)
+    except ValueError:
+        return jsonify({'error': 'Invalid pagination'}), 400
     
     # Build query
     query = '''
@@ -456,6 +497,7 @@ def create_rule():
     conn.close()
     
     log_audit(session['user_id'], 'create', 'rules', None, None, json.dumps(data))
+    return jsonify({'message': 'Rule created successfully'}), 201
     
 @app.route('/api/rules/<int:rule_id>', methods=['PUT'])
 @role_required(['soc_manager', 'admin'])
@@ -501,7 +543,7 @@ def update_rule(rule_id):
 def get_sources():
     """Get data sources"""
     conn = get_db_connection()
-    sources = conn.execute('SELECT * FROM event_sources ORDER BY created_at DESC').fetchall()
+    sources = conn.execute('SELECT id, name, type, endpoint, is_active, last_sync, created_at FROM event_sources ORDER BY created_at DESC').fetchall()
     conn.close()
     
     return jsonify([dict(source) for source in sources])
@@ -526,7 +568,7 @@ def create_source():
     conn.commit()
     conn.close()
     
-    log_audit(session['user_id'], 'create', 'event_sources', None, None, json.dumps(data))
+    log_audit(session['user_id'], 'create', 'event_sources', None, None, json.dumps({k: v for k, v in data.items() if k != 'api_key'}))
     
     return jsonify({'message': 'Source created successfully'})
 
@@ -561,7 +603,7 @@ def update_source(source_id):
     conn.close()
     
     log_audit(session['user_id'], 'update', 'event_sources', source_id, 
-              json.dumps(dict(current_source)), json.dumps(data))
+              json.dumps({k: v for k, v in dict(current_source).items() if k != 'api_key'}), json.dumps({k: v for k, v in data.items() if k != 'api_key'}))
     
     return jsonify({'message': 'Source updated successfully'})
 
@@ -604,10 +646,8 @@ def get_stats():
 @login_required
 def create_lab_event():
     """Create event from lab simulation"""
-    data = request.get_json()
-    
-    required_fields = ['source', 'severity', 'category', 'title', 'description']
-    if not all(field in data for field in required_fields):
+    data = request.get_json(silent=True)
+    if not valid_event_data(data):
         return jsonify({'error': 'Missing required fields'}), 400
     
     conn = get_db_connection()
@@ -619,20 +659,20 @@ def create_lab_event():
     ''', (event_id, data['source'], data['severity'], data['category'], 
           data['title'], data['description'], data.get('raw_data', ''), session['user_id']))
     
-    # Get the created event ID before committing
     event_db_id = cursor.lastrowid
-    
+    detections = evaluate_rules(conn, event_db_id)
     conn.commit()
     conn.close()
     
     log_audit(session['user_id'], 'create', 'security_events', event_db_id, None, 
               json.dumps({**data, 'source': 'lab'}))
     
-    return jsonify({'message': 'Lab event created successfully', 'event_id': event_id, 'id': event_db_id})
+    return jsonify({'message': 'Lab event created successfully', 'event_id': event_id, 'id': event_db_id, 'detections': detections})
 
 if __name__ == '__main__':
     # Initialize database
     if not os.path.exists(app.config['DATABASE']):
         init_db()
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    ensure_phase1_schema()
+    app.run(debug=os.environ.get('SOCIFY_DEBUG') == '1', host=os.environ.get('SOCIFY_HOST', '127.0.0.1'), port=5000)
