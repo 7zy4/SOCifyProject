@@ -11,6 +11,7 @@ import os
 from functools import wraps
 import logging
 from detection_engine import evaluate_rules
+from incidents import incidents_api
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SOCIFY_SECRET_KEY') or os.urandom(32)
@@ -20,6 +21,7 @@ app.config['DATABASE'] = 'socify.db'
 # Initialize extensions
 CORS(app, origins=['http://localhost:5000', 'http://127.0.0.1:5000'])
 csrf = CSRFProtect(app)
+app.register_blueprint(incidents_api)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
