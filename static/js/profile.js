@@ -311,7 +311,7 @@ function handleEditProfile(e) {
     showNotification('تم تحديث الملف الشخصي بنجاح', 'success');
 }
 
-function handleChangePassword(e) {
+async function handleChangePassword(e) {
     e.preventDefault();
 
     const formData = new FormData(e.target);
@@ -330,13 +330,22 @@ function handleChangePassword(e) {
         return;
     }
 
-    // In a real implementation, validate current password and update
-    closeModal('changePasswordModal');
-
-    // Add to activity log
-    addActivityLog('password', 'تغيير كلمة المرور', 'تم تغيير كلمة المرور بنجاح');
-
-    showNotification('تم تغيير كلمة المرور بنجاح', 'success');
+    try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+        const response = await fetch('/api/profile/password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ current_password: currentPassword, new_password: newPassword })
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'فشل تغيير كلمة المرور');
+        closeModal('changePasswordModal');
+        e.target.reset();
+        addActivityLog('password', 'تغيير كلمة المرور', 'تم تغيير كلمة المرور بنجاح');
+        showNotification('تم تغيير كلمة المرور بنجاح', 'success');
+    } catch (error) {
+        showNotification(error.message, 'error');
+    }
 }
 
 // Preference updates

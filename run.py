@@ -35,8 +35,9 @@ def main():
     print("\n⏹️  اضغط Ctrl+C لإيقاف الخادم")
     
     try:
-        from app import app
-        app.run(debug=True, host='0.0.0.0', port=5000)
+        from app import app, ensure_phase1_schema
+        ensure_phase1_schema()
+        app.run(debug=os.environ.get('SOCIFY_DEBUG') == '1', host=os.environ.get('SOCIFY_HOST', '127.0.0.1'), port=5000)
     except KeyboardInterrupt:
         print("\n👋 تم إيقاف الخادم")
     except Exception as e:
