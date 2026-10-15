@@ -276,6 +276,33 @@ def register():
     
     return render_template('register.html')
 
+@app.route('/api/profile/password', methods=['POST'])
+@login_required
+def change_own_password():
+    """Verify current password before changing the logged-in user's credential."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Invalid JSON'}), 400
+    current = data.get('current_password')
+    new = data.get('new_password')
+    if not isinstance(current, str) or not isinstance(new, str) or not 8 <= len(new) <= 128:
+        return jsonify({'error': 'Password must be 8-128 characters'}), 400
+    conn = get_db_connection()
+    try:
+        user = conn.execute('SELECT password_hash FROM users WHERE id = ? AND is_active = 1',
+                            (session['user_id'],)).fetchone()
+        if not user or not bcrypt.checkpw(current.encode('utf-8'), user['password_hash'].encode('utf-8')):
+            return jsonify({'error': 'Current password is incorrect'}), 403
+        password_hash = bcrypt.hashpw(new.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        conn.execute('UPDATE users SET password_hash = ? WHERE id = ?',
+                     (password_hash, session['user_id']))
+        conn.commit()
+    finally:
+        conn.close()
+    log_audit(session['user_id'], 'password_change', 'users', session['user_id'])
+    return jsonify({'message': 'Password changed successfully'})
+
+
 @app.route('/logout')
 def logout():
     """User logout"""
