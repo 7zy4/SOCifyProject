@@ -153,6 +153,11 @@ def lab():
     """Security simulation lab"""
     return render_template('lab.html')
 
+@app.route('/incidents')
+@login_required
+def incidents_page():
+    return render_template('incidents.html')
+
 @app.route('/rules')
 @login_required
 def rules():
