@@ -34,16 +34,13 @@ def get_db_connection():
     return conn
 
 def init_db():
-    """Initialize database only if absent; never discard existing investigation data."""
+    """Initialize a fresh demo database without deleting existing data."""
     if os.path.exists(app.config['DATABASE']):
         return
-    conn = get_db_connection()
-    try:
-        with open(os.path.join(os.path.dirname(__file__), 'schema.sql'), encoding='utf-8') as file:
-            conn.executescript(file.read())
-        conn.commit()
-    finally:
-        conn.close()
+    # create_database seeds users with valid bcrypt hashes.
+    import create_db
+    create_db.create_database()
+
 
 
 def ensure_phase1_schema():
