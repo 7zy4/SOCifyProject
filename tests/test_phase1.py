@@ -112,6 +112,22 @@ class PhaseOneTests(unittest.TestCase):
         self.assertNotIn("private-token", response.get_data(as_text=True))
         self.assertNotIn("api_key", response.json[0])
 
+    def test_password_change_rejects_wrong_password_and_accepts_correct(self):
+        self.auth(2)
+        rejected = self.client.post("/api/profile/password", json={
+            "current_password": "incorrect",
+            "new_password": "updated-strong-password"})
+        self.assertEqual(rejected.status_code, 403)
+        accepted = self.client.post("/api/profile/password", json={
+            "current_password": "testpassword",
+            "new_password": "updated-strong-password"})
+        self.assertEqual(accepted.status_code, 200)
+        with sqlite3.connect(app.config["DATABASE"]) as db:
+            password_hash = db.execute(
+                "SELECT password_hash FROM users WHERE id = 2").fetchone()[0]
+        self.assertTrue(bcrypt.checkpw(b"updated-strong-password",
+                                       password_hash.encode()))
+
     def test_anonymous_incidents_returns_401(self):
         self.assertEqual(self.client.get("/api/incidents").status_code, 401)
 
