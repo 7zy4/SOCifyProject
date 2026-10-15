@@ -111,3 +111,44 @@ INSERT OR IGNORE INTO rules (name, description, condition_type, condition_value,
 ('Multiple Failed Logins', 'Detect multiple failed login attempts', 'failed_login_count', '{"threshold": 5, "timeframe": "10m"}', 'create_event', '{"severity": "high", "category": "authentication"}', 1),
 ('Suspicious Network Activity', 'Detect unusual network patterns', 'network_anomaly', '{"threshold": 0.8}', 'create_event', '{"severity": "medium", "category": "network"}', 1),
 ('Critical System Error', 'Detect critical system errors', 'error_level', '{"level": "critical"}', 'create_event', '{"severity": "critical", "category": "system"}', 1);
+
+-- Phase 1: deduplicated detection matches and investigation cases.
+CREATE TABLE IF NOT EXISTS detection_matches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rule_id INTEGER NOT NULL REFERENCES rules(id),
+    event_id INTEGER NOT NULL REFERENCES security_events(id),
+    alert_event_id INTEGER NOT NULL REFERENCES security_events(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(rule_id, event_id)
+);
+
+CREATE TABLE IF NOT EXISTS incidents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title VARCHAR(255) NOT NULL,
+    description TEXT DEFAULT '',
+    severity VARCHAR(20) NOT NULL DEFAULT 'medium'
+      CHECK (severity IN ('critical', 'high', 'medium', 'low')),
+    status VARCHAR(20) NOT NULL DEFAULT 'open'
+      CHECK (status IN ('open', 'investigating', 'resolved', 'false_positive')),
+    assigned_to INTEGER REFERENCES users(id),
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS incident_events (
+    incident_id INTEGER NOT NULL REFERENCES incidents(id),
+    event_id INTEGER NOT NULL REFERENCES security_events(id),
+    PRIMARY KEY (incident_id, event_id)
+);
+
+CREATE TABLE IF NOT EXISTS incident_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    incident_id INTEGER NOT NULL REFERENCES incidents(id),
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    note TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status);
+CREATE INDEX IF NOT EXISTS idx_incidents_assigned ON incidents(assigned_to);
