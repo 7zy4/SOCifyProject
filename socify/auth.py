@@ -153,7 +153,7 @@ def _login_response(data: dict[str, Any]):
 @auth_api.get("/login")
 def login_page():
     if current_user():
-        return redirect(url_for("ui.dashboard"))
+        return redirect("/dashboard")
     return render_template("login.html", csrf_token=generate_csrf())
 
 
@@ -165,7 +165,7 @@ def login_form():
     if isinstance(response, tuple):
         flash("تعذر تسجيل الدخول. تحقق من البيانات أو انتظر قبل المحاولة", "error")
         return redirect(url_for("auth.login_page"))
-    return redirect(url_for("ui.dashboard"))
+    return redirect("/dashboard")
 
 
 @auth_api.post("/api/auth/login")
