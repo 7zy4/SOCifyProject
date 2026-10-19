@@ -1,0 +1,6 @@
+<Events xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <Event>
+    <System><EventID>1</EventID><TimeCreated SystemTime="2026-10-15T01:40:00Z"/><Computer>ws-training-01</Computer></System>
+    <EventData><Data Name="RuleName">Synthetic process creation</Data><Data Name="Image">C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe</Data><Data Name="ParentImage">C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE</Data><Data Name="User">TRAINING\amina</Data></EventData>
+  </Event>
+</Events>

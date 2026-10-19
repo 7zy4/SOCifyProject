@@ -6,7 +6,7 @@ This branch implements the initial foundation of SOCify's first delivery phase.
 
 ```bash
 pip install -r requirements.txt
-export SOCIFY_SECRET_KEY='replace-with-a-long-random-secret'
+export SOCIFY_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 python run.py
 ```
 

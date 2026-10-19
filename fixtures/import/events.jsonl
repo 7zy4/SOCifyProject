@@ -1,0 +1,2 @@
+{"external_id":"jsonl-1","event_time":"2026-10-15T01:10:00Z","source":"fixture-jsonl","event_type":"web_request","severity":"medium","source_ip":"192.0.2.20","http_status":401,"title":"Unauthorized request"}
+{"external_id":"jsonl-2","event_time":"2026-10-15T01:11:00Z","source":"fixture-jsonl","event_type":"system_error","category":"system","severity":"critical","hostname":"app-training-01","title":"Critical training service error"}

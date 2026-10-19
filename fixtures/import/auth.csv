@@ -1,0 +1,6 @@
+event_time,source,event_type,severity,source_ip,username,hostname,action,outcome,title
+2026-10-15T01:00:00Z,fixture-auth,failed_login,high,198.51.100.20,amina,idp-training-01,login,failed,Failed login one
+2026-10-15T01:01:00Z,fixture-auth,failed_login,high,198.51.100.20,amina,idp-training-01,login,failed,Failed login two
+2026-10-15T01:02:00Z,fixture-auth,failed_login,high,198.51.100.20,amina,idp-training-01,login,failed,Failed login three
+2026-10-15T01:03:00Z,fixture-auth,failed_login,high,198.51.100.20,amina,idp-training-01,login,failed,Failed login four
+2026-10-15T01:04:00Z,fixture-auth,failed_login,high,198.51.100.20,amina,idp-training-01,login,failed,Failed login five

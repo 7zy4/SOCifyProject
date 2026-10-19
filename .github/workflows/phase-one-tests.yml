@@ -13,6 +13,5 @@ jobs:
         with:
           python-version: '3.11'
       - run: python -m pip install -r requirements.txt
+      - run: echo "SOCIFY_SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(48))')" >> "$GITHUB_ENV"
       - run: python -m unittest discover -s tests -v
-        env:
-          SOCIFY_SECRET_KEY: ci-only-test-secret

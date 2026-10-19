@@ -1,133 +1,90 @@
-# 🛡️ SOCify - SOC Simulation Platform
+# SOCify
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
-![Flask](https://img.shields.io/badge/Flask-2.3.3-green)
-![Security](https://img.shields.io/badge/Security-Simulation-red)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+SOCify منصة عربية مفتوحة المصدر لتدريب محللي مراكز العمليات الأمنية داخل بيئة محاكاة معزولة. تربط المنصة الاستيراد والتطبيع بقواعد الكشف والتنبيهات والتحقيقات وMITRE ATT&CK والصيد والرسم الزمني وخطط الاستجابة والتقييم، مع حفظ مصدر الدليل وسجل التدقيق.
 
-##  Overview
-**SOCify** is a comprehensive and advanced **Security Operations Center (SOC)** simulation platform. It is designed to provide a realistic, safe environment for security analysts to practice threat detection, analysis, and response without risking actual infrastructure.
+## التشغيل السريع
 
-###  The Problem & Solution
-* **The Problem:** The lack of practical, hands-on training environments for SOC analysts, with most education relying heavily on theory.
-* **The Solution:** SOCify offers an isolated sandbox environment that simulates real-world attacks (e.g., DDoS, SQLi) and allows users to analyze logs and take action.
+يتطلب التشغيل Python 3.12 أو أحدث. لا توجد حسابات افتراضية في الإنتاج ولا تُنشأ بيانات تجريبية دون طلب صريح.
 
----
-
-##  Key Features
-
-### 1.  Advanced Role-Based Access Control (RBAC)
-* **Security Analyst:** Monitor events, analyze threats, and add investigation notes.
-* **SOC Manager:** Manage detection rules, oversee team performance, and view reports.
-* **System Admin:** Full system control and database management.
-
-### 2.  Simulation Lab
-The platform generates realistic attack scenarios for training purposes:
-*  **Web Attacks:** SQL Injection, XSS, CSRF, Directory Traversal.
-*  **Network Attacks:** DDoS, DoS, Port Scanning.
-*  **Auth Attacks:** Brute Force, Credential Stuffing.
-*  **Social Eng:** Phishing simulation.
-
-### 3.  Rules Engine & Automation
-* Custom detection rules creation.
-* Automated alerting based on thresholds.
-* Incident severity classification (Critical, High, Medium, Low).
-
----
-
-##  Tech Stack
-
-### Backend
-* **Language:** Python 3.x
-* **Framework:** Flask
-* **Database:** SQLite (SQLAlchemy)
-* **Security:** Bcrypt (Hashing), CSRF Protection
-
-### Frontend
-* **Design:** HTML5, CSS3 (Custom Dashboard Design)
-* **Interactivity:** JavaScript (ES6+)
-* **Visualization:** Real-time Logs & Charts
-
----
-
-## 📂 Project Structure
-
-```text
-SOCify/
-├── app.py             # Main Application (Flask)
-├── create_db.py       # Database Initialization Script
-├── socify.db          # SQLite Database
-├── requirements.txt   # Python Dependencies
-├── templates/         # HTML Templates (Dashboard, Lab, Login...)
-├── static/            # Static Assets (CSS, JS, Images)
-└── README.md          # Project Documentation
-
-```
-
----
-
-##  Installation Guide
-
-Follow these steps to run the project locally:
-
-1. **Clone the Repository:**
 ```bash
-git clone [https://github.com/YourUsername/SOCify-Project.git](https://github.com/YourUsername/SOCify-Project.git)
-cd SOCify-Project
-
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install -r requirements.txt
+export SOCIFY_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+export SOCIFY_CREDENTIAL_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+export SOCIFY_DATABASE="$PWD/instance/socify.db"
+mkdir -p instance
+python create_db.py
+gunicorn --config gunicorn.conf.py app:app
 ```
 
+افتح `http://127.0.0.1:5000`. التسجيل متاح افتراضيًا في بيئة `development` وينشئ دور `analyst` فقط.
 
-2. **Install Dependencies:**
+## بيانات تطوير صريحة
+
+يمكن إنشاء مستخدمين وسيناريو وقواعد وPlaybook اصطناعية في بيئة التطوير فقط:
+
 ```bash
-pip install -r requirements.txt
-
+export SOCIFY_ENV=development
+export SOCIFY_SEED_DEMO=1
+export SOCIFY_DEMO_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
+python create_db.py
+printf 'Temporary demo password: %s\n' "$SOCIFY_DEMO_PASSWORD"
 ```
 
+الحسابات المنشأة موثقة في `socify/seeding.py`، وجميع المؤشرات تستخدم نطاقات التوثيق المحجوزة أو نطاق `.test`. لا ترسل السيناريوهات رسائل ولا تتصل بخدمات عامة.
 
-3. **Initialize Database:**
+## الاختبارات والبوابات
+
 ```bash
-python init_db.py
-
+python -m pip install -r requirements-dev.txt
+ruff check .
+mypy socify scripts
+pytest --cov=socify --cov-report=term-missing --cov-report=xml
+bandit -r socify scripts -q
+pip-audit -r requirements.txt
 ```
 
+توجد اختبارات الوحدات والتكامل والأمن والقبول في `tests/`. يثبت CI المتصفح ثم يشغل Playwright على واجهة RTL. لا تُعامل أي بوابة أمن Critical/High كاختبار اختياري.
 
-*(This script creates the tables and populates them with demo data)*
-4. **Run the Server:**
+## Docker
+
 ```bash
-python run.py
-
+export SOCIFY_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+export SOCIFY_CREDENTIAL_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+docker compose up --build
 ```
 
+الخدمة مربوطة بـ`127.0.0.1` افتراضيًا، تعمل كمستخدم غير root، وتستخدم Volume مستمرًا وقاعدة ملفات للقراءة فقط عدا `/data` و`/tmp`. النشر العام يحتاج Reverse Proxy موثوقًا وTLS ونسخًا احتياطية ومراقبة.
 
-5. **Access the Platform:**
-Open your browser and navigate to: `http://localhost:5000`
+## Codespaces
 
----
+افتح المستودع في Codespaces؛ يثبت Dev Container الاعتمادات، يرحّل القاعدة، ويشغل Gunicorn على المنفذ 5000 بظهور `Private`. التفاصيل في [دليل Codespaces](docs/codespaces.md).
 
-##  Demo Credentials
+## البيانات والتكاملات
 
-| Role | Email | Password |
-| --- | --- | --- |
-| **Admin** | `admin@socify.local` | `admin123` |
-| **Manager** | `manager@socify.local` | `password123` |
-| **Analyst** | `analyst1@socify.local` | `password123` |
+- CSV وJSON Array وJSONL/NDJSON وSyslog RFC3164/5424 وسجلات Linux auth وApache/Nginx وSysmon XML وEVTX.
+- raw evidence وSHA-256 وprovenance وidempotency ومهام استيراد مع المقبول والمرفوض والمتكرر.
+- موصل HTTP في وضع Default Deny؛ لا يُجري اتصالًا ما لم يكن المضيف في قائمة السماح والعامل المعزول مهيأ. نتيجة الاختبار `unsupported` أو `not_configured` صادقة.
+- ATT&CK snapshot مرجعي يعمل دون اتصال، مع أداة تحميل STIX 2.1 كاملة في `scripts/load_attack_snapshot.py`.
 
->  **Note:** These credentials are for demonstration purposes only. Please change them in a production environment.
+## التوثيق
 
----
+- [الهندسة وقرارات التصميم](docs/architecture.md)
+- [نموذج البيانات](docs/data-model.md)
+- [عقد OpenAPI](docs/openapi.yaml)
+- [دليل الأمان](docs/security-guide.md)
+- [Threat Model](docs/threat-model.md)
+- [دليل المحلل](docs/analyst-guide.md)
+- [دليل المدرّب](docs/instructor-guide.md)
+- [التشغيل والنسخ الاحتياطي](docs/operations.md)
+- [خطة الاختبار](docs/qa/test-plan.md)
+- [مصفوفة التتبّع](docs/qa/requirements-traceability.csv)
 
-##  Support & Issues
+## الإفصاح الأمني
 
-If you encounter any bugs or issues, please feel free to open an **Issue** here on GitHub.
+راجع [SECURITY.md](SECURITY.md). لا تضع ثغرات أو بيانات اعتماد في Issues عامة.
 
----
+## الترخيص
 
-##  Author
-
-Developed by **Mohammad Alqarni**.
-
-* **LinkedIn:** [Mohammad Alqarni](https://www.linkedin.com/in/mohammad-alqarni-sec?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=ios_app)
-* **Email:** mohammad.aqarni.10@gmail.com
-
-All Rights Reserved © 2025 SOCify
+الكود تحت رخصة MIT. بيانات ATT&CK تخضع لشروط MITRE المبينة في [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

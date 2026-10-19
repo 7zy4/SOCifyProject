@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <meta name="section" content="{{ section }}">
+  <title>SOCify | مركز العمليات</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</head>
+<body class="app-shell">
+  <a class="skip-link" href="#workspace">انتقل إلى مساحة العمل</a>
+  <aside class="sidebar" aria-label="تنقل المنصة">
+    <a class="brand" href="{{ url_for('ui.dashboard') }}"><span class="brand-mark" aria-hidden="true">S</span><span>SOCify</span></a>
+    <nav id="primary-nav">
+      <a data-section="dashboard" href="/dashboard"><span aria-hidden="true">⌂</span>نظرة عامة</a>
+      <a data-section="events" href="/events"><span aria-hidden="true">≋</span>مستكشف السجلات</a>
+      <a data-section="alerts" href="/alerts"><span aria-hidden="true">!</span>التنبيهات</a>
+      <a data-section="rules" href="/rules"><span aria-hidden="true">⟐</span>قواعد الكشف</a>
+      <a data-section="sources" href="/sources"><span aria-hidden="true">⇣</span>المصادر</a>
+      <a data-section="imports" href="/imports"><span aria-hidden="true">↥</span>مركز الاستيراد</a>
+      <a data-section="incidents" href="/incidents"><span aria-hidden="true">◇</span>التحقيقات</a>
+      <a data-section="lab" href="/lab"><span aria-hidden="true">▶</span>المختبر</a>
+      <a data-section="attack" href="/attack"><span aria-hidden="true">▦</span>MITRE ATT&amp;CK</a>
+      <a data-section="hunt" href="/hunt"><span aria-hidden="true">⌕</span>الصيد</a>
+      <a data-section="graph" href="/graph"><span aria-hidden="true">⌘</span>الرسم الزمني</a>
+      <a data-section="playbooks" href="/playbooks"><span aria-hidden="true">▷</span>Playbooks</a>
+      <a data-section="scores" href="/scores"><span aria-hidden="true">⌁</span>التقييم</a>
+      <a data-section="audit" href="/audit"><span aria-hidden="true">✓</span>التدقيق</a>
+      <a data-section="admin" href="/admin"><span aria-hidden="true">⚙</span>الإدارة</a>
+    </nav>
+    <div class="sidebar-foot"><span class="status-dot" aria-hidden="true"></span><span>بيئة تدريب معزولة</span></div>
+  </aside>
+  <div class="app-main">
+    <header class="topbar">
+      <button id="menu-toggle" class="icon-button" type="button" aria-label="فتح القائمة" aria-expanded="false">☰</button>
+      <div><p id="section-kicker" class="eyebrow">SECURITY OPERATIONS</p><h1 id="section-title">مركز العمليات</h1></div>
+      <div class="user-menu"><span><strong>{{ user.name }}</strong><small>{{ user.role }} · {{ user.team or '—' }}</small></span><a class="avatar" href="/profile" aria-label="الملف الشخصي">{{ user.name[:1] }}</a><form method="post" action="{{ url_for('auth.logout_page') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button ghost compact" type="submit">خروج</button></form></div>
+    </header>
+    <div id="global-message" class="global-message" role="status" aria-live="polite" hidden></div>
+    <main id="workspace" tabindex="-1" aria-busy="true"><div class="loading"><span></span><p>جارٍ تحميل البيانات المصرّح بها…</p></div></main>
+  </div>
+</body>
+</html>

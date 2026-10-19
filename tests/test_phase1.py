@@ -1,11 +1,10 @@
-"""Focused phase-one integration checks; run with python -m unittest discover -s tests."""
 import os
 import sqlite3
 import tempfile
 import unittest
-from unittest.mock import patch
 
 import bcrypt
+
 from app import app, ensure_phase1_schema
 
 
@@ -18,7 +17,6 @@ class PhaseOneTests(unittest.TestCase):
         app.config.update(DATABASE=os.path.join(self.temp.name, "test.db"),
                           TESTING=True, WTF_CSRF_ENABLED=False)
         with sqlite3.connect(app.config["DATABASE"]) as db:
-            # Test fixtures avoid seeded credentials from the demo initializer.
             db.executescript("""
             CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, name TEXT,
                 password_hash TEXT, role TEXT, is_active INTEGER DEFAULT 1);

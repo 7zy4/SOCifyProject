@@ -1,0 +1,52 @@
+name: Enterprise Quality Gates
+
+on:
+  pull_request:
+  push:
+    branches:
+      - feature/enterprise-platform-implementation
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements.txt -r requirements-dev.txt
+      - run: python -m ruff check .
+      - run: python -m mypy socify scripts app.py create_db.py init_db.py run.py
+      - run: python -m scripts.generate_openapi
+      - run: git diff --exit-code docs/api/openapi.yaml
+      - run: python -m pytest -q --cov=socify --cov-branch --cov-report=xml --cov-fail-under=90
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements.txt -r requirements-dev.txt
+      - run: python -m bandit -c pyproject.toml -r socify scripts app.py create_db.py init_db.py run.py
+      - run: python -m pip_audit -r requirements.txt
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements.txt -r requirements-dev.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: python -m pytest -m e2e tests/e2e

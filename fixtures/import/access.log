@@ -1,0 +1,2 @@
+192.0.2.55 - amina [15/Oct/2026:01:35:00 +0000] "GET /training/login HTTP/1.1" 401 120 "-" "SOCify-Fixture/1.0"
+192.0.2.55 - amina [15/Oct/2026:01:35:01 +0000] "POST /training/login HTTP/1.1" 200 320 "-" "SOCify-Fixture/1.0"

@@ -1,0 +1,27 @@
+services:
+  socify:
+    build:
+      context: .
+      target: runtime
+    environment:
+      SOCIFY_ENV: production
+      SOCIFY_SECRET_KEY: ${SOCIFY_SECRET_KEY:?Set SOCIFY_SECRET_KEY to a random value of at least 32 bytes}
+      SOCIFY_CREDENTIAL_KEY: ${SOCIFY_CREDENTIAL_KEY:?Set SOCIFY_CREDENTIAL_KEY to a separate random value}
+      SOCIFY_DATABASE: /data/socify.db
+      SOCIFY_HTTPS: "0"
+      SOCIFY_TRUSTED_HOSTS: localhost,127.0.0.1
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - socify-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+volumes:
+  socify-data:

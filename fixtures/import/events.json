@@ -1,0 +1,4 @@
+[
+  {"external_id":"json-1","event_time":"2026-10-15T01:20:00Z","source":"fixture-json","event_type":"phishing_email","category":"email","severity":"medium","username":"amina","title":"Synthetic phishing email"},
+  {"external_id":"json-2","event_time":"2026-10-15T01:21:00Z","source":"fixture-json","event_type":"failed_login","category":"authentication","severity":"high","source_ip":"198.51.100.44","username":"amina","title":"Synthetic credential misuse"}
+]
