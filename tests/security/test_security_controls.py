@@ -202,6 +202,15 @@ def test_training_run_object_scope_hides_another_trainee(
     login_as("analyst")
     assert client.get(f"/api/training/runs/{run_id}").status_code == 404
     assert client.get(f"/api/training/runs/{run_id}/score").status_code == 404
+    login_as("admin")
+    created = client.post("/api/events", json={"source": "private-instructor-source", "title": "Private training event", "training_run_id": run_id})
+    assert created.status_code == 201
+    login_as("analyst")
+    dashboard = client.get("/api/dashboard").json
+    assert all(item["source"] != "private-instructor-source" for item in dashboard["top_sources"])
+    assert all(item["source"] != "private-instructor-source" for item in client.get("/api/stats").json["top_sources"])
+    login_as("admin")
+    assert any(item["source"] == "private-instructor-source" for item in client.get("/api/dashboard").json["top_sources"])
 
 
 def test_source_secret_is_encrypted_and_redacted_from_audit(

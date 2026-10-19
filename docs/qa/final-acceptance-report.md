@@ -6,13 +6,15 @@ This report is intentionally evidence-driven. A feature implementation is not tr
 
 ## Current local evidence
 
-- Functional and security test suite: 112 passed, 0 failed, 1 browser test deselected locally.
+- Previous published head adcbf712f0b10d43f24d0c9eb007488e24f34cc7: 113 passed, 1 browser test deselected in the quality job.
 - Combined statement and branch coverage: 79% on the current working tree; the required 90% gate is not yet met.
 - Ruff: pass.
 - mypy: pass for application and operational code.
-- Bandit: no findings after excluding B608. B608 is handled as a reviewed false-positive class because every dynamic SQL fragment is selected from server-owned allowlists; SQL injection regression tests remain mandatory.
+- Bandit currently excludes B608 globally. A clean run therefore does not establish absence of SQL injection; individual query review and removal or justification of exclusions remain required.
 - Browser: not verified locally because Chromium cannot start in the restricted execution container. The dedicated GitHub Actions browser job is mandatory and is not allowed to continue on error.
-- Critical and high security findings: none observed in the completed local checks. SCA and the remote browser job remain unverified until GitHub Actions finishes.
+- Remote security and single browser smoke jobs passed on the previous published head. They do not establish complete security or the required end-to-end journey coverage.
+- A confidentiality regression was reproduced: dashboard source aggregates exposed another trainee's source name. The query now applies the training-run visibility filter, with negative and privileged-access regression assertions.
+- Requirements traceability, import recovery, full API contract validation, load/soak and backup recovery acceptance remain incomplete or unverified. No claim of complete confidentiality, integrity, availability, or merge readiness is made.
 
 ## Gate decision
 
