@@ -50,7 +50,7 @@ def test_browser_training_requires_explicit_assessment_submission(app) -> None:
             page.get_by_role("button", name="بدء جلسة").first.click()
             page.get_by_role("button", name="تسليم التقييم بعد التحقيق").first.wait_for()
             page.goto(base + "/scores")
-            assert page.get_by_text("لا توجد نتائج", exact=True).first.is_visible()
+            page.get_by_text("لا توجد نتائج", exact=True).first.wait_for(state="visible")
             page.goto(base + "/lab")
             page.get_by_role("button", name="تسليم التقييم بعد التحقيق").first.click()
             page.get_by_text("تم اعتماد المحاولة وحساب الدرجة", exact=False).wait_for()
