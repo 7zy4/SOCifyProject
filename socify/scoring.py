@@ -89,7 +89,7 @@ def _learner_evidence(
 ) -> set[tuple[str, str]]:
     rows = connection.execute(
         """SELECT ta.target_id, tre.step_id, e.source_ip, e.destination_ip, e.username,
-                  e.hostname, e.process_name, e.parent_process, e.file_hash, e.raw_payload
+                  e.hostname, e.process_name, e.parent_process, e.file_hash, e.raw_data
            FROM trainee_actions ta
            JOIN training_run_events tre ON tre.run_id = ta.run_id AND
                 CAST(tre.event_id AS TEXT) = ta.target_id
@@ -100,7 +100,7 @@ def _learner_evidence(
     ).fetchall()
     matched: set[tuple[str, str]] = set()
     for row in rows:
-        raw = json.loads(row["raw_payload"] or "{}")
+        raw = json.loads(row["raw_data"] or "{}")
         for step, field in expected:
             if step != row["step_id"]:
                 continue
