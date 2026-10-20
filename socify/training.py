@@ -25,7 +25,8 @@ SCENARIO_STATES = {
 }
 RUN_STATES = {
     "ready": {"running", "cancelled"},
-    "running": {"paused", "completed", "failed", "cancelled"},
+    "running": {"paused", "awaiting_submission", "failed", "cancelled"},
+    "awaiting_submission": {"completed", "cancelled"},
     "paused": {"running", "cancelled"},
     "completed": {"archived"},
     "failed": {"archived"},
@@ -334,15 +335,41 @@ def _play_run(run_id: int, steps_requested: int):
         current = int(get_db().execute("SELECT current_step FROM training_runs WHERE id = ?", (run_id,)).fetchone()[0])
         completed = current >= total_steps
         if completed:
-            get_db().execute("UPDATE training_runs SET state = 'completed', completed_at = ? WHERE id = ?", (iso_now(), run_id))
-            record_training_action(get_db(), run_id, run["user_id"], "run_completed", "training_run", run_id, {}, f"run-complete:{run_id}")
+            get_db().execute("UPDATE training_runs SET state = 'awaiting_submission', completed_at = ? WHERE id = ?", (iso_now(), run_id))
+            record_training_action(get_db(), run_id, run["user_id"], "playback_finished", "training_run", run_id, {}, f"playback-finish:{run_id}")
         record_audit(get_db(), "play", "training_run", run_id, details={"steps": len(steps), "events": len(generated_events), "alerts": len(generated_alerts), "completed": completed})
         insert_outbox(get_db(), run["workspace_id"], "training_run.updated", {"id": run_id, "current_step": current, "completed": completed})
-    response: dict[str, Any] = {"id": run_id, "state": "completed" if completed else "running", "current_step": current, "total_steps": total_steps, "event_ids": generated_events, "alert_ids": generated_alerts}
+    response: dict[str, Any] = {"id": run_id, "state": "awaiting_submission" if completed else "running", "current_step": current, "total_steps": total_steps, "event_ids": generated_events, "alert_ids": generated_alerts}
     if completed:
-        from .scoring import calculate_assessment
-        response["assessment"] = calculate_assessment(get_db(), run_id)
+        response["assessment_status"] = "awaiting_submission"
     return jsonify(response)
+
+
+@training_api.post("/api/training/runs/<int:run_id>/submit")
+@require_permission("training.run")
+def submit_run(run_id: int):
+    run = _run_access(run_id)
+    if not run:
+        return error_response("RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
+    if int(run["user_id"]) != actor_id():
+        return error_response("PERMISSION_DENIED", "لا يمكنك تسليم جلسة متدرب آخر", 403)
+    if run["state"] not in {"awaiting_submission", "completed"}:
+        return error_response("RUN_NOT_READY_FOR_SUBMISSION", "يجب إنهاء عرض السيناريو أولًا", 409)
+    from .scoring import calculate_assessment
+    if run["state"] == "completed" and run["submitted_at"]:
+        return jsonify({"state": "completed", "assessment": calculate_assessment(get_db(), run_id)})
+    with transaction():
+        updated = get_db().execute(
+            "UPDATE training_runs SET state = 'completed', submitted_at = ? WHERE id = ? AND state = 'awaiting_submission' AND submitted_at IS NULL",
+            (iso_now(), run_id),
+        )
+        if updated.rowcount != 1:
+            return error_response("RUN_SUBMISSION_CONFLICT", "تم تسليم المحاولة سابقًا أو تغيّرت حالتها", 409)
+        record_training_action(get_db(), run_id, actor_id(), "run_submitted", "training_run", run_id, {}, f"run-submit:{run_id}")
+        assessment = calculate_assessment(get_db(), run_id)
+        record_audit(get_db(), "submit", "training_run", run_id, details={"assessment_id": assessment["id"]})
+        insert_outbox(get_db(), workspace_id(), "training_run.submitted", {"id": run_id, "assessment_id": assessment["id"]})
+    return jsonify({"state": "completed", "assessment": assessment})
 
 
 @training_api.post("/api/training/runs/<int:run_id>/play")
