@@ -82,3 +82,18 @@ GitHub connector access used for this audit supports branch creation, files, and
 ## Release criteria
 
 No GO before 100% critical P0, >=99% weighted acceptance supported by real evidence, zero unmitigated critical/high findings, required CI passes on final HEAD, demonstrable complete journeys, and measured performance/reliability. The current project remains a feature-rich but **unreleased development candidate**.
+
+## Revalidation against attached master requirements — 20 October 2026
+
+The supplied `SOCify_Enterprise_Master_Implementation_Prompt_AR(4).md` reiterates F01–F10, 132 traceability items, 60 browser E2E journeys, comment-free implementation, Secure SDLC, >/=99% weighted acceptance, 100% critical P0, and a strictly untouched `main` branch. Repository comparison on this review confirms:
+
+- `main` → Phase 1: 17 commits ahead, zero behind.
+- Phase 1 → enterprise: 5 commits ahead, zero behind.
+- Enterprise → canonical: 5 commits ahead, zero behind.
+- `master` cannot be compared to `main` by ancestry: unrelated Git history. Review but do not import independently.
+- PR #1 and PR #2 are closed, unmerged. PR #3 is the only open draft review, with base `main` and head the canonical branch. The fact its target is `main` does not change `main` until an explicit merge.
+- All six configured quality/security/browser checks were green on the canonical head at the start of this reconciliation. They are *not* sufficient to certify the mandatory 99% release gate, and any new commit requires fresh CI.
+
+**Canonical development copy:** `feature/socify-browser-review-2026-10-20`. The phase-one and enterprise refs are preserved as historical ancestors rather than erased; no separate implementation from those branches needs to be cherry-picked. The legacy `master` ref is preserved for forensic review only and not merged because of unrelated history and potential tracked database/runtime artifacts. Repository connector access does not support removing those refs; archive or remove them in GitHub UI later only after independent verification and backup.
+
+**Release verdict remains NO-GO**, unchanged from `docs/qa/final-acceptance-report.md`: current documented 30.29% weighted acceptance, with 8 categories of unresolved release blockers, despite configured CI green. The 132/60 figures are coverage targets from the specification, not proof of having passed every requirement. Use only the canonical branch for browser-based trial and all future changes; keep `main` unchanged.
