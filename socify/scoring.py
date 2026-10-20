@@ -20,94 +20,225 @@ def _bounded(value: float) -> float:
     return round(min(max(value, 0.0), 100.0), 4)
 
 
+def _training_ground_truth(connection: sqlite3.Connection, scenario_version_id: int) -> tuple[set[tuple[str, str]], set[tuple[str, str]], set[str]]:
+    rows = connection.execute(
+        "SELECT step_id, expected_detections, relevant_evidence, allowed_responses FROM scenario_ground_truth WHERE scenario_version_id = ?",
+        (scenario_version_id,),
+    ).fetchall()
+    detection_targets: set[tuple[str, str]] = set()
+    evidence_targets: set[tuple[str, str]] = set()
+    response_targets: set[str] = set()
+    for row in rows:
+        detection_targets.update((row["step_id"], str(value)) for value in json.loads(row["expected_detections"]))
+        evidence_targets.update((row["step_id"], str(value)) for value in json.loads(row["relevant_evidence"]))
+        response_targets.update(str(value) for value in json.loads(row["allowed_responses"]))
+    return detection_targets, evidence_targets, response_targets
+
+
+def _learner_detection_results(
+    connection: sqlite3.Connection, run_id: int, user_id: int, expected: set[tuple[str, str]],
+) -> tuple[set[tuple[str, str]], int, int, list[float]]:
+    rows = connection.execute(
+        """SELECT a.id AS alert_id, a.detected_at, r.name AS rule_name,
+                  tre.step_id, ta.action_type, ta.payload, ta.occurred_at, ta.id AS action_id
+           FROM alerts a JOIN rules r ON r.id = a.rule_id
+           LEFT JOIN alert_events ae ON ae.alert_id = a.id
+           LEFT JOIN training_run_events tre ON tre.event_id = ae.event_id AND tre.run_id = ?
+           LEFT JOIN trainee_actions ta ON ta.run_id = ? AND ta.user_id = ?
+                AND ta.target_type = 'alert' AND ta.target_id = CAST(a.id AS TEXT)
+                AND ta.action_type = 'alert_triage'
+           WHERE a.training_run_id = ?
+           ORDER BY a.id, ta.id""",
+        (run_id, run_id, user_id, run_id),
+    ).fetchall()
+    alerts: dict[int, dict[str, Any]] = {}
+    for row in rows:
+        item = alerts.setdefault(
+            int(row["alert_id"]),
+            {"name": str(row["rule_name"]), "steps": set(), "decision": None, "detected_at": row["detected_at"], "triaged_at": None},
+        )
+        if row["step_id"]:
+            item["steps"].add(str(row["step_id"]))
+        if row["action_id"] is not None:
+            if item["decision"] is None or int(row["action_id"]) >= int(item["decision"][0]):
+                payload = json.loads(row["payload"])
+                item["decision"] = (int(row["action_id"]), payload.get("status"))
+                item["triaged_at"] = row["occurred_at"]
+    matched: set[tuple[str, str]] = set()
+    true_positive = 0
+    false_positive = 0
+    analyst_latency: list[float] = []
+    for item in alerts.values():
+        if item["decision"] is None or item["decision"][1] not in {"triaged", "investigating", "closed"}:
+            continue
+        candidates = {(step, item["name"]) for step in item["steps"]} & expected
+        unused = candidates - matched
+        if unused:
+            matched.add(sorted(unused)[0])
+            true_positive += 1
+        else:
+            false_positive += 1
+        if item["triaged_at"] and item["detected_at"]:
+            seconds = (parse_timestamp(item["triaged_at"]) - parse_timestamp(item["detected_at"])).total_seconds()
+            analyst_latency.append(max(seconds, 0.0))
+    return matched, true_positive, false_positive, analyst_latency
+
+
+def _learner_evidence(
+    connection: sqlite3.Connection, run_id: int, user_id: int, expected: set[tuple[str, str]],
+) -> set[tuple[str, str]]:
+    rows = connection.execute(
+        """SELECT ta.target_id, tre.step_id, e.source_ip, e.destination_ip, e.username,
+                  e.hostname, e.process_name, e.parent_process, e.file_hash, e.raw_payload
+           FROM trainee_actions ta
+           JOIN training_run_events tre ON tre.run_id = ta.run_id AND
+                CAST(tre.event_id AS TEXT) = ta.target_id
+           JOIN security_events e ON e.id = tre.event_id
+           WHERE ta.run_id = ? AND ta.user_id = ?
+             AND ta.action_type = 'evidence_added' AND ta.target_type = 'event'""",
+        (run_id, user_id),
+    ).fetchall()
+    matched: set[tuple[str, str]] = set()
+    for row in rows:
+        raw = json.loads(row["raw_payload"] or "{}")
+        for step, field in expected:
+            if step != row["step_id"]:
+                continue
+            if field in row.keys() and row[field] not in (None, ""):
+                matched.add((step, field))
+            elif isinstance(raw, dict) and raw.get(field) not in (None, ""):
+                matched.add((step, field))
+    return matched
+
+
+def _learner_responses(connection: sqlite3.Connection, run_id: int, user_id: int) -> set[str]:
+    rows = connection.execute(
+        """SELECT DISTINCT ps.action_type
+           FROM playbook_runs pr
+           JOIN playbook_step_runs psr ON psr.run_id = pr.id AND psr.status = 'succeeded'
+           JOIN playbook_steps ps ON ps.id = psr.step_id
+           WHERE pr.training_run_id = ? AND pr.requested_by = ? AND pr.state = 'succeeded'""",
+        (run_id, user_id),
+    ).fetchall()
+    return {str(row["action_type"]) for row in rows}
+
+
 def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[str, Any]:
-    existing = connection.execute("SELECT * FROM assessment_snapshots WHERE run_id = ? AND policy_version = 'socify-score-v1' ORDER BY revision DESC LIMIT 1", (run_id,)).fetchone()
+    policy_version = "socify-score-v2"
+    existing = connection.execute(
+        "SELECT * FROM assessment_snapshots WHERE run_id = ? AND policy_version = ? ORDER BY revision DESC LIMIT 1",
+        (run_id, policy_version),
+    ).fetchone()
     if existing:
         return assessment_view(existing)
     run = connection.execute("SELECT * FROM training_runs WHERE id = ?", (run_id,)).fetchone()
-    if not run or run["state"] != "completed":
-        raise ValueError("training run must be completed before scoring")
-    version = connection.execute("SELECT * FROM scenario_versions WHERE id = ?", (run["scenario_version_id"],)).fetchone()
+    if not run or run["state"] != "completed" or not run["submitted_at"]:
+        raise ValueError("training run requires explicit learner submission before scoring")
+    version = connection.execute(
+        "SELECT * FROM scenario_versions WHERE id = ?", (run["scenario_version_id"],)
+    ).fetchone()
     if version is None:
-        raise RuntimeError("scenario version is missing for completed training run")
-    ground_truth = connection.execute("SELECT * FROM scenario_ground_truth WHERE scenario_version_id = ?", (run["scenario_version_id"],)).fetchall()
-    expected_detections = sum(len(json.loads(row["expected_detections"])) for row in ground_truth)
-    expected_evidence = sum(len(json.loads(row["relevant_evidence"])) for row in ground_truth)
-    expected_responses = sum(len(json.loads(row["allowed_responses"])) for row in ground_truth)
-    alert_rows = connection.execute("SELECT status FROM alerts WHERE training_run_id = ?", (run_id,)).fetchall()
-    detected = len(alert_rows)
-    false_positives = sum(1 for row in alert_rows if row["status"] == "false_positive")
-    cases = connection.execute("SELECT id, status, created_at, closed_at FROM incident_cases WHERE training_run_id = ?", (run_id,)).fetchall()
-    case_ids = [int(row["id"]) for row in cases]
-    evidence_count = 0
-    if case_ids:
-        placeholders = ",".join("?" for _ in case_ids)
-        evidence_count = int(connection.execute(f"SELECT COUNT(*) FROM case_evidence WHERE case_id IN ({placeholders})", case_ids).fetchone()[0])
-    response_count = int(connection.execute("SELECT COUNT(*) FROM playbook_runs WHERE training_run_id = ? AND state = 'succeeded'", (run_id,)).fetchone()[0])
-    actions = int(connection.execute("SELECT COUNT(*) FROM trainee_actions WHERE run_id = ?", (run_id,)).fetchone()[0])
+        raise RuntimeError("scenario version is missing")
+    expected_detection, expected_evidence, expected_responses = _training_ground_truth(
+        connection, int(run["scenario_version_id"])
+    )
+    detected, true_positives, false_positives, latencies = _learner_detection_results(
+        connection, run_id, int(run["user_id"]), expected_detection
+    )
+    false_negatives = len(expected_detection - detected)
+    precision = true_positives / (true_positives + false_positives) if true_positives + false_positives else 0.0
+    recall = true_positives / len(expected_detection) if expected_detection else 1.0
+    evidence_found = _learner_evidence(connection, run_id, int(run["user_id"]), expected_evidence)
+    response_found = _learner_responses(connection, run_id, int(run["user_id"])) & expected_responses
+    cases = connection.execute(
+        "SELECT status, created_at, closed_at FROM incident_cases WHERE training_run_id = ? AND workspace_id = ?",
+        (run_id, run["workspace_id"]),
+    ).fetchall()
+    actions = connection.execute(
+        "SELECT action_type, payload FROM trainee_actions WHERE run_id = ? AND user_id = ? ORDER BY id",
+        (run_id, run["user_id"]),
+    ).fetchall()
+    transitions = [json.loads(action["payload"]).get("to") for action in actions if action["action_type"] == "case_transition"]
+    closed_cases = [case for case in cases if case["status"] == "closed"]
+    investigation_progress = (0.40 if cases else 0.0) + (
+        0.30 if any(status in {"triaged", "investigating", "contained", "recovered"} for status in transitions) else 0.0
+    ) + (0.30 if closed_cases else 0.0)
+    completed_at = parse_timestamp(run["submitted_at"])
+    started_at = parse_timestamp(run["started_at"])
+    elapsed_seconds = max((completed_at - started_at).total_seconds(), 0.0)
+    allowed_seconds = max(int(version["duration_minutes"]) * 60, 1)
     hints = int(run["hints_used"] or 0)
-    detection_recall = min(detected / expected_detections, 1.0) if expected_detections else 1.0
-    detection_precision = max((detected - false_positives) / detected, 0.0) if detected else 0.0
-    detection_score = _bounded(100 * detection_recall * detection_precision)
-    closed_cases = sum(1 for row in cases if row["status"] == "closed")
-    investigation_score = _bounded(100.0 if closed_cases else 70.0 if cases else 0.0)
-    evidence_score = _bounded(100 * min(evidence_count / max(expected_evidence, 1), 1.0))
-    response_score = _bounded(100 * min(response_count / max(expected_responses, 1), 1.0))
-    allowed_seconds = int(version["duration_minutes"]) * 60
-    elapsed_seconds = max((parse_timestamp(run["completed_at"]) - parse_timestamp(run["started_at"])).total_seconds(), 0)
-    time_score = _bounded(100 if elapsed_seconds <= allowed_seconds else 100 * allowed_seconds / max(elapsed_seconds, 1))
-    time_score = _bounded(time_score - hints * 5)
-    false_positive_score = _bounded(100 * (1 - false_positives / max(detected, 1)))
+    timing = _bounded((100 if elapsed_seconds <= allowed_seconds else 100 * allowed_seconds / max(elapsed_seconds, 1)) - 5 * hints)
+    false_positive_accuracy = (
+        _bounded(100 * (1 - false_positives / max(true_positives + false_positives, 1)))
+        if true_positives + false_positives else 0.0
+    )
+    case_resolution_seconds = [
+        max((parse_timestamp(case["closed_at"]) - parse_timestamp(case["created_at"])).total_seconds(), 0.0)
+        for case in closed_cases if case["closed_at"]
+    ]
+    metrics: dict[str, Any] = {
+        "true_positives": true_positives,
+        "false_positives": false_positives,
+        "false_negatives": false_negatives,
+        "detection_precision": round(precision, 4),
+        "detection_recall": round(recall, 4),
+        "false_positive_rate": round(false_positives / max(true_positives + false_positives, 1), 4),
+        "analyst_triage_latency_seconds": round(sum(latencies) / len(latencies), 3) if latencies else None,
+        "case_resolution_seconds": round(sum(case_resolution_seconds) / len(case_resolution_seconds), 3) if case_resolution_seconds else None,
+        "elapsed_seconds": round(elapsed_seconds, 3),
+        "actions": len(actions),
+        "hints_used": hints,
+    }
     components: dict[str, Any] = {
-        "detection": detection_score,
-        "investigation": investigation_score,
-        "response": response_score,
-        "evidence": evidence_score,
-        "time": time_score,
-        "false_positive": false_positive_score,
-        "metrics": {
-            "detection_recall": round(detection_recall, 4),
-            "detection_precision": round(detection_precision, 4),
-            "false_positive_rate": round(false_positives / max(detected, 1), 4),
-            "elapsed_seconds": round(elapsed_seconds, 3),
-            "actions": actions,
-            "hints_used": hints,
-        },
+        "detection": _bounded(100 * precision * recall),
+        "investigation": _bounded(100 * investigation_progress),
+        "response": _bounded(100 * len(response_found) / len(expected_responses)) if expected_responses else 100.0,
+        "evidence": _bounded(100 * len(evidence_found) / len(expected_evidence)) if expected_evidence else 100.0,
+        "time": timing,
+        "false_positive": false_positive_accuracy,
+        "metrics": metrics,
     }
     configured_weights = json.loads(version["scoring_policy"] or "{}")
     weights = {key: float(configured_weights.get(key, value)) for key, value in DEFAULT_WEIGHTS.items()}
-    if round(sum(weights.values()), 6) != 100:
+    if round(sum(weights.values()), 6) != 100 or any(weight < 0 or weight > 100 for weight in weights.values()):
         weights = dict(DEFAULT_WEIGHTS)
     total = _bounded(sum(float(components[key]) * weight / 100 for key, weight in weights.items()))
     inputs = {
         "run_id": run_id,
         "scenario_version_id": run["scenario_version_id"],
         "difficulty": run["difficulty"],
-        "expected_detections": expected_detections,
-        "expected_evidence": expected_evidence,
-        "expected_responses": expected_responses,
-        "detected_alerts": detected,
+        "expected_detections": len(expected_detection),
+        "expected_evidence": len(expected_evidence),
+        "expected_responses": len(expected_responses),
+        "matched_detection_targets": sorted([list(item) for item in detected]),
+        "matched_evidence_targets": sorted([list(item) for item in evidence_found]),
+        "matched_response_actions": sorted(response_found),
+        "false_negatives": false_negatives,
+        "true_positives": true_positives,
         "false_positives": false_positives,
         "cases": len(cases),
-        "closed_cases": closed_cases,
-        "evidence_count": evidence_count,
-        "response_count": response_count,
+        "closed_cases": len(closed_cases),
+        "submitted_at": run["submitted_at"],
     }
     cursor = connection.execute(
         """INSERT INTO assessment_snapshots
-        (assessment_id, workspace_id, run_id, user_id, policy_version, weights, inputs, components, total_score, created_at)
-        VALUES (?, ?, ?, ?, 'socify-score-v1', ?, ?, ?, ?, ?)""",
+           (assessment_id, workspace_id, run_id, user_id, policy_version, weights, inputs, components, total_score, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
-            public_id("ASM"), run["workspace_id"], run_id, run["user_id"], json.dumps(weights, sort_keys=True, separators=(",", ":")),
-            json.dumps(inputs, sort_keys=True, separators=(",", ":")), json.dumps(components, sort_keys=True, separators=(",", ":")), total, iso_now(),
+            public_id("ASM"), run["workspace_id"], run_id, run["user_id"], policy_version,
+            json.dumps(weights, sort_keys=True, separators=(",", ":")),
+            json.dumps(inputs, sort_keys=True, separators=(",", ":")),
+            json.dumps(components, sort_keys=True, separators=(",", ":")),
+            total, iso_now(),
         ),
     )
     assessment_id = inserted_id(cursor)
-    assessment = connection.execute("SELECT * FROM assessment_snapshots WHERE id = ?", (assessment_id,)).fetchone()
-    record_audit(connection, "create", "assessment", assessment_id, details={"run_id": run_id, "score": total}, actor=run["user_id"], workspace=run["workspace_id"])
-    if assessment is None:
+    row = connection.execute("SELECT * FROM assessment_snapshots WHERE id = ?", (assessment_id,)).fetchone()
+    if row is None:
         raise RuntimeError("assessment disappeared during request")
-    return assessment_view(assessment)
+    record_audit(connection, "create", "assessment", assessment_id, details={"run_id": run_id, "score": total}, actor=run["user_id"], workspace=run["workspace_id"])
+    return assessment_view(row)
 
 
 def assessment_view(row: sqlite3.Row) -> dict[str, Any]:
