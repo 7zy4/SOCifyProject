@@ -244,6 +244,22 @@ def _run_access(run_id: int) -> sqlite3.Row | None:
     return get_db().execute("SELECT * FROM training_runs WHERE id = ? AND workspace_id = ? AND user_id = ?", (run_id, workspace_id(), actor_id())).fetchone()
 
 
+@training_api.get("/api/training/runs")
+@require_permission("training.run")
+def list_my_runs():
+    rows = get_db().execute(
+        """SELECT tr.id, tr.run_id, tr.difficulty, tr.state, tr.started_at,
+                  tr.completed_at, tr.submitted_at, tr.current_step, s.name AS scenario_name
+           FROM training_runs tr
+           JOIN scenario_versions sv ON sv.id = tr.scenario_version_id
+           JOIN attack_scenarios s ON s.id = sv.scenario_id
+           WHERE tr.workspace_id = ? AND tr.user_id = ?
+           ORDER BY tr.id DESC LIMIT 50""",
+        (workspace_id(), actor_id()),
+    ).fetchall()
+    return jsonify({"items": [dict(row) for row in rows]})
+
+
 @training_api.post("/api/training/runs")
 @require_permission("training.run")
 def start_run():
