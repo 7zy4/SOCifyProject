@@ -124,3 +124,17 @@ def test_parser_resource_budgets_and_auto_detection(app):
     assert _priority_severity(4) == "medium"
     with pytest.raises(ValueError):
         parse_timestamp([])
+
+
+def test_codespaces_trusted_host_exact_match(monkeypatch):
+    from socify.config import build_config
+    monkeypatch.setenv("CODESPACE_NAME", "socify-test-abc123")
+    monkeypatch.setenv("SOCIFY_PORT", "5000")
+    monkeypatch.delenv("SOCIFY_TRUSTED_HOSTS", raising=False)
+    hosts = build_config()["TRUSTED_HOSTS"]
+    assert "socify-test-abc123-5000.app.github.dev" in hosts
+    assert "localhost" in hosts
+    assert "127.0.0.1" in hosts
+    assert "*.app.github.dev" not in hosts
+    monkeypatch.setenv("CODESPACE_NAME", "../unsafe")
+    assert "unsafe-5000.app.github.dev" not in build_config()["TRUSTED_HOSTS"]
