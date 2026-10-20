@@ -1,19 +1,36 @@
-# Adversarial final audit
+# Adversarial audit — 2026-10-20
 
-## Open findings
+Decision: **NO-GO**. This is an implementation self-review, not an independent security certification. Baseline: a32a33c12fa2a3b124fc3dd4820ea5d01ac0fc88. All new regression tests are in tests/security/test_release_isolation.py.
 
-| ID | Severity | Finding | Required resolution |
+## Reproduced defects corrected in this change
+
+| ID | Impact | Reproduction and correction | Regression evidence |
 |---|---|---|---|
-| AUD-001 | Resolved locally; remote verification pending | Aggregate coverage is 93.18%, with 285 passing tests after adding 172 boundary and lifecycle cases. | Verify both push and pull-request quality jobs on the published correction; the threshold remains 90%. |
-| AUD-002 | High gate blocker | Chromium cannot start in the restricted local container. | Pass the mandatory GitHub Actions Chromium job on the final head SHA. |
-| AUD-003 | High gate blocker | SCA and remote CI evidence are not yet attached to the final SHA. | Pass pip-audit and every required workflow job. |
-| AUD-004 | Medium | Bandit reports B608 for server-constructed SQL fragments. | Keep server-owned allowlists and parameterized values, retain injection tests, and document the configuration exclusion. |
+| FIX-01 | High: confidentiality/integrity | Same identity in two training runs contributed to one detection; candidate window and watermark now include run scope. | test_detection_window_and_watermark_do_not_cross_training_runs |
+| FIX-02 | High: confidentiality | Reused event key returned another run's event ID; lookup and unique index now include run scope. | test_same_idempotency_key_in_different_runs_never_returns_private_event |
+| FIX-03 | High: authorization | Another trainee could retry/cancel response runs and retrieve duplicates; all response operations use object access. | test_response_mutations_require_object_access |
+| FIX-04 | High: authentication | Re-enrollment reset enabled MFA; enabled enrollment is rejected, including interleaved activation. | test_active_mfa_cannot_be_disabled_by_reenrollment; test_mfa_enrollment_cannot_race_activation |
+| FIX-05 | High: evidence integrity | Closed cases accepted event/alert evidence and playbook writes; case and response paths now reject these writes. | test_closed_case_cannot_receive_new_event_or_alert_evidence; test_response_cannot_mutate_closed_case |
+| FIX-06 | High: confidentiality | Private response notifications leaked through SSE; event visibility now checks resource access, and streams revalidate account/session on each poll. | test_private_response_stream_is_not_visible_to_other_trainee; test_stream_stops_after_account_revocation |
+| FIX-07 | High: confidentiality | Private evidence could be attached to a shared case; case scope is inferred and every attachment must match it. | test_private_evidence_cannot_be_attached_to_shared_case |
+| FIX-08 | High: confidentiality | IOC list/enrich exposed private-run context; event-bound observations now provide visible context/tags/times, and response tagging stays in scope. | test_indicator_observations_do_not_cross_training_runs |
+| FIX-09 | Medium: availability | Malformed scenario/DSL/playbook values and passwords over bcrypt's byte limit caused exceptions or invalid persistence; explicit validation now returns client errors. | test_malformed_scenario_is_rejected_without_partial_write; test_rule_enums_reject_non_scalar_json; test_playbook_steps_validate_types_before_writing; test_oversized_bcrypt_input_never_crashes_authentication |
+| FIX-10 | Medium: atomicity | Missing case evidence produced a server exception; prerequisites are validated before insertion. | test_case_creation_with_missing_evidence_is_atomic_client_error |
+| FIX-11 | High: integrity | Case version comparison occurred before the write without a SQL condition; updates now compare-and-swap the stored version. | test_case_compare_and_swap_preserves_interleaved_write |
+| FIX-12 | High: migration integrity | executescript implicitly committed before the migration finished; complete SQL statements now run inside one transaction. | test_schema_failure_rolls_back_ddl_and_data; test_scope_migration_is_repeatable_and_preserves_events |
+| FIX-13 | Medium: API quality | Generated OpenAPI had duplicate operation IDs and an incorrect error shape; IDs and error schema corrected. | test_openapi_operation_ids_and_error_contract |
 
-## Verified controls
+## Open release blockers
 
-- RBAC and cross-workspace IDOR denial are covered by negative integration tests.
-- CSRF, authentication throttling, MFA lifecycle, session invalidation, source-secret encryption and redaction, SSRF default denial, XXE rejection, immutable event evidence, CSV formula neutralization, deterministic scoring, and training-run isolation have executable tests.
-- ATT&CK Enterprise 20.0 is bundled as an offline catalog with 706 active techniques and sub-techniques.
-- Backup, restore, integrity verification, migration dry-run, and fresh schema creation have executable tests.
+| ID | Severity / class | Evidence | Required resolution |
+|---|---|---|---|
+| OPEN-01 | High: historical confidentiality | Old case/alert evidence and generated reports may retain cross-run associations produced before FIX-01/FIX-07. No deployed dataset was supplied or audited. | Audit legacy associations and report contents; quarantine or repair affected artifacts with an auditable migration and negative read/export tests. IOC migration preserves the last valid observation but cannot reconstruct previously overwritten history. |
+| OPEN-02 | High: availability/integrity | socify/ingestion.py and socify/playbooks.py execute jobs in-request; durable checkpoint/restart, complete compensation and concurrent response guarantees are absent. | Implement persistent job lifecycle and interruption/retry/cancel recovery; demonstrate no loss/duplicate effects. |
+| OPEN-03 | High: assessment correctness | socify/scoring.py scores aggregate counts, and training playback completion snapshots the score before subsequent investigation. | Match actual decisions to ground truth, implement correct TP/FP/FN/MTTD/MTTR, and separate event playback from learner submission with end-to-end evidence. |
+| OPEN-04 | Medium: catalog integrity | schema.seed_reference_data overwrites bundled ATT&CK rows and version metadata on startup. | Versioned import/migration that survives restart, with official-source provenance and upgrade tests. |
+| OPEN-05 | Security gate incomplete | Global Bandit B608 exclusion; no complete SCA/secret/SBOM/license/DAST/container/ASVS-SSDF evidence. | Review every dynamic SQL construction; implement the missing checks and map controls to official identifiers. A configured clean scan is not a comprehensive clearance. |
+| OPEN-06 | Functional/UI/accessibility | Full visual builders, graph interactions, all important UI writes and 60 complete browser/operational journeys are not proven. | Complete and exercise each item in requirements-traceability.csv and e2e-acceptance.csv. |
+| OPEN-07 | Performance/recovery gate | No current reference load/soak artifacts, fresh Docker/Codespaces run or measured RTO/RPO. Docker is unavailable in this execution environment. | Run the required reference workloads and operational drills in an appropriate environment, retain raw evidence. |
+| OPEN-08 | API contract | Request bodies and successful responses remain generic; fixing error shape and IDs is not full OpenAPI contract coverage. | Define endpoint schemas and validate real request/response fixtures. |
 
-The audit remains open until all blocker rows are closed on the final pull-request head.
+Do not interpret green configured checks as closure of these findings. The PR must remain draft until acceptance blockers are resolved. No main-branch merge or production deployment is authorized by this report.

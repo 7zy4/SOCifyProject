@@ -12,7 +12,7 @@
   "paths": {
     "/api/admin/role-matrix": {
       "get": {
-        "operationId": "platform_role_matrix",
+        "operationId": "platform_role_matrix_get__api_admin_role-matrix",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -31,7 +31,7 @@
     },
     "/api/admin/users": {
       "get": {
-        "operationId": "auth_users_list",
+        "operationId": "auth_users_list_get__api_admin_users",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -50,7 +50,7 @@
     },
     "/api/admin/users/{user_id}": {
       "patch": {
-        "operationId": "auth_update_user",
+        "operationId": "auth_update_user_patch__api_admin_users_user_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -90,7 +90,7 @@
     },
     "/api/admin/users/{user_id}/mfa": {
       "delete": {
-        "operationId": "auth_admin_reset_mfa",
+        "operationId": "auth_admin_reset_mfa_delete__api_admin_users_user_id_mfa",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -119,7 +119,7 @@
     },
     "/api/alerts": {
       "get": {
-        "operationId": "detection_list_alerts",
+        "operationId": "detection_list_alerts_get__api_alerts",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -138,7 +138,7 @@
     },
     "/api/alerts/{alert_id}": {
       "get": {
-        "operationId": "detection_alert_detail",
+        "operationId": "detection_alert_detail_get__api_alerts_alert_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -167,7 +167,7 @@
     },
     "/api/alerts/{alert_id}/case": {
       "post": {
-        "operationId": "cases_case_from_alert",
+        "operationId": "cases_case_from_alert_post__api_alerts_alert_id_case",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -207,7 +207,7 @@
     },
     "/api/alerts/{alert_id}/triage": {
       "post": {
-        "operationId": "detection_triage_alert",
+        "operationId": "detection_triage_alert_post__api_alerts_alert_id_triage",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -247,7 +247,7 @@
     },
     "/api/assessments/{assessment_id}": {
       "get": {
-        "operationId": "scoring_assessment_detail",
+        "operationId": "scoring_assessment_detail_get__api_assessments_assessment_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -276,7 +276,7 @@
     },
     "/api/attack/coverage": {
       "get": {
-        "operationId": "attack_coverage",
+        "operationId": "attack_coverage_get__api_attack_coverage",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -295,7 +295,7 @@
     },
     "/api/attack/matrix": {
       "get": {
-        "operationId": "attack_matrix",
+        "operationId": "attack_matrix_get__api_attack_matrix",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -314,7 +314,7 @@
     },
     "/api/attack/navigator-layer": {
       "get": {
-        "operationId": "attack_navigator_layer",
+        "operationId": "attack_navigator_layer_get__api_attack_navigator-layer",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -333,7 +333,7 @@
     },
     "/api/attack/techniques": {
       "get": {
-        "operationId": "attack_list_techniques",
+        "operationId": "attack_list_techniques_get__api_attack_techniques",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -352,7 +352,7 @@
     },
     "/api/attack/techniques/{technique_id}": {
       "get": {
-        "operationId": "attack_technique_detail",
+        "operationId": "attack_technique_detail_get__api_attack_techniques_technique_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -381,7 +381,7 @@
     },
     "/api/audit": {
       "get": {
-        "operationId": "platform_audit_logs",
+        "operationId": "platform_audit_logs_get__api_audit",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -400,7 +400,7 @@
     },
     "/api/auth/csrf": {
       "get": {
-        "operationId": "auth_csrf_token_api",
+        "operationId": "auth_csrf_token_api_get__api_auth_csrf",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -419,7 +419,7 @@
     },
     "/api/auth/login": {
       "post": {
-        "operationId": "auth_login_api",
+        "operationId": "auth_login_api_post__api_auth_login",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -449,7 +449,7 @@
     },
     "/api/auth/logout": {
       "post": {
-        "operationId": "auth_logout_api",
+        "operationId": "auth_logout_api_post__api_auth_logout",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -479,7 +479,7 @@
     },
     "/api/auth/me": {
       "get": {
-        "operationId": "auth_me",
+        "operationId": "auth_me_get__api_auth_me",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -498,7 +498,7 @@
     },
     "/api/auth/mfa": {
       "delete": {
-        "operationId": "auth_mfa_disable",
+        "operationId": "auth_mfa_disable_delete__api_auth_mfa",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -517,7 +517,7 @@
     },
     "/api/auth/mfa/enroll": {
       "post": {
-        "operationId": "auth_mfa_enroll",
+        "operationId": "auth_mfa_enroll_post__api_auth_mfa_enroll",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -547,7 +547,7 @@
     },
     "/api/auth/mfa/verify": {
       "post": {
-        "operationId": "auth_mfa_verify",
+        "operationId": "auth_mfa_verify_post__api_auth_mfa_verify",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -577,7 +577,7 @@
     },
     "/api/auth/register": {
       "post": {
-        "operationId": "auth_register_api",
+        "operationId": "auth_register_api_post__api_auth_register",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -607,7 +607,7 @@
     },
     "/api/auth/sessions": {
       "get": {
-        "operationId": "auth_sessions_list",
+        "operationId": "auth_sessions_list_get__api_auth_sessions",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -626,7 +626,7 @@
     },
     "/api/auth/sessions/{session_id}": {
       "delete": {
-        "operationId": "auth_revoke_session",
+        "operationId": "auth_revoke_session_delete__api_auth_sessions_session_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -655,7 +655,7 @@
     },
     "/api/dashboard": {
       "get": {
-        "operationId": "platform_dashboard_data",
+        "operationId": "platform_dashboard_data_get__api_dashboard",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -674,7 +674,7 @@
     },
     "/api/events": {
       "get": {
-        "operationId": "events_list_events",
+        "operationId": "events_list_events_get__api_events",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -691,7 +691,7 @@
         }
       },
       "post": {
-        "operationId": "events_create_event",
+        "operationId": "events_create_event_post__api_events",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -721,7 +721,7 @@
     },
     "/api/events/{event_id}": {
       "get": {
-        "operationId": "events_event_detail",
+        "operationId": "events_event_detail_get__api_events_event_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -748,7 +748,7 @@
         ]
       },
       "put": {
-        "operationId": "events_update_event",
+        "operationId": "events_update_event_put__api_events_event_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -786,7 +786,7 @@
         }
       },
       "delete": {
-        "operationId": "events_delete_event",
+        "operationId": "events_delete_event_delete__api_events_event_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -815,7 +815,7 @@
     },
     "/api/events/{event_id}/raw": {
       "get": {
-        "operationId": "events_event_raw",
+        "operationId": "events_event_raw_get__api_events_event_id_raw",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -844,7 +844,7 @@
     },
     "/api/events/export": {
       "get": {
-        "operationId": "events_export_events",
+        "operationId": "events_export_events_get__api_events_export",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -863,7 +863,7 @@
     },
     "/api/health": {
       "get": {
-        "operationId": "platform_health_api",
+        "operationId": "platform_health_api_get__api_health",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -882,7 +882,7 @@
     },
     "/api/hunt/query": {
       "post": {
-        "operationId": "hunting_execute_query",
+        "operationId": "hunting_execute_query_post__api_hunt_query",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -912,7 +912,7 @@
     },
     "/api/hunt/saved-queries": {
       "get": {
-        "operationId": "hunting_list_saved_queries",
+        "operationId": "hunting_list_saved_queries_get__api_hunt_saved-queries",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -929,7 +929,7 @@
         }
       },
       "post": {
-        "operationId": "hunting_save_query",
+        "operationId": "hunting_save_query_post__api_hunt_saved-queries",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -959,7 +959,7 @@
     },
     "/api/hunt/saved-queries/{query_id}": {
       "delete": {
-        "operationId": "hunting_delete_saved_query",
+        "operationId": "hunting_delete_saved_query_delete__api_hunt_saved-queries_query_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -988,7 +988,7 @@
     },
     "/api/imports": {
       "post": {
-        "operationId": "ingestion_create_import",
+        "operationId": "ingestion_create_import_post__api_imports",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1016,7 +1016,7 @@
         }
       },
       "get": {
-        "operationId": "ingestion_list_imports",
+        "operationId": "ingestion_list_imports_get__api_imports",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1035,7 +1035,7 @@
     },
     "/api/imports/{job_id}": {
       "get": {
-        "operationId": "ingestion_import_detail",
+        "operationId": "ingestion_import_detail_get__api_imports_job_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1064,7 +1064,7 @@
     },
     "/api/imports/preview": {
       "post": {
-        "operationId": "ingestion_preview_import",
+        "operationId": "ingestion_preview_import_post__api_imports_preview",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1094,7 +1094,7 @@
     },
     "/api/incidents": {
       "get": {
-        "operationId": "cases_list_cases",
+        "operationId": "cases_list_cases_get__api_incidents",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1111,7 +1111,7 @@
         }
       },
       "post": {
-        "operationId": "cases_create_case",
+        "operationId": "cases_create_case_post__api_incidents",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1141,7 +1141,7 @@
     },
     "/api/incidents/{case_id}": {
       "get": {
-        "operationId": "cases_case_detail",
+        "operationId": "cases_case_detail_get__api_incidents_case_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1168,7 +1168,7 @@
         ]
       },
       "patch": {
-        "operationId": "cases_update_case",
+        "operationId": "cases_update_case_patch__api_incidents_case_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1208,7 +1208,7 @@
     },
     "/api/incidents/{case_id}/alerts": {
       "post": {
-        "operationId": "cases_add_case_alert",
+        "operationId": "cases_add_case_alert_post__api_incidents_case_id_alerts",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1248,7 +1248,7 @@
     },
     "/api/incidents/{case_id}/events": {
       "post": {
-        "operationId": "cases_add_case_event",
+        "operationId": "cases_add_case_event_post__api_incidents_case_id_events",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1288,7 +1288,7 @@
     },
     "/api/incidents/{case_id}/evidence": {
       "post": {
-        "operationId": "cases_add_evidence",
+        "operationId": "cases_add_evidence_post__api_incidents_case_id_evidence",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1328,7 +1328,7 @@
     },
     "/api/incidents/{case_id}/notes": {
       "post": {
-        "operationId": "cases_add_note",
+        "operationId": "cases_add_note_post__api_incidents_case_id_notes",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1368,7 +1368,7 @@
     },
     "/api/incidents/{case_id}/report": {
       "get": {
-        "operationId": "cases_get_report",
+        "operationId": "cases_get_report_get__api_incidents_case_id_report",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1397,7 +1397,7 @@
     },
     "/api/incidents/{case_id}/tasks": {
       "post": {
-        "operationId": "cases_add_task",
+        "operationId": "cases_add_task_post__api_incidents_case_id_tasks",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1437,7 +1437,7 @@
     },
     "/api/incidents/{case_id}/tasks/{task_id}": {
       "patch": {
-        "operationId": "cases_update_task",
+        "operationId": "cases_update_task_patch__api_incidents_case_id_tasks_task_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1485,7 +1485,7 @@
     },
     "/api/incidents/{case_id}/transitions": {
       "post": {
-        "operationId": "cases_transition_case",
+        "operationId": "cases_transition_case_post__api_incidents_case_id_transitions",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1525,7 +1525,7 @@
     },
     "/api/iocs": {
       "get": {
-        "operationId": "hunting_list_iocs",
+        "operationId": "hunting_list_iocs_get__api_iocs",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1544,7 +1544,7 @@
     },
     "/api/iocs/{ioc_id}/enrich": {
       "post": {
-        "operationId": "hunting_enrich_ioc",
+        "operationId": "hunting_enrich_ioc_post__api_iocs_ioc_id_enrich",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1584,7 +1584,7 @@
     },
     "/api/iocs/extract": {
       "post": {
-        "operationId": "hunting_extract_iocs",
+        "operationId": "hunting_extract_iocs_post__api_iocs_extract",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1614,7 +1614,7 @@
     },
     "/api/lab/event": {
       "post": {
-        "operationId": "events_create_lab_event",
+        "operationId": "events_create_lab_event_post__api_lab_event",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1644,7 +1644,7 @@
     },
     "/api/leaderboards": {
       "get": {
-        "operationId": "scoring_leaderboard",
+        "operationId": "scoring_leaderboard_get__api_leaderboards",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1663,7 +1663,7 @@
     },
     "/api/playbook-runs": {
       "post": {
-        "operationId": "playbooks_create_playbook_run",
+        "operationId": "playbooks_create_playbook_run_post__api_playbook-runs",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1693,7 +1693,7 @@
     },
     "/api/playbook-runs/{run_id}": {
       "get": {
-        "operationId": "playbooks_run_detail",
+        "operationId": "playbooks_run_detail_get__api_playbook-runs_run_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1722,7 +1722,7 @@
     },
     "/api/playbook-runs/{run_id}/approve": {
       "post": {
-        "operationId": "playbooks_approve_run",
+        "operationId": "playbooks_approve_run_post__api_playbook-runs_run_id_approve",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1762,7 +1762,7 @@
     },
     "/api/playbook-runs/{run_id}/cancel": {
       "post": {
-        "operationId": "playbooks_cancel_run",
+        "operationId": "playbooks_cancel_run_post__api_playbook-runs_run_id_cancel",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1802,7 +1802,7 @@
     },
     "/api/playbook-runs/{run_id}/retry": {
       "post": {
-        "operationId": "playbooks_retry_run",
+        "operationId": "playbooks_retry_run_post__api_playbook-runs_run_id_retry",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1842,7 +1842,7 @@
     },
     "/api/playbook-runs/{run_id}/rollback": {
       "post": {
-        "operationId": "playbooks_rollback_run",
+        "operationId": "playbooks_rollback_run_post__api_playbook-runs_run_id_rollback",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1882,7 +1882,7 @@
     },
     "/api/playbooks": {
       "get": {
-        "operationId": "playbooks_list_playbooks",
+        "operationId": "playbooks_list_playbooks_get__api_playbooks",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1899,7 +1899,7 @@
         }
       },
       "post": {
-        "operationId": "playbooks_create_playbook",
+        "operationId": "playbooks_create_playbook_post__api_playbooks",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1929,7 +1929,7 @@
     },
     "/api/playbooks/{playbook_id}/preview": {
       "post": {
-        "operationId": "playbooks_preview_playbook",
+        "operationId": "playbooks_preview_playbook_post__api_playbooks_playbook_id_preview",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1969,7 +1969,7 @@
     },
     "/api/playbooks/{playbook_id}/versions": {
       "post": {
-        "operationId": "playbooks_create_playbook_version",
+        "operationId": "playbooks_create_playbook_version_post__api_playbooks_playbook_id_versions",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2009,7 +2009,7 @@
     },
     "/api/profile": {
       "get": {
-        "operationId": "platform_profile",
+        "operationId": "platform_profile_get__api_profile",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2028,7 +2028,7 @@
     },
     "/api/profile/password": {
       "post": {
-        "operationId": "auth_change_password",
+        "operationId": "auth_change_password_post__api_profile_password",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2058,7 +2058,7 @@
     },
     "/api/rules": {
       "get": {
-        "operationId": "detection_list_rules",
+        "operationId": "detection_list_rules_get__api_rules",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2075,7 +2075,7 @@
         }
       },
       "post": {
-        "operationId": "detection_create_rule",
+        "operationId": "detection_create_rule_post__api_rules",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2105,7 +2105,7 @@
     },
     "/api/rules/{rule_id}": {
       "get": {
-        "operationId": "detection_rule_detail",
+        "operationId": "detection_rule_detail_get__api_rules_rule_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2132,7 +2132,7 @@
         ]
       },
       "put": {
-        "operationId": "detection_update_rule",
+        "operationId": "detection_update_rule_put__api_rules_rule_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2170,7 +2170,7 @@
         }
       },
       "delete": {
-        "operationId": "detection_archive_rule",
+        "operationId": "detection_archive_rule_delete__api_rules_rule_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2199,7 +2199,7 @@
     },
     "/api/rules/{rule_id}/backfill": {
       "post": {
-        "operationId": "detection_backfill_rule",
+        "operationId": "detection_backfill_rule_post__api_rules_rule_id_backfill",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2239,7 +2239,7 @@
     },
     "/api/rules/{rule_id}/clone": {
       "post": {
-        "operationId": "detection_clone_rule",
+        "operationId": "detection_clone_rule_post__api_rules_rule_id_clone",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2279,7 +2279,7 @@
     },
     "/api/rules/{rule_id}/rollback": {
       "post": {
-        "operationId": "detection_rollback_rule",
+        "operationId": "detection_rollback_rule_post__api_rules_rule_id_rollback",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2319,7 +2319,7 @@
     },
     "/api/rules/{rule_id}/test": {
       "post": {
-        "operationId": "detection_test_rule",
+        "operationId": "detection_test_rule_post__api_rules_rule_id_test",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2359,7 +2359,7 @@
     },
     "/api/rules/{rule_id}/toggle": {
       "post": {
-        "operationId": "detection_toggle_rule",
+        "operationId": "detection_toggle_rule_post__api_rules_rule_id_toggle",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2399,7 +2399,7 @@
     },
     "/api/rules/{rule_id}/versions": {
       "get": {
-        "operationId": "detection_rule_versions",
+        "operationId": "detection_rule_versions_get__api_rules_rule_id_versions",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2428,7 +2428,7 @@
     },
     "/api/scenarios": {
       "get": {
-        "operationId": "training_list_scenarios",
+        "operationId": "training_list_scenarios_get__api_scenarios",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2445,7 +2445,7 @@
         }
       },
       "post": {
-        "operationId": "training_create_scenario",
+        "operationId": "training_create_scenario_post__api_scenarios",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2475,7 +2475,7 @@
     },
     "/api/scenarios/{scenario_id}": {
       "get": {
-        "operationId": "training_scenario_detail",
+        "operationId": "training_scenario_detail_get__api_scenarios_scenario_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2504,7 +2504,7 @@
     },
     "/api/scenarios/{scenario_id}/clone": {
       "post": {
-        "operationId": "training_clone_scenario",
+        "operationId": "training_clone_scenario_post__api_scenarios_scenario_id_clone",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2544,7 +2544,7 @@
     },
     "/api/scenarios/{scenario_id}/transition": {
       "post": {
-        "operationId": "training_transition_scenario",
+        "operationId": "training_transition_scenario_post__api_scenarios_scenario_id_transition",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2584,7 +2584,7 @@
     },
     "/api/scenarios/{scenario_id}/versions": {
       "post": {
-        "operationId": "training_create_scenario_version",
+        "operationId": "training_create_scenario_version_post__api_scenarios_scenario_id_versions",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2624,7 +2624,7 @@
     },
     "/api/scores/me": {
       "get": {
-        "operationId": "scoring_my_scores",
+        "operationId": "scoring_my_scores_get__api_scores_me",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2643,7 +2643,7 @@
     },
     "/api/settings": {
       "get": {
-        "operationId": "platform_settings",
+        "operationId": "platform_settings_get__api_settings",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2662,7 +2662,7 @@
     },
     "/api/sources": {
       "get": {
-        "operationId": "sources_list_sources",
+        "operationId": "sources_list_sources_get__api_sources",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2679,7 +2679,7 @@
         }
       },
       "post": {
-        "operationId": "sources_create_source",
+        "operationId": "sources_create_source_post__api_sources",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2709,7 +2709,7 @@
     },
     "/api/sources/{source_id}": {
       "patch": {
-        "operationId": "sources_update_source",
+        "operationId": "sources_update_source_patch__api_sources_source_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2747,7 +2747,7 @@
         }
       },
       "put": {
-        "operationId": "sources_update_source",
+        "operationId": "sources_update_source_put__api_sources_source_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2785,7 +2785,7 @@
         }
       },
       "delete": {
-        "operationId": "sources_disable_source",
+        "operationId": "sources_disable_source_delete__api_sources_source_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2814,7 +2814,7 @@
     },
     "/api/sources/{source_id}/test": {
       "post": {
-        "operationId": "sources_test_source",
+        "operationId": "sources_test_source_post__api_sources_source_id_test",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2854,7 +2854,7 @@
     },
     "/api/stats": {
       "get": {
-        "operationId": "platform_stats_compatibility",
+        "operationId": "platform_stats_compatibility_get__api_stats",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2873,7 +2873,7 @@
     },
     "/api/stream/events": {
       "get": {
-        "operationId": "visualization_event_stream",
+        "operationId": "visualization_event_stream_get__api_stream_events",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2892,7 +2892,7 @@
     },
     "/api/training/runs": {
       "post": {
-        "operationId": "training_start_run",
+        "operationId": "training_start_run_post__api_training_runs",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2922,7 +2922,7 @@
     },
     "/api/training/runs/{run_id}": {
       "get": {
-        "operationId": "training_run_detail",
+        "operationId": "training_run_detail_get__api_training_runs_run_id",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2951,7 +2951,7 @@
     },
     "/api/training/runs/{run_id}/ground-truth": {
       "get": {
-        "operationId": "training_run_ground_truth",
+        "operationId": "training_run_ground_truth_get__api_training_runs_run_id_ground-truth",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2980,7 +2980,7 @@
     },
     "/api/training/runs/{run_id}/hints": {
       "post": {
-        "operationId": "training_consume_hint",
+        "operationId": "training_consume_hint_post__api_training_runs_run_id_hints",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3020,7 +3020,7 @@
     },
     "/api/training/runs/{run_id}/pause": {
       "post": {
-        "operationId": "training_pause_run",
+        "operationId": "training_pause_run_post__api_training_runs_run_id_pause",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3060,7 +3060,7 @@
     },
     "/api/training/runs/{run_id}/play": {
       "post": {
-        "operationId": "training_play_run",
+        "operationId": "training_play_run_post__api_training_runs_run_id_play",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3100,7 +3100,7 @@
     },
     "/api/training/runs/{run_id}/restart": {
       "post": {
-        "operationId": "training_restart_run",
+        "operationId": "training_restart_run_post__api_training_runs_run_id_restart",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3140,7 +3140,7 @@
     },
     "/api/training/runs/{run_id}/resume": {
       "post": {
-        "operationId": "training_resume_run",
+        "operationId": "training_resume_run_post__api_training_runs_run_id_resume",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3180,7 +3180,7 @@
     },
     "/api/training/runs/{run_id}/score": {
       "get": {
-        "operationId": "scoring_run_score",
+        "operationId": "scoring_run_score_get__api_training_runs_run_id_score",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3209,7 +3209,7 @@
     },
     "/api/visualizations/graph": {
       "get": {
-        "operationId": "visualization_graph",
+        "operationId": "visualization_graph_get__api_visualizations_graph",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3228,7 +3228,7 @@
     },
     "/api/visualizations/graph/export": {
       "get": {
-        "operationId": "visualization_export_graph",
+        "operationId": "visualization_export_graph_get__api_visualizations_graph_export",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3247,7 +3247,7 @@
     },
     "/api/visualizations/timeline": {
       "get": {
-        "operationId": "visualization_timeline",
+        "operationId": "visualization_timeline_get__api_visualizations_timeline",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3266,7 +3266,7 @@
     },
     "/health/live": {
       "get": {
-        "operationId": "platform_health_live",
+        "operationId": "platform_health_live_get__health_live",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3285,7 +3285,7 @@
     },
     "/health/ready": {
       "get": {
-        "operationId": "platform_health_ready",
+        "operationId": "platform_health_ready_get__health_ready",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3309,14 +3309,26 @@
         "type": "object",
         "required": [
           "error",
-          "message"
+          "correlation_id"
         ],
         "properties": {
           "error": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object"
+              }
+            }
           },
           "correlation_id": {
             "type": "string"

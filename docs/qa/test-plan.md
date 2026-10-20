@@ -1,29 +1,18 @@
-# خطة الاختبار
+# خطة الاختبار وحدود الدليل
 
-## الطبقات
+حالة القبول: NO-GO. الاختبارات الحالية تثبت المسارات التي تنفذها فقط.
 
-| الطبقة | الأدوات | النطاق |
+| الطبقة | الدليل الموجود | ما لا تثبته |
 |---|---|---|
-| Unit | pytest + Hypothesis | time, DSL, normalization, parsers, password/TOTP, query compiler, scoring |
-| Integration | Flask client + SQLite حقيقية | auth/RBAC/CSRF، ingest→detect→alert→case، migrations، backup |
-| Security negative | pytest + Bandit + pip-audit | XSS/SQLi/SSRF/IDOR/upload/CSV/secret redaction/rate limit |
-| E2E browser | Playwright Chromium | landing/login/nav/RTL/responsive/forms/network persistence |
-| Operational | Docker + health + schema scripts | non-root image، persistent DB، backup/restore/readiness |
-| Performance smoke | pytest marker | ingest/detection/query budgets على ملف مرجعي محلي |
+| وحدات وتكامل وأمن | pytest مع SQLite وبيانات اصطناعية | اكتمال كل مطلب مركب أو واجهة المتصفح |
+| متصفح | tests/e2e/test_browser.py: تسجيل دخول، تنقل، RTL وعرض محمول | الرحلات الستون كاملة، الوصول بلوحة المفاتيح، الشبكة البطيئة |
+| تحليل ساكن | Ruff، mypy، Bandit وفق pyproject.toml | Bandit يستثني B608 عالميًا، فلا يعد فحص SQL كاملًا |
+| اعتماديات | pip-audit في GitHub Actions | SBOM، رخص، أسرار، صور حاويات، DAST |
+| تشغيل | اختبارات scripts للنسخ والاستعادة والترحيل | تجربة Docker وCodespaces جديدة، RTO/RPO، انقطاع worker |
+| أداء | لا يوجد أثر قبول للحمل المرجعي الحالي | حمل 15 دقيقة لكل مستوى وSoak لمدة 60 دقيقة |
 
-## البيانات
+عتبة CI الحالية للتغطية المجمعة 90% ولم تخفض. متطلبات الملف أشد: تغطية أسطر عامة 90%، وللوحدات الحرجة/الجديدة أسطر 95% وفروع 90%. نجاح العتبة المجمعة لا يثبت العتبات المنفصلة.
 
-Fixtures كلها اصطناعية وموسومة: CSV/JSON/JSONL/Syslog/Linux/Web/Sysmon XML وEVTX base64. لا بيانات إنتاج ولا credentials حقيقية. يحتفظ الاختبار بقاعدة مؤقتة لكل حالة من Template seeded مرة واحدة.
+تحتوي [مصفوفة المتطلبات](requirements-traceability.csv) على 132 مطلبًا، و[مصفوفة الرحلات](e2e-acceptance.csv) على 60 رحلة. أسماء test_e2e داخل tests/integration أو tests/security هي اختبارات API وليست دليلًا على رحلة متصفح كاملة. لا يوجد ملف tests/e2e/test_acceptance.py؛ الإشارة السابقة إليه كانت غير صحيحة وأزيلت.
 
-## معايير البوابات
-
-- P0 = 100% pass.
-- P1 ≥ 99% ولا رحلة حرجة حمراء.
-- Critical/High security findings المفتوحة = 0.
-- coverage statements ≥ 85% وbranches ≥ 75% للنسخة الحالية، مع رفع الهدف تدريجيًا إلى 90% للوحدات الحرجة.
-- لا flaky retry؛ تكرار الاختبار الحتمي يعطي fingerprint نفسه.
-- Performance يقاس p95 على GitHub runner ويخزن artifact؛ الهدف المرجعي API read p95 < 300ms محليًا وingest 1000 event < 10s.
-
-## E2E-01..60
-
-الأسماء نفسها مستخدمة كـmarkers أو test IDs داخل `tests/e2e/test_acceptance.py` و`tests/e2e/test_browser.py`. البنود التشغيلية التي تحتاج Docker/Codespaces منفصلة في CI ولا تُحوّل إلى pass عبر فحص نصي فقط. النتيجة الفعلية تنسخ إلى RTM وتقرير القبول بعد آخر HEAD.
+لا تُحتسب NOT TESTED أو FAIL كنقاط، ولا يُمنح P0 نصف نقطة. لا تُعطّل اختبارات أو تخفض حدودًا لمعالجة فشل. تُراجع نتائج CI على HEAD المنشور، وتبقى اختبارات القبول غير المثبتة مفتوحة.

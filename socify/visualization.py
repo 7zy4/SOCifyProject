@@ -5,7 +5,7 @@ from collections import OrderedDict
 from collections.abc import Iterator
 from typing import Any
 
-from flask import Blueprint, Response, jsonify, request, stream_with_context
+from flask import Blueprint, Response, g, jsonify, request, stream_with_context
 
 from .db import get_db
 from .security import actor_id, can_access_training_run, current_user, error_response, has_permission, require_permission, workspace_id
@@ -20,22 +20,27 @@ def _outbox_visible(row: sqlite3.Row) -> bool:
         payload = json.loads(row["payload"])
     except (TypeError, json.JSONDecodeError):
         return False
-    identifier = payload.get("id") if isinstance(payload, dict) else None
+    identifier = payload.get("id", payload.get("resource_id")) if isinstance(payload, dict) else None
+    if event_type == "training.notification" and isinstance(payload, dict):
+        identifier = payload.get("playbook_run_id")
+    if event_type.startswith("playbook_run.") or event_type == "training.notification":
+        from .playbooks import _run_access
+        return type(identifier) is int and _run_access(identifier) is not None
     if not isinstance(identifier, int):
-        return True
+        return has_permission(current_user(), "audit.read")
     table = None
     if event_type.startswith("event."):
         table = "security_events"
     elif event_type.startswith("alert."):
         table = "alerts"
-    elif event_type.startswith("incident."):
+    elif event_type.startswith(("incident.", "case.")):
         table = "incident_cases"
     elif event_type.startswith("training_run."):
         return can_access_training_run(identifier)
     if table:
         record = get_db().execute(f"SELECT training_run_id FROM {table} WHERE id = ? AND workspace_id = ?", (identifier, workspace_id())).fetchone()
         return bool(record and can_access_training_run(record["training_run_id"]))
-    return True
+    return has_permission(current_user(), "audit.read")
 
 
 def _scope() -> tuple[str, list[object]]:
@@ -112,6 +117,8 @@ def build_graph(limit: int) -> dict[str, Any]:
         placeholders = ",".join("?" for _ in event_ids)
         alerts = get_db().execute(f"SELECT DISTINCT a.* FROM alerts a JOIN alert_events ae ON ae.alert_id = a.id WHERE ae.event_id IN ({placeholders}) AND a.workspace_id = ?", (*event_ids, workspace_id())).fetchall()
         for alert in alerts:
+            if not can_access_training_run(alert["training_run_id"]):
+                continue
             alert_node = f"alert:{alert['id']}"
             nodes[alert_node] = _node(alert_node, "Alert", alert["reason"], alert["detected_at"], "rules_engine", alert["id"], alert["confidence"], "derived")
             for event in get_db().execute("SELECT event_id FROM alert_events WHERE alert_id = ?", (alert["id"],)).fetchall():
@@ -120,6 +127,8 @@ def build_graph(limit: int) -> dict[str, Any]:
                     edges[identifier] = _edge(identifier, f"event:{event['event_id']}", alert_node, "triggered_rule", alert["detected_at"], alert["id"], alert["confidence"], "derived")
         cases = get_db().execute(f"SELECT DISTINCT c.* FROM incident_cases c JOIN case_events ce ON ce.case_id = c.id WHERE ce.event_id IN ({placeholders}) AND c.workspace_id = ?", (*event_ids, workspace_id())).fetchall()
         for case in cases:
+            if not can_access_training_run(case["training_run_id"]):
+                continue
             case_node = f"incident:{case['id']}"
             nodes[case_node] = _node(case_node, "Incident", f"{case['reference']} {case['title']}", case["created_at"], "case_management", case["id"])
             for event in get_db().execute("SELECT event_id FROM case_events WHERE case_id = ?", (case["id"],)).fetchall():
@@ -178,6 +187,10 @@ def event_stream():
         nonlocal cursor
         last_heartbeat = time.monotonic()
         while True:
+            g.pop("current_user", None)
+            user = current_user()
+            if not has_permission(user, "events.read") or not user or user["workspace_id"] != workspace:
+                break
             rows = get_db().execute("SELECT id, event_type, payload, created_at FROM outbox_events WHERE workspace_id = ? AND id > ? ORDER BY id LIMIT 100", (workspace, cursor)).fetchall()
             for row in rows:
                 cursor = int(row["id"])
@@ -185,8 +198,7 @@ def event_stream():
                     continue
                 yield f"id: {cursor}\nevent: {row['event_type']}\ndata: {row['payload']}\n\n"
             if once:
-                if not rows:
-                    yield f"event: heartbeat\ndata: {{\"cursor\":{cursor}}}\n\n"
+                yield f"event: heartbeat\ndata: {{\"cursor\":{cursor}}}\n\n"
                 break
             if time.monotonic() - last_heartbeat >= 15:
                 yield f"event: heartbeat\ndata: {{\"cursor\":{cursor}}}\n\n"

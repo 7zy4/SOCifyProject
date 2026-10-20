@@ -156,7 +156,7 @@ def ingest_event(
             raise ValueError(f"unknown ATT&CK technique identifiers: {', '.join(unknown)}")
     idempotency_key = normalized["idempotency_key"]
     if idempotency_key:
-        existing = connection.execute("SELECT id FROM security_events WHERE workspace_id = ? AND idempotency_key = ?", (workspace, idempotency_key)).fetchone()
+        existing = connection.execute("SELECT id FROM security_events WHERE workspace_id = ? AND training_run_id IS ? AND idempotency_key = ?", (workspace, training_run_id, idempotency_key)).fetchone()
         if existing:
             return int(existing["id"]), [], True
     event_public_id = _string(data.get("event_id"), 80) or public_id("EVT")
@@ -293,7 +293,7 @@ def create_event():
         data["idempotency_key"] = header_key
     try:
         with transaction():
-            training_run_id = data.get("training_run_id") if isinstance(data.get("training_run_id"), int) else None
+            training_run_id = data.get("training_run_id")
             if not can_access_training_run(training_run_id):
                 return error_response("TRAINING_RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
             event_id, alerts, duplicate = ingest_event(get_db(), data, actor_id(), workspace_id(), training_run_id)

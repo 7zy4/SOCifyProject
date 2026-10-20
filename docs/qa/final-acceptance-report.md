@@ -1,22 +1,72 @@
-# Final acceptance report
+# تقرير القبول — SOCify
 
-Status: **NO-GO / NEEDS FIXES**
+القرار: **NO-GO / NEEDS FIXES**. لا تُعد النسخة إصدارًا نهائيًا جاهزًا للدمج وفق الملف المرفق.
 
-This report is intentionally evidence-driven. A feature implementation is not treated as a release candidate until the required GitHub checks pass on the final head SHA.
+## A. التنفيذ الفعلي
 
-## Current local evidence
+المستودع: https://github.com/7zy4/SOCifyProject — الفرع: feature/enterprise-platform-implementation — PR: https://github.com/7zy4/SOCifyProject/pull/2، ويبقى Draft. قاعدة المراجعة a32a33c12fa2a3b124fc3dd4820ea5d01ac0fc88. سجل CI على أحدث HEAD هو المرجع النهائي بعد نشر هذا التغيير.
 
-- Coverage correction, 2026-10-20: 285 passed, 1 browser test deselected in the local quality suite. The browser test runs separately in the browser job.
-- Combined statement and branch coverage: 93.18%, above the unchanged 90% gate. Reproduce with `python -m pytest -q --cov=socify --cov-branch --cov-report=xml --cov-fail-under=90`.
-- The correction adds 172 test cases covering invalid API requests, missing resources, detection and query budgets, backfill idempotency, case evidence and task state, playbook execution and retries, training scores, session revocation, MFA failures, and import limits. Application source, dependencies, workflow configuration and coverage exclusions are unchanged by this correction.
-- Ruff: pass.
-- mypy: pass for application and operational code.
-- Bandit currently excludes B608 globally. A clean run therefore does not establish absence of SQL injection; individual query review and removal or justification of exclusions remain required.
-- Browser: not verified locally because Chromium cannot start in the restricted execution container. The dedicated GitHub Actions browser job is mandatory and is not allowed to continue on error.
-- Remote security and single browser smoke jobs passed on the previous published head. They do not establish complete security or the required end-to-end journey coverage.
-- A confidentiality regression was reproduced: dashboard source aggregates exposed another trainee's source name. The query now applies the training-run visibility filter, with negative and privileged-access regression assertions.
-- Requirements traceability, import recovery, full API contract validation, load/soak and backup recovery acceptance remain incomplete or unverified. No claim of complete confidentiality, integrity, availability, or merge readiness is made.
+قرئ ملف التكليف كاملًا. أضيفت مصفوفة بكل **132 مطلبًا F01–F10** ومصفوفة لكل **60 رحلة E2E**. تشمل الإصلاحات عزل الكشف والأحداث والمؤشرات والاستجابات، حماية MFA، قفل الأدلة، تعارض تحديث القضايا، ترحيلًا ذريًا، والتحقق من المدخلات وعقد أخطاء API. لم تُخفّض عتبات النجاح ولم تُحذف اختبارات.
 
-## Gate decision
+| المجال | الحالة المثبتة |
+|---|---|
+| F01 الكشف | API وقواعد وترابط واختبارات؛ البناء البصري، بعض العمليات، ومقاييس الصحة/الأداء غير مكتملة |
+| F02 السيناريوهات | سلسلة أساسية وتشغيل حتمي وحالات محفوظة؛ المكتبة والمصمم والضغط الزمني والرحلة الكاملة غير مكتملة |
+| F03 الاستيراد | صيغ واختبارات Pipeline؛ حفظ الملف واستئناف العامل وواجهة الاستيراد الكاملة غير مكتملة |
+| F04 القضايا | دورة حياة وتقارير وأدلة واختبارات؛ الواجهة الكاملة والتعاون والتاريخ القديم غير مقبولة نهائيًا |
+| F05 الرسم | اشتقاق Graph وTimeline وSSE؛ التفاعلات وإتاحة الوصول وإعادة الاتصال غير مثبتة بالكامل |
+| F06 ATT&CK | Snapshot وواجهات تغطية؛ الحفاظ على النسخ المستوردة والتحقق المرجعي غير مكتملين |
+| F07 الصيد | Query محدودة ومؤشرات Offline مع عزل؛ تفاصيل المؤشر وواجهات البناء وTTL غير مكتملة |
+| F08 التقييم | Snapshot حتمي؛ الدقة التعليمية ومطابقة Ground Truth ودورة تسليم المتدرب تفشل القبول |
+| F09 الأمان | ضوابط واختبارات سلبية وإصلاحات؛ لا دليل على إغلاق كل المخاطر العالية أو مراجعة التاريخ |
+| F10 الاستجابة والتشغيل | تأثيرات محاكاة واختبارات وCI؛ استرداد المهام والتعويض الكامل والنشر الجديد غير مثبتة |
 
-The coverage blocker is resolved locally. Remote results for this correction must still be checked on its published head. Passing the six configured checks does not close the broader requirements traceability, security review, performance and recovery acceptance work listed above. Release acceptance remains NO-GO until those outstanding requirements have reproducible evidence; the pull request remains draft.
+## B. نتيجة الأمان
+
+راجع [المشكلات والإصلاحات واختباراتها](final-audit-findings.md). أُصلحت ثغرات فعلية أعادت الاختبارات إنتاجها، لكن مخاطر التاريخ القديم واسترداد المهام وصحة التقييم ما زالت مفتوحة. لا يوجد أساس لادعاء أن السرية والنزاهة والتوافر مكتملة أو أن عدد المخاطر العالية صفر.
+
+Bandit وفق الإعداد الحالي يمر مع استثناء B608. لم يتحول الاستثناء إلى دليل خلو من SQLi. المراجعة ذاتية وليست مستقلة.
+
+## C. الجودة والأداء
+
+نتيجة التشغيل المحلي النهائي: **319 passed، 1 deselected** في 35.26 ثانية، والتغطية المجمعة **93.18%** مع بقاء العتبة 90%. الاختبار المستبعد هو اختبار المتصفح الذي ينفذ في مهمة مستقلة. أضيفت 34 حالة اختبار انحدار في هذا التغيير. Ruff وmypy يمران، وBandit يمر وفق الاستثناء المعلن أدناه. تُفحص جودة GitHub وSCA والمتصفح على نفس HEAD بعد النشر؛ روابط النتائج وSHA النهائي توثّق في وصف PR #2 حتى لا تُنسب نتائج HEAD سابق لتغيير أحدث.
+
+تغطية security.py ما زالت دون 95% للأسطر و90% للفروع، ولذلك لم تجتز بوابة الوحدات الحرجة رغم نجاح بوابة التغطية المجمعة. لا يوجد ادعاء أن نجاح 319 اختبارًا يثبت اكتمال 132 مطلبًا.
+
+وجود اختبار Chromium واحد لا يساوي 60 رحلة. لا توجد نتائج قبول للحمل والـSoak المطلوبة، ولا تحقق كامل من تغطية الوحدات الحرجة/الجديدة. [ميزانيات الأداء](performance-slo.md) تحتفظ بالأهداف الأصلية دون استبدالها بقياسات شكلية.
+
+## D. النسبة الرياضية
+
+الأولويات والأوزان مثبّتة في RTM لهذه المراجعة: P0=8، P1=5. جميع البنود الإلزامية صُنفت P0/P1؛ لا خفض إلى P2/P3 لتحسين النسبة. لم تكن RTM سابقة موجودة، لذلك هذا تقييم تدقيقي محافظ، وليس ادعاء اتفاق مسبق على الأولويات قبل تنفيذ المشروع. أي PARTIAL في P0 ممنوع واحتسب صفرًا.
+
+| النتيجة | العدد |
+|---|---:|
+| PASS | 4 |
+| PARTIAL | 84 |
+| FAIL | 9 |
+| NOT TESTED بالكامل | 35 |
+| الإجمالي | 132 |
+
+Weighted Acceptance = 100 × 239 / 789 = **30.29%**. هذه نسبة **دليل قبول المطالب كاملة** وليست نسبة الأسطر المنفذة أو دقة اكتشاف التهديدات.
+
+P0 الكامل: 3/43 = 6.98%، والمطلوب 100%. P1 الكامل: 1/89 = 1.12%، والمطلوب 99%. بعض المطالب المركبة لها اختبارات جزئية كثيرة لكنها لا تُمنح PASS كاملًا. رحلة قبول متصفح/تشغيل مكتملة: **0/60 مثبتة بالكامل**؛ توجد اختبارات API داعمة موثقة لكل ما أمكن ربطه.
+
+Security، Functional Correctness، UX/Accessibility، Performance، Reliability، Maintainability، Documentation/Deployment، Data Quality، Educational Effectiveness: لا توجد نسب فرعية مقبولة بالكامل؛ حالات كل مجال وأسبابها أعلاه وفي RTM. لا يُنشأ متوسط يخفي هذه البوابات الرافضة.
+
+## E. التشغيل والتحقق
+
+التشغيل المحلي المعزول موثق في [README](../../README.md). الأوامر القابلة للإعادة بعد تفعيل بيئة Python وتثبيت المتطلبات:
+
+```bash
+python -m ruff check .
+python -m mypy socify scripts app.py create_db.py init_db.py run.py
+python -m scripts.generate_openapi
+git diff --exit-code docs/api/openapi.yaml
+python -m pytest -q --cov=socify --cov-branch --cov-report=xml --cov-fail-under=90
+python -m bandit -c pyproject.toml -r socify scripts app.py create_db.py init_db.py run.py
+python -m pip_audit -r requirements.txt
+python -m playwright install --with-deps chromium
+python -m pytest -m e2e tests/e2e
+```
+
+استخدم قاعدة تدريب جديدة ومعزولة عند تجربة هذه النسخة. قبل ترقية بيانات قديمة، نفّذ نسخة احتياطية ومراجعة الروابط والتقارير المشار إليها في OPEN-01. لا تنشرها بوصفها إصدارًا نهائيًا قبل إغلاق البوابات.

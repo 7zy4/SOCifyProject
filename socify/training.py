@@ -1,5 +1,6 @@
 import hashlib
 import json
+import math
 import sqlite3
 from datetime import timedelta
 from typing import Any
@@ -94,7 +95,7 @@ def _validate_scenario(data: dict[str, Any]) -> tuple[dict[str, Any] | None, obj
     scoring = data.get("scoring_policy", {"detection": 25, "investigation": 25, "response": 20, "evidence": 15, "time": 10, "false_positive": 5})
     if not isinstance(name, str) or not 3 <= len(name.strip()) <= 180 or not isinstance(description, str) or len(description) > 5000:
         return None, error_response("INVALID_SCENARIO", "اسم السيناريو ووصفه غير صالحين", 422)
-    if difficulty not in DIFFICULTIES or not isinstance(objectives, list) or not objectives or any(not isinstance(item, str) for item in objectives):
+    if not isinstance(difficulty, str) or difficulty not in DIFFICULTIES or not isinstance(objectives, list) or not objectives or any(not isinstance(item, str) for item in objectives):
         return None, error_response("INVALID_SCENARIO", "الصعوبة أو الأهداف غير صالحة", 422)
     if not isinstance(steps, list) or not 1 <= len(steps) <= 50:
         return None, error_response("INVALID_SCENARIO_STEPS", "يلزم من خطوة واحدة إلى 50 خطوة", 422)
@@ -104,16 +105,37 @@ def _validate_scenario(data: dict[str, Any]) -> tuple[dict[str, Any] | None, obj
         if not isinstance(step, dict) or not isinstance(step.get("name"), str) or not isinstance(step.get("event"), dict):
             return None, error_response("INVALID_SCENARIO_STEP", f"الخطوة {index} غير صالحة", 422)
         position = step.get("position", index)
-        if not isinstance(position, int) or position in positions:
+        if type(position) is not int or position < 1 or position in positions:
             return None, error_response("INVALID_SCENARIO_STEP", "ترتيب الخطوات غير صالح", 422)
+        truth = step.get("ground_truth", {})
+        if not isinstance(truth, dict):
+            return None, error_response("INVALID_SCENARIO_STEP", "معايير الخطوة غير صالحة", 422)
+        weight = truth.get("score_weight", 1)
+        if type(weight) not in (int, float) or not math.isfinite(weight) or weight <= 0:
+            return None, error_response("INVALID_SCENARIO_STEP", "وزن الخطوة غير صالح", 422)
+        for field in ("expected_detections", "relevant_evidence", "allowed_responses"):
+            values = truth.get(field, [])
+            if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+                return None, error_response("INVALID_SCENARIO_STEP", "معايير الخطوة غير صالحة", 422)
+        repeat = step["event"].get("repeat", 1)
+        if type(repeat) is not int or not 1 <= repeat <= 50:
+            return None, error_response("INVALID_SCENARIO_STEP", "تكرار الخطوة غير صالح", 422)
+        for values in (step.get("mitre_ids", []), step["event"].get("tags", [])):
+            if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+                return None, error_response("INVALID_SCENARIO_STEP", "وسوم الخطوة غير صالحة", 422)
         serialized = json.dumps(step["event"], ensure_ascii=False)
         if any(token in serialized.casefold() for token in ("http://", "https://", "password=", "authorization")):
             return None, error_response("UNSAFE_SCENARIO_STEP", "لا يسمح السيناريو باتصالات أو بيانات اعتماد خارجية", 422)
         positions.add(position)
         normalized_steps.append({**step, "position": position, "step_id": str(step.get("step_id") or f"step-{position}")[:80]})
-    if not isinstance(scoring, dict) or sum(float(value) for value in scoring.values()) != 100:
+    if positions != set(range(1, len(steps) + 1)):
+        return None, error_response("INVALID_SCENARIO_STEP", "ترتيب الخطوات غير صالح", 422)
+    if not isinstance(scoring, dict) or any(type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 100 for value in scoring.values()) or sum(scoring.values()) != 100:
         return None, error_response("INVALID_SCORING_POLICY", "يجب أن يساوي مجموع أوزان التقييم 100", 422)
-    return {"name": name.strip(), "description": description.strip(), "difficulty": difficulty, "objectives": objectives, "steps": normalized_steps, "scoring_policy": scoring, "duration_minutes": int(data.get("duration_minutes", 30)), "roles": data.get("roles", ["analyst"]), "environment": data.get("environment", {"mode": "isolated_training"}), "visibility": data.get("visibility", "workspace")}, None
+    duration = data.get("duration_minutes", 30)
+    if type(duration) is not int or not 1 <= duration <= 1440:
+        return None, error_response("INVALID_SCENARIO", "مدة السيناريو غير صالحة", 422)
+    return {"name": name.strip(), "description": description.strip(), "difficulty": difficulty, "objectives": objectives, "steps": normalized_steps, "scoring_policy": scoring, "duration_minutes": duration, "roles": data.get("roles", ["analyst"]), "environment": data.get("environment", {"mode": "isolated_training"}), "visibility": data.get("visibility", "workspace")}, None
 
 
 @training_api.post("/api/scenarios")
@@ -149,7 +171,7 @@ def transition_scenario(scenario_id: int):
     target = data.get("state") if isinstance(data, dict) else None
     if not row:
         return error_response("SCENARIO_NOT_FOUND", "السيناريو غير موجود", 404)
-    if target not in SCENARIO_STATES.get(row["state"], set()):
+    if not isinstance(target, str) or target not in SCENARIO_STATES.get(row["state"], set()):
         return error_response("ILLEGAL_SCENARIO_TRANSITION", "انتقال حالة السيناريو غير مسموح", 409)
     if target == "validated":
         steps = int(get_db().execute("SELECT COUNT(*) FROM scenario_steps s JOIN scenario_versions v ON v.id = s.scenario_version_id WHERE v.scenario_id = ? AND v.version = ?", (scenario_id, row["active_version"])).fetchone()[0])
@@ -234,10 +256,15 @@ def _start_run(data: dict[str, Any]):
     scenario = get_db().execute("SELECT * FROM attack_scenarios WHERE id = ? AND workspace_id = ? AND state IN ('published', 'ready')", (data["scenario_id"], workspace_id())).fetchone()
     if not scenario:
         return error_response("SCENARIO_NOT_AVAILABLE", "السيناريو غير منشور أو غير موجود", 404)
-    version = _required_version(_scenario_version(int(scenario["id"]), data.get("version") if isinstance(data.get("version"), int) else None))
+    version = _scenario_version(int(scenario["id"]), data.get("version") if isinstance(data.get("version"), int) else None)
+    if version is None:
+        return error_response("SCENARIO_NOT_AVAILABLE", "نسخة السيناريو غير موجودة", 404)
     difficulty = data.get("difficulty", version["difficulty"])
-    if difficulty not in DIFFICULTIES:
+    if not isinstance(difficulty, str) or difficulty not in DIFFICULTIES:
         return error_response("INVALID_DIFFICULTY", "مستوى الصعوبة غير صالح", 422)
+    rate = data.get("playback_rate", 1)
+    if type(rate) not in (int, float) or not math.isfinite(rate) or not 0 < rate <= 100:
+        return error_response("INVALID_PLAYBACK_RATE", "سرعة التشغيل غير صالحة", 422)
     seed = data.get("seed")
     if not isinstance(seed, int):
         seed = int(hashlib.sha256(f"{version['id']}:{actor_id()}:{iso_now()}".encode()).hexdigest()[:8], 16)

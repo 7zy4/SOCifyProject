@@ -461,6 +461,14 @@ CREATE TABLE IF NOT EXISTS ioc_indicators (
     tags TEXT NOT NULL DEFAULT '[]',
     UNIQUE (workspace_id, type, value)
 );
+CREATE TABLE IF NOT EXISTS ioc_observations (
+    ioc_id INTEGER NOT NULL REFERENCES ioc_indicators(id),
+    event_id INTEGER NOT NULL REFERENCES security_events(id),
+    context TEXT NOT NULL,
+    tags TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (ioc_id, event_id)
+);
 CREATE TABLE IF NOT EXISTS ioc_enrichment_results (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ioc_id INTEGER NOT NULL REFERENCES ioc_indicators(id),
@@ -657,7 +665,9 @@ CREATE INDEX IF NOT EXISTS idx_users_workspace ON users(workspace_id, is_active)
 CREATE INDEX IF NOT EXISTS idx_events_workspace_time ON security_events(workspace_id, event_time DESC);
 CREATE INDEX IF NOT EXISTS idx_events_source_time ON security_events(workspace_id, source, event_time DESC);
 CREATE INDEX IF NOT EXISTS idx_events_identity ON security_events(workspace_id, source_ip, username, event_time DESC);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_events_idempotency ON security_events(workspace_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
+DROP INDEX IF EXISTS idx_events_idempotency;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_events_scope_idempotency ON security_events(workspace_id, COALESCE(training_run_id, 0), idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_events_run_time ON security_events(workspace_id, training_run_id, event_time);
 CREATE INDEX IF NOT EXISTS idx_rules_workspace_active ON rules(workspace_id, is_active, archived_at);
 CREATE INDEX IF NOT EXISTS idx_alerts_workspace_status ON alerts(workspace_id, status, detected_at DESC);
 CREATE INDEX IF NOT EXISTS idx_cases_workspace_status ON incident_cases(workspace_id, status, updated_at DESC);
@@ -701,6 +711,12 @@ def _ensure_columns(connection: sqlite3.Connection) -> None:
 
 def _normalize_existing_rows(connection: sqlite3.Connection) -> None:
     now = iso_now()
+    for indicator in connection.execute("SELECT id, workspace_id, context, last_seen FROM ioc_indicators WHERE source = 'SOCify extraction'").fetchall():
+        context = json.loads(indicator["context"])
+        event_id = context.get("event_id") if isinstance(context, dict) else None
+        event = connection.execute("SELECT id FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, indicator["workspace_id"])).fetchone() if type(event_id) is int else None
+        if event:
+            connection.execute("INSERT OR IGNORE INTO ioc_observations (ioc_id, event_id, context, tags, created_at) VALUES (?, ?, ?, '[\"training\"]', ?)", (indicator["id"], event_id, indicator["context"], indicator["last_seen"]))
     connection.execute("UPDATE users SET workspace_id = 1 WHERE workspace_id IS NULL")
     connection.execute("UPDATE users SET created_at = COALESCE(created_at, ?)", (now,))
     if _table_exists(connection, "security_events"):
@@ -787,15 +803,26 @@ def seed_reference_data(connection: sqlite3.Connection) -> None:
     connection.execute("INSERT INTO schema_meta (key, value, updated_at) VALUES ('attack_snapshot_source', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at", (catalog["source_url"], now))
 
 
+def _execute_schema(connection: sqlite3.Connection, schema: str) -> None:
+    statement = ""
+    for line in schema.splitlines(keepends=True):
+        statement += line
+        if sqlite3.complete_statement(statement):
+            connection.execute(statement)
+            statement = ""
+    if statement.strip():
+        raise ValueError("incomplete schema statement")
+
+
 def ensure_schema(connection: sqlite3.Connection) -> None:
     connection.execute("BEGIN IMMEDIATE")
     try:
-        connection.executescript(BASE_SCHEMA)
+        _execute_schema(connection, BASE_SCHEMA)
         _ensure_columns(connection)
         seed_reference_data(connection)
         _normalize_existing_rows(connection)
         _migrate_legacy_incidents(connection)
-        connection.executescript(INDEX_SCHEMA)
+        _execute_schema(connection, INDEX_SCHEMA)
         connection.commit()
     except Exception:
         connection.rollback()

@@ -125,7 +125,7 @@ def _login_response(data: dict[str, Any]):
     email = data.get("email")
     password = data.get("password")
     ip_address = request.remote_addr or "unknown"
-    if not isinstance(email, str) or not isinstance(password, str) or not email.strip() or not password:
+    if not isinstance(email, str) or not isinstance(password, str) or not email.strip() or not password or len(password.encode()) > 72:
         return error_response("INVALID_CREDENTIALS", "بيانات الدخول غير صحيحة", 401)
     normalized_email = email.strip().lower()
     if _rate_limited(normalized_email, ip_address):
@@ -306,7 +306,7 @@ def change_password():
     current = data.get("current_password")
     new = data.get("new_password")
     problem = password_error(new)
-    if not isinstance(current, str) or problem:
+    if not isinstance(current, str) or len(current.encode()) > 72 or problem:
         return error_response("INVALID_PASSWORD_CHANGE", problem or "كلمة المرور الحالية مطلوبة", 422)
     user = get_db().execute("SELECT password_hash FROM users WHERE id = ? AND is_active = 1", (actor_id(),)).fetchone()
     if not user or not bcrypt.checkpw(current.encode(), user["password_hash"].encode()):
@@ -325,14 +325,19 @@ def change_password():
 @auth_api.post("/api/auth/mfa/enroll")
 @login_required
 def mfa_enroll():
+    enrollment = get_db().execute("SELECT enabled FROM mfa_enrollments WHERE user_id = ?", (actor_id(),)).fetchone()
+    if enrollment and enrollment["enabled"]:
+        return error_response("MFA_ALREADY_ENABLED", "ألغِ التفعيل الحالي بعد التحقق قبل إعادة التسجيل", 409)
     secret = generate_totp_secret()
     encrypted = encrypt_secret(secret)
-    get_db().execute(
+    updated = get_db().execute(
         """INSERT INTO mfa_enrollments (user_id, secret_ciphertext, enabled, updated_at)
         VALUES (?, ?, 0, ?) ON CONFLICT(user_id) DO UPDATE SET secret_ciphertext = excluded.secret_ciphertext,
-        enabled = 0, verified_at = NULL, updated_at = excluded.updated_at""",
+        enabled = 0, verified_at = NULL, updated_at = excluded.updated_at WHERE mfa_enrollments.enabled = 0""",
         (actor_id(), encrypted, iso_now()),
     )
+    if updated.rowcount != 1:
+        return error_response("MFA_ALREADY_ENABLED", "ألغِ التفعيل الحالي بعد التحقق قبل إعادة التسجيل", 409)
     user = _active_user()
     uri = f"otpauth://totp/SOCify:{user['email']}?secret={secret}&issuer=SOCify&algorithm=SHA1&digits=6&period=30"
     record_audit(get_db(), "enroll_started", "mfa", actor_id())
@@ -372,7 +377,7 @@ def mfa_disable():
     password = data.get("current_password")
     code = data.get("code")
     user = get_db().execute("SELECT password_hash FROM users WHERE id = ?", (actor_id(),)).fetchone()
-    if not isinstance(password, str) or not user or not bcrypt.checkpw(password.encode(), user["password_hash"].encode()) or not _mfa_valid(actor_id(), code):
+    if not isinstance(password, str) or len(password.encode()) > 72 or not user or not bcrypt.checkpw(password.encode(), user["password_hash"].encode()) or not _mfa_valid(actor_id(), code):
         return error_response("REAUTHENTICATION_FAILED", "يلزم التحقق من كلمة المرور ورمز المصادقة", 403)
     with transaction():
         get_db().execute("DELETE FROM mfa_backup_codes WHERE user_id = ?", (actor_id(),))

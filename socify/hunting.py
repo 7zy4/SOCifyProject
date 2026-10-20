@@ -1,6 +1,7 @@
 import ipaddress
 import json
 import re
+import sqlite3
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
@@ -277,10 +278,29 @@ def _upsert_ioc(value_type: str, value: str, context: dict[str, Any]) -> int:
     now = iso_now()
     existing = get_db().execute("SELECT id FROM ioc_indicators WHERE workspace_id = ? AND type = ? AND value = ?", (workspace_id(), value_type, value)).fetchone()
     if existing:
-        get_db().execute("UPDATE ioc_indicators SET last_seen = ?, context = ? WHERE id = ?", (now, json.dumps(context, ensure_ascii=False), existing["id"]))
-        return int(existing["id"])
-    cursor = get_db().execute("INSERT INTO ioc_indicators (workspace_id, type, value, first_seen, last_seen, confidence, source, context, tags) VALUES (?, ?, ?, ?, ?, 0.5, 'SOCify extraction', ?, '[\"training\"]')", (workspace_id(), value_type, value, now, now, json.dumps(context, ensure_ascii=False)))
-    return inserted_id(cursor)
+        identifier = int(existing["id"])
+    else:
+        cursor = get_db().execute("INSERT INTO ioc_indicators (workspace_id, type, value, first_seen, last_seen, confidence, source, context, tags) VALUES (?, ?, ?, ?, ?, 0.5, 'SOCify extraction', '{}', '[\"training\"]')", (workspace_id(), value_type, value, now, now))
+        identifier = inserted_id(cursor)
+    get_db().execute("INSERT OR IGNORE INTO ioc_observations (ioc_id, event_id, context, tags, created_at) VALUES (?, ?, ?, '[\"training\"]', ?)", (identifier, context["event_id"], json.dumps(context, ensure_ascii=False), now))
+    return identifier
+
+
+def _ioc_view(row: sqlite3.Row) -> dict[str, Any] | None:
+    scope, parameters = _run_scope()
+    observations = get_db().execute(f"SELECT o.* FROM ioc_observations o JOIN security_events e ON e.id = o.event_id WHERE o.ioc_id = ? AND e.workspace_id = ?{scope} ORDER BY o.created_at, o.event_id", (row["id"], workspace_id(), *parameters)).fetchall()
+    item = dict(row)
+    if observations:
+        item["first_seen"] = observations[0]["created_at"]
+        item["last_seen"] = observations[-1]["created_at"]
+        item["context"] = json.loads(observations[-1]["context"])
+        item["tags"] = sorted({tag for observation in observations for tag in json.loads(observation["tags"])})
+    elif row["source"] == "SOCify synthetic fixtures":
+        item["context"] = json.loads(row["context"])
+        item["tags"] = json.loads(row["tags"])
+    else:
+        return None
+    return item
 
 
 @hunting_api.post("/api/iocs/extract")
@@ -315,10 +335,10 @@ def list_iocs():
     rows = get_db().execute("SELECT * FROM ioc_indicators WHERE workspace_id = ? ORDER BY last_seen DESC LIMIT 500", (workspace_id(),)).fetchall()
     items = []
     for row in rows:
-        item = dict(row)
-        item["context"] = json.loads(item["context"])
-        item["tags"] = json.loads(item["tags"])
-        items.append(item)
+        item = _ioc_view(row)
+        if item is not None:
+            items.append(item)
+    items.sort(key=lambda item: item["last_seen"], reverse=True)
     return jsonify({"items": items})
 
 
@@ -326,7 +346,7 @@ def list_iocs():
 @require_permission("hunt.execute")
 def enrich_ioc(ioc_id: int):
     row = get_db().execute("SELECT * FROM ioc_indicators WHERE id = ? AND workspace_id = ?", (ioc_id, workspace_id())).fetchone()
-    if not row:
+    if not row or _ioc_view(row) is None:
         return error_response("IOC_NOT_FOUND", "المؤشر غير موجود", 404)
     provider = request.args.get("provider", "offline")
     now = iso_now()

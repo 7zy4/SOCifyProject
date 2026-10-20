@@ -16,7 +16,7 @@ def generate() -> dict[str, object]:
         parameters = [{"name": argument, "in": "path", "required": True, "schema": {"type": "integer" if f"<int:{argument}>" in rule.rule else "string"}} for argument in sorted(rule.arguments)]
         for method in sorted(set(rule.methods or ()) - {"HEAD", "OPTIONS"}):
             operation: dict[str, object] = {
-                "operationId": rule.endpoint.replace(".", "_"),
+                "operationId": rule.endpoint.replace(".", "_") + "_" + method.lower() + "_" + path.replace("/", "_").replace("{", "").replace("}", ""),
                 "responses": {
                     "200": {"description": "Successful response"},
                     "400": {"$ref": "#/components/responses/BadRequest"},
@@ -35,7 +35,7 @@ def generate() -> dict[str, object]:
         "servers": [{"url": "/"}],
         "paths": paths,
         "components": {
-            "schemas": {"Error": {"type": "object", "required": ["error", "message"], "properties": {"error": {"type": "string"}, "message": {"type": "string"}, "correlation_id": {"type": "string"}}}},
+            "schemas": {"Error": {"type": "object", "required": ["error", "correlation_id"], "properties": {"error": {"type": "object", "required": ["code", "message"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "details": {"type": "object"}}}, "correlation_id": {"type": "string"}}}},
             "responses": {
                 "BadRequest": {"description": "Invalid request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
                 "Unauthorized": {"description": "Authentication required", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},

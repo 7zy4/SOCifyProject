@@ -134,11 +134,11 @@ def _validate_condition(node: object, path: str, depth: int, errors: list[str], 
     if "field" in node:
         field = node.get("field")
         operator = node.get("operator")
-        if field not in FIELDS:
+        if not isinstance(field, str) or field not in FIELDS:
             errors.append(f"{path}.field: unsupported field")
-        if operator not in OPERATORS:
+        if not isinstance(operator, str) or operator not in OPERATORS:
             errors.append(f"{path}.operator: unsupported operator")
-        if operator not in {"exists"} and "value" not in node:
+        if operator != "exists" and "value" not in node:
             errors.append(f"{path}.value: value is required")
         if operator == "in" and (not isinstance(node.get("value"), list) or len(node.get("value", [])) > 100):
             errors.append(f"{path}.value: in requires a list with at most 100 items")
@@ -150,7 +150,7 @@ def _validate_condition(node: object, path: str, depth: int, errors: list[str], 
         return
     logic = node.get("logic")
     children = node.get("conditions")
-    if logic not in {"and", "or", "not"}:
+    if not isinstance(logic, str) or logic not in {"and", "or", "not"}:
         errors.append(f"{path}.logic: expected and, or, or not")
     if not isinstance(children, list) or not children or len(children) > 20:
         errors.append(f"{path}.conditions: expected 1-20 conditions")
@@ -176,15 +176,15 @@ def validate_dsl(value: object) -> dict[str, Any]:
             threshold = window.get("threshold")
             group_by = window.get("group_by", [])
             mode = window.get("mode", "count")
-            if not isinstance(seconds, int) or not 1 <= seconds <= 604800:
+            if type(seconds) is not int or not 1 <= seconds <= 604800:
                 errors.append("window.seconds must be between 1 and 604800")
-            if not isinstance(threshold, int) or not 1 <= threshold <= 10000:
+            if type(threshold) is not int or not 1 <= threshold <= 10000:
                 errors.append("window.threshold must be between 1 and 10000")
-            if not isinstance(group_by, list) or len(group_by) > 4 or any(item not in FIELDS for item in group_by):
+            if not isinstance(group_by, list) or len(group_by) > 4 or any(not isinstance(item, str) or item not in FIELDS for item in group_by):
                 errors.append("window.group_by contains unsupported fields")
-            if mode not in {"count", "distinct_count"}:
+            if not isinstance(mode, str) or mode not in {"count", "distinct_count"}:
                 errors.append("window.mode must be count or distinct_count")
-            if mode == "distinct_count" and window.get("distinct_field") not in FIELDS:
+            if mode == "distinct_count" and (not isinstance(window.get("distinct_field"), str) or window["distinct_field"] not in FIELDS):
                 errors.append("window.distinct_field is required for distinct_count")
             allowed_lateness = window.get("allowed_lateness_seconds", 86400)
             if not isinstance(allowed_lateness, int) or not 0 <= allowed_lateness <= 2592000:
@@ -261,9 +261,9 @@ def _candidate_events(connection: sqlite3.Connection, event: dict[str, Any], sec
     start = end - timedelta(seconds=seconds)
     rows = connection.execute(
         """SELECT * FROM security_events
-        WHERE workspace_id = ? AND source != 'rules_engine' AND event_time >= ? AND event_time <= ?
+        WHERE workspace_id = ? AND training_run_id IS ? AND source != 'rules_engine' AND event_time >= ? AND event_time <= ?
         ORDER BY event_time, id LIMIT 20000""",
-        (event["workspace_id"], start.isoformat().replace("+00:00", "Z"), end.isoformat().replace("+00:00", "Z")),
+        (event["workspace_id"], event.get("training_run_id"), start.isoformat().replace("+00:00", "Z"), end.isoformat().replace("+00:00", "Z")),
     ).fetchall()
     return [_event_dict(row) for row in rows]
 
@@ -278,7 +278,7 @@ def evaluate_dsl(connection: sqlite3.Connection, dsl: dict[str, Any], event: dic
     threshold = int(window["threshold"])
     group_fields = [str(item) for item in window.get("group_by", [])]
     target_group = _group_key(event, group_fields)
-    max_time_row = connection.execute("SELECT MAX(event_time) FROM security_events WHERE workspace_id = ? AND source != 'rules_engine'", (event["workspace_id"],)).fetchone()
+    max_time_row = connection.execute("SELECT MAX(event_time) FROM security_events WHERE workspace_id = ? AND training_run_id IS ? AND source != 'rules_engine'", (event["workspace_id"], event.get("training_run_id"))).fetchone()
     max_time = parse_timestamp(max_time_row[0]) if max_time_row and max_time_row[0] else parse_timestamp(event["event_time"])
     lateness = int((max_time - parse_timestamp(event["event_time"])).total_seconds())
     allowed_lateness = int(window.get("allowed_lateness_seconds", 86400))
@@ -469,7 +469,7 @@ def _rule_payload() -> tuple[dict[str, Any] | None, object | None]:
     if not isinstance(name, str) or not 3 <= len(name.strip()) <= 150 or not isinstance(description, str) or len(description) > 2000:
         return None, error_response("INVALID_RULE_METADATA", "تحقق من اسم القاعدة ووصفها", 422)
     action = data.get("action", {"severity": "medium", "confidence": 0.85})
-    if not isinstance(action, dict) or action.get("severity", "medium") not in SEVERITIES:
+    if not isinstance(action, dict) or not isinstance(action.get("severity", "medium"), str) or action.get("severity", "medium") not in SEVERITIES:
         return None, error_response("INVALID_RULE_ACTION", "إجراء القاعدة غير صالح", 422)
     return {"name": name.strip(), "description": description.strip(), "dsl": dsl, "action": action, "active": bool(data.get("active", False)), "change_summary": str(data.get("change_summary") or "Rule created")[:500]}, None
 

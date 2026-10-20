@@ -78,7 +78,8 @@ def _reference(connection: sqlite3.Connection) -> str:
 
 def _attach_event(connection: sqlite3.Connection, case_id: int, event_id: int) -> bool:
     event = connection.execute("SELECT id, event_id, title, raw_hash, provenance, training_run_id FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, workspace_id())).fetchone()
-    if not event or not can_access_training_run(event["training_run_id"]):
+    case = connection.execute("SELECT training_run_id FROM incident_cases WHERE id = ? AND workspace_id = ?", (case_id, workspace_id())).fetchone()
+    if not event or not case or event["training_run_id"] != case["training_run_id"] or not can_access_training_run(event["training_run_id"]):
         return False
     now = iso_now()
     connection.execute("INSERT OR IGNORE INTO case_events (case_id, event_id, attached_by, attached_at) VALUES (?, ?, ?, ?)", (case_id, event_id, actor_id(), now))
@@ -93,7 +94,8 @@ def _attach_event(connection: sqlite3.Connection, case_id: int, event_id: int) -
 
 def _attach_alert(connection: sqlite3.Connection, case_id: int, alert_id: int) -> bool:
     alert = connection.execute("SELECT id, alert_id, reason, dedup_key, evidence, training_run_id FROM alerts WHERE id = ? AND workspace_id = ?", (alert_id, workspace_id())).fetchone()
-    if not alert or not can_access_training_run(alert["training_run_id"]):
+    case = connection.execute("SELECT training_run_id FROM incident_cases WHERE id = ? AND workspace_id = ?", (case_id, workspace_id())).fetchone()
+    if not alert or not case or alert["training_run_id"] != case["training_run_id"] or not can_access_training_run(alert["training_run_id"]):
         return False
     now = iso_now()
     connection.execute("INSERT OR IGNORE INTO case_alerts (case_id, alert_id, attached_by, attached_at) VALUES (?, ?, ?, ?)", (case_id, alert_id, actor_id(), now))
@@ -194,6 +196,9 @@ def _create_case(data: dict[str, Any]):
     if training_run_id is None and alert_ids:
         source_alert = get_db().execute("SELECT training_run_id FROM alerts WHERE id = ? AND workspace_id = ?", (alert_ids[0], workspace_id())).fetchone()
         training_run_id = source_alert["training_run_id"] if source_alert else None
+    if training_run_id is None and event_ids:
+        source_event = get_db().execute("SELECT training_run_id FROM security_events WHERE id = ? AND workspace_id = ?", (event_ids[0], workspace_id())).fetchone()
+        training_run_id = source_event["training_run_id"] if source_event else None
     if not can_access_training_run(training_run_id):
         return error_response("TRAINING_RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
     now = iso_now()
@@ -202,6 +207,14 @@ def _create_case(data: dict[str, Any]):
     user = current_user()
     team = str(data.get("team") or (user.get("team") if user else "") or "")[:120]
     with transaction():
+        for event_id in event_ids:
+            event = get_db().execute("SELECT training_run_id FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, workspace_id())).fetchone()
+            if not event or event["training_run_id"] != training_run_id or not can_access_training_run(event["training_run_id"]):
+                return error_response("EVENT_NOT_FOUND", "السجل غير موجود", 404)
+        for alert_id in alert_ids:
+            alert = get_db().execute("SELECT training_run_id FROM alerts WHERE id = ? AND workspace_id = ?", (alert_id, workspace_id())).fetchone()
+            if not alert or alert["training_run_id"] != training_run_id or not can_access_training_run(alert["training_run_id"]):
+                return error_response("ALERT_NOT_FOUND", "التنبيه غير موجود", 404)
         cursor = get_db().execute(
             """INSERT INTO incident_cases
             (reference, workspace_id, training_run_id, title, description, case_type, severity, priority, status,
@@ -311,7 +324,9 @@ def update_case(case_id: int):
     now = iso_now()
     assignments = ", ".join(f"{field} = ?" for field in updates)
     with transaction():
-        get_db().execute(f"UPDATE incident_cases SET {assignments}, updated_at = ?, version = version + 1 WHERE id = ?", (*updates.values(), now, case_id))
+        changed = get_db().execute(f"UPDATE incident_cases SET {assignments}, updated_at = ?, version = version + 1 WHERE id = ? AND version = ?", (*updates.values(), now, case_id, row["version"]))
+        if changed.rowcount != 1:
+            return error_response("CASE_VERSION_CONFLICT", "تم تعديل التحقيق في جلسة أخرى", 409)
         _history(get_db(), case_id, "case_updated", {key: row[key] for key in updates}, updates, str(data.get("reason") or "")[:500] or None)
         record_audit(get_db(), "update", "case", case_id, details={"fields": list(updates)})
         insert_outbox(get_db(), workspace_id(), "incident.updated", {"id": case_id, "version": int(row["version"]) + 1})
@@ -348,7 +363,9 @@ def _transition(case_id: int, row: sqlite3.Row, target: str, reason: str, data: 
         extra["closed_at"] = None
     assignments = ["status = ?", "updated_at = ?", "version = version + 1"] + [f"{field} = ?" for field in extra]
     with transaction():
-        get_db().execute(f"UPDATE incident_cases SET {', '.join(assignments)} WHERE id = ?", (target, now, *extra.values(), case_id))
+        changed = get_db().execute(f"UPDATE incident_cases SET {', '.join(assignments)} WHERE id = ? AND version = ?", (target, now, *extra.values(), case_id, row["version"]))
+        if changed.rowcount != 1:
+            return error_response("CASE_VERSION_CONFLICT", "تم تعديل التحقيق في جلسة أخرى", 409)
         _history(get_db(), case_id, "status_changed", row["status"], target, reason)
         record_audit(get_db(), "transition", "case", case_id, details={"from": row["status"], "to": target, "reason": reason})
         record_training_action(get_db(), row["training_run_id"], actor_id(), "case_transition", "case", case_id, {"from": row["status"], "to": target}, f"case-transition:{case_id}:{row['version']}:{target}")
@@ -401,6 +418,8 @@ def add_case_event(case_id: int):
     row = _case_row(case_id)
     if not row:
         return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
+    if row["status"] == "closed":
+        return error_response("CASE_EVIDENCE_LOCKED", "الأدلة مقفلة بعد إغلاق التحقيق", 409)
     data = request.get_json(silent=True)
     event_id = data.get("event_id") if isinstance(data, dict) else None
     if not isinstance(event_id, int):
@@ -420,6 +439,8 @@ def add_case_alert(case_id: int):
     row = _case_row(case_id)
     if not row:
         return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
+    if row["status"] == "closed":
+        return error_response("CASE_EVIDENCE_LOCKED", "الأدلة مقفلة بعد إغلاق التحقيق", 409)
     data = request.get_json(silent=True)
     alert_id = data.get("alert_id") if isinstance(data, dict) else None
     if not isinstance(alert_id, int):
