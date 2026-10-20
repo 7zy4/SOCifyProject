@@ -1,5 +1,9 @@
 # SOCify
 
+> **فرع التطوير الموحد:** [feature/socify-browser-review-2026-10-20](https://github.com/7zy4/SOCifyProject/tree/feature/socify-browser-review-2026-10-20) — يشمل أعمال المرحلة الأولى والمنصة المؤسسية وتحسين تشغيل Codespaces، دون تعديل `main`. [تقرير تدقيق الفروع والمتطلبات](docs/qa/branch-consolidation-2026-10-20.md). النسخة **NO-GO** حتى إغلاق متطلبات القبول.
+>
+> [تجربة Codespaces من المتصفح](docs/codespaces.md) · [مصفوفة 132 مطلبًا](docs/qa/requirements-traceability.csv) · [60 رحلة قبول](docs/qa/e2e-acceptance.csv)
+
 SOCify منصة عربية مفتوحة المصدر لتدريب محللي مراكز العمليات الأمنية داخل بيئة محاكاة معزولة. تربط المنصة الاستيراد والتطبيع بقواعد الكشف والتنبيهات والتحقيقات وMITRE ATT&CK والصيد والرسم الزمني وخطط الاستجابة والتقييم، مع حفظ مصدر الدليل وسجل التدقيق.
 
 حالة القبول الحالية: **NO-GO**. النسخة فرع تطوير للاختبار المعزول، ولم يثبت اجتياز جميع متطلبات الإصدار النهائي. راجع [تقرير القبول](docs/qa/final-acceptance-report.md) و[نتائج المراجعة](docs/qa/final-audit-findings.md) قبل استخدامها أو دمجها.
