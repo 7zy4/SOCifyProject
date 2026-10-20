@@ -114,7 +114,9 @@ def test_training_hints_and_score_read_models(client, login_as, database):
     assert client.post(url + "/resume", json={}).status_code == 200
     completed = client.post(url + "/play", json={"steps": 50})
     assert completed.status_code == 200
-    score = completed.json["assessment"]
+    assert completed.json["state"] == "awaiting_submission"
+    assert client.get(url + "/score").status_code == 409
+    score = client.post(url + "/submit", json={}).json["assessment"]
     assert client.get(f"/api/assessments/{score['id']}").json["calculation_fingerprint"] == score["calculation_fingerprint"]
     assert client.get("/api/assessments/99999").status_code == 404
     assert len(client.get("/api/scores/me").json["items"]) == 1
