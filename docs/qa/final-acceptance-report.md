@@ -6,8 +6,9 @@ This report is intentionally evidence-driven. A feature implementation is not tr
 
 ## Current local evidence
 
-- Previous published head adcbf712f0b10d43f24d0c9eb007488e24f34cc7: 113 passed, 1 browser test deselected in the quality job.
-- Combined statement and branch coverage: 79% on the current working tree; the required 90% gate is not yet met.
+- Coverage correction, 2026-10-20: 285 passed, 1 browser test deselected in the local quality suite. The browser test runs separately in the browser job.
+- Combined statement and branch coverage: 93.18%, above the unchanged 90% gate. Reproduce with `python -m pytest -q --cov=socify --cov-branch --cov-report=xml --cov-fail-under=90`.
+- The correction adds 172 test cases covering invalid API requests, missing resources, detection and query budgets, backfill idempotency, case evidence and task state, playbook execution and retries, training scores, session revocation, MFA failures, and import limits. Application source, dependencies, workflow configuration and coverage exclusions are unchanged by this correction.
 - Ruff: pass.
 - mypy: pass for application and operational code.
 - Bandit currently excludes B608 globally. A clean run therefore does not establish absence of SQL injection; individual query review and removal or justification of exclusions remain required.
@@ -18,4 +19,4 @@ This report is intentionally evidence-driven. A feature implementation is not tr
 
 ## Gate decision
 
-The result is NO-GO because project coverage is below 90%, the browser test is not locally executable, and the final remote CI run has not yet passed. This document must be updated with the final head SHA, workflow run URLs, exact coverage, performance measurements, and the RTM score before the pull request can be marked ready for review.
+The coverage blocker is resolved locally. Remote results for this correction must still be checked on its published head. Passing the six configured checks does not close the broader requirements traceability, security review, performance and recovery acceptance work listed above. Release acceptance remains NO-GO until those outstanding requirements have reproducible evidence; the pull request remains draft.
