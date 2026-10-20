@@ -309,17 +309,52 @@ async function renderIncidents() {
 
 async function renderLab() {
   begin("lab");
-  const data = await api("/api/scenarios");
+  const [data, runs] = await Promise.all([api("/api/scenarios"), api("/api/training/runs")]);
   const root = node("div");
   const cards = node("div", { class: "cards" });
   data.items.forEach((scenario) => {
-    const start = button("بدء جلسة", async () => { try { const run = await api("/api/training/runs", { method: "POST", body: { scenario_id: scenario.id, difficulty: scenario.difficulty, auto_play: false } }); const result = await api(`/api/training/runs/${run.id}/play`, { method: "POST", body: { steps: 50 } }); showMessage(`بدأت الجلسة ${run.id} ووُلّد ${result.event_ids?.length || 0} سجل`, "success"); await renderLab(); } catch (error) { handleError(error); } }, "primary");
-    cards.append(node("article", { class: "card" }, [node("div", { class: "card-meta" }, [badge(scenario.difficulty), badge(scenario.state), badge(`${scenario.step_count} خطوات`)]), node("h3", { text: scenario.name }), node("p", { text: scenario.description }), node("p", { text: `المدة ${scenario.duration_minutes} دقيقة · محاولاتك ${scenario.attempt_count}` }), node("div", { class: "action-row" }, [start])]));
+    const start = button("بدء جلسة", async () => {
+      try {
+        const run = await api("/api/training/runs", { method: "POST", body: { scenario_id: scenario.id, difficulty: scenario.difficulty, auto_play: false } });
+        const result = await api(`/api/training/runs/${run.id}/play`, { method: "POST", body: { steps: 50 } });
+        showMessage(`أُنشئت ${result.event_ids?.length || 0} واقعة تدريبية. يمكنك التحقيق قبل تسليم محاولتك ${run.id}.`, "success");
+        await renderLab();
+      } catch (error) {
+        handleError(error);
+      }
+    }, "primary");
+    cards.append(node("article", { class: "card" }, [
+      node("div", { class: "card-meta" }, [badge(scenario.difficulty), badge(scenario.state), badge(`${scenario.step_count} خطوات`)]),
+      node("h3", { text: scenario.name }),
+      node("p", { text: scenario.description }),
+      node("p", { text: `المدة ${scenario.duration_minutes} دقيقة · محاولاتك ${scenario.attempt_count}` }),
+      node("div", { class: "action-row" }, [start]),
+    ]));
   });
-  root.append(pageHead("سيناريوهات سلاسل الهجوم", "كل الأحداث اصطناعية داخل مساحة التدريب وتعبر مسار السجلات والكشف نفسه"), data.items.length ? cards : emptyState("لا توجد سيناريوهات منشورة", "شغّل seed-data في بيئة development أو أنشئ سيناريو كمدرّب."));
+  const runColumns = [
+    { label: "المحاولة", value: (run) => node("span", { class: "mono", text: run.run_id }) },
+    { label: "السيناريو", value: "scenario_name" },
+    { label: "الحالة", value: (run) => badge(run.state) },
+    { label: "تاريخ البدء", value: (run) => formatTime(run.started_at) },
+    { label: "الإجراء", value: (run) => run.state === "awaiting_submission"
+      ? button("تسليم التقييم بعد التحقيق", async () => {
+        try {
+          await api(`/api/training/runs/${run.id}/submit`, { method: "POST", body: {} });
+          showMessage("تم اعتماد المحاولة وحساب الدرجة بناءً على قراراتك وأدلتك المسجلة", "success");
+          await renderLab();
+        } catch (error) {
+          handleError(error);
+        }
+      }, "primary")
+      : run.state === "completed" ? linkedButton("عرض التقييم", "/scores") : badge(run.state) },
+  ];
+  root.append(
+    pageHead("سيناريوهات سلاسل الهجوم", "المختبر يولّد أحداثًا تدريبية؛ التقييم لا يُحتسب حتى تسلّم المحاولة بنفسك"),
+    data.items.length ? cards : emptyState("لا توجد سيناريوهات منشورة", "شغّل seed-data في بيئة development أو أنشئ سيناريو كمدرّب."),
+    panel("محاولاتي التدريبية", runs.items.length ? table(runColumns, runs.items) : emptyState("لا توجد محاولات", "ابدأ جلسة ثم عالج الأحداث والتنبيهات في التحقيقات قبل تسليم تقييمك."), true),
+  );
   finish(root);
 }
-
 async function renderAttack() {
   begin("attack");
   const [matrix, coverage] = await Promise.all([api("/api/attack/matrix"), api("/api/attack/coverage")]);
