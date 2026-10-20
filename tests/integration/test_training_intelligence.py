@@ -24,8 +24,10 @@ def complete_run(client: FlaskClient, difficulty: str = "beginner", seed: int = 
     run_id = start_run(client, difficulty, seed)
     result = client.post(f"/api/training/runs/{run_id}/play", json={"steps": 50})
     assert result.status_code == 200
-    assert result.json["state"] == "completed"
-    return run_id, result.json
+    assert result.json["state"] == "awaiting_submission"
+    submitted = client.post(f"/api/training/runs/{run_id}/submit", json={})
+    assert submitted.status_code == 200
+    return run_id, {**result.json, **submitted.json}
 
 
 def test_e2e_27_beginner_chain_persists_events_alerts_and_score(client: FlaskClient, login_as: Callable[[str], None]) -> None:
@@ -69,7 +71,7 @@ def test_e2e_29_pause_resume_restart_and_replay_are_idempotent(client: FlaskClie
     assert client.post(f"/api/training/runs/{run_id}/play", json={"steps": 1}).status_code == 409
     assert client.post(f"/api/training/runs/{run_id}/resume", json={}).json["state"] == "running"
     second = client.post(f"/api/training/runs/{run_id}/play", json={"steps": 50})
-    assert second.json["state"] == "completed"
+    assert second.json["state"] == "awaiting_submission"
     before = len(client.get(f"/api/training/runs/{run_id}").json["events"])
     assert client.post(f"/api/training/runs/{run_id}/play", json={"steps": 50}).status_code == 409
     assert len(client.get(f"/api/training/runs/{run_id}").json["events"]) == before
