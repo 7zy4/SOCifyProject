@@ -59,11 +59,10 @@ def _learner_detection_results(
         )
         if row["step_id"]:
             item["steps"].add(str(row["step_id"]))
-        if row["action_id"] is not None:
-            if item["decision"] is None or int(row["action_id"]) >= int(item["decision"][0]):
-                payload = json.loads(row["payload"])
-                item["decision"] = (int(row["action_id"]), payload.get("status"))
-                item["triaged_at"] = row["occurred_at"]
+        if row["action_id"] is not None and (item["decision"] is None or int(row["action_id"]) >= int(item["decision"][0])):
+            payload = json.loads(row["payload"])
+            item["decision"] = (int(row["action_id"]), payload.get("status"))
+            item["triaged_at"] = row["occurred_at"]
     matched: set[tuple[str, str]] = set()
     true_positive = 0
     false_positive = 0
@@ -104,9 +103,7 @@ def _learner_evidence(
         for step, field in expected:
             if step != row["step_id"]:
                 continue
-            if field in row.keys() and row[field] not in (None, ""):
-                matched.add((step, field))
-            elif isinstance(raw, dict) and raw.get(field) not in (None, ""):
+            if (field in row and row[field] not in (None, "")) or (isinstance(raw, dict) and raw.get(field) not in (None, "")):
                 matched.add((step, field))
     return matched
 
