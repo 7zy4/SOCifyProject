@@ -28,6 +28,10 @@ def build_config() -> dict[str, object]:
     effective_secret = secret_key or secrets.token_bytes(32)
     database = os.environ.get("SOCIFY_DATABASE", str(Path.cwd() / "socify.db"))
     trusted_hosts = [item.strip() for item in os.environ.get("SOCIFY_TRUSTED_HOSTS", "localhost,127.0.0.1").split(",") if item.strip()]
+    codespace_name = os.environ.get("CODESPACE_NAME", "").strip()
+    codespace_port = _integer("SOCIFY_PORT", 5000)
+    if codespace_name and all(char in "abcdefghijklmnopqrstuvwxyz0123456789-" for char in codespace_name) and 1 <= codespace_port <= 65535:
+        trusted_hosts.append(f"{codespace_name}-{codespace_port}.app.github.dev")
     return {
         "ENV_NAME": environment,
         "SECRET_KEY": effective_secret,
