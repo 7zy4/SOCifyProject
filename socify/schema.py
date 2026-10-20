@@ -778,16 +778,19 @@ def _migrate_legacy_incidents(connection: sqlite3.Connection) -> None:
 
 def seed_reference_data(connection: sqlite3.Connection) -> None:
     now = iso_now()
-    catalog = _attack_catalog()
     connection.execute("INSERT OR IGNORE INTO training_workspaces (id, public_id, name, created_at) VALUES (1, 'workspace-default', 'SOCify Training', ?)", (now,))
+    existing_catalog = connection.execute("SELECT value FROM schema_meta WHERE key = 'attack_version'").fetchone()
+    if existing_catalog:
+        return
+    existing_rows = int(connection.execute("SELECT COUNT(*) FROM attack_techniques").fetchone()[0])
+    if existing_rows:
+        raise RuntimeError("ATT&CK catalog already contains records without version metadata; migration requires manual review")
+    catalog = _attack_catalog()
     for technique in catalog["techniques"]:
         connection.execute(
             """INSERT INTO attack_techniques
             (technique_id, name, tactic, description, source_url, attack_version, is_subtechnique)
-            VALUES (?, ?, ?, ?, ?, '20.0', ?)
-            ON CONFLICT(technique_id) DO UPDATE SET name = excluded.name, tactic = excluded.tactic,
-            description = excluded.description, source_url = excluded.source_url, attack_version = excluded.attack_version,
-            is_subtechnique = excluded.is_subtechnique""",
+            VALUES (?, ?, ?, ?, ?, '20.0', ?)""",
             (
                 technique["technique_id"],
                 technique["name"],
@@ -797,10 +800,10 @@ def seed_reference_data(connection: sqlite3.Connection) -> None:
                 1 if technique["is_subtechnique"] else 0,
             ),
         )
-    connection.execute("INSERT INTO schema_meta (key, value, updated_at) VALUES ('schema_version', '2', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at", (now,))
-    connection.execute("INSERT INTO schema_meta (key, value, updated_at) VALUES ('attack_version', '20.0', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at", (now,))
-    connection.execute("INSERT INTO schema_meta (key, value, updated_at) VALUES ('attack_snapshot_count', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at", (str(catalog["total_active"]), now))
-    connection.execute("INSERT INTO schema_meta (key, value, updated_at) VALUES ('attack_snapshot_source', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at", (catalog["source_url"], now))
+    connection.execute("INSERT OR IGNORE INTO schema_meta (key, value, updated_at) VALUES ('schema_version', '2', ?)", (now,))
+    connection.execute("INSERT INTO schema_meta (key, value, updated_at) VALUES ('attack_version', '20.0', ?)", (now,))
+    connection.execute("INSERT INTO schema_meta (key, value, updated_at) VALUES ('attack_snapshot_count', ?, ?)", (str(catalog["total_active"]), now))
+    connection.execute("INSERT INTO schema_meta (key, value, updated_at) VALUES ('attack_snapshot_source', ?, ?)", (catalog["source_url"], now))
 
 
 def _execute_schema(connection: sqlite3.Connection, schema: str) -> None:
