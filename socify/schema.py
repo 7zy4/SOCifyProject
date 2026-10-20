@@ -403,6 +403,7 @@ CREATE TABLE IF NOT EXISTS training_runs (
     started_at TEXT NOT NULL,
     paused_at TEXT,
     completed_at TEXT,
+    submitted_at TEXT,
     hints_used INTEGER NOT NULL DEFAULT 0,
     snapshot TEXT NOT NULL DEFAULT '{}'
 );
@@ -642,6 +643,7 @@ COLUMN_MIGRATIONS: dict[str, dict[str, str]] = {
         "failed_evaluations": "INTEGER NOT NULL DEFAULT 0",
         "suppressions": "INTEGER NOT NULL DEFAULT 0",
     },
+    "training_runs": {"submitted_at": "TEXT"},
     "detection_matches": {
         "alert_id": "INTEGER",
         "dedup_key": "TEXT",
