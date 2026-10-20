@@ -720,33 +720,6 @@
       }
     },
     "/api/events/{event_id}": {
-      "delete": {
-        "operationId": "events_delete_event_delete__api_events_event_id",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        },
-        "parameters": [
-          {
-            "name": "event_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ]
-      },
       "get": {
         "operationId": "events_event_detail_get__api_events_event_id",
         "responses": {
@@ -811,6 +784,33 @@
             }
           }
         }
+      },
+      "delete": {
+        "operationId": "events_delete_event_delete__api_events_event_id",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
       }
     },
     "/api/events/{event_id}/raw": {
@@ -987,23 +987,6 @@
       }
     },
     "/api/imports": {
-      "get": {
-        "operationId": "ingestion_list_imports_get__api_imports",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        }
-      },
       "post": {
         "operationId": "ingestion_create_import_post__api_imports",
         "responses": {
@@ -1029,6 +1012,23 @@
                 "additionalProperties": true
               }
             }
+          }
+        }
+      },
+      "get": {
+        "operationId": "ingestion_list_imports_get__api_imports",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         }
       }
@@ -2104,33 +2104,6 @@
       }
     },
     "/api/rules/{rule_id}": {
-      "delete": {
-        "operationId": "detection_archive_rule_delete__api_rules_rule_id",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        },
-        "parameters": [
-          {
-            "name": "rule_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ]
-      },
       "get": {
         "operationId": "detection_rule_detail_get__api_rules_rule_id",
         "responses": {
@@ -2195,6 +2168,33 @@
             }
           }
         }
+      },
+      "delete": {
+        "operationId": "detection_archive_rule_delete__api_rules_rule_id",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
       }
     },
     "/api/rules/{rule_id}/backfill": {
@@ -2708,33 +2708,6 @@
       }
     },
     "/api/sources/{source_id}": {
-      "delete": {
-        "operationId": "sources_disable_source_delete__api_sources_source_id",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        },
-        "parameters": [
-          {
-            "name": "source_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ]
-      },
       "patch": {
         "operationId": "sources_update_source_patch__api_sources_source_id",
         "responses": {
@@ -2810,6 +2783,33 @@
             }
           }
         }
+      },
+      "delete": {
+        "operationId": "sources_disable_source_delete__api_sources_source_id",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
       }
     },
     "/api/sources/{source_id}/test": {
