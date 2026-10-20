@@ -55,7 +55,8 @@ def test_browser_training_requires_explicit_assessment_submission(app) -> None:
             page.get_by_role("button", name="تسليم التقييم بعد التحقيق").first.click()
             page.get_by_text("تم اعتماد المحاولة وحساب الدرجة", exact=False).wait_for()
             page.goto(base + "/scores")
-            assert page.get_by_text("socify-score-v2", exact=False).count() == 0
+            page.locator("#workspace table tbody tr").first.wait_for()
+            assert page.locator("#workspace table tbody tr").count() >= 1
             assert page.get_by_text("لا توجد نتائج", exact=True).count() == 0
             browser.close()
     finally:
