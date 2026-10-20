@@ -719,7 +719,53 @@
         }
       }
     },
+    "/api/events/export": {
+      "get": {
+        "operationId": "events_export_events_get__api_events_export",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
     "/api/events/{event_id}": {
+      "delete": {
+        "operationId": "events_delete_event_delete__api_events_event_id",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
       "get": {
         "operationId": "events_event_detail_get__api_events_event_id",
         "responses": {
@@ -784,33 +830,6 @@
             }
           }
         }
-      },
-      "delete": {
-        "operationId": "events_delete_event_delete__api_events_event_id",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        },
-        "parameters": [
-          {
-            "name": "event_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ]
       }
     },
     "/api/events/{event_id}/raw": {
@@ -840,25 +859,6 @@
             }
           }
         ]
-      }
-    },
-    "/api/events/export": {
-      "get": {
-        "operationId": "events_export_events_get__api_events_export",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        }
       }
     },
     "/api/health": {
@@ -987,6 +987,23 @@
       }
     },
     "/api/imports": {
+      "get": {
+        "operationId": "ingestion_list_imports_get__api_imports",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
       "post": {
         "operationId": "ingestion_create_import_post__api_imports",
         "responses": {
@@ -1014,9 +1031,11 @@
             }
           }
         }
-      },
-      "get": {
-        "operationId": "ingestion_list_imports_get__api_imports",
+      }
+    },
+    "/api/imports/preview": {
+      "post": {
+        "operationId": "ingestion_preview_import_post__api_imports_preview",
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1029,6 +1048,17 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
           }
         }
       }
@@ -1060,36 +1090,6 @@
             }
           }
         ]
-      }
-    },
-    "/api/imports/preview": {
-      "post": {
-        "operationId": "ingestion_preview_import_post__api_imports_preview",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        },
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              }
-            }
-          }
-        }
       }
     },
     "/api/incidents": {
@@ -1542,6 +1542,36 @@
         }
       }
     },
+    "/api/iocs/extract": {
+      "post": {
+        "operationId": "hunting_extract_iocs_post__api_iocs_extract",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/iocs/{ioc_id}/enrich": {
       "post": {
         "operationId": "hunting_enrich_ioc_post__api_iocs_ioc_id_enrich",
@@ -1569,36 +1599,6 @@
             }
           }
         ],
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/iocs/extract": {
-      "post": {
-        "operationId": "hunting_extract_iocs_post__api_iocs_extract",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        },
         "requestBody": {
           "required": false,
           "content": {
@@ -2104,6 +2104,33 @@
       }
     },
     "/api/rules/{rule_id}": {
+      "delete": {
+        "operationId": "detection_archive_rule_delete__api_rules_rule_id",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
       "get": {
         "operationId": "detection_rule_detail_get__api_rules_rule_id",
         "responses": {
@@ -2168,33 +2195,6 @@
             }
           }
         }
-      },
-      "delete": {
-        "operationId": "detection_archive_rule_delete__api_rules_rule_id",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        },
-        "parameters": [
-          {
-            "name": "rule_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ]
       }
     },
     "/api/rules/{rule_id}/backfill": {
@@ -2708,6 +2708,33 @@
       }
     },
     "/api/sources/{source_id}": {
+      "delete": {
+        "operationId": "sources_disable_source_delete__api_sources_source_id",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
       "patch": {
         "operationId": "sources_update_source_patch__api_sources_source_id",
         "responses": {
@@ -2783,33 +2810,6 @@
             }
           }
         }
-      },
-      "delete": {
-        "operationId": "sources_disable_source_delete__api_sources_source_id",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        },
-        "parameters": [
-          {
-            "name": "source_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ]
       }
     },
     "/api/sources/{source_id}/test": {
@@ -2891,6 +2891,23 @@
       }
     },
     "/api/training/runs": {
+      "get": {
+        "operationId": "training_list_my_runs_get__api_training_runs",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
       "post": {
         "operationId": "training_start_run_post__api_training_runs",
         "responses": {
@@ -3205,6 +3222,46 @@
             }
           }
         ]
+      }
+    },
+    "/api/training/runs/{run_id}/submit": {
+      "post": {
+        "operationId": "training_submit_run_post__api_training_runs_run_id_submit",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
       }
     },
     "/api/visualizations/graph": {
