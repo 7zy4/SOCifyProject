@@ -719,25 +719,6 @@
         }
       }
     },
-    "/api/events/export": {
-      "get": {
-        "operationId": "events_export_events_get__api_events_export",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        }
-      }
-    },
     "/api/events/{event_id}": {
       "delete": {
         "operationId": "events_delete_event_delete__api_events_event_id",
@@ -859,6 +840,25 @@
             }
           }
         ]
+      }
+    },
+    "/api/events/export": {
+      "get": {
+        "operationId": "events_export_events_get__api_events_export",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
       }
     },
     "/api/health": {
@@ -1033,6 +1033,35 @@
         }
       }
     },
+    "/api/imports/{job_id}": {
+      "get": {
+        "operationId": "ingestion_import_detail_get__api_imports_job_id",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
     "/api/imports/preview": {
       "post": {
         "operationId": "ingestion_preview_import_post__api_imports_preview",
@@ -1061,35 +1090,6 @@
             }
           }
         }
-      }
-    },
-    "/api/imports/{job_id}": {
-      "get": {
-        "operationId": "ingestion_import_detail_get__api_imports_job_id",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        },
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ]
       }
     },
     "/api/incidents": {
@@ -1542,36 +1542,6 @@
         }
       }
     },
-    "/api/iocs/extract": {
-      "post": {
-        "operationId": "hunting_extract_iocs_post__api_iocs_extract",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        },
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/iocs/{ioc_id}/enrich": {
       "post": {
         "operationId": "hunting_enrich_ioc_post__api_iocs_ioc_id_enrich",
@@ -1599,6 +1569,36 @@
             }
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/iocs/extract": {
+      "post": {
+        "operationId": "hunting_extract_iocs_post__api_iocs_extract",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
         "requestBody": {
           "required": false,
           "content": {
