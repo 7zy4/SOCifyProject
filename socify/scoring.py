@@ -100,10 +100,11 @@ def _learner_evidence(
     matched: set[tuple[str, str]] = set()
     for row in rows:
         raw = json.loads(row["raw_data"] or "{}")
+        available_fields = set(row.keys())
         for step, field in expected:
             if step != row["step_id"]:
                 continue
-            if (field in row and row[field] not in (None, "")) or (isinstance(raw, dict) and raw.get(field) not in (None, "")):
+            if (field in available_fields and row[field] not in (None, "")) or (isinstance(raw, dict) and raw.get(field) not in (None, "")):
                 matched.add((step, field))
     return matched
 
