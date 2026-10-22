@@ -108,3 +108,36 @@ def test_browser_case_workspace_supports_investigation_actions(app) -> None:
     finally:
         server.shutdown()
         thread.join(timeout=5)
+
+
+@pytest.mark.e2e
+def test_browser_import_preview_commit_and_evidence_controls(app) -> None:
+    server = make_server("127.0.0.1", 0, app)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as playwright:
+            browser = launch_browser(playwright)
+            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            base = f"http://127.0.0.1:{server.server_port}"
+            page.goto(base + "/login")
+            page.locator("input[name=email]").fill("analyst@socify.local")
+            page.locator("input[name=password]").fill("Training-Safe-Password-2026!")
+            page.locator("button[type=submit]").click()
+            page.wait_for_url("**/dashboard")
+            page.goto(base + "/imports")
+            payload = b'{"source":"browser-import","event_type":"browser_event","severity":"low","title":"Browser import"}'
+            page.locator("input[type=file]").set_input_files({"name": "browser.jsonl", "mimeType": "application/x-ndjson", "buffer": payload})
+            page.get_by_role("button", name="معاينة").click()
+            page.get_by_text('"commit_required": true', exact=False).wait_for()
+            page.get_by_role("button", name="تحقق واستورد").click()
+            page.get_by_text('"accepted": 1', exact=False).wait_for()
+            page.reload()
+            row = page.locator("tbody tr").filter(has_text="browser.jsonl")
+            row.get_by_text("completed", exact=True).wait_for()
+            assert row.get_by_role("link", name="الدليل الخام").is_visible()
+            assert row.get_by_text("100%", exact=True).is_visible()
+            browser.close()
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)

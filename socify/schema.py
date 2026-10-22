@@ -319,6 +319,12 @@ CREATE TABLE IF NOT EXISTS ingestion_jobs (
     filename TEXT NOT NULL,
     format TEXT NOT NULL,
     content_hash TEXT NOT NULL,
+    evidence_ciphertext TEXT,
+    raw_size INTEGER NOT NULL DEFAULT 0,
+    estimated_total INTEGER NOT NULL DEFAULT 0,
+    checkpoint INTEGER NOT NULL DEFAULT 0,
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    source_name TEXT NOT NULL DEFAULT 'file-import',
     status TEXT NOT NULL,
     accepted INTEGER NOT NULL DEFAULT 0,
     rejected INTEGER NOT NULL DEFAULT 0,
@@ -328,6 +334,7 @@ CREATE TABLE IF NOT EXISTS ingestion_jobs (
     parser_version TEXT NOT NULL,
     created_by INTEGER NOT NULL REFERENCES users(id),
     created_at TEXT NOT NULL,
+    updated_at TEXT,
     completed_at TEXT,
     UNIQUE (workspace_id, content_hash, training_run_id)
 );
@@ -659,6 +666,15 @@ COLUMN_MIGRATIONS: dict[str, dict[str, str]] = {
         "error_rate": "REAL NOT NULL DEFAULT 0",
         "updated_at": "TEXT",
     },
+    "ingestion_jobs": {
+        "evidence_ciphertext": "TEXT",
+        "raw_size": "INTEGER NOT NULL DEFAULT 0",
+        "estimated_total": "INTEGER NOT NULL DEFAULT 0",
+        "checkpoint": "INTEGER NOT NULL DEFAULT 0",
+        "retry_count": "INTEGER NOT NULL DEFAULT 0",
+        "source_name": "TEXT NOT NULL DEFAULT 'file-import'",
+        "updated_at": "TEXT",
+    },
 }
 
 
@@ -735,6 +751,9 @@ def _normalize_existing_rows(connection: sqlite3.Connection) -> None:
     if _table_exists(connection, "event_sources"):
         connection.execute("UPDATE event_sources SET workspace_id = 1 WHERE workspace_id IS NULL")
         connection.execute("UPDATE event_sources SET updated_at = COALESCE(updated_at, created_at, ?)", (now,))
+    if _table_exists(connection, "ingestion_jobs"):
+        connection.execute("UPDATE ingestion_jobs SET status = 'interrupted', updated_at = ? WHERE status = 'processing'", (now,))
+        connection.execute("UPDATE ingestion_jobs SET updated_at = COALESCE(updated_at, created_at, ?)", (now,))
 
 
 def _migrate_legacy_incidents(connection: sqlite3.Connection) -> None:

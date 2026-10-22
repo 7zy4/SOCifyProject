@@ -1,3 +1,5 @@
+import base64
+import binascii
 import csv
 import hashlib
 import io
@@ -11,17 +13,29 @@ from pathlib import Path
 from typing import Any
 
 from defusedxml import ElementTree
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, Response, current_app, jsonify, request
 from werkzeug.utils import secure_filename
 
 from .audit import record_audit
 from .db import get_db, inserted_id, transaction
 from .events import ingest_event
 from .schema import public_id
-from .security import actor_id, can_access_training_run, error_response, require_permission, training_scope_sql, workspace_id
+from .security import (
+    actor_id,
+    can_access_training_run,
+    current_user,
+    decrypt_secret,
+    encrypt_secret,
+    error_response,
+    has_permission,
+    require_permission,
+    training_scope_sql,
+    workspace_id,
+)
 from .timeutils import iso_now
 
 ingestion_api = Blueprint("ingestion", __name__)
+IMPORT_CHUNK_SIZE = 100
 
 SYSLOG_5424 = re.compile(r"^<(?P<pri>\d{1,3})>1\s+(?P<timestamp>\S+)\s+(?P<host>\S+)\s+(?P<app>\S+)\s+(?P<proc>\S+)\s+(?P<msgid>\S+)\s+(?:-|\[[^]]*\])\s*(?P<message>.*)$")
 SYSLOG_3164 = re.compile(r"^<(?P<pri>\d{1,3})>(?P<month>[A-Z][a-z]{2})\s+(?P<day>\d{1,2})\s+(?P<time>\d{2}:\d{2}:\d{2})\s+(?P<host>\S+)\s+(?P<app>[\w./-]+)(?:\[(?P<pid>\d+)\])?:\s*(?P<message>.*)$")
@@ -247,6 +261,177 @@ def parse_records(filename: str, content: bytes, selected_format: str | None, so
     raise ValueError("selected format is not supported")
 
 
+def _estimated_rows(format_name: str, content: bytes) -> int:
+    if format_name == "json":
+        try:
+            value = json.loads(_decode(content))
+        except ValueError:
+            return 1
+        return len(value) if isinstance(value, list) else 1
+    if format_name == "sysmon_xml":
+        return max(content.count(b"<Event"), 1)
+    if format_name == "evtx":
+        return 0
+    lines = sum(1 for line in _decode(content).splitlines() if line.strip())
+    return max(lines - 1, 0) if format_name == "csv" else lines
+
+
+def _job_view(row: sqlite3.Row) -> dict[str, Any]:
+    item = dict(row)
+    available = bool(item.pop("evidence_ciphertext", None))
+    item["raw_evidence"] = {
+        "available": available,
+        "sha256": item["content_hash"],
+        "size": item["raw_size"],
+    }
+    return item
+
+
+def _job_access(job_id: int, write: bool = False) -> sqlite3.Row | None:
+    row = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ? AND workspace_id = ?", (job_id, workspace_id())).fetchone()
+    if not row or not can_access_training_run(row["training_run_id"]):
+        return None
+    if write and row["created_by"] != actor_id() and not has_permission(current_user(), "sources.manage"):
+        return None
+    return row
+
+
+def _job_content(row: sqlite3.Row) -> bytes:
+    ciphertext = row["evidence_ciphertext"]
+    if not ciphertext:
+        raise ValueError("raw import evidence is unavailable")
+    try:
+        content = base64.b64decode(decrypt_secret(str(ciphertext)), validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise ValueError("raw import evidence cannot be decrypted") from exc
+    if len(content) != int(row["raw_size"]) or not hashlib.sha256(content).hexdigest() == row["content_hash"]:
+        raise ValueError("raw import evidence failed integrity validation")
+    return content
+
+
+def _mark_job_failed(job_id: int, message: str) -> None:
+    now = iso_now()
+    get_db().execute("UPDATE ingestion_jobs SET status = 'failed', updated_at = ? WHERE id = ?", (now, job_id))
+    get_db().execute(
+        "INSERT INTO ingestion_errors (job_id, row_number, error_code, message, sample, created_at) VALUES (?, NULL, 'JOB_FAILURE', ?, NULL, ?)",
+        (job_id, message[:500], now),
+    )
+
+
+def _process_job(job_id: int) -> sqlite3.Row:
+    job = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
+    if job is None:
+        raise RuntimeError("import job disappeared during processing")
+    try:
+        content = _job_content(job)
+        _, records = parse_records(job["filename"], content, job["format"], job["source_name"])
+    except (ValueError, json.JSONDecodeError, csv.Error, ElementTree.ParseError) as exc:
+        _mark_job_failed(job_id, str(exc))
+        failed = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
+        if failed is None:
+            raise RuntimeError("import job disappeared after failure") from exc
+        return failed
+    accepted = int(job["accepted"])
+    rejected = int(job["rejected"])
+    skipped = int(job["skipped"])
+    checkpoint = int(job["checkpoint"])
+    maximum_rows = int(current_app.config["MAX_IMPORT_ROWS"])
+    iterator = iter(records)
+    exhausted = False
+    for _ in range(checkpoint):
+        try:
+            next(iterator)
+        except StopIteration:
+            exhausted = True
+            break
+        except (ValueError, json.JSONDecodeError, csv.Error, ElementTree.ParseError):
+            exhausted = True
+            break
+    get_db().execute("UPDATE ingestion_jobs SET status = 'processing', updated_at = ? WHERE id = ?", (iso_now(), job_id))
+    while checkpoint < maximum_rows and not exhausted:
+        batch: list[tuple[int, dict[str, Any] | None, Exception | None]] = []
+        while len(batch) < IMPORT_CHUNK_SIZE and checkpoint + len(batch) < maximum_rows:
+            row_number = checkpoint + len(batch) + 1
+            try:
+                batch.append((row_number, next(iterator), None))
+            except StopIteration:
+                exhausted = True
+                break
+            except (ValueError, json.JSONDecodeError, csv.Error, ElementTree.ParseError) as exc:
+                batch.append((row_number, None, exc))
+                exhausted = True
+                break
+        if not batch:
+            break
+        with transaction():
+            for row_number, record, parse_error in batch:
+                if parse_error is not None:
+                    rejected += 1
+                    get_db().execute(
+                        "INSERT INTO ingestion_errors (job_id, row_number, error_code, message, sample, created_at) VALUES (?, ?, 'PARSE_ERROR', ?, NULL, ?)",
+                        (job_id, row_number, str(parse_error)[:500], iso_now()),
+                    )
+                    continue
+                if record is None:
+                    raise RuntimeError("import batch contains no record")
+                get_db().execute("SAVEPOINT import_row")
+                try:
+                    _, _, was_duplicate = ingest_event(get_db(), record, int(job["created_by"]), int(job["workspace_id"]), job["training_run_id"])
+                    get_db().execute("RELEASE SAVEPOINT import_row")
+                    if was_duplicate:
+                        skipped += 1
+                    else:
+                        accepted += 1
+                except (ValueError, sqlite3.Error) as exc:
+                    get_db().execute("ROLLBACK TO SAVEPOINT import_row")
+                    get_db().execute("RELEASE SAVEPOINT import_row")
+                    rejected += 1
+                    get_db().execute(
+                        "INSERT INTO ingestion_errors (job_id, row_number, error_code, message, sample, created_at) VALUES (?, ?, 'VALIDATION_ERROR', ?, ?, ?)",
+                        (job_id, row_number, str(exc)[:500], json.dumps(record, ensure_ascii=False)[:1000], iso_now()),
+                    )
+            checkpoint += len(batch)
+            estimated = max(min(int(job["estimated_total"]), maximum_rows), 1)
+            progress = min(checkpoint / estimated, 0.9999)
+            get_db().execute(
+                "UPDATE ingestion_jobs SET accepted = ?, rejected = ?, skipped = ?, total = ?, checkpoint = ?, progress = ?, updated_at = ? WHERE id = ?",
+                (accepted, rejected, skipped, checkpoint, checkpoint, progress, iso_now(), job_id),
+            )
+        state = get_db().execute("SELECT status FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
+        if state and state["status"] == "cancel_requested":
+            get_db().execute("UPDATE ingestion_jobs SET status = 'cancelled', updated_at = ?, completed_at = ? WHERE id = ?", (iso_now(), iso_now(), job_id))
+            cancelled = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
+            if cancelled is None:
+                raise RuntimeError("import job disappeared after cancellation")
+            return cancelled
+    if checkpoint >= maximum_rows and not exhausted:
+        sentinel = object()
+        overflow = next(iterator, sentinel)
+        if overflow is not sentinel:
+            rejected += 1
+            get_db().execute(
+                "INSERT INTO ingestion_errors (job_id, row_number, error_code, message, sample, created_at) VALUES (?, ?, 'ROW_LIMIT', ?, NULL, ?)",
+                (job_id, checkpoint + 1, f"row limit {maximum_rows} exceeded", iso_now()),
+            )
+    completed = iso_now()
+    status = "completed" if rejected == 0 else "completed_with_errors"
+    get_db().execute(
+        "UPDATE ingestion_jobs SET status = ?, accepted = ?, rejected = ?, skipped = ?, total = ?, checkpoint = ?, progress = 1, updated_at = ?, completed_at = ? WHERE id = ?",
+        (status, accepted, rejected, skipped, checkpoint, checkpoint, completed, completed, job_id),
+    )
+    if job["source_id"]:
+        error_rate = rejected / checkpoint if checkpoint else 0
+        get_db().execute(
+            "UPDATE event_sources SET rows_ingested = rows_ingested + ?, error_rate = ?, last_sync = ?, status = ?, updated_at = ? WHERE id = ?",
+            (accepted, error_rate, completed, "connected" if accepted else "failed", completed, job["source_id"]),
+        )
+    record_audit(get_db(), "complete", "import", job_id, details={"accepted": accepted, "rejected": rejected, "skipped": skipped, "format": job["format"]}, actor=int(job["created_by"]), workspace=int(job["workspace_id"]))
+    result = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
+    if result is None:
+        raise RuntimeError("import job disappeared after completion")
+    return result
+
+
 def _upload_payload() -> tuple[str, bytes, str | None, int | None, int | None]:
     if request.files:
         uploaded = request.files.get("file")
@@ -302,62 +487,31 @@ def create_import():
     content_hash = hashlib.sha256(content).hexdigest()
     duplicate = get_db().execute("SELECT * FROM ingestion_jobs WHERE workspace_id = ? AND content_hash = ? AND training_run_id IS ?", (workspace_id(), content_hash, training_run_id)).fetchone()
     if duplicate:
-        return jsonify({**dict(duplicate), "duplicate": True})
+        return jsonify({**_job_view(duplicate), "duplicate": True})
     try:
-        format_name, records = parse_records(filename, content, selected_format, source_name)
+        format_name, _ = parse_records(filename, content, selected_format, source_name)
+        estimated_total = _estimated_rows(format_name, content)
     except (ValueError, json.JSONDecodeError, csv.Error, ElementTree.ParseError) as exc:
         return error_response("IMPORT_FORMAT_ERROR", str(exc), 422)
     now = iso_now()
+    ciphertext = encrypt_secret(base64.b64encode(content).decode())
     with transaction():
         cursor = get_db().execute(
             """INSERT INTO ingestion_jobs
-            (job_id, workspace_id, source_id, training_run_id, filename, format, content_hash, status, parser_version,
-            created_by, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'processing', 'socify-import-2', ?, ?)""",
-            (public_id("IMP"), workspace_id(), source_id, training_run_id, filename, format_name, content_hash, actor_id(), now),
+            (job_id, workspace_id, source_id, training_run_id, filename, format, content_hash, evidence_ciphertext,
+            raw_size, estimated_total, source_name, status, parser_version, created_by, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 'socify-import-2', ?, ?, ?)""",
+            (public_id("IMP"), workspace_id(), source_id, training_run_id, filename, format_name, content_hash, ciphertext,
+             len(content), estimated_total, source_name, actor_id(), now, now),
         )
         job_database_id = inserted_id(cursor)
-    accepted = 0
-    rejected = 0
-    skipped = 0
-    total = 0
-    maximum_rows = int(current_app.config["MAX_IMPORT_ROWS"])
-    iterator = iter(records)
-    while total < maximum_rows:
-        try:
-            record = next(iterator)
-        except StopIteration:
-            break
-        except (ValueError, json.JSONDecodeError, csv.Error, ElementTree.ParseError) as exc:
-            total += 1
-            rejected += 1
-            get_db().execute("INSERT INTO ingestion_errors (job_id, row_number, error_code, message, sample, created_at) VALUES (?, ?, 'PARSE_ERROR', ?, NULL, ?)", (job_database_id, total, str(exc)[:500], iso_now()))
-            continue
-        total += 1
-        try:
-            with transaction():
-                _, _, was_duplicate = ingest_event(get_db(), record, actor_id(), workspace_id(), training_run_id)
-            if was_duplicate:
-                skipped += 1
-            else:
-                accepted += 1
-        except (ValueError, sqlite3.Error) as exc:
-            rejected += 1
-            get_db().execute("INSERT INTO ingestion_errors (job_id, row_number, error_code, message, sample, created_at) VALUES (?, ?, 'VALIDATION_ERROR', ?, ?, ?)", (job_database_id, total, str(exc)[:500], json.dumps(record, ensure_ascii=False)[:1000], iso_now()))
-    sentinel = object()
-    overflow = next(iterator, sentinel)
-    if overflow is not sentinel:
-        rejected += 1
-        get_db().execute("INSERT INTO ingestion_errors (job_id, row_number, error_code, message, sample, created_at) VALUES (?, ?, 'ROW_LIMIT', ?, NULL, ?)", (job_database_id, total + 1, f"row limit {maximum_rows} exceeded", iso_now()))
-    completed = iso_now()
-    status = "completed" if rejected == 0 else "completed_with_errors"
-    get_db().execute("UPDATE ingestion_jobs SET status = ?, accepted = ?, rejected = ?, skipped = ?, total = ?, progress = 1, completed_at = ? WHERE id = ?", (status, accepted, rejected, skipped, total, completed, job_database_id))
-    if source_id:
-        error_rate = rejected / total if total else 0
-        get_db().execute("UPDATE event_sources SET rows_ingested = rows_ingested + ?, error_rate = ?, last_sync = ?, status = ?, updated_at = ? WHERE id = ?", (accepted, error_rate, completed, "connected" if accepted else "failed", completed, source_id))
-    record_audit(get_db(), "complete", "import", job_database_id, details={"accepted": accepted, "rejected": rejected, "skipped": skipped, "format": format_name})
-    job = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_database_id,)).fetchone()
-    return jsonify(dict(job)), 201, {"Location": f"/api/imports/{job_database_id}"}
+        record_audit(get_db(), "create", "import", job_database_id, details={"format": format_name, "sha256": content_hash, "size": len(content)})
+    if request.args.get("defer") == "1":
+        queued = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_database_id,)).fetchone()
+        if queued is None:
+            raise RuntimeError("import job disappeared after creation")
+        return jsonify(_job_view(queued)), 202, {"Location": f"/api/imports/{job_database_id}"}
+    return jsonify(_job_view(_process_job(job_database_id))), 201, {"Location": f"/api/imports/{job_database_id}"}
 
 
 @ingestion_api.get("/api/imports")
@@ -365,15 +519,63 @@ def create_import():
 def list_imports():
     scope, parameters = training_scope_sql("training_run_id")
     rows = get_db().execute(f"SELECT * FROM ingestion_jobs WHERE workspace_id = ?{scope} ORDER BY created_at DESC LIMIT 100", (workspace_id(), *parameters)).fetchall()
-    return jsonify({"items": [dict(row) for row in rows]})
+    return jsonify({"items": [_job_view(row) for row in rows]})
 
 
 @ingestion_api.get("/api/imports/<int:job_id>")
 @require_permission("events.read")
 def import_detail(job_id: int):
-    row = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ? AND workspace_id = ?", (job_id, workspace_id())).fetchone()
-    if not row or not can_access_training_run(row["training_run_id"]):
+    row = _job_access(job_id)
+    if not row:
         return error_response("IMPORT_NOT_FOUND", "مهمة الاستيراد غير موجودة", 404)
-    item = dict(row)
+    item = _job_view(row)
     item["errors"] = [dict(error) for error in get_db().execute("SELECT row_number, error_code, message, sample, created_at FROM ingestion_errors WHERE job_id = ? ORDER BY id LIMIT 1000", (job_id,)).fetchall()]
     return jsonify(item)
+
+
+@ingestion_api.post("/api/imports/<int:job_id>/resume")
+@require_permission("events.create")
+def resume_import(job_id: int):
+    row = _job_access(job_id, True)
+    if not row:
+        return error_response("IMPORT_NOT_FOUND", "مهمة الاستيراد غير موجودة", 404)
+    if row["status"] not in {"queued", "interrupted", "failed"}:
+        return error_response("IMPORT_NOT_RESUMABLE", "مهمة الاستيراد ليست في حالة قابلة للاستئناف", 409)
+    get_db().execute("UPDATE ingestion_jobs SET retry_count = retry_count + 1, completed_at = NULL, updated_at = ? WHERE id = ?", (iso_now(), job_id))
+    record_audit(get_db(), "resume", "import", job_id, details={"checkpoint": row["checkpoint"], "retry": int(row["retry_count"]) + 1})
+    return jsonify(_job_view(_process_job(job_id)))
+
+
+@ingestion_api.post("/api/imports/<int:job_id>/cancel")
+@require_permission("events.create")
+def cancel_import(job_id: int):
+    row = _job_access(job_id, True)
+    if not row:
+        return error_response("IMPORT_NOT_FOUND", "مهمة الاستيراد غير موجودة", 404)
+    if row["status"] not in {"queued", "processing", "interrupted", "failed"}:
+        return error_response("IMPORT_NOT_CANCELLABLE", "مهمة الاستيراد ليست في حالة قابلة للإلغاء", 409)
+    status = "cancel_requested" if row["status"] == "processing" else "cancelled"
+    completed_at = None if status == "cancel_requested" else iso_now()
+    get_db().execute("UPDATE ingestion_jobs SET status = ?, updated_at = ?, completed_at = ? WHERE id = ?", (status, iso_now(), completed_at, job_id))
+    record_audit(get_db(), "cancel", "import", job_id, details={"status": status})
+    updated = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
+    if updated is None:
+        raise RuntimeError("import job disappeared after cancellation")
+    return jsonify(_job_view(updated))
+
+
+@ingestion_api.get("/api/imports/<int:job_id>/evidence")
+@require_permission("events.read")
+def import_evidence(job_id: int):
+    row = _job_access(job_id)
+    if not row:
+        return error_response("IMPORT_NOT_FOUND", "مهمة الاستيراد غير موجودة", 404)
+    try:
+        content = _job_content(row)
+    except ValueError as exc:
+        return error_response("IMPORT_EVIDENCE_INVALID", str(exc), 409)
+    record_audit(get_db(), "read", "import_evidence", job_id, details={"sha256": row["content_hash"]})
+    response = Response(content, mimetype="application/octet-stream")
+    response.headers["Content-Disposition"] = f"attachment; filename={row['filename']}"
+    response.headers["Digest"] = f"sha-256={base64.b64encode(bytes.fromhex(row['content_hash'])).decode()}"
+    return response

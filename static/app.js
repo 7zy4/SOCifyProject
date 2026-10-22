@@ -140,6 +140,23 @@ function linkedButton(label, href, style = "ghost") {
   return node("a", { class: `button ${style}`, href, text: label });
 }
 
+function field(label, control, wide = false) {
+  return node("label", { class: wide ? "span-2" : "" }, [label, control]);
+}
+
+function selectControl(name, values, placeholder = null) {
+  const options = placeholder ? [node("option", { value: "auto", text: placeholder })] : [];
+  options.push(...values.map((value) => node("option", { value, text: value })));
+  return node("select", { name }, options);
+}
+
+function formActions(submitLabel, cancelId) {
+  return node("div", { class: "action-row span-2" }, [
+    node("button", { type: "submit", class: "button primary", text: submitLabel }),
+    node("button", { type: "button", id: cancelId, class: "button ghost", text: "إلغاء" })
+  ]);
+}
+
 function permission(name) {
   return state.permissions.has("*") || state.permissions.has(name);
 }
@@ -275,7 +292,13 @@ async function renderImports() {
     importActions
   ]);
   importer.append(node("h3", { text: "استيراد آمن" }), importForm, node("div", { id: "import-result", "aria-live": "polite" }));
-  const columns = [{ label: "المهمة", value: (row) => node("span", { class: "mono", text: row.job_id }) }, { label: "الملف", value: "filename" }, { label: "الصيغة", value: "format" }, { label: "الحالة", value: (row) => badge(row.status) }, { label: "مقبول", value: "accepted" }, { label: "مرفوض", value: "rejected" }, { label: "مكرر", value: "skipped" }, { label: "الوقت", value: (row) => formatTime(row.created_at) }];
+  const jobActions = (row) => {
+    const actions = [linkedButton("الدليل الخام", `/api/imports/${row.id}/evidence`, "compact")];
+    if (["queued", "interrupted", "failed"].includes(row.status)) actions.push(button("استئناف", async () => { try { await api(`/api/imports/${row.id}/resume`, { method: "POST", body: {} }); showMessage("تم استئناف مهمة الاستيراد", "success"); await renderImports(); } catch (error) { handleError(error); } }, "compact"));
+    if (["queued", "processing", "interrupted", "failed"].includes(row.status)) actions.push(button("إلغاء", async () => { try { await api(`/api/imports/${row.id}/cancel`, { method: "POST", body: {} }); showMessage("تم إلغاء مهمة الاستيراد", "success"); await renderImports(); } catch (error) { handleError(error); } }, "compact"));
+    return node("div", { class: "action-row" }, actions);
+  };
+  const columns = [{ label: "المهمة", value: (row) => node("span", { class: "mono", text: row.job_id }) }, { label: "الملف", value: "filename" }, { label: "الصيغة", value: "format" }, { label: "الحالة", value: (row) => badge(row.status) }, { label: "التقدم", value: (row) => `${Math.round(Number(row.progress) * 100)}%` }, { label: "مقبول", value: "accepted" }, { label: "مرفوض", value: "rejected" }, { label: "مكرر", value: "skipped" }, { label: "إجراء", value: jobActions }, { label: "الوقت", value: (row) => formatTime(row.created_at) }];
   root.append(pageHead("مركز الاستيراد", "CSV وJSON(L) وSyslog وLinux وWeb وSysmon XML وEVTX ضمن حدود موارد صارمة"), importer, panel("سجل المهام", jobs.items.length ? table(columns, jobs.items) : emptyState("لم تنفذ مهام استيراد", "اختر ملفًا تدريبيًا مصرحًا لمعاينته قبل الحفظ."), true));
   finish(root);
   const form = document.getElementById("import-form");

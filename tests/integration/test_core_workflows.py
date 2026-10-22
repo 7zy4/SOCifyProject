@@ -5,6 +5,8 @@ from collections.abc import Callable
 
 from flask.testing import FlaskClient
 
+from socify.schema import ensure_schema
+
 
 def failed_login(client: FlaskClient, number: int, source_ip: str = "198.51.100.20", prefix: str = "login"):
     return client.post(
@@ -301,6 +303,37 @@ def test_e2e_14_json_import_counts_rejected_rows(client: FlaskClient, login_as: 
     detail = client.get(f"/api/imports/{imported.json['id']}").json
     assert detail["status"] == "completed_with_errors"
     assert detail["errors"][0]["error_code"] == "VALIDATION_ERROR"
+
+
+def test_import_evidence_is_encrypted_recoverable_and_cancellable(client: FlaskClient, login_as: Callable[[str], None], database: sqlite3.Connection) -> None:
+    login_as("analyst")
+    content = '{"source":"recovery-fixture","event_type":"recovered_event","severity":"low","title":"Recovered import"}'
+    queued = client.post("/api/imports?defer=1", json={"filename": "recovery.jsonl", "format": "jsonl", "content": content})
+    assert queued.status_code == 202
+    assert queued.json["status"] == "queued"
+    assert queued.json["raw_evidence"] == {"available": True, "sha256": hashlib.sha256(content.encode()).hexdigest(), "size": len(content)}
+    assert "evidence_ciphertext" not in queued.json
+    stored = database.execute("SELECT evidence_ciphertext FROM ingestion_jobs WHERE id = ?", (queued.json["id"],)).fetchone()[0]
+    assert content not in stored
+    database.execute("UPDATE ingestion_jobs SET status = 'processing' WHERE id = ?", (queued.json["id"],))
+    ensure_schema(database)
+    assert database.execute("SELECT status FROM ingestion_jobs WHERE id = ?", (queued.json["id"],)).fetchone()[0] == "interrupted"
+    resumed = client.post(f"/api/imports/{queued.json['id']}/resume")
+    assert resumed.status_code == 200
+    assert resumed.json["status"] == "completed"
+    assert resumed.json["accepted"] == 1
+    assert resumed.json["checkpoint"] == 1
+    assert resumed.json["retry_count"] == 1
+    evidence = client.get(f"/api/imports/{queued.json['id']}/evidence")
+    assert evidence.status_code == 200
+    assert evidence.data == content.encode()
+    assert evidence.headers["Digest"].startswith("sha-256=")
+    cancelled_content = content.replace("Recovered", "Cancelled").replace("recovered_event", "cancelled_event")
+    cancellable = client.post("/api/imports?defer=1", json={"filename": "cancel.jsonl", "format": "jsonl", "content": cancelled_content})
+    cancelled = client.post(f"/api/imports/{cancellable.json['id']}/cancel")
+    assert cancelled.status_code == 200
+    assert cancelled.json["status"] == "cancelled"
+    assert client.post(f"/api/imports/{cancellable.json['id']}/resume").status_code == 409
 
 
 def test_e2e_18_and_19_source_credentials_are_redacted_and_health_is_truthful(client: FlaskClient, login_as: Callable[[str], None]) -> None:
