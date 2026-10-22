@@ -12,3 +12,5 @@
 | `https://learn.microsoft.com/sysinternals/downloads/sysmon` | Sysmon field semantics | تحقق 2026-10-15 |
 
 تُستخدم نطاقات RFC 5737 (`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`) و`.test` في كل Fixture وسيناريو. لا تنفذ عملية البحث أو الاختبار Probe على أي عنوان عام.
+
+يسجل [التحليل المرجعي لمنصات عمليات الأمن](competitive-analysis-v2.md) الالتزامات المثبتة ونتائج REA والمقارنة النظيفة مع Splunk Security Content وTheHive وMITRE ATT&CK وWazuh وElastic Detection Rules وSigma وSecurity Onion وShuffle. لم يُنسخ كود أو محتوى كشف من هذه المشاريع.

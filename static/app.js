@@ -294,17 +294,134 @@ async function renderImports() {
   });
 }
 
-async function renderIncidents() {
+const caseTransitions = {
+  new: ["open", "triaged", "investigating", "cancelled"],
+  open: ["triaged", "investigating", "escalated", "cancelled"],
+  triaged: ["investigating", "false_positive", "escalated"],
+  investigating: ["contained", "escalated", "false_positive"],
+  contained: ["remediated", "recovered"],
+  remediated: ["recovered"],
+  recovered: ["closed"],
+  escalated: ["investigating", "closed"],
+  false_positive: ["closed", "reopened"],
+  closed: ["reopened"],
+  reopened: ["investigating", "contained"],
+  cancelled: ["reopened"]
+};
+
+function caseDetailView(item) {
+  const root = node("section", { class: "case-workspace", "aria-label": `التحقيق ${item.reference}` });
+  const actions = [
+    button("تعيين لي", async () => {
+      try {
+        await api(`/api/incidents/${item.id}`, { method: "PATCH", body: { assignee: state.user.id, version: item.version, reason: "Self assignment from investigation workspace" } });
+        showMessage("تم تعيين التحقيق لك", "success");
+        await renderIncidents(item.id);
+      } catch (error) { handleError(error); }
+    }, "primary"),
+    linkedButton("فتح الرسم الزمني", `/graph?case_id=${item.id}`)
+  ];
+  if (item.status === "closed") actions.push(linkedButton("تنزيل التقرير", `/api/incidents/${item.id}/report?format=html`));
+  root.append(pageHead(`${item.reference} · ${item.title}`, `${item.description || "لا يوجد وصف"} · الإصدار ${item.version}`, actions));
+  root.append(node("section", { class: "metric-grid", "aria-label": "ملخص التحقيق" }, [
+    node("article", { class: "metric" }, [node("span", { text: "الحالة" }), badge(item.status), node("small", { text: `آخر تحديث ${formatTime(item.updated_at)}` })]),
+    node("article", { class: "metric" }, [node("span", { text: "الخطورة" }), badge(item.severity), node("small", { text: `الأولوية ${item.priority}` })]),
+    metric("الأدلة", item.evidence.length),
+    metric("المهام المفتوحة", item.tasks.filter((task) => task.status !== "completed").length, item.overdue ? "critical" : ""),
+    node("article", { class: `metric ${item.overdue ? "critical" : ""}` }, [node("span", { text: "SLA" }), node("strong", { text: item.overdue ? "متجاوز" : "ضمن المهلة" }), node("small", { text: formatTime(item.sla_due_at) })])
+  ]));
+
+  const workflow = node("form", { class: "form-grid", id: "case-transition-form" });
+  const target = node("select", { name: "status", required: true }, [node("option", { value: "", text: "اختر الحالة التالية" }), ...(caseTransitions[item.status] || []).map((value) => node("option", { value, text: value }))]);
+  workflow.append(
+    node("label", {}, ["الحالة التالية", target]),
+    node("label", {}, ["سبب القرار", node("input", { name: "reason", required: true, minlength: "3", maxlength: "500" })]),
+    node("label", {}, ["التصنيف النهائي", node("input", { name: "disposition", maxlength: "500" })]),
+    node("label", {}, ["السبب الجذري", node("input", { name: "root_cause", maxlength: "2000" })]),
+    node("label", {}, ["الأثر", node("input", { name: "impact", maxlength: "2000" })]),
+    node("label", {}, ["ملخص الاستجابة", node("input", { name: "response_summary", maxlength: "2000" })]),
+    node("label", { class: "span-2" }, ["الدروس المستفادة", node("textarea", { name: "lessons_learned", maxlength: "5000" })]),
+    node("div", { class: "action-row span-2" }, button("تسجيل الانتقال", () => {}, "primary"))
+  );
+  workflow.querySelector("button").setAttribute("type", "submit");
+  workflow.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(workflow).entries());
+    const payload = { ...values, version: item.version };
+    if (payload.status !== "closed") ["disposition", "root_cause", "impact", "response_summary", "lessons_learned"].forEach((field) => delete payload[field]);
+    try {
+      await api(`/api/incidents/${item.id}/transitions`, { method: "POST", body: payload });
+      showMessage("تم تحديث دورة حياة التحقيق", "success");
+      await renderIncidents(item.id);
+    } catch (error) { handleError(error); }
+  });
+
+  const noteForm = node("form", { class: "form-grid" }, [
+    node("label", { class: "span-2" }, ["ملاحظة التحقيق", node("textarea", { name: "body", required: true, maxlength: "5000" })]),
+    node("label", {}, ["الرؤية", node("select", { name: "visibility" }, [node("option", { value: "team", text: "الفريق" }), node("option", { value: "private", text: "خاصة" })])]),
+    node("div", { class: "action-row" }, node("button", { type: "submit", class: "button primary", text: "إضافة الملاحظة" }))
+  ]);
+  noteForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await api(`/api/incidents/${item.id}/notes`, { method: "POST", body: Object.fromEntries(new FormData(noteForm).entries()) });
+      showMessage("تم حفظ الملاحظة في سجل التحقيق", "success");
+      await renderIncidents(item.id);
+    } catch (error) { handleError(error); }
+  });
+
+  const taskColumns = [
+    { label: "المهمة", value: "title" },
+    { label: "الحالة", value: (task) => badge(task.status) },
+    { label: "إلزامية", value: (task) => task.required ? "نعم" : "لا" },
+    { label: "إجراء", value: (task) => task.status === "completed" ? "مكتملة" : button("إكمال", async () => {
+      try {
+        await api(`/api/incidents/${item.id}/tasks/${task.id}`, { method: "PATCH", body: { status: "completed" } });
+        await renderIncidents(item.id);
+      } catch (error) { handleError(error); }
+    }, "compact") }
+  ];
+  const evidenceColumns = [
+    { label: "النوع", value: "evidence_type" }, { label: "العنوان", value: "title" }, { label: "SHA-256", value: (evidence) => node("span", { class: "mono", text: evidence.sha256 }) }, { label: "أضيف", value: (evidence) => formatTime(evidence.added_at) }
+  ];
+  const noteColumns = [
+    { label: "الكاتب", value: "author_name" }, { label: "الملاحظة", value: "body" }, { label: "الرؤية", value: (note) => badge(note.visibility) }, { label: "الوقت", value: (note) => formatTime(note.created_at) }
+  ];
+  const alertColumns = [{ label: "التنبيه", value: "alert_id" }, { label: "السبب", value: "reason" }, { label: "الخطورة", value: (alert) => badge(alert.severity) }, { label: "الحالة", value: (alert) => badge(alert.status) }];
+  const eventColumns = [{ label: "الواقعة", value: "event_id" }, { label: "العنوان", value: "title" }, { label: "المصدر", value: "source" }, { label: "الخطورة", value: (event) => badge(event.severity) }, { label: "الوقت", value: (event) => formatTime(event.event_time) }];
+  const observableColumns = [{ label: "النوع", value: "type" }, { label: "القيمة", value: (observable) => node("span", { class: "mono", text: observable.value }) }, { label: "الثقة", value: (observable) => `${Math.round(Number(observable.confidence) * 100)}%` }, { label: "المشاهدات", value: "observation_count" }, { label: "آخر ظهور", value: (observable) => formatTime(observable.last_seen) }];
+  const similarColumns = [{ label: "المرجع", value: (entry) => linkedButton(entry.reference, `/incidents?selected=${entry.id}`, "compact") }, { label: "العنوان", value: "title" }, { label: "الحالة", value: (entry) => badge(entry.status) }, { label: "الخطورة", value: (entry) => badge(entry.severity) }, { label: "مؤشرات مشتركة", value: "shared_observables" }];
+  const history = node("ol", { class: "timeline" }, item.history.map((entry) => node("li", {}, [node("time", { text: formatTime(entry.created_at) }), node("i"), node("p", { text: `${entry.actor_name}: ${entry.action}${entry.reason ? ` · ${entry.reason}` : ""}` })])));
+  root.append(
+    node("div", { class: "panel-grid" }, [panel("دورة الحياة", workflow), panel("المهام", table(taskColumns, item.tasks))]),
+    node("div", { class: "panel-grid" }, [panel("ملاحظات التحقيق", node("div", {}, [noteForm, item.notes.length ? table(noteColumns, item.notes) : emptyState("لا توجد ملاحظات", "أضف نتيجة تحليل أو قرارًا موثقًا.")])), panel("الأدلة وسلسلة الحيازة", item.evidence.length ? table(evidenceColumns, item.evidence) : emptyState("لا توجد أدلة", "اربط تنبيهًا أو سجلًا بالتحقيق."))]),
+    panel("التنبيهات المرتبطة", item.alerts.length ? table(alertColumns, item.alerts) : emptyState("لا توجد تنبيهات مرتبطة", "أنشئ التحقيق من قائمة التنبيهات لربط الأدلة تلقائيًا."), true),
+    panel("السجلات المرتبطة", item.events.length ? table(eventColumns, item.events) : emptyState("لا توجد سجلات مرتبطة", "أضف سجلًا من مسار التحقيق المصرح."), true),
+    node("div", { class: "panel-grid" }, [panel("Observables", item.observables.length ? table(observableColumns, item.observables) : emptyState("لا توجد مؤشرات مستخرجة", "استخرج IoCs من السجلات المرتبطة لتفعيل الارتباط بين القضايا.")), panel("تحقيقات مشابهة", item.similar_cases.length ? table(similarColumns, item.similar_cases) : emptyState("لا توجد قضايا مشابهة", "يظهر التشابه عند اشتراك التحقيقات في مؤشرات موثقة."))]),
+    panel("سجل النشاط", history, true)
+  );
+  return root;
+}
+
+async function renderIncidents(selectedId = null) {
   begin("incidents");
   const data = await api("/api/incidents?page_size=100");
   const root = node("div");
   const drawer = node("section", { class: "drawer", hidden: true });
   drawer.innerHTML = '<h3>تحقيق جديد</h3><form id="case-form" class="form-grid"><label class="span-2">العنوان<input name="title" required minlength="3" maxlength="255"></label><label>الخطورة<select name="severity"><option>medium</option><option>critical</option><option>high</option><option>low</option></select></label><label>الأولوية<select name="priority"><option>medium</option><option>urgent</option><option>high</option><option>low</option></select></label><label class="span-2">الوصف<textarea name="description" maxlength="10000"></textarea></label><div class="action-row"><button class="button primary" type="submit">إنشاء التحقيق</button><button id="cancel-case" class="button ghost" type="button">إلغاء</button></div></form>';
-  const columns = [{ label: "المرجع", value: (row) => node("span", { class: "mono", text: row.reference }) }, { label: "التحقيق", value: (row) => node("div", { class: "cell-title" }, [node("strong", { text: row.title }), node("small", { text: row.description })]) }, { label: "الخطورة", value: (row) => badge(row.severity) }, { label: "الأولوية", value: (row) => badge(row.priority) }, { label: "الحالة", value: (row) => badge(row.status) }, { label: "المسؤول", value: "assignee_name" }, { label: "أدلة", value: "evidence_count" }, { label: "SLA", value: (row) => row.overdue ? badge("overdue") : formatTime(row.sla_due_at) }];
+  const columns = [{ label: "المرجع", value: (row) => button(row.reference, async () => { window.history.replaceState({}, "", `/incidents?selected=${row.id}`); await renderIncidents(row.id); }, "compact") }, { label: "التحقيق", value: (row) => node("div", { class: "cell-title" }, [node("strong", { text: row.title }), node("small", { text: row.description })]) }, { label: "الخطورة", value: (row) => badge(row.severity) }, { label: "الأولوية", value: (row) => badge(row.priority) }, { label: "الحالة", value: (row) => badge(row.status) }, { label: "المسؤول", value: "assignee_name" }, { label: "أدلة", value: "evidence_count" }, { label: "SLA", value: (row) => row.overdue ? badge("overdue") : formatTime(row.sla_due_at) }];
   root.append(pageHead("مساحة التحقيقات", "حالات مضبوطة، أدلة محمية، قفل تفاؤلي، وتقارير بإصدارات", [button("تحقيق جديد", () => { drawer.hidden = false; drawer.querySelector("input").focus(); }, "primary"), linkedButton("ابدأ Guided Demo", "/lab")]), drawer, panel("التحقيقات", data.items.length ? table(columns, data.items) : emptyState("لا توجد تحقيقات بعد", "أنشئ تحقيقًا أو شغّل سيناريو لتوليد تنبيه ثم اربطه بقضية.", [button("إنشاء تحقيق", () => { drawer.hidden = false; }, "primary"), linkedButton("تشغيل سيناريو", "/lab")]), true));
   finish(root);
   document.getElementById("cancel-case").addEventListener("click", () => { drawer.hidden = true; });
   document.getElementById("case-form").addEventListener("submit", async (event) => { event.preventDefault(); const values = new FormData(event.currentTarget); try { const created = await api("/api/incidents", { method: "POST", body: Object.fromEntries(values.entries()) }); showMessage(`تم إنشاء ${created.reference}`, "success"); await renderIncidents(); } catch (error) { handleError(error); } });
+  const querySelected = new URLSearchParams(window.location.search).get("selected");
+  const activeId = selectedId || (querySelected && /^\d+$/.test(querySelected) ? Number(querySelected) : null);
+  if (activeId) {
+    try {
+      const detail = await api(`/api/incidents/${activeId}`);
+      root.append(caseDetailView(detail));
+    } catch (error) { handleError(error); }
+  }
 }
 
 async function renderLab() {

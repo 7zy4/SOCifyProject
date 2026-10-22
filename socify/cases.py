@@ -279,6 +279,35 @@ def case_detail(case_id: int):
     item["tasks"] = [dict(value) for value in get_db().execute("SELECT * FROM case_tasks WHERE case_id = ? ORDER BY id", (case_id,)).fetchall()]
     item["history"] = [dict(value) for value in get_db().execute("SELECT h.*, u.name AS actor_name FROM case_history h JOIN users u ON u.id = h.actor_id WHERE h.case_id = ? ORDER BY h.created_at", (case_id,)).fetchall()]
     item["reports"] = [dict(value) for value in get_db().execute("SELECT id, revision, format, sha256, created_by, created_at FROM case_reports WHERE case_id = ? ORDER BY revision DESC", (case_id,)).fetchall()]
+    item["observables"] = [
+        {**dict(value), "tags": json.loads(value["tags"] or "[]")}
+        for value in get_db().execute(
+            """SELECT i.id, i.type, i.value, i.confidence, i.source, i.tags,
+            MIN(o.created_at) AS first_seen, MAX(o.created_at) AS last_seen, COUNT(DISTINCT o.event_id) AS observation_count
+            FROM case_events ce
+            JOIN ioc_observations o ON o.event_id = ce.event_id
+            JOIN ioc_indicators i ON i.id = o.ioc_id AND i.workspace_id = ?
+            WHERE ce.case_id = ?
+            GROUP BY i.id, i.type, i.value, i.confidence, i.source, i.tags
+            ORDER BY observation_count DESC, last_seen DESC""",
+            (workspace_id(), case_id),
+        ).fetchall()
+    ]
+    candidates = get_db().execute(
+        """SELECT c.id, c.reference, c.title, c.status, c.severity, c.training_run_id,
+        COUNT(DISTINCT source_o.ioc_id) AS shared_observables
+        FROM case_events source_ce
+        JOIN ioc_observations source_o ON source_o.event_id = source_ce.event_id
+        JOIN ioc_observations candidate_o ON candidate_o.ioc_id = source_o.ioc_id
+        JOIN case_events candidate_ce ON candidate_ce.event_id = candidate_o.event_id
+        JOIN incident_cases c ON c.id = candidate_ce.case_id
+        WHERE source_ce.case_id = ? AND c.id != ? AND c.workspace_id = ? AND c.archived_at IS NULL
+        GROUP BY c.id, c.reference, c.title, c.status, c.severity, c.training_run_id
+        ORDER BY shared_observables DESC, c.updated_at DESC
+        LIMIT 20""",
+        (case_id, case_id, workspace_id()),
+    ).fetchall()
+    item["similar_cases"] = [dict(value) for value in candidates if can_access_training_run(value["training_run_id"])]
     return jsonify(item)
 
 

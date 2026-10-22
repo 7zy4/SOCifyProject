@@ -333,3 +333,28 @@ def test_event_export_neutralizes_spreadsheet_formula(client: FlaskClient, login
     exported = client.get("/api/events/export")
     assert exported.status_code == 200
     assert "'=HYPERLINK" in exported.get_data(as_text=True)
+
+
+def test_case_workspace_correlates_observables_and_similar_cases(client: FlaskClient, login_as: Callable[[str], None], event_payload: dict[str, object]) -> None:
+    login_as("analyst")
+    event = client.post("/api/events", json={**event_payload, "idempotency_key": "case-correlation-event"})
+    assert event.status_code == 201
+    extracted = client.post("/api/iocs/extract", json={"event_id": event.json["id"]})
+    assert extracted.status_code == 200
+    assert any(item["value"] == "198.51.100.20" for item in extracted.json["items"])
+    first = client.post("/api/incidents", json={"title": "First correlated investigation", "event_ids": [event.json["id"]]})
+    second = client.post("/api/incidents", json={"title": "Second correlated investigation", "event_ids": [event.json["id"]]})
+    assert first.status_code == second.status_code == 201
+    detail = client.get(f"/api/incidents/{first.json['id']}")
+    assert detail.status_code == 200
+    assert detail.json["observables"][0]["value"] == "198.51.100.20"
+    assert detail.json["observables"][0]["observation_count"] == 1
+    assert detail.json["similar_cases"] == [{
+        "id": second.json["id"],
+        "reference": second.json["reference"],
+        "title": "Second correlated investigation",
+        "status": "new",
+        "severity": "medium",
+        "training_run_id": None,
+        "shared_observables": 1,
+    }]

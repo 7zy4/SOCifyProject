@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches:
-      - feature/enterprise-platform-implementation
+      - socify-version-2
 
 permissions:
   contents: read
