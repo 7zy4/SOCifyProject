@@ -1,32 +1,32 @@
 {
   "bulk_load": {
-    "events_per_second": 83654.21,
-    "seconds": 1.195
+    "events_per_second": 210409.7,
+    "seconds": 0.475
   },
   "command": "python -m scripts.benchmark_reference --bulk-events 100000 --import-events 10000 --samples 20",
-  "commit": "1603e9a13cea58e2c98d4823740c7de7f848b545",
+  "commit": "b024f04b774e8400ac598cbbbd59f9786a4f585c",
   "detection": {
-    "p50_ms": 2.515,
-    "p95_ms": 3.41,
-    "p99_ms": 4.728
+    "p50_ms": 2.186,
+    "p95_ms": 2.56,
+    "p99_ms": 2.725
   },
-  "elapsed_seconds": 25.692,
+  "elapsed_seconds": 12.46,
   "error_rate": 0.0,
   "errors": 0,
   "fixture_seed": 20261023,
   "hunt": {
-    "p50_ms": 263.568,
-    "p95_ms": 457.661,
-    "p99_ms": 584.136,
+    "p50_ms": 229.803,
+    "p95_ms": 302.983,
+    "p99_ms": 332.693,
     "total": 100000
   },
   "import": {
     "accepted": 10000,
-    "events_per_second": 1054.57,
-    "seconds": 9.483,
+    "events_per_second": 2129.89,
+    "seconds": 4.695,
     "status_code": 201
   },
-  "max_rss_kib": 82756,
+  "max_rss_kib": 82380,
   "platform": {
     "cpu_count": 5,
     "memory_bytes": 35743760384,
