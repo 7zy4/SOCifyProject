@@ -41,6 +41,8 @@ flowchart TD
 6. يربط المحلل Alert وEvents بقضية؛ الأدلة تحصل على SHA-256 وسلسلة نشاط.
 7. عند اكتمال Training Run يحفظ Assessment Snapshot ومدخلات الحساب وبصمته.
 
+تستخدم نوافذ الكشف `event_time` بعد تحويل ISO 8601 ذي المنطقة الزمنية أو Unix إلى UTC، ولا تستخدم وقت وصول الطلب لبناء التسلسل. يحسب watermark كأعلى `event_time` داخل workspace وTraining Run؛ يرفض كل Rule حدثًا يتجاوز `allowed_lateness_seconds` ويسجل suppression. تقرأ النافذة حتى وقت الحدث الحالي فقط، وترتب بالتوقيت ثم المعرف، ويمنع dedup key المبني على Rule version والمجموعة ومعرفات الأحداث احتساب النافذة نفسها مرتين. سجلات Syslog القديمة بلا منطقة تعلن `current_year_utc` في المعاينة والدليل الخام.
+
 ## ADR
 
 | القرار | النتيجة | السبب |

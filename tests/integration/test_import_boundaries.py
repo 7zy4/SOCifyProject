@@ -116,3 +116,40 @@ def test_imported_spreadsheet_formula_is_neutralized_on_export(client, login_as)
     exported = client.get("/api/events/export")
     assert exported.status_code == 200
     assert "'=HYPERLINK" in exported.get_data(as_text=True)
+
+
+def test_import_timestamps_normalize_or_expose_explicit_assumption(client, login_as):
+    login_as("analyst")
+    legacy = client.post(
+        "/api/imports/preview",
+        json={
+            "filename": "legacy.log",
+            "format": "syslog",
+            "content": "<34>Oct 19 10:00:00 host sshd[1]: Accepted publickey for analyst from 198.51.100.2",
+        },
+    )
+    assert legacy.status_code == 200
+    assert legacy.json["preview"][0]["timestamp_assumption"] == "current_year_utc"
+
+    naive = client.post(
+        "/api/imports",
+        json={
+            "filename": "naive.jsonl",
+            "format": "jsonl",
+            "content": '{"source":"time-fixture","event_time":"2026-10-19T10:00:00","title":"Naive"}',
+        },
+    )
+    assert naive.json["rejected"] == 1
+    error = client.get(f"/api/imports/{naive.json['id']}").json["errors"][0]
+    assert "timezone" in error["message"]
+
+    unix = client.post(
+        "/api/imports",
+        json={
+            "filename": "unix.jsonl",
+            "format": "jsonl",
+            "content": '{"source":"time-fixture","event_time":0,"title":"Unix"}',
+        },
+    )
+    assert unix.json["accepted"] == 1
+    assert client.get("/api/events?source=time-fixture").json["items"][0]["event_time"] == "1970-01-01T00:00:00Z"
