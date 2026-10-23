@@ -11,23 +11,28 @@ from socify.timeutils import parse_timestamp
 LEAF = {"field": "source", "operator": "equals", "value": "lab"}
 
 
-@pytest.mark.parametrize("value", [
-    None, [], {"condition": "bad"},
-    {"condition": {"field": "source", "operator": "equals"}},
-    {"condition": {"field": "source", "operator": "in", "value": "bad"}},
-    {"condition": {"logic": "xor", "conditions": [LEAF]}},
-    {"condition": {"logic": "not", "conditions": [LEAF, LEAF]}},
-    {"condition": {"logic": "and", "conditions": [LEAF] * 21}},
-    {"condition": {"logic": "and", "conditions": [{"logic": "or", "conditions": [LEAF] * 20}] * 2}},
-    {"condition": LEAF, "window": []},
-    {"condition": LEAF, "window": {"seconds": 1, "threshold": 1, "group_by": ["bad"]}},
-    {"condition": LEAF, "window": {"seconds": 1, "threshold": 1, "mode": "bad"}},
-    {"condition": LEAF, "window": {"seconds": 1, "threshold": 1, "mode": "distinct_count"}},
-    {"condition": LEAF, "window": {"seconds": 1, "threshold": 1, "allowed_lateness_seconds": -1}},
-    {"condition": LEAF, "sequence": []},
-    {"condition": LEAF, "sequence": [LEAF, LEAF]},
-    {"condition": LEAF, "mitre_ids": [123]},
-])
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        [],
+        {"condition": "bad"},
+        {"condition": {"field": "source", "operator": "equals"}},
+        {"condition": {"field": "source", "operator": "in", "value": "bad"}},
+        {"condition": {"logic": "xor", "conditions": [LEAF]}},
+        {"condition": {"logic": "not", "conditions": [LEAF, LEAF]}},
+        {"condition": {"logic": "and", "conditions": [LEAF] * 21}},
+        {"condition": {"logic": "and", "conditions": [{"logic": "or", "conditions": [LEAF] * 20}] * 2}},
+        {"condition": LEAF, "window": []},
+        {"condition": LEAF, "window": {"seconds": 1, "threshold": 1, "group_by": ["bad"]}},
+        {"condition": LEAF, "window": {"seconds": 1, "threshold": 1, "mode": "bad"}},
+        {"condition": LEAF, "window": {"seconds": 1, "threshold": 1, "mode": "distinct_count"}},
+        {"condition": LEAF, "window": {"seconds": 1, "threshold": 1, "allowed_lateness_seconds": -1}},
+        {"condition": LEAF, "sequence": []},
+        {"condition": LEAF, "sequence": [LEAF, LEAF]},
+        {"condition": LEAF, "mitre_ids": [123]},
+    ],
+)
 def test_rule_budgets_and_schema_reject_invalid_definitions(value):
     with pytest.raises(RuleValidationError) as error:
         validate_dsl(value)
@@ -47,13 +52,22 @@ def test_rule_depth_budget_and_legacy_migration():
         legacy_dsl({"condition_type": "bad"})
 
 
-@pytest.mark.parametrize("operator,actual,expected,matched", [
-    ("gt", True, 0, False), ("gt", "bad", 0, False), ("gt", "nan", 0, False),
-    ("gt", 2, "inf", False), ("cidr", "bad", "192.0.2.0/24", False),
-    ("contains", ["lab"], "lab", True), ("not_contains", ["lab"], "lab", False),
-    ("boolean", "true", True, False), ("exists", None, False, True),
-    ("in", "lab", [], False), ("equals", "lab", "other", False),
-])
+@pytest.mark.parametrize(
+    "operator,actual,expected,matched",
+    [
+        ("gt", True, 0, False),
+        ("gt", "bad", 0, False),
+        ("gt", "nan", 0, False),
+        ("gt", 2, "inf", False),
+        ("cidr", "bad", "192.0.2.0/24", False),
+        ("contains", ["lab"], "lab", True),
+        ("not_contains", ["lab"], "lab", False),
+        ("boolean", "true", True, False),
+        ("exists", None, False, True),
+        ("in", "lab", [], False),
+        ("equals", "lab", "other", False),
+    ],
+)
 def test_detection_never_coerces_invalid_numbers_or_booleans(operator, actual, expected, matched):
     result, trace = _leaf_matches({"field": "source", "operator": operator, "value": expected}, {"source": actual})
     assert result is matched
@@ -69,10 +83,22 @@ def test_normalized_fields_fallback_is_safe():
     assert row == {"normalized_fields": {}, "tags": [], "mitre_ids": []}
 
 
-@pytest.mark.parametrize("query", [
-    "x" * 2001, " OR ".join(["source=x"] * 30), "source", "source =", "source = x source = y",
-    "NOT", "(source=x source=y)", "source AND x", "source = AND", 'source="\\q"', "mitre_id != T1110",
-])
+@pytest.mark.parametrize(
+    "query",
+    [
+        "x" * 2001,
+        " OR ".join(["source=x"] * 30),
+        "source",
+        "source =",
+        "source = x source = y",
+        "NOT",
+        "(source=x source=y)",
+        "source AND x",
+        "source = AND",
+        'source="\\q"',
+        "mitre_id != T1110",
+    ],
+)
 def test_hunt_grammar_limits_fail_closed(query):
     with pytest.raises(QueryError):
         compile_query(query)
@@ -86,17 +112,29 @@ def test_hunt_operators_preserve_parameterization():
     assert _ioc_type("b" * 40) == ("sha1", "b" * 40)
 
 
-@pytest.mark.parametrize("patch", [
-    {"source": None}, {"source": 1}, {"source": " "}, {"source": "x" * 101},
-    {"severity": "bad"}, {"http_status": "bad"}, {"tags": [1]}, {"mitre_ids": [1]},
-    {"event_time": "invalid"}, {"event_time": None},
-])
+@pytest.mark.parametrize(
+    "patch",
+    [
+        {"source": None},
+        {"source": 1},
+        {"source": " "},
+        {"source": "x" * 101},
+        {"severity": "bad"},
+        {"http_status": "bad"},
+        {"tags": [1]},
+        {"mitre_ids": [1]},
+        {"event_time": "invalid"},
+        {"event_time": None},
+    ],
+)
 def test_event_normalization_rejects_invalid_input(patch):
     with pytest.raises(ValueError):
         normalize_event({"source": "lab", **patch})
 
 
-@pytest.mark.parametrize("raw,expected", [('not json', {"message": "not json"}), ('{"src_ip":"192.0.2.1"}', {"src_ip": "192.0.2.1"}), (None, {}), ([], {"value": "[]"})])
+@pytest.mark.parametrize(
+    "raw,expected", [("not json", {"message": "not json"}), ('{"src_ip":"192.0.2.1"}', {"src_ip": "192.0.2.1"}), (None, {}), ([], {"value": "[]"})]
+)
 def test_raw_payload_preservation(raw, expected):
     result = normalize_event({"source": "lab", "raw_payload": raw})
     assert json.loads(result["raw_data"]) == expected
@@ -128,6 +166,7 @@ def test_parser_resource_budgets_and_auto_detection(app):
 
 def test_codespaces_trusted_host_exact_match(monkeypatch):
     from socify.config import build_config
+
     monkeypatch.setenv("CODESPACE_NAME", "socify-test-abc123")
     monkeypatch.setenv("SOCIFY_PORT", "5000")
     monkeypatch.delenv("SOCIFY_TRUSTED_HOSTS", raising=False)

@@ -132,7 +132,13 @@ def test_e2e_33_hunt_query_save_reload_permissions_and_delete(client: FlaskClien
     assert result.json["query_plan"]["parameterized"] is True
     saved = client.post(
         "/api/hunt/saved-queries",
-        json={"name": "Failed login acceptance", "description": "Parameterized fixture query", "query": "source_ip=198.51.100.20 AND event_type=failed_login", "tags": ["training"], "visibility": "private"},
+        json={
+            "name": "Failed login acceptance",
+            "description": "Parameterized fixture query",
+            "query": "source_ip=198.51.100.20 AND event_type=failed_login",
+            "tags": ["training"],
+            "visibility": "private",
+        },
     )
     assert saved.status_code == 201
     listed = client.get("/api/hunt/saved-queries")
@@ -238,7 +244,9 @@ def test_e2e_38_playbook_approval_effect_and_rollback(
         (run_id,),
     ).fetchone()[0]
     assert host_state == "isolated"
-    assert database.execute("SELECT COUNT(*) FROM case_evidence WHERE case_id = ? AND evidence_type = 'training_artifact'", (case.json["id"],)).fetchone()[0] == 1
+    assert (
+        database.execute("SELECT COUNT(*) FROM case_evidence WHERE case_id = ? AND evidence_type = 'training_artifact'", (case.json["id"],)).fetchone()[0] == 1
+    )
     rolled_back = client.post(f"/api/playbook-runs/{requested.json['id']}/rollback", json={})
     assert rolled_back.status_code == 200
     assert rolled_back.json["state"] == "rolled_back"

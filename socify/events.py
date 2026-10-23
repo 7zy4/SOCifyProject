@@ -59,7 +59,12 @@ def normalize_event(data: dict[str, Any]) -> dict[str, Any]:
     category = _string(data.get("category", data.get("event_type", "general")), 100, True)
     event_type = _string(data.get("event_type", raw.get("event_type")), 100) or str(category).lower().replace(" ", "_")
     lowered_category = str(category).casefold()
-    if "brute force" in lowered_category or "failed login" in lowered_category or str(raw.get("outcome", "")).casefold() in {"failed", "failure"} and str(raw.get("action", "")).casefold() in {"login", "authenticate"}:
+    if (
+        "brute force" in lowered_category
+        or "failed login" in lowered_category
+        or str(raw.get("outcome", "")).casefold() in {"failed", "failure"}
+        and str(raw.get("action", "")).casefold() in {"login", "authenticate"}
+    ):
         event_type = "failed_login"
     title = _string(data.get("title", event_type.replace("_", " ").title()), 255, True)
     description = _string(data.get("description", ""), 4000) or ""
@@ -150,13 +155,19 @@ def ingest_event(
     mitre_ids = json.loads(str(normalized["mitre_ids"]))
     if mitre_ids:
         placeholders = ",".join("?" for _ in mitre_ids)
-        known = {row["technique_id"] for row in connection.execute(f"SELECT technique_id FROM attack_techniques WHERE technique_id IN ({placeholders})", mitre_ids).fetchall()}
+        known = {
+            row["technique_id"]
+            for row in connection.execute(f"SELECT technique_id FROM attack_techniques WHERE technique_id IN ({placeholders})", mitre_ids).fetchall()
+        }
         unknown = sorted(set(mitre_ids) - known)
         if unknown:
             raise ValueError(f"unknown ATT&CK technique identifiers: {', '.join(unknown)}")
     idempotency_key = normalized["idempotency_key"]
     if idempotency_key:
-        existing = connection.execute("SELECT id FROM security_events WHERE workspace_id = ? AND COALESCE(training_run_id, 0) = COALESCE(?, 0) AND idempotency_key = ?", (workspace, training_run_id, idempotency_key)).fetchone()
+        existing = connection.execute(
+            "SELECT id FROM security_events WHERE workspace_id = ? AND COALESCE(training_run_id, 0) = COALESCE(?, 0) AND idempotency_key = ?",
+            (workspace, training_run_id, idempotency_key),
+        ).fetchone()
         if existing:
             return int(existing["id"]), [], True
     event_public_id = _string(data.get("event_id"), 80) or public_id("EVT")
@@ -206,7 +217,9 @@ def ingest_event(
     )
     event_id = inserted_id(cursor)
     alerts = evaluate_rules(connection, event_id)
-    insert_outbox(connection, workspace, "event.created", {"id": event_id, "event_id": event_public_id, "severity": normalized["severity"], "alert_ids": alerts})
+    insert_outbox(
+        connection, workspace, "event.created", {"id": event_id, "event_id": event_public_id, "severity": normalized["severity"], "alert_ids": alerts}
+    )
     return event_id, alerts, False
 
 
@@ -275,10 +288,14 @@ def list_events():
         return error_response("INVALID_SORT", "حقل الفرز أو اتجاهه غير مسموح", 422)
     where = " AND ".join(clauses)
     total = int(get_db().execute(f"SELECT COUNT(*) FROM security_events WHERE {where}", parameters).fetchone()[0])
-    rows = get_db().execute(
-        f"SELECT * FROM security_events WHERE {where} ORDER BY {sort} {direction.upper()}, id DESC LIMIT ? OFFSET ?",
-        (*parameters, page_size, (page - 1) * page_size),
-    ).fetchall()
+    rows = (
+        get_db()
+        .execute(
+            f"SELECT * FROM security_events WHERE {where} ORDER BY {sort} {direction.upper()}, id DESC LIMIT ? OFFSET ?",
+            (*parameters, page_size, (page - 1) * page_size),
+        )
+        .fetchall()
+    )
     return jsonify({"items": [_event_view(row) for row in rows], "total": total, "page": page, "page_size": page_size})
 
 
@@ -339,7 +356,11 @@ def update_event(event_id: int):
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return error_response("INVALID_JSON", "يلزم إرسال كائن JSON صالح", 400)
-    row = get_db().execute("SELECT status, severity, assigned_to, training_run_id FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, workspace_id())).fetchone()
+    row = (
+        get_db()
+        .execute("SELECT status, severity, assigned_to, training_run_id FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, workspace_id()))
+        .fetchone()
+    )
     if not row or not can_access_training_run(row["training_run_id"]):
         return error_response("EVENT_NOT_FOUND", "السجل غير موجود", 404)
     updates: dict[str, Any] = {}
@@ -349,7 +370,10 @@ def update_event(event_id: int):
         updates["status"] = data["status"]
     if "assigned_to" in data:
         assignee = data["assigned_to"]
-        if assignee is not None and (not isinstance(assignee, int) or not get_db().execute("SELECT 1 FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (assignee, workspace_id())).fetchone()):
+        if assignee is not None and (
+            not isinstance(assignee, int)
+            or not get_db().execute("SELECT 1 FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (assignee, workspace_id())).fetchone()
+        ):
             return error_response("INVALID_ASSIGNEE", "المحلل المحدد غير متاح", 422)
         updates["assigned_to"] = assignee
     if "severity" in data:
@@ -385,11 +409,15 @@ def _csv_cell(value: object) -> str:
 @require_permission("events.read")
 def export_events():
     scope, parameters = training_scope_sql("training_run_id")
-    rows = get_db().execute(
-        f"""SELECT event_id, event_time, source, severity, event_type, title, source_ip, destination_ip, username, hostname, status
+    rows = (
+        get_db()
+        .execute(
+            f"""SELECT event_id, event_time, source, severity, event_type, title, source_ip, destination_ip, username, hostname, status
         FROM security_events WHERE workspace_id = ?{scope} ORDER BY event_time DESC LIMIT 10000""",
-        (workspace_id(), *parameters),
-    ).fetchall()
+            (workspace_id(), *parameters),
+        )
+        .fetchall()
+    )
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     fields = ["event_id", "event_time", "source", "severity", "event_type", "title", "source_ip", "destination_ip", "username", "hostname", "status"]
@@ -397,4 +425,8 @@ def export_events():
     for row in rows:
         writer.writerow([_csv_cell(row[field]) for field in fields])
     record_audit(get_db(), "export", "events", None, details={"count": len(rows)})
-    return Response(buffer.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": "attachment; filename=socify-events.csv", "X-Content-Type-Options": "nosniff"})
+    return Response(
+        buffer.getvalue(),
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=socify-events.csv", "X-Content-Type-Options": "nosniff"},
+    )

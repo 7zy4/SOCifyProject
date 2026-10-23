@@ -67,8 +67,14 @@ def test_e2e_06_dashboard_matches_database(
     assert dashboard.status_code == 200
     payload = dashboard.json
     assert payload["counts"]["events"] == database.execute("SELECT COUNT(*) FROM security_events WHERE source != 'rules_engine'").fetchone()[0]
-    assert payload["counts"]["open_alerts"] == database.execute("SELECT COUNT(*) FROM alerts WHERE status NOT IN ('closed', 'false_positive', 'suppressed')").fetchone()[0]
-    assert payload["counts"]["active_cases"] == database.execute("SELECT COUNT(*) FROM incident_cases WHERE status NOT IN ('closed', 'cancelled', 'false_positive')").fetchone()[0]
+    assert (
+        payload["counts"]["open_alerts"]
+        == database.execute("SELECT COUNT(*) FROM alerts WHERE status NOT IN ('closed', 'false_positive', 'suppressed')").fetchone()[0]
+    )
+    assert (
+        payload["counts"]["active_cases"]
+        == database.execute("SELECT COUNT(*) FROM incident_cases WHERE status NOT IN ('closed', 'cancelled', 'false_positive')").fetchone()[0]
+    )
 
 
 def test_e2e_07_empty_dashboard_and_case_state_are_truthful(client: FlaskClient, login_as: Callable[[str], None]) -> None:
@@ -292,10 +298,12 @@ def test_e2e_13_csv_import_pipeline_and_duplicate_retry(client: FlaskClient, log
 
 def test_e2e_14_json_import_counts_rejected_rows(client: FlaskClient, login_as: Callable[[str], None]) -> None:
     login_as("analyst")
-    content = json.dumps([
-        {"source": "json-fixture", "event_time": "2026-10-19T10:00:00Z", "event_type": "routine_activity", "severity": "low", "title": "Valid"},
-        {"source": "json-fixture", "event_time": "not-a-date", "event_type": "routine_activity", "severity": "low", "title": "Invalid"},
-    ])
+    content = json.dumps(
+        [
+            {"source": "json-fixture", "event_time": "2026-10-19T10:00:00Z", "event_type": "routine_activity", "severity": "low", "title": "Valid"},
+            {"source": "json-fixture", "event_time": "not-a-date", "event_type": "routine_activity", "severity": "low", "title": "Invalid"},
+        ]
+    )
     imported = client.post("/api/imports", json={"filename": "events.json", "format": "json", "content": content})
     assert imported.status_code == 201
     assert imported.json["accepted"] == 1
@@ -361,14 +369,16 @@ def test_e2e_18_and_19_source_credentials_are_redacted_and_health_is_truthful(cl
 
 def test_event_export_neutralizes_spreadsheet_formula(client: FlaskClient, login_as: Callable[[str], None], event_payload: dict[str, object]) -> None:
     login_as("analyst")
-    payload = {**event_payload, "title": "=HYPERLINK(\"https://invalid.test\")", "idempotency_key": "csv-formula-test"}
+    payload = {**event_payload, "title": '=HYPERLINK("https://invalid.test")', "idempotency_key": "csv-formula-test"}
     assert client.post("/api/events", json=payload).status_code == 201
     exported = client.get("/api/events/export")
     assert exported.status_code == 200
     assert "'=HYPERLINK" in exported.get_data(as_text=True)
 
 
-def test_case_workspace_correlates_observables_and_similar_cases(client: FlaskClient, login_as: Callable[[str], None], event_payload: dict[str, object]) -> None:
+def test_case_workspace_correlates_observables_and_similar_cases(
+    client: FlaskClient, login_as: Callable[[str], None], event_payload: dict[str, object]
+) -> None:
     login_as("analyst")
     event = client.post("/api/events", json={**event_payload, "idempotency_key": "case-correlation-event"})
     assert event.status_code == 201
@@ -382,12 +392,14 @@ def test_case_workspace_correlates_observables_and_similar_cases(client: FlaskCl
     assert detail.status_code == 200
     assert detail.json["observables"][0]["value"] == "198.51.100.20"
     assert detail.json["observables"][0]["observation_count"] == 1
-    assert detail.json["similar_cases"] == [{
-        "id": second.json["id"],
-        "reference": second.json["reference"],
-        "title": "Second correlated investigation",
-        "status": "new",
-        "severity": "medium",
-        "training_run_id": None,
-        "shared_observables": 1,
-    }]
+    assert detail.json["similar_cases"] == [
+        {
+            "id": second.json["id"],
+            "reference": second.json["reference"],
+            "title": "Second correlated investigation",
+            "status": "new",
+            "severity": "medium",
+            "training_run_id": None,
+            "shared_observables": 1,
+        }
+    ]

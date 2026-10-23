@@ -18,8 +18,20 @@ def test_detection_window_and_watermark_do_not_cross_training_runs(client, login
     first = start(client, login_as, "instructor")
     second = start(client, login_as, "analyst")
     login_as("admin")
+
     def emit(run, index):
-        return client.post("/api/events", json={"source": "isolation-fixture", "event_type": "failed_login", "source_ip": "192.0.2.10", "username": "same-synthetic-user", "event_time": f"2026-10-20T10:0{index}:00Z", "training_run_id": run})
+        return client.post(
+            "/api/events",
+            json={
+                "source": "isolation-fixture",
+                "event_type": "failed_login",
+                "source_ip": "192.0.2.10",
+                "username": "same-synthetic-user",
+                "event_time": f"2026-10-20T10:0{index}:00Z",
+                "training_run_id": run,
+            },
+        )
+
     for index in range(4):
         assert emit(first, index).json["detections"] == []
     assert emit(second, 4).json["detections"] == []
@@ -43,7 +55,10 @@ def test_same_idempotency_key_in_different_runs_never_returns_private_event(clie
     assert second.status_code == 201
     assert second.json["id"] != first.json["id"]
     assert client.get(f"/api/events/{second.json['id']}").json["source"] == "own-fixture"
-    assert client.post("/api/events", headers={"Idempotency-Key": "shared-client-key"}, json={"source": "own-fixture", "training_run_id": own}).json["duplicate"] is True
+    assert (
+        client.post("/api/events", headers={"Idempotency-Key": "shared-client-key"}, json={"source": "own-fixture", "training_run_id": own}).json["duplicate"]
+        is True
+    )
 
 
 @pytest.mark.parametrize("action", ["retry", "cancel"])
@@ -83,7 +98,14 @@ def test_closed_case_cannot_receive_new_event_or_alert_evidence(client, login_as
 
 def test_private_response_stream_is_not_visible_to_other_trainee(client, login_as):
     login_as("admin")
-    playbook = client.post("/api/playbooks", json={"name": "Private notification", "publish": True, "steps": [{"action": "notify_training_team", "parameters": {"message": "private-response-marker"}}]}).json["id"]
+    playbook = client.post(
+        "/api/playbooks",
+        json={
+            "name": "Private notification",
+            "publish": True,
+            "steps": [{"action": "notify_training_team", "parameters": {"message": "private-response-marker"}}],
+        },
+    ).json["id"]
     login_as("instructor")
     assert client.post("/api/playbook-runs", json={"playbook_id": playbook, "idempotency_key": "private-stream-key"}).status_code == 201
     login_as("analyst")
@@ -117,11 +139,26 @@ def test_private_evidence_cannot_be_attached_to_shared_case(client, login_as):
     assert client.get(f"/api/incidents/{inferred.json['id']}").status_code == 404
 
 
-@pytest.mark.parametrize("patch", [{"scoring_policy": {"detection": "bad"}}, {"scoring_policy": {"detection": -20, "response": 120}}, {"duration_minutes": "bad"}, {"difficulty": []}, {"steps": [{"name": "Step", "event": {}, "ground_truth": []}]}])
+@pytest.mark.parametrize(
+    "patch",
+    [
+        {"scoring_policy": {"detection": "bad"}},
+        {"scoring_policy": {"detection": -20, "response": 120}},
+        {"duration_minutes": "bad"},
+        {"difficulty": []},
+        {"steps": [{"name": "Step", "event": {}, "ground_truth": []}]},
+    ],
+)
 def test_malformed_scenario_is_rejected_without_partial_write(client, login_as, database, patch):
     login_as("admin")
     before = database.execute("SELECT COUNT(*) FROM attack_scenarios").fetchone()[0]
-    payload = {"name": "Scenario boundary", "description": "Training fixture", "objectives": ["Investigate"], "steps": [{"name": "Step", "event": {"source": "fixture"}}], **patch}
+    payload = {
+        "name": "Scenario boundary",
+        "description": "Training fixture",
+        "objectives": ["Investigate"],
+        "steps": [{"name": "Step", "event": {"source": "fixture"}}],
+        **patch,
+    }
     assert client.post("/api/scenarios", json=payload).status_code == 422
     assert database.execute("SELECT COUNT(*) FROM attack_scenarios").fetchone()[0] == before
 
@@ -129,7 +166,11 @@ def test_malformed_scenario_is_rejected_without_partial_write(client, login_as, 
 @pytest.mark.parametrize("field,value", [("field", []), ("operator", {}), ("logic", [])])
 def test_rule_enums_reject_non_scalar_json(client, login_as, field, value):
     login_as("admin")
-    condition = {"field": "source", "operator": "equals", "value": "lab"} if field != "logic" else {"logic": "and", "conditions": [{"field": "source", "operator": "exists"}]}
+    condition = (
+        {"field": "source", "operator": "equals", "value": "lab"}
+        if field != "logic"
+        else {"logic": "and", "conditions": [{"field": "source", "operator": "exists"}]}
+    )
     condition[field] = value
     assert client.post("/api/rules", json={"name": "Invalid scalar", "dsl": {"condition": condition}}).status_code == 422
 
@@ -180,6 +221,7 @@ def test_stream_stops_after_account_revocation(app, client, login_as, database, 
 
 def test_scope_migration_is_repeatable_and_preserves_events(client, login_as, database):
     from socify.schema import ensure_schema
+
     login_as("admin")
     event = client.post("/api/events", json={"source": "migration-fixture", "source_ip": "192.0.2.234", "idempotency_key": "legacy-key"}).json["id"]
     indicator = client.post("/api/iocs/extract", json={"event_id": event}).json["items"][0]["id"]
@@ -199,10 +241,13 @@ def test_schema_failure_rolls_back_ddl_and_data(monkeypatch):
     import sqlite3
 
     from socify.schema import ensure_schema
+
     connection = sqlite3.connect(":memory:", isolation_level=None)
     connection.row_factory = sqlite3.Row
+
     def fail(_):
         raise RuntimeError("injected migration failure")
+
     monkeypatch.setattr("socify.schema.seed_reference_data", fail)
     with pytest.raises(RuntimeError, match="injected migration failure"):
         ensure_schema(connection)
@@ -212,6 +257,7 @@ def test_schema_failure_rolls_back_ddl_and_data(monkeypatch):
 
 def test_openapi_operation_ids_and_error_contract():
     from scripts.generate_openapi import generate
+
     contract = generate()
     identifiers = [operation["operationId"] for path in contract["paths"].values() for operation in path.values()]
     assert len(identifiers) == len(set(identifiers))
@@ -226,13 +272,16 @@ def test_case_compare_and_swap_preserves_interleaved_write(client, login_as, dat
     from contextlib import contextmanager
 
     from socify.db import transaction
+
     login_as("admin")
     case = client.post("/api/incidents", json={"title": "Concurrent case"}).json["id"]
+
     @contextmanager
     def interleave():
         database.execute("UPDATE incident_cases SET title = 'Concurrent winner', version = version + 1 WHERE id = ?", (case,))
         with transaction() as connection:
             yield connection
+
     monkeypatch.setattr("socify.cases.transaction", interleave)
     assert client.patch(f"/api/incidents/{case}", json={"version": 1, **payload}).status_code == 409
     row = database.execute("SELECT title, version, status FROM incident_cases WHERE id = ?", (case,)).fetchone()
@@ -241,12 +290,18 @@ def test_case_compare_and_swap_preserves_interleaved_write(client, login_as, dat
 
 def test_mfa_enrollment_cannot_race_activation(client, login_as, database, user_ids, monkeypatch):
     from socify.security import generate_totp_secret
+
     login_as("analyst")
     assert client.post("/api/auth/mfa/enroll", json={}).status_code == 200
     original = database.execute("SELECT secret_ciphertext FROM mfa_enrollments WHERE user_id = ?", (user_ids["analyst"],)).fetchone()[0]
+
     def activate():
         database.execute("UPDATE mfa_enrollments SET enabled = 1 WHERE user_id = ?", (user_ids["analyst"],))
         return generate_totp_secret()
+
     monkeypatch.setattr("socify.auth.generate_totp_secret", activate)
     assert client.post("/api/auth/mfa/enroll", json={}).status_code == 409
-    assert tuple(database.execute("SELECT enabled, secret_ciphertext FROM mfa_enrollments WHERE user_id = ?", (user_ids["analyst"],)).fetchone()) == (1, original)
+    assert tuple(database.execute("SELECT enabled, secret_ciphertext FROM mfa_enrollments WHERE user_id = ?", (user_ids["analyst"],)).fetchone()) == (
+        1,
+        original,
+    )

@@ -25,6 +25,7 @@ def _outbox_visible(row: sqlite3.Row) -> bool:
         identifier = payload.get("playbook_run_id")
     if event_type.startswith("playbook_run.") or event_type == "training.notification":
         from .playbooks import _run_access
+
         return type(identifier) is int and _run_access(identifier) is not None
     if not isinstance(identifier, int):
         return has_permission(current_user(), "audit.read")
@@ -47,7 +48,10 @@ def _scope() -> tuple[str, list[object]]:
     user = current_user()
     if has_permission(user, "scores.read_team") or has_permission(user, "training.manage"):
         return "", []
-    return " AND (e.training_run_id IS NULL OR e.training_run_id IN (SELECT id FROM training_runs WHERE workspace_id = ? AND user_id = ?))", [workspace_id(), actor_id()]
+    return " AND (e.training_run_id IS NULL OR e.training_run_id IN (SELECT id FROM training_runs WHERE workspace_id = ? AND user_id = ?))", [
+        workspace_id(),
+        actor_id(),
+    ]
 
 
 def _filters(alias: str = "e") -> tuple[str, list[object]]:
@@ -74,18 +78,46 @@ def _filters(alias: str = "e") -> tuple[str, list[object]]:
     return " AND ".join(clauses), parameters
 
 
-def _node(node_id: str, node_type: str, label: object, timestamp: object, source: object, reference_id: object, confidence: float = 1.0, provenance: str = "observed") -> dict[str, Any]:
-    return {"id": node_id, "type": node_type, "label": str(label)[:255], "timestamp": timestamp, "source": source, "reference_id": reference_id, "confidence": confidence, "provenance": provenance}
+def _node(
+    node_id: str, node_type: str, label: object, timestamp: object, source: object, reference_id: object, confidence: float = 1.0, provenance: str = "observed"
+) -> dict[str, Any]:
+    return {
+        "id": node_id,
+        "type": node_type,
+        "label": str(label)[:255],
+        "timestamp": timestamp,
+        "source": source,
+        "reference_id": reference_id,
+        "confidence": confidence,
+        "provenance": provenance,
+    }
 
 
-def _edge(edge_id: str, source: str, target: str, relation: str, timestamp: object, reference_id: object, confidence: float = 1.0, provenance: str = "observed") -> dict[str, Any]:
-    return {"id": edge_id, "source": source, "target": target, "type": relation, "timestamp": timestamp, "reference_id": reference_id, "confidence": confidence, "provenance": provenance}
+def _edge(
+    edge_id: str, source: str, target: str, relation: str, timestamp: object, reference_id: object, confidence: float = 1.0, provenance: str = "observed"
+) -> dict[str, Any]:
+    return {
+        "id": edge_id,
+        "source": source,
+        "target": target,
+        "type": relation,
+        "timestamp": timestamp,
+        "reference_id": reference_id,
+        "confidence": confidence,
+        "provenance": provenance,
+    }
 
 
 def build_graph(limit: int) -> dict[str, Any]:
     where, parameters = _filters()
     scope, scope_parameters = _scope()
-    rows = get_db().execute(f"SELECT e.* FROM security_events e WHERE {where}{scope} ORDER BY e.event_time DESC, e.id DESC LIMIT ?", (*parameters, *scope_parameters, limit)).fetchall()
+    rows = (
+        get_db()
+        .execute(
+            f"SELECT e.* FROM security_events e WHERE {where}{scope} ORDER BY e.event_time DESC, e.id DESC LIMIT ?", (*parameters, *scope_parameters, limit)
+        )
+        .fetchall()
+    )
     nodes: OrderedDict[str, dict[str, Any]] = OrderedDict()
     edges: OrderedDict[str, dict[str, Any]] = OrderedDict()
     for event in rows:
@@ -109,13 +141,32 @@ def build_graph(limit: int) -> dict[str, Any]:
         for technique_id in json.loads(event["mitre_ids"] or "[]"):
             technique = get_db().execute("SELECT name FROM attack_techniques WHERE technique_id = ?", (technique_id,)).fetchone()
             entity = f"technique:{technique_id}"
-            nodes.setdefault(entity, _node(entity, "Technique", f"{technique_id} {technique['name'] if technique else ''}".strip(), event["event_time"], "MITRE ATT&CK 20.0", technique_id, 1.0, "mapped"))
+            nodes.setdefault(
+                entity,
+                _node(
+                    entity,
+                    "Technique",
+                    f"{technique_id} {technique['name'] if technique else ''}".strip(),
+                    event["event_time"],
+                    "MITRE ATT&CK 20.0",
+                    technique_id,
+                    1.0,
+                    "mapped",
+                ),
+            )
             identifier = f"edge:{event['id']}:technique:{technique_id}"
             edges[identifier] = _edge(identifier, event_node, entity, "related_to", event["event_time"], event["id"], 0.9, "mapped")
     if rows:
         event_ids = [int(row["id"]) for row in rows]
         placeholders = ",".join("?" for _ in event_ids)
-        alerts = get_db().execute(f"SELECT DISTINCT a.* FROM alerts a JOIN alert_events ae ON ae.alert_id = a.id WHERE ae.event_id IN ({placeholders}) AND a.workspace_id = ?", (*event_ids, workspace_id())).fetchall()
+        alerts = (
+            get_db()
+            .execute(
+                f"SELECT DISTINCT a.* FROM alerts a JOIN alert_events ae ON ae.alert_id = a.id WHERE ae.event_id IN ({placeholders}) AND a.workspace_id = ?",
+                (*event_ids, workspace_id()),
+            )
+            .fetchall()
+        )
         for alert in alerts:
             if not can_access_training_run(alert["training_run_id"]):
                 continue
@@ -124,8 +175,24 @@ def build_graph(limit: int) -> dict[str, Any]:
             for event in get_db().execute("SELECT event_id FROM alert_events WHERE alert_id = ?", (alert["id"],)).fetchall():
                 if f"event:{event['event_id']}" in nodes:
                     identifier = f"edge:alert:{alert['id']}:event:{event['event_id']}"
-                    edges[identifier] = _edge(identifier, f"event:{event['event_id']}", alert_node, "triggered_rule", alert["detected_at"], alert["id"], alert["confidence"], "derived")
-        cases = get_db().execute(f"SELECT DISTINCT c.* FROM incident_cases c JOIN case_events ce ON ce.case_id = c.id WHERE ce.event_id IN ({placeholders}) AND c.workspace_id = ?", (*event_ids, workspace_id())).fetchall()
+                    edges[identifier] = _edge(
+                        identifier,
+                        f"event:{event['event_id']}",
+                        alert_node,
+                        "triggered_rule",
+                        alert["detected_at"],
+                        alert["id"],
+                        alert["confidence"],
+                        "derived",
+                    )
+        cases = (
+            get_db()
+            .execute(
+                f"SELECT DISTINCT c.* FROM incident_cases c JOIN case_events ce ON ce.case_id = c.id WHERE ce.event_id IN ({placeholders}) AND c.workspace_id = ?",
+                (*event_ids, workspace_id()),
+            )
+            .fetchall()
+        )
         for case in cases:
             if not can_access_training_run(case["training_run_id"]):
                 continue
@@ -135,7 +202,14 @@ def build_graph(limit: int) -> dict[str, Any]:
                 if f"event:{event['event_id']}" in nodes:
                     identifier = f"edge:case:{case['id']}:event:{event['event_id']}"
                     edges[identifier] = _edge(identifier, f"event:{event['event_id']}", case_node, "attached_to_case", case["created_at"], case["id"])
-    return {"nodes": list(nodes.values()), "edges": list(edges.values()), "event_count": len(rows), "truncated": len(rows) >= limit, "limit": limit, "accuracy_policy": "Observed relationships reference source events; mapped and derived relationships declare provenance and confidence."}
+    return {
+        "nodes": list(nodes.values()),
+        "edges": list(edges.values()),
+        "event_count": len(rows),
+        "truncated": len(rows) >= limit,
+        "limit": limit,
+        "accuracy_policy": "Observed relationships reference source events; mapped and derived relationships declare provenance and confidence.",
+    }
 
 
 @visualization_api.get("/api/visualizations/graph")
@@ -158,7 +232,14 @@ def timeline():
     except ValueError as exc:
         return error_response("INVALID_TIMELINE_FILTER", str(exc), 422)
     scope, scope_parameters = _scope()
-    rows = get_db().execute(f"SELECT e.id, e.event_id, e.event_time, e.source, e.severity, e.event_type, e.title, e.mitre_ids FROM security_events e WHERE {where}{scope} ORDER BY e.event_time, e.id LIMIT ?", (*parameters, *scope_parameters, limit)).fetchall()
+    rows = (
+        get_db()
+        .execute(
+            f"SELECT e.id, e.event_id, e.event_time, e.source, e.severity, e.event_type, e.title, e.mitre_ids FROM security_events e WHERE {where}{scope} ORDER BY e.event_time, e.id LIMIT ?",
+            (*parameters, *scope_parameters, limit),
+        )
+        .fetchall()
+    )
     items = [{**dict(row), "mitre_ids": json.loads(row["mitre_ids"] or "[]"), "reference": f"/api/events/{row['id']}"} for row in rows]
     return jsonify({"items": items, "truncated": len(rows) >= limit, "limit": limit})
 
@@ -170,7 +251,11 @@ def export_graph():
         result = build_graph(min(max(int(request.args.get("limit", 500)), 1), 1000))
     except ValueError as exc:
         return error_response("INVALID_GRAPH_FILTER", str(exc), 422)
-    return Response(json.dumps(result, ensure_ascii=False, separators=(",", ":")), mimetype="application/json", headers={"Content-Disposition": "attachment; filename=socify-attack-graph.json"})
+    return Response(
+        json.dumps(result, ensure_ascii=False, separators=(",", ":")),
+        mimetype="application/json",
+        headers={"Content-Disposition": "attachment; filename=socify-attack-graph.json"},
+    )
 
 
 @visualization_api.get("/api/stream/events")
@@ -191,18 +276,28 @@ def event_stream():
             user = current_user()
             if not has_permission(user, "events.read") or not user or user["workspace_id"] != workspace:
                 break
-            rows = get_db().execute("SELECT id, event_type, payload, created_at FROM outbox_events WHERE workspace_id = ? AND id > ? ORDER BY id LIMIT 100", (workspace, cursor)).fetchall()
+            rows = (
+                get_db()
+                .execute(
+                    "SELECT id, event_type, payload, created_at FROM outbox_events WHERE workspace_id = ? AND id > ? ORDER BY id LIMIT 100", (workspace, cursor)
+                )
+                .fetchall()
+            )
             for row in rows:
                 cursor = int(row["id"])
                 if not _outbox_visible(row):
                     continue
                 yield f"id: {cursor}\nevent: {row['event_type']}\ndata: {row['payload']}\n\n"
             if once:
-                yield f"event: heartbeat\ndata: {{\"cursor\":{cursor}}}\n\n"
+                yield f'event: heartbeat\ndata: {{"cursor":{cursor}}}\n\n'
                 break
             if time.monotonic() - last_heartbeat >= 15:
-                yield f"event: heartbeat\ndata: {{\"cursor\":{cursor}}}\n\n"
+                yield f'event: heartbeat\ndata: {{"cursor":{cursor}}}\n\n'
                 last_heartbeat = time.monotonic()
             time.sleep(1)
 
-    return Response(stream_with_context(generate()), mimetype="text/event-stream", headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no", "Connection": "keep-alive"})
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+    )

@@ -14,8 +14,15 @@ from .timeutils import iso_now
 playbooks_api = Blueprint("playbooks", __name__)
 
 ACTIONS = {
-    "isolate_virtual_host", "block_simulated_ip", "disable_training_account", "force_reset_synthetic_credentials",
-    "collect_evidence", "escalate_to_manager", "notify_training_team", "tag_ioc", "contain_simulated_exfiltration",
+    "isolate_virtual_host",
+    "block_simulated_ip",
+    "disable_training_account",
+    "force_reset_synthetic_credentials",
+    "collect_evidence",
+    "escalate_to_manager",
+    "notify_training_team",
+    "tag_ioc",
+    "contain_simulated_exfiltration",
     "restore_virtual_service",
 }
 
@@ -27,13 +34,17 @@ def _playbook_view(row: sqlite3.Row) -> dict[str, Any]:
 @playbooks_api.get("/api/playbooks")
 @require_permission("playbooks.request")
 def list_playbooks():
-    rows = get_db().execute(
-        """SELECT p.*, pv.trigger_type, pv.preconditions, pv.expected_outcome,
+    rows = (
+        get_db()
+        .execute(
+            """SELECT p.*, pv.trigger_type, pv.preconditions, pv.expected_outcome,
         (SELECT COUNT(*) FROM playbook_steps ps WHERE ps.playbook_version_id = pv.id) AS step_count
         FROM playbooks p JOIN playbook_versions pv ON pv.playbook_id = p.id AND pv.version = p.active_version
         WHERE p.workspace_id = ? AND p.state = 'published' ORDER BY p.name""",
-        (workspace_id(),),
-    ).fetchall()
+            (workspace_id(),),
+        )
+        .fetchall()
+    )
     items = []
     for row in rows:
         item = dict(row)
@@ -61,7 +72,14 @@ def _playbook_payload(data: object) -> tuple[dict[str, Any] | None, object | Non
         position = step.get("position", index)
         parameters = step.get("parameters", {})
         approval_role = step.get("approval_role")
-        if type(position) is not int or position < 1 or position in positions or not isinstance(parameters, dict) or approval_role is not None and approval_role != "soc_manager":
+        if (
+            type(position) is not int
+            or position < 1
+            or position in positions
+            or not isinstance(parameters, dict)
+            or approval_role is not None
+            and approval_role != "soc_manager"
+        ):
             return None, error_response("INVALID_PLAYBOOK_STEP", "ترتيب الخطوة أو معطياتها أو الموافقة غير صالحة", 422)
         if len(json.dumps(parameters, ensure_ascii=False)) > 5000:
             return None, error_response("INVALID_PLAYBOOK_STEP", "معطيات الخطوة تتجاوز الحجم المسموح", 422)
@@ -73,19 +91,65 @@ def _playbook_payload(data: object) -> tuple[dict[str, Any] | None, object | Non
         if compensation is not None and (not isinstance(compensation, str) or compensation not in ACTIONS):
             return None, error_response("INVALID_PLAYBOOK_STEP", "إجراء التراجع غير صالح", 422)
         positions.add(position)
-        normalized.append({"position": position, "action": step["action"], "parameters": parameters, "approval_role": approval_role, "timeout_seconds": timeout, "retry_limit": retries, "compensation_action": compensation})
+        normalized.append(
+            {
+                "position": position,
+                "action": step["action"],
+                "parameters": parameters,
+                "approval_role": approval_role,
+                "timeout_seconds": timeout,
+                "retry_limit": retries,
+                "compensation_action": compensation,
+            }
+        )
     trigger = data.get("trigger_type", "manual")
-    if not isinstance(trigger, str) or trigger not in {"manual", "recommended", "automated_simulation"} or not isinstance(data.get("preconditions", {}), dict) or not isinstance(data.get("expected_outcome", {}), dict):
+    if (
+        not isinstance(trigger, str)
+        or trigger not in {"manual", "recommended", "automated_simulation"}
+        or not isinstance(data.get("preconditions", {}), dict)
+        or not isinstance(data.get("expected_outcome", {}), dict)
+    ):
         return None, error_response("INVALID_PLAYBOOK", "نوع التشغيل والشروط والنتيجة المتوقعة غير صالحة", 422)
-    return {"name": name.strip(), "description": description.strip(), "trigger_type": trigger, "preconditions": data.get("preconditions", {}), "expected_outcome": data.get("expected_outcome", {}), "steps": normalized, "publish": bool(data.get("publish"))}, None
+    return {
+        "name": name.strip(),
+        "description": description.strip(),
+        "trigger_type": trigger,
+        "preconditions": data.get("preconditions", {}),
+        "expected_outcome": data.get("expected_outcome", {}),
+        "steps": normalized,
+        "publish": bool(data.get("publish")),
+    }, None
 
 
 def _insert_playbook_version(playbook_id: int, version: int, payload: dict[str, Any]) -> int:
     now = iso_now()
-    cursor = get_db().execute("INSERT INTO playbook_versions (playbook_id, version, trigger_type, preconditions, expected_outcome, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", (playbook_id, version, payload["trigger_type"], json.dumps(payload["preconditions"], ensure_ascii=False), json.dumps(payload["expected_outcome"], ensure_ascii=False), actor_id(), now))
+    cursor = get_db().execute(
+        "INSERT INTO playbook_versions (playbook_id, version, trigger_type, preconditions, expected_outcome, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (
+            playbook_id,
+            version,
+            payload["trigger_type"],
+            json.dumps(payload["preconditions"], ensure_ascii=False),
+            json.dumps(payload["expected_outcome"], ensure_ascii=False),
+            actor_id(),
+            now,
+        ),
+    )
     version_id = inserted_id(cursor)
     for step in payload["steps"]:
-        get_db().execute("INSERT INTO playbook_steps (playbook_version_id, position, action_type, parameters, approval_role, timeout_seconds, retry_limit, compensation_action) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (version_id, step["position"], step["action"], json.dumps(step["parameters"], ensure_ascii=False), step["approval_role"], step["timeout_seconds"], step["retry_limit"], step["compensation_action"]))
+        get_db().execute(
+            "INSERT INTO playbook_steps (playbook_version_id, position, action_type, parameters, approval_role, timeout_seconds, retry_limit, compensation_action) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                version_id,
+                step["position"],
+                step["action"],
+                json.dumps(step["parameters"], ensure_ascii=False),
+                step["approval_role"],
+                step["timeout_seconds"],
+                step["retry_limit"],
+                step["compensation_action"],
+            ),
+        )
     return version_id
 
 
@@ -99,7 +163,10 @@ def create_playbook():
         raise RuntimeError("playbook payload validation did not return data")
     now = iso_now()
     with transaction():
-        cursor = get_db().execute("INSERT INTO playbooks (playbook_id, workspace_id, name, description, active_version, state, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)", (public_id("PB"), workspace_id(), payload["name"], payload["description"], "published" if payload["publish"] else "draft", actor_id(), now, now))
+        cursor = get_db().execute(
+            "INSERT INTO playbooks (playbook_id, workspace_id, name, description, active_version, state, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)",
+            (public_id("PB"), workspace_id(), payload["name"], payload["description"], "published" if payload["publish"] else "draft", actor_id(), now, now),
+        )
         playbook_id = inserted_id(cursor)
         _insert_playbook_version(playbook_id, 1, payload)
         record_audit(get_db(), "create", "playbook", playbook_id, details={"published": payload["publish"]})
@@ -121,13 +188,23 @@ def create_playbook_version(playbook_id: int):
     now = iso_now()
     with transaction():
         _insert_playbook_version(playbook_id, version, payload)
-        get_db().execute("UPDATE playbooks SET name = ?, description = ?, active_version = ?, state = ?, updated_at = ? WHERE id = ?", (payload["name"], payload["description"], version, "published" if payload["publish"] else "draft", now, playbook_id))
+        get_db().execute(
+            "UPDATE playbooks SET name = ?, description = ?, active_version = ?, state = ?, updated_at = ? WHERE id = ?",
+            (payload["name"], payload["description"], version, "published" if payload["publish"] else "draft", now, playbook_id),
+        )
         record_audit(get_db(), "version", "playbook", playbook_id, details={"version": version, "published": payload["publish"]})
     return jsonify({"id": playbook_id, "version": version, "state": "published" if payload["publish"] else "draft"}), 201
 
 
 def _version(playbook_id: int) -> sqlite3.Row | None:
-    return get_db().execute("SELECT pv.* FROM playbook_versions pv JOIN playbooks p ON p.id = pv.playbook_id AND p.active_version = pv.version WHERE p.id = ? AND p.workspace_id = ? AND p.state = 'published'", (playbook_id, workspace_id())).fetchone()
+    return (
+        get_db()
+        .execute(
+            "SELECT pv.* FROM playbook_versions pv JOIN playbooks p ON p.id = pv.playbook_id AND p.active_version = pv.version WHERE p.id = ? AND p.workspace_id = ? AND p.state = 'published'",
+            (playbook_id, workspace_id()),
+        )
+        .fetchone()
+    )
 
 
 def _steps(version_id: int) -> list[sqlite3.Row]:
@@ -178,7 +255,27 @@ def preview_playbook(playbook_id: int):
     except ValueError as exc:
         return error_response("INVALID_PARAMETERS", str(exc), 422)
     steps = _steps(int(version["id"]))
-    return jsonify({"playbook_id": playbook_id, "version": version["version"], "case_id": case_id, "training_run_id": training_run_id, "parameters": parameters, "steps": [{"position": step["position"], "action": step["action_type"], "approval_role": step["approval_role"], "expected_change": _expected_change(step["action_type"]), "rollback": step["compensation_action"]} for step in steps], "external_effects": False, "confirmation_required": True})
+    return jsonify(
+        {
+            "playbook_id": playbook_id,
+            "version": version["version"],
+            "case_id": case_id,
+            "training_run_id": training_run_id,
+            "parameters": parameters,
+            "steps": [
+                {
+                    "position": step["position"],
+                    "action": step["action_type"],
+                    "approval_role": step["approval_role"],
+                    "expected_change": _expected_change(step["action_type"]),
+                    "rollback": step["compensation_action"],
+                }
+                for step in steps
+            ],
+            "external_effects": False,
+            "confirmation_required": True,
+        }
+    )
 
 
 def _expected_change(action: str) -> str:
@@ -224,13 +321,50 @@ def create_playbook_run():
     approval_required = any(step["approval_role"] for step in steps)
     now = iso_now()
     with transaction():
-        cursor = get_db().execute("INSERT INTO playbook_runs (run_id, workspace_id, playbook_version_id, case_id, training_run_id, state, requested_by, idempotency_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (public_id("PBR"), workspace_id(), version["id"], case_id, training_run_id, "awaiting_approval" if approval_required else "pending", actor_id(), idempotency_key, now, now))
+        cursor = get_db().execute(
+            "INSERT INTO playbook_runs (run_id, workspace_id, playbook_version_id, case_id, training_run_id, state, requested_by, idempotency_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                public_id("PBR"),
+                workspace_id(),
+                version["id"],
+                case_id,
+                training_run_id,
+                "awaiting_approval" if approval_required else "pending",
+                actor_id(),
+                idempotency_key,
+                now,
+                now,
+            ),
+        )
         run_id = inserted_id(cursor)
         for step in steps:
             step_parameters = {**json.loads(step["parameters"]), **parameters}
-            get_db().execute("INSERT INTO playbook_step_runs (run_id, step_id, status, attempt, input) VALUES (?, ?, ?, 0, ?)", (run_id, step["id"], "awaiting_approval" if step["approval_role"] else "pending", json.dumps(step_parameters, ensure_ascii=False, separators=(",", ":"))))
-        record_audit(get_db(), "request", "playbook_run", run_id, details={"case_id": case_id, "training_run_id": training_run_id, "approval_required": approval_required})
-        record_training_action(get_db(), training_run_id, actor_id(), "playbook_requested", "playbook_run", run_id, {"playbook_id": data["playbook_id"]}, f"playbook-request:{idempotency_key}")
+            get_db().execute(
+                "INSERT INTO playbook_step_runs (run_id, step_id, status, attempt, input) VALUES (?, ?, ?, 0, ?)",
+                (
+                    run_id,
+                    step["id"],
+                    "awaiting_approval" if step["approval_role"] else "pending",
+                    json.dumps(step_parameters, ensure_ascii=False, separators=(",", ":")),
+                ),
+            )
+        record_audit(
+            get_db(),
+            "request",
+            "playbook_run",
+            run_id,
+            details={"case_id": case_id, "training_run_id": training_run_id, "approval_required": approval_required},
+        )
+        record_training_action(
+            get_db(),
+            training_run_id,
+            actor_id(),
+            "playbook_requested",
+            "playbook_run",
+            run_id,
+            {"playbook_id": data["playbook_id"]},
+            f"playbook-request:{idempotency_key}",
+        )
     if not approval_required:
         _execute_run(run_id)
     return jsonify(_run_view(get_db().execute("SELECT * FROM playbook_runs WHERE id = ?", (run_id,)).fetchone())), 201
@@ -257,33 +391,68 @@ def _apply_action(connection: sqlite3.Connection, run: sqlite3.Row, action: str,
         raise ValueError("unsupported playbook action")
     before: dict[str, Any] = {}
     after: dict[str, Any] = {}
-    if action in {"isolate_virtual_host", "block_simulated_ip", "disable_training_account", "force_reset_synthetic_credentials", "contain_simulated_exfiltration", "restore_virtual_service"}:
+    if action in {
+        "isolate_virtual_host",
+        "block_simulated_ip",
+        "disable_training_account",
+        "force_reset_synthetic_credentials",
+        "contain_simulated_exfiltration",
+        "restore_virtual_service",
+    }:
         entity_type, entity_id, target_state = _entity_key(action, parameters)
-        existing = connection.execute("SELECT state FROM response_simulation_state WHERE workspace_id = ? AND training_run_id IS ? AND entity_type = ? AND entity_id = ?", (run["workspace_id"], run["training_run_id"], entity_type, entity_id)).fetchone()
+        existing = connection.execute(
+            "SELECT state FROM response_simulation_state WHERE workspace_id = ? AND training_run_id IS ? AND entity_type = ? AND entity_id = ?",
+            (run["workspace_id"], run["training_run_id"], entity_type, entity_id),
+        ).fetchone()
         before = {"entity_type": entity_type, "entity_id": entity_id, "state": existing["state"] if existing else "normal"}
-        connection.execute("INSERT INTO response_simulation_state (workspace_id, training_run_id, entity_type, entity_id, state, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(workspace_id, training_run_id, entity_type, entity_id) DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at", (run["workspace_id"], run["training_run_id"], entity_type, entity_id, target_state, iso_now()))
+        connection.execute(
+            "INSERT INTO response_simulation_state (workspace_id, training_run_id, entity_type, entity_id, state, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(workspace_id, training_run_id, entity_type, entity_id) DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at",
+            (run["workspace_id"], run["training_run_id"], entity_type, entity_id, target_state, iso_now()),
+        )
         after = {"entity_type": entity_type, "entity_id": entity_id, "state": target_state}
     elif action == "collect_evidence":
         if not run["case_id"]:
             raise ValueError("collect_evidence requires a case")
-        case = connection.execute("SELECT status FROM incident_cases WHERE id = ? AND workspace_id = ? AND training_run_id IS ?", (run["case_id"], run["workspace_id"], run["training_run_id"])).fetchone()
+        case = connection.execute(
+            "SELECT status FROM incident_cases WHERE id = ? AND workspace_id = ? AND training_run_id IS ?",
+            (run["case_id"], run["workspace_id"], run["training_run_id"]),
+        ).fetchone()
         if not case or case["status"] == "closed":
             raise ValueError("case evidence is locked or inaccessible")
         content = json.dumps(parameters, ensure_ascii=False, sort_keys=True)
         digest = hashlib.sha256(content.encode()).hexdigest()
-        cursor = connection.execute("INSERT INTO case_evidence (case_id, evidence_type, reference_id, title, sha256, provenance, added_by, added_at) VALUES (?, 'training_artifact', ?, ?, ?, ?, ?, ?)", (run["case_id"], f"playbook-run-{run['id']}", "Playbook evidence collection", digest, json.dumps({"playbook_run_id": run["id"]}), run["requested_by"], iso_now()))
+        cursor = connection.execute(
+            "INSERT INTO case_evidence (case_id, evidence_type, reference_id, title, sha256, provenance, added_by, added_at) VALUES (?, 'training_artifact', ?, ?, ?, ?, ?, ?)",
+            (
+                run["case_id"],
+                f"playbook-run-{run['id']}",
+                "Playbook evidence collection",
+                digest,
+                json.dumps({"playbook_run_id": run["id"]}),
+                run["requested_by"],
+                iso_now(),
+            ),
+        )
         after = {"evidence_id": cursor.lastrowid, "sha256": digest}
     elif action == "escalate_to_manager":
         if not run["case_id"]:
             raise ValueError("escalation requires a case")
-        case = connection.execute("SELECT status FROM incident_cases WHERE id = ? AND workspace_id = ? AND training_run_id IS ?", (run["case_id"], run["workspace_id"], run["training_run_id"])).fetchone()
+        case = connection.execute(
+            "SELECT status FROM incident_cases WHERE id = ? AND workspace_id = ? AND training_run_id IS ?",
+            (run["case_id"], run["workspace_id"], run["training_run_id"]),
+        ).fetchone()
         if not case or case["status"] in {"closed", "cancelled"}:
             raise ValueError("case must be reopened before escalation")
         before = {"status": case["status"]}
         connection.execute("UPDATE incident_cases SET status = 'escalated', updated_at = ?, version = version + 1 WHERE id = ?", (iso_now(), run["case_id"]))
         after = {"status": "escalated"}
     elif action == "notify_training_team":
-        insert_outbox(connection, run["workspace_id"], "training.notification", {"playbook_run_id": run["id"], "case_id": run["case_id"], "message": str(parameters.get("message") or "Playbook notification")[:500]})
+        insert_outbox(
+            connection,
+            run["workspace_id"],
+            "training.notification",
+            {"playbook_run_id": run["id"], "case_id": run["case_id"], "message": str(parameters.get("message") or "Playbook notification")[:500]},
+        )
         after = {"notification": "queued"}
     elif action == "tag_ioc":
         ioc_id = parameters.get("ioc_id")
@@ -291,10 +460,14 @@ def _apply_action(connection: sqlite3.Connection, run: sqlite3.Row, action: str,
         if not isinstance(ioc_id, int) or not isinstance(tag, str) or not tag:
             raise ValueError("ioc_id and tag are required")
         from .hunting import _ioc_view
+
         ioc = connection.execute("SELECT * FROM ioc_indicators WHERE id = ? AND workspace_id = ?", (ioc_id, run["workspace_id"])).fetchone()
         if not ioc or _ioc_view(ioc) is None:
             raise ValueError("indicator not found")
-        observations = connection.execute("SELECT o.event_id, o.tags FROM ioc_observations o JOIN security_events e ON e.id = o.event_id WHERE o.ioc_id = ? AND e.workspace_id = ? AND e.training_run_id IS ?", (ioc_id, run["workspace_id"], run["training_run_id"])).fetchall()
+        observations = connection.execute(
+            "SELECT o.event_id, o.tags FROM ioc_observations o JOIN security_events e ON e.id = o.event_id WHERE o.ioc_id = ? AND e.workspace_id = ? AND e.training_run_id IS ?",
+            (ioc_id, run["workspace_id"], run["training_run_id"]),
+        ).fetchall()
         if not observations and (run["training_run_id"] is not None or ioc["source"] != "SOCify synthetic fixtures"):
             raise ValueError("indicator not found in response scope")
         tags = sorted({value for observation in observations for value in json.loads(observation["tags"])}) if observations else json.loads(ioc["tags"])
@@ -303,7 +476,9 @@ def _apply_action(connection: sqlite3.Connection, run: sqlite3.Row, action: str,
         if observations:
             for observation in observations:
                 updated_tags = sorted(set(json.loads(observation["tags"]) + [tag[:80]]))
-                connection.execute("UPDATE ioc_observations SET tags = ? WHERE ioc_id = ? AND event_id = ?", (json.dumps(updated_tags), ioc_id, observation["event_id"]))
+                connection.execute(
+                    "UPDATE ioc_observations SET tags = ? WHERE ioc_id = ? AND event_id = ?", (json.dumps(updated_tags), ioc_id, observation["event_id"])
+                )
         else:
             connection.execute("UPDATE ioc_indicators SET tags = ? WHERE id = ?", (json.dumps(tags), ioc_id))
         after = {"tags": tags}
@@ -315,26 +490,49 @@ def _execute_run(run_id: int) -> None:
     if not run or run["state"] not in {"pending", "approved", "failed"}:
         return
     get_db().execute("UPDATE playbook_runs SET state = 'running', updated_at = ? WHERE id = ?", (iso_now(), run_id))
-    step_runs = get_db().execute("SELECT psr.*, ps.action_type, ps.retry_limit FROM playbook_step_runs psr JOIN playbook_steps ps ON ps.id = psr.step_id WHERE psr.run_id = ? ORDER BY ps.position", (run_id,)).fetchall()
+    step_runs = (
+        get_db()
+        .execute(
+            "SELECT psr.*, ps.action_type, ps.retry_limit FROM playbook_step_runs psr JOIN playbook_steps ps ON ps.id = psr.step_id WHERE psr.run_id = ? ORDER BY ps.position",
+            (run_id,),
+        )
+        .fetchall()
+    )
     failed = False
     for step in step_runs:
         if step["status"] == "succeeded":
             continue
         parameters = json.loads(step["input"])
         started = iso_now()
-        get_db().execute("UPDATE playbook_step_runs SET status = 'running', attempt = attempt + 1, started_at = ?, error = NULL WHERE id = ?", (started, step["id"]))
+        get_db().execute(
+            "UPDATE playbook_step_runs SET status = 'running', attempt = attempt + 1, started_at = ?, error = NULL WHERE id = ?", (started, step["id"])
+        )
         try:
             before, after = _apply_action(get_db(), run, step["action_type"], parameters)
             output = {"before": before, "after": after, "simulated": True}
-            get_db().execute("UPDATE playbook_step_runs SET status = 'succeeded', output = ?, impact = ?, completed_at = ? WHERE id = ?", (json.dumps(output, ensure_ascii=False), json.dumps(after, ensure_ascii=False), iso_now(), step["id"]))
+            get_db().execute(
+                "UPDATE playbook_step_runs SET status = 'succeeded', output = ?, impact = ?, completed_at = ? WHERE id = ?",
+                (json.dumps(output, ensure_ascii=False), json.dumps(after, ensure_ascii=False), iso_now(), step["id"]),
+            )
         except (ValueError, sqlite3.Error) as exc:
             failed = True
-            get_db().execute("UPDATE playbook_step_runs SET status = 'failed', error = ?, completed_at = ? WHERE id = ?", (str(exc)[:500], iso_now(), step["id"]))
+            get_db().execute(
+                "UPDATE playbook_step_runs SET status = 'failed', error = ?, completed_at = ? WHERE id = ?", (str(exc)[:500], iso_now(), step["id"])
+            )
             break
     state = "failed" if failed else "succeeded"
     get_db().execute("UPDATE playbook_runs SET state = ?, updated_at = ? WHERE id = ?", (state, iso_now(), run_id))
     record_audit(get_db(), "execute", "playbook_run", run_id, result="failed" if failed else "success", details={"state": state})
-    record_training_action(get_db(), run["training_run_id"], run["requested_by"], "playbook_completed", "playbook_run", run_id, {"state": state}, f"playbook-complete:{run_id}:{state}")
+    record_training_action(
+        get_db(),
+        run["training_run_id"],
+        run["requested_by"],
+        "playbook_completed",
+        "playbook_run",
+        run_id,
+        {"state": state},
+        f"playbook-complete:{run_id}:{state}",
+    )
     insert_outbox(get_db(), run["workspace_id"], "playbook_run.updated", {"id": run_id, "state": state})
 
 
@@ -361,7 +559,14 @@ def retry_run(run_id: int):
         return error_response("PLAYBOOK_RUN_NOT_FOUND", "تشغيل الاستجابة غير موجود", 404)
     if run["state"] != "failed":
         return error_response("RETRY_NOT_AVAILABLE", "إعادة المحاولة متاحة للتشغيل الفاشل فقط", 409)
-    failed_steps = get_db().execute("SELECT psr.id, psr.attempt, ps.retry_limit FROM playbook_step_runs psr JOIN playbook_steps ps ON ps.id = psr.step_id WHERE psr.run_id = ? AND psr.status = 'failed'", (run_id,)).fetchall()
+    failed_steps = (
+        get_db()
+        .execute(
+            "SELECT psr.id, psr.attempt, ps.retry_limit FROM playbook_step_runs psr JOIN playbook_steps ps ON ps.id = psr.step_id WHERE psr.run_id = ? AND psr.status = 'failed'",
+            (run_id,),
+        )
+        .fetchall()
+    )
     if any(step["attempt"] >= step["retry_limit"] for step in failed_steps):
         return error_response("RETRY_LIMIT_REACHED", "بلغت إحدى الخطوات حد إعادة المحاولة", 409)
     get_db().execute("UPDATE playbook_step_runs SET status = 'pending' WHERE run_id = ? AND status = 'failed'", (run_id,))
@@ -378,7 +583,10 @@ def cancel_run(run_id: int):
     if run["state"] not in {"pending", "awaiting_approval", "approved", "failed"}:
         return error_response("CANCEL_NOT_AVAILABLE", "لا يمكن إلغاء التشغيل في حالته الحالية", 409)
     get_db().execute("UPDATE playbook_runs SET state = 'cancelled', updated_at = ? WHERE id = ?", (iso_now(), run_id))
-    get_db().execute("UPDATE playbook_step_runs SET status = 'skipped', completed_at = ? WHERE run_id = ? AND status IN ('pending', 'awaiting_approval')", (iso_now(), run_id))
+    get_db().execute(
+        "UPDATE playbook_step_runs SET status = 'skipped', completed_at = ? WHERE run_id = ? AND status IN ('pending', 'awaiting_approval')",
+        (iso_now(), run_id),
+    )
     record_audit(get_db(), "cancel", "playbook_run", run_id)
     return jsonify({"id": run_id, "state": "cancelled"})
 
@@ -391,13 +599,23 @@ def rollback_run(run_id: int):
         return error_response("PLAYBOOK_RUN_NOT_FOUND", "تشغيل الاستجابة غير موجود", 404)
     if run["state"] != "succeeded":
         return error_response("ROLLBACK_NOT_AVAILABLE", "التراجع متاح للتشغيل الناجح فقط", 409)
-    steps = get_db().execute("SELECT psr.*, ps.action_type FROM playbook_step_runs psr JOIN playbook_steps ps ON ps.id = psr.step_id WHERE psr.run_id = ? AND psr.status = 'succeeded' ORDER BY ps.position DESC", (run_id,)).fetchall()
+    steps = (
+        get_db()
+        .execute(
+            "SELECT psr.*, ps.action_type FROM playbook_step_runs psr JOIN playbook_steps ps ON ps.id = psr.step_id WHERE psr.run_id = ? AND psr.status = 'succeeded' ORDER BY ps.position DESC",
+            (run_id,),
+        )
+        .fetchall()
+    )
     with transaction():
         for step in steps:
             output = json.loads(step["output"] or "{}")
             before = output.get("before", {})
             if isinstance(before, dict) and {"entity_type", "entity_id", "state"}.issubset(before):
-                get_db().execute("UPDATE response_simulation_state SET state = ?, updated_at = ? WHERE workspace_id = ? AND training_run_id IS ? AND entity_type = ? AND entity_id = ?", (before["state"], iso_now(), run["workspace_id"], run["training_run_id"], before["entity_type"], before["entity_id"]))
+                get_db().execute(
+                    "UPDATE response_simulation_state SET state = ?, updated_at = ? WHERE workspace_id = ? AND training_run_id IS ? AND entity_type = ? AND entity_id = ?",
+                    (before["state"], iso_now(), run["workspace_id"], run["training_run_id"], before["entity_type"], before["entity_id"]),
+                )
             get_db().execute("UPDATE playbook_step_runs SET status = 'rolled_back', completed_at = ? WHERE id = ?", (iso_now(), step["id"]))
         get_db().execute("UPDATE playbook_runs SET state = 'rolled_back', updated_at = ? WHERE id = ?", (iso_now(), run_id))
         record_audit(get_db(), "rollback", "playbook_run", run_id)
@@ -406,7 +624,14 @@ def rollback_run(run_id: int):
 
 def _run_view(row: sqlite3.Row) -> dict[str, Any]:
     item = dict(row)
-    steps = get_db().execute("SELECT psr.id, ps.position, ps.action_type, ps.approval_role, psr.status, psr.attempt, psr.output, psr.impact, psr.error, psr.started_at, psr.completed_at FROM playbook_step_runs psr JOIN playbook_steps ps ON ps.id = psr.step_id WHERE psr.run_id = ? ORDER BY ps.position", (row["id"],)).fetchall()
+    steps = (
+        get_db()
+        .execute(
+            "SELECT psr.id, ps.position, ps.action_type, ps.approval_role, psr.status, psr.attempt, psr.output, psr.impact, psr.error, psr.started_at, psr.completed_at FROM playbook_step_runs psr JOIN playbook_steps ps ON ps.id = psr.step_id WHERE psr.run_id = ? ORDER BY ps.position",
+            (row["id"],),
+        )
+        .fetchall()
+    )
     item["steps"] = []
     for step in steps:
         value = dict(step)
@@ -434,4 +659,5 @@ def _run_access(run_id: int) -> sqlite3.Row | None:
 
 def require_manager_access() -> bool:
     from .security import current_user, has_permission
+
     return has_permission(current_user(), "playbooks.approve")

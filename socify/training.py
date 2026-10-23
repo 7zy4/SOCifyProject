@@ -38,8 +38,22 @@ DIFFICULTIES = {"beginner", "intermediate", "advanced"}
 
 def _scenario_version(scenario_id: int, version: int | None = None) -> sqlite3.Row | None:
     if version is None:
-        return get_db().execute("SELECT sv.* FROM scenario_versions sv JOIN attack_scenarios s ON s.id = sv.scenario_id WHERE s.id = ? AND s.workspace_id = ? AND sv.version = s.active_version", (scenario_id, workspace_id())).fetchone()
-    return get_db().execute("SELECT sv.* FROM scenario_versions sv JOIN attack_scenarios s ON s.id = sv.scenario_id WHERE s.id = ? AND s.workspace_id = ? AND sv.version = ?", (scenario_id, workspace_id(), version)).fetchone()
+        return (
+            get_db()
+            .execute(
+                "SELECT sv.* FROM scenario_versions sv JOIN attack_scenarios s ON s.id = sv.scenario_id WHERE s.id = ? AND s.workspace_id = ? AND sv.version = s.active_version",
+                (scenario_id, workspace_id()),
+            )
+            .fetchone()
+        )
+    return (
+        get_db()
+        .execute(
+            "SELECT sv.* FROM scenario_versions sv JOIN attack_scenarios s ON s.id = sv.scenario_id WHERE s.id = ? AND s.workspace_id = ? AND sv.version = ?",
+            (scenario_id, workspace_id(), version),
+        )
+        .fetchone()
+    )
 
 
 def _required_version(row: sqlite3.Row | None) -> sqlite3.Row:
@@ -63,14 +77,18 @@ def list_scenarios():
     user = current_user()
     states = ("published", "ready") if not has_permission(user, "training.manage") else ("draft", "validated", "published", "ready", "archived")
     placeholders = ",".join("?" for _ in states)
-    rows = get_db().execute(
-        f"""SELECT s.*, sv.difficulty, sv.duration_minutes, sv.objectives, sv.roles, sv.environment, sv.scoring_policy,
+    rows = (
+        get_db()
+        .execute(
+            f"""SELECT s.*, sv.difficulty, sv.duration_minutes, sv.objectives, sv.roles, sv.environment, sv.scoring_policy,
         (SELECT COUNT(*) FROM scenario_steps st WHERE st.scenario_version_id = sv.id) AS step_count,
         (SELECT COUNT(*) FROM training_runs tr WHERE tr.scenario_version_id = sv.id AND tr.user_id = ?) AS attempt_count
         FROM attack_scenarios s JOIN scenario_versions sv ON sv.scenario_id = s.id AND sv.version = s.active_version
         WHERE s.workspace_id = ? AND s.state IN ({placeholders}) ORDER BY s.name""",
-        (actor_id(), workspace_id(), *states),
-    ).fetchall()
+            (actor_id(), workspace_id(), *states),
+        )
+        .fetchall()
+    )
     return jsonify({"items": [_scenario_view(row) for row in rows]})
 
 
@@ -82,8 +100,17 @@ def scenario_detail(scenario_id: int):
         return error_response("SCENARIO_NOT_FOUND", "السيناريو غير موجود", 404)
     version = _required_version(_scenario_version(scenario_id))
     item = {**dict(row), **_scenario_view(version)}
-    steps = get_db().execute("SELECT step_id, position, name, mitre_ids, visible_hint FROM scenario_steps WHERE scenario_version_id = ? ORDER BY position", (version["id"],)).fetchall()
-    item["steps"] = [{**dict(step), "mitre_ids": json.loads(step["mitre_ids"]), "visible_hint": step["visible_hint"] if version["difficulty"] == "beginner" else None} for step in steps]
+    steps = (
+        get_db()
+        .execute(
+            "SELECT step_id, position, name, mitre_ids, visible_hint FROM scenario_steps WHERE scenario_version_id = ? ORDER BY position", (version["id"],)
+        )
+        .fetchall()
+    )
+    item["steps"] = [
+        {**dict(step), "mitre_ids": json.loads(step["mitre_ids"]), "visible_hint": step["visible_hint"] if version["difficulty"] == "beginner" else None}
+        for step in steps
+    ]
     return jsonify(item)
 
 
@@ -96,7 +123,13 @@ def _validate_scenario(data: dict[str, Any]) -> tuple[dict[str, Any] | None, obj
     scoring = data.get("scoring_policy", {"detection": 25, "investigation": 25, "response": 20, "evidence": 15, "time": 10, "false_positive": 5})
     if not isinstance(name, str) or not 3 <= len(name.strip()) <= 180 or not isinstance(description, str) or len(description) > 5000:
         return None, error_response("INVALID_SCENARIO", "اسم السيناريو ووصفه غير صالحين", 422)
-    if not isinstance(difficulty, str) or difficulty not in DIFFICULTIES or not isinstance(objectives, list) or not objectives or any(not isinstance(item, str) for item in objectives):
+    if (
+        not isinstance(difficulty, str)
+        or difficulty not in DIFFICULTIES
+        or not isinstance(objectives, list)
+        or not objectives
+        or any(not isinstance(item, str) for item in objectives)
+    ):
         return None, error_response("INVALID_SCENARIO", "الصعوبة أو الأهداف غير صالحة", 422)
     if not isinstance(steps, list) or not 1 <= len(steps) <= 50:
         return None, error_response("INVALID_SCENARIO_STEPS", "يلزم من خطوة واحدة إلى 50 خطوة", 422)
@@ -131,12 +164,27 @@ def _validate_scenario(data: dict[str, Any]) -> tuple[dict[str, Any] | None, obj
         normalized_steps.append({**step, "position": position, "step_id": str(step.get("step_id") or f"step-{position}")[:80]})
     if positions != set(range(1, len(steps) + 1)):
         return None, error_response("INVALID_SCENARIO_STEP", "ترتيب الخطوات غير صالح", 422)
-    if not isinstance(scoring, dict) or any(type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 100 for value in scoring.values()) or sum(scoring.values()) != 100:
+    if (
+        not isinstance(scoring, dict)
+        or any(type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 100 for value in scoring.values())
+        or sum(scoring.values()) != 100
+    ):
         return None, error_response("INVALID_SCORING_POLICY", "يجب أن يساوي مجموع أوزان التقييم 100", 422)
     duration = data.get("duration_minutes", 30)
     if type(duration) is not int or not 1 <= duration <= 1440:
         return None, error_response("INVALID_SCENARIO", "مدة السيناريو غير صالحة", 422)
-    return {"name": name.strip(), "description": description.strip(), "difficulty": difficulty, "objectives": objectives, "steps": normalized_steps, "scoring_policy": scoring, "duration_minutes": duration, "roles": data.get("roles", ["analyst"]), "environment": data.get("environment", {"mode": "isolated_training"}), "visibility": data.get("visibility", "workspace")}, None
+    return {
+        "name": name.strip(),
+        "description": description.strip(),
+        "difficulty": difficulty,
+        "objectives": objectives,
+        "steps": normalized_steps,
+        "scoring_policy": scoring,
+        "duration_minutes": duration,
+        "roles": data.get("roles", ["analyst"]),
+        "environment": data.get("environment", {"mode": "isolated_training"}),
+        "visibility": data.get("visibility", "workspace"),
+    }, None
 
 
 @training_api.post("/api/scenarios")
@@ -152,14 +200,52 @@ def create_scenario():
         raise RuntimeError("scenario payload validation did not return data")
     now = iso_now()
     with transaction():
-        cursor = get_db().execute("INSERT INTO attack_scenarios (scenario_id, workspace_id, name, description, active_version, state, visibility, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 'draft', ?, ?, ?, ?)", (public_id("SCN"), workspace_id(), payload["name"], payload["description"], payload["visibility"], actor_id(), now, now))
+        cursor = get_db().execute(
+            "INSERT INTO attack_scenarios (scenario_id, workspace_id, name, description, active_version, state, visibility, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 'draft', ?, ?, ?, ?)",
+            (public_id("SCN"), workspace_id(), payload["name"], payload["description"], payload["visibility"], actor_id(), now, now),
+        )
         scenario_id = inserted_id(cursor)
-        version_cursor = get_db().execute("INSERT INTO scenario_versions (scenario_id, version, objectives, roles, difficulty, duration_minutes, environment, scoring_policy, created_by, created_at) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)", (scenario_id, json.dumps(payload["objectives"], ensure_ascii=False), json.dumps(payload["roles"]), payload["difficulty"], payload["duration_minutes"], json.dumps(payload["environment"]), json.dumps(payload["scoring_policy"]), actor_id(), now))
+        version_cursor = get_db().execute(
+            "INSERT INTO scenario_versions (scenario_id, version, objectives, roles, difficulty, duration_minutes, environment, scoring_policy, created_by, created_at) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                scenario_id,
+                json.dumps(payload["objectives"], ensure_ascii=False),
+                json.dumps(payload["roles"]),
+                payload["difficulty"],
+                payload["duration_minutes"],
+                json.dumps(payload["environment"]),
+                json.dumps(payload["scoring_policy"]),
+                actor_id(),
+                now,
+            ),
+        )
         version_id = inserted_id(version_cursor)
         for step in payload["steps"]:
-            get_db().execute("INSERT INTO scenario_steps (scenario_version_id, step_id, position, name, event_template, artifact, mitre_ids, visible_hint) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (version_id, step["step_id"], step["position"], step["name"], json.dumps(step["event"], ensure_ascii=False), json.dumps(step.get("artifact", {}), ensure_ascii=False), json.dumps(step.get("mitre_ids", [])), step.get("hint")))
+            get_db().execute(
+                "INSERT INTO scenario_steps (scenario_version_id, step_id, position, name, event_template, artifact, mitre_ids, visible_hint) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    version_id,
+                    step["step_id"],
+                    step["position"],
+                    step["name"],
+                    json.dumps(step["event"], ensure_ascii=False),
+                    json.dumps(step.get("artifact", {}), ensure_ascii=False),
+                    json.dumps(step.get("mitre_ids", [])),
+                    step.get("hint"),
+                ),
+            )
             ground_truth = step.get("ground_truth", {})
-            get_db().execute("INSERT INTO scenario_ground_truth (scenario_version_id, step_id, expected_detections, relevant_evidence, allowed_responses, score_weight) VALUES (?, ?, ?, ?, ?, ?)", (version_id, step["step_id"], json.dumps(ground_truth.get("expected_detections", [])), json.dumps(ground_truth.get("relevant_evidence", [])), json.dumps(ground_truth.get("allowed_responses", [])), float(ground_truth.get("score_weight", 1))))
+            get_db().execute(
+                "INSERT INTO scenario_ground_truth (scenario_version_id, step_id, expected_detections, relevant_evidence, allowed_responses, score_weight) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    version_id,
+                    step["step_id"],
+                    json.dumps(ground_truth.get("expected_detections", [])),
+                    json.dumps(ground_truth.get("relevant_evidence", [])),
+                    json.dumps(ground_truth.get("allowed_responses", [])),
+                    float(ground_truth.get("score_weight", 1)),
+                ),
+            )
         record_audit(get_db(), "create", "scenario", scenario_id, details={"version": 1, "steps": len(payload["steps"])})
     return jsonify({"id": scenario_id, "state": "draft", "version": 1}), 201
 
@@ -175,7 +261,14 @@ def transition_scenario(scenario_id: int):
     if not isinstance(target, str) or target not in SCENARIO_STATES.get(row["state"], set()):
         return error_response("ILLEGAL_SCENARIO_TRANSITION", "انتقال حالة السيناريو غير مسموح", 409)
     if target == "validated":
-        steps = int(get_db().execute("SELECT COUNT(*) FROM scenario_steps s JOIN scenario_versions v ON v.id = s.scenario_version_id WHERE v.scenario_id = ? AND v.version = ?", (scenario_id, row["active_version"])).fetchone()[0])
+        steps = int(
+            get_db()
+            .execute(
+                "SELECT COUNT(*) FROM scenario_steps s JOIN scenario_versions v ON v.id = s.scenario_version_id WHERE v.scenario_id = ? AND v.version = ?",
+                (scenario_id, row["active_version"]),
+            )
+            .fetchone()[0]
+        )
         if steps == 0:
             return error_response("SCENARIO_HAS_NO_STEPS", "لا يمكن اعتماد سيناريو بلا خطوات", 409)
     get_db().execute("UPDATE attack_scenarios SET state = ?, updated_at = ? WHERE id = ?", (target, iso_now(), scenario_id))
@@ -200,13 +293,52 @@ def create_scenario_version(scenario_id: int):
     version = int(scenario["active_version"]) + 1
     now = iso_now()
     with transaction():
-        version_cursor = get_db().execute("INSERT INTO scenario_versions (scenario_id, version, objectives, roles, difficulty, duration_minutes, environment, scoring_policy, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (scenario_id, version, json.dumps(payload["objectives"], ensure_ascii=False), json.dumps(payload["roles"]), payload["difficulty"], payload["duration_minutes"], json.dumps(payload["environment"]), json.dumps(payload["scoring_policy"]), actor_id(), now))
+        version_cursor = get_db().execute(
+            "INSERT INTO scenario_versions (scenario_id, version, objectives, roles, difficulty, duration_minutes, environment, scoring_policy, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                scenario_id,
+                version,
+                json.dumps(payload["objectives"], ensure_ascii=False),
+                json.dumps(payload["roles"]),
+                payload["difficulty"],
+                payload["duration_minutes"],
+                json.dumps(payload["environment"]),
+                json.dumps(payload["scoring_policy"]),
+                actor_id(),
+                now,
+            ),
+        )
         version_id = inserted_id(version_cursor)
         for step in payload["steps"]:
-            get_db().execute("INSERT INTO scenario_steps (scenario_version_id, step_id, position, name, event_template, artifact, mitre_ids, visible_hint) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (version_id, step["step_id"], step["position"], step["name"], json.dumps(step["event"], ensure_ascii=False), json.dumps(step.get("artifact", {}), ensure_ascii=False), json.dumps(step.get("mitre_ids", [])), step.get("hint")))
+            get_db().execute(
+                "INSERT INTO scenario_steps (scenario_version_id, step_id, position, name, event_template, artifact, mitre_ids, visible_hint) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    version_id,
+                    step["step_id"],
+                    step["position"],
+                    step["name"],
+                    json.dumps(step["event"], ensure_ascii=False),
+                    json.dumps(step.get("artifact", {}), ensure_ascii=False),
+                    json.dumps(step.get("mitre_ids", [])),
+                    step.get("hint"),
+                ),
+            )
             ground_truth = step.get("ground_truth", {})
-            get_db().execute("INSERT INTO scenario_ground_truth (scenario_version_id, step_id, expected_detections, relevant_evidence, allowed_responses, score_weight) VALUES (?, ?, ?, ?, ?, ?)", (version_id, step["step_id"], json.dumps(ground_truth.get("expected_detections", [])), json.dumps(ground_truth.get("relevant_evidence", [])), json.dumps(ground_truth.get("allowed_responses", [])), float(ground_truth.get("score_weight", 1))))
-        get_db().execute("UPDATE attack_scenarios SET name = ?, description = ?, active_version = ?, state = 'draft', visibility = ?, updated_at = ? WHERE id = ?", (payload["name"], payload["description"], version, payload["visibility"], now, scenario_id))
+            get_db().execute(
+                "INSERT INTO scenario_ground_truth (scenario_version_id, step_id, expected_detections, relevant_evidence, allowed_responses, score_weight) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    version_id,
+                    step["step_id"],
+                    json.dumps(ground_truth.get("expected_detections", [])),
+                    json.dumps(ground_truth.get("relevant_evidence", [])),
+                    json.dumps(ground_truth.get("allowed_responses", [])),
+                    float(ground_truth.get("score_weight", 1)),
+                ),
+            )
+        get_db().execute(
+            "UPDATE attack_scenarios SET name = ?, description = ?, active_version = ?, state = 'draft', visibility = ?, updated_at = ? WHERE id = ?",
+            (payload["name"], payload["description"], version, payload["visibility"], now, scenario_id),
+        )
         record_audit(get_db(), "version", "scenario", scenario_id, details={"from": scenario["active_version"], "to": version})
     return jsonify({"id": scenario_id, "version": version, "state": "draft"}), 201
 
@@ -223,16 +355,54 @@ def clone_scenario(scenario_id: int):
     name = requested_name.strip() if isinstance(requested_name, str) and 3 <= len(requested_name.strip()) <= 180 else f"{scenario['name']} copy"
     now = iso_now()
     with transaction():
-        cursor = get_db().execute("INSERT INTO attack_scenarios (scenario_id, workspace_id, name, description, active_version, state, visibility, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 'draft', ?, ?, ?, ?)", (public_id("SCN"), workspace_id(), name, scenario["description"], scenario["visibility"], actor_id(), now, now))
+        cursor = get_db().execute(
+            "INSERT INTO attack_scenarios (scenario_id, workspace_id, name, description, active_version, state, visibility, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 'draft', ?, ?, ?, ?)",
+            (public_id("SCN"), workspace_id(), name, scenario["description"], scenario["visibility"], actor_id(), now, now),
+        )
         cloned_id = inserted_id(cursor)
-        version_cursor = get_db().execute("INSERT INTO scenario_versions (scenario_id, version, objectives, roles, difficulty, duration_minutes, environment, scoring_policy, created_by, created_at) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)", (cloned_id, version["objectives"], version["roles"], version["difficulty"], version["duration_minutes"], version["environment"], version["scoring_policy"], actor_id(), now))
+        version_cursor = get_db().execute(
+            "INSERT INTO scenario_versions (scenario_id, version, objectives, roles, difficulty, duration_minutes, environment, scoring_policy, created_by, created_at) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                cloned_id,
+                version["objectives"],
+                version["roles"],
+                version["difficulty"],
+                version["duration_minutes"],
+                version["environment"],
+                version["scoring_policy"],
+                actor_id(),
+                now,
+            ),
+        )
         cloned_version_id = inserted_id(version_cursor)
         steps = get_db().execute("SELECT * FROM scenario_steps WHERE scenario_version_id = ? ORDER BY position", (version["id"],)).fetchall()
         for step in steps:
-            get_db().execute("INSERT INTO scenario_steps (scenario_version_id, step_id, position, name, event_template, artifact, mitre_ids, visible_hint) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (cloned_version_id, step["step_id"], step["position"], step["name"], step["event_template"], step["artifact"], step["mitre_ids"], step["visible_hint"]))
+            get_db().execute(
+                "INSERT INTO scenario_steps (scenario_version_id, step_id, position, name, event_template, artifact, mitre_ids, visible_hint) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    cloned_version_id,
+                    step["step_id"],
+                    step["position"],
+                    step["name"],
+                    step["event_template"],
+                    step["artifact"],
+                    step["mitre_ids"],
+                    step["visible_hint"],
+                ),
+            )
         truths = get_db().execute("SELECT * FROM scenario_ground_truth WHERE scenario_version_id = ?", (version["id"],)).fetchall()
         for truth in truths:
-            get_db().execute("INSERT INTO scenario_ground_truth (scenario_version_id, step_id, expected_detections, relevant_evidence, allowed_responses, score_weight) VALUES (?, ?, ?, ?, ?, ?)", (cloned_version_id, truth["step_id"], truth["expected_detections"], truth["relevant_evidence"], truth["allowed_responses"], truth["score_weight"]))
+            get_db().execute(
+                "INSERT INTO scenario_ground_truth (scenario_version_id, step_id, expected_detections, relevant_evidence, allowed_responses, score_weight) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    cloned_version_id,
+                    truth["step_id"],
+                    truth["expected_detections"],
+                    truth["relevant_evidence"],
+                    truth["allowed_responses"],
+                    truth["score_weight"],
+                ),
+            )
         record_audit(get_db(), "clone", "scenario", cloned_id, details={"source_scenario_id": scenario_id})
     return jsonify({"id": cloned_id, "version": 1, "state": "draft"}), 201
 
@@ -247,16 +417,20 @@ def _run_access(run_id: int) -> sqlite3.Row | None:
 @training_api.get("/api/training/runs")
 @require_permission("training.run")
 def list_my_runs():
-    rows = get_db().execute(
-        """SELECT tr.id, tr.run_id, tr.difficulty, tr.state, tr.started_at,
+    rows = (
+        get_db()
+        .execute(
+            """SELECT tr.id, tr.run_id, tr.difficulty, tr.state, tr.started_at,
                   tr.completed_at, tr.submitted_at, tr.current_step, s.name AS scenario_name
            FROM training_runs tr
            JOIN scenario_versions sv ON sv.id = tr.scenario_version_id
            JOIN attack_scenarios s ON s.id = sv.scenario_id
            WHERE tr.workspace_id = ? AND tr.user_id = ?
            ORDER BY tr.id DESC LIMIT 50""",
-        (workspace_id(), actor_id()),
-    ).fetchall()
+            (workspace_id(), actor_id()),
+        )
+        .fetchall()
+    )
     return jsonify({"items": [dict(row) for row in rows]})
 
 
@@ -270,7 +444,11 @@ def start_run():
 
 
 def _start_run(data: dict[str, Any]):
-    scenario = get_db().execute("SELECT * FROM attack_scenarios WHERE id = ? AND workspace_id = ? AND state IN ('published', 'ready')", (data["scenario_id"], workspace_id())).fetchone()
+    scenario = (
+        get_db()
+        .execute("SELECT * FROM attack_scenarios WHERE id = ? AND workspace_id = ? AND state IN ('published', 'ready')", (data["scenario_id"], workspace_id()))
+        .fetchone()
+    )
     if not scenario:
         return error_response("SCENARIO_NOT_AVAILABLE", "السيناريو غير منشور أو غير موجود", 404)
     version = _scenario_version(int(scenario["id"]), data.get("version") if isinstance(data.get("version"), int) else None)
@@ -287,7 +465,20 @@ def _start_run(data: dict[str, Any]):
         seed = int(hashlib.sha256(f"{version['id']}:{actor_id()}:{iso_now()}".encode()).hexdigest()[:8], 16)
     now = iso_now()
     with transaction():
-        cursor = get_db().execute("INSERT INTO training_runs (run_id, workspace_id, scenario_version_id, user_id, difficulty, seed, state, current_step, playback_rate, started_at, snapshot) VALUES (?, ?, ?, ?, ?, ?, 'running', 0, ?, ?, ?)", (public_id("RUN"), workspace_id(), version["id"], actor_id(), difficulty, seed, float(data.get("playback_rate", 1)), now, json.dumps({"scenario_version": version["version"], "difficulty": difficulty, "seed": seed})))
+        cursor = get_db().execute(
+            "INSERT INTO training_runs (run_id, workspace_id, scenario_version_id, user_id, difficulty, seed, state, current_step, playback_rate, started_at, snapshot) VALUES (?, ?, ?, ?, ?, ?, 'running', 0, ?, ?, ?)",
+            (
+                public_id("RUN"),
+                workspace_id(),
+                version["id"],
+                actor_id(),
+                difficulty,
+                seed,
+                float(data.get("playback_rate", 1)),
+                now,
+                json.dumps({"scenario_version": version["version"], "difficulty": difficulty, "seed": seed}),
+            ),
+        )
         run_id = inserted_id(cursor)
         record_audit(get_db(), "start", "training_run", run_id, details={"scenario": scenario["scenario_id"], "seed": seed, "difficulty": difficulty})
         record_training_action(get_db(), run_id, actor_id(), "run_started", "training_run", run_id, {}, f"run-start:{run_id}")
@@ -301,7 +492,21 @@ def _noise_event(run: sqlite3.Row, position: int, index: int, event_time: str) -
     digest = hashlib.sha256(f"{run['seed']}:{position}:{index}".encode()).digest()
     source_ip = f"198.51.100.{20 + int.from_bytes(digest[:2], 'big') % 201}"
     username = f"training-user-{1 + digest[2] % 12}"
-    return {"source": "scenario-noise", "source_type": "training", "severity": "low", "category": "benign", "event_type": "routine_activity", "title": "Routine training activity", "description": "Deterministic background event", "event_time": event_time, "source_ip": source_ip, "username": username, "raw_payload": {"synthetic": True, "noise": True}, "tags": ["training", "noise"], "idempotency_key": f"run:{run['id']}:noise:{position}:{index}"}
+    return {
+        "source": "scenario-noise",
+        "source_type": "training",
+        "severity": "low",
+        "category": "benign",
+        "event_type": "routine_activity",
+        "title": "Routine training activity",
+        "description": "Deterministic background event",
+        "event_time": event_time,
+        "source_ip": source_ip,
+        "username": username,
+        "raw_payload": {"synthetic": True, "noise": True},
+        "tags": ["training", "noise"],
+        "idempotency_key": f"run:{run['id']}:noise:{position}:{index}",
+    }
 
 
 def _materialize_step(connection: sqlite3.Connection, run: sqlite3.Row, step: sqlite3.Row) -> tuple[list[int], list[int]]:
@@ -319,14 +524,20 @@ def _materialize_step(connection: sqlite3.Connection, run: sqlite3.Row, step: sq
         event["mitre_ids"] = json.loads(step["mitre_ids"])
         event["provenance"] = {"scenario_step": step["step_id"], "seed": run["seed"], "synthetic": True}
         event_id, alerts, _ = ingest_event(connection, event, run["user_id"], run["workspace_id"], run["id"])
-        connection.execute("INSERT OR IGNORE INTO training_run_events (run_id, step_id, event_id, sequence_number) VALUES (?, ?, ?, ?)", (run["id"], step["step_id"], event_id, int(step["position"]) * 100 + index))
+        connection.execute(
+            "INSERT OR IGNORE INTO training_run_events (run_id, step_id, event_id, sequence_number) VALUES (?, ?, ?, ?)",
+            (run["id"], step["step_id"], event_id, int(step["position"]) * 100 + index),
+        )
         event_ids.append(event_id)
         alert_ids.extend(alerts)
     noise_count = {"beginner": 0, "intermediate": 1, "advanced": 3}[run["difficulty"]]
     for index in range(noise_count):
         event = _noise_event(run, int(step["position"]), index, (base_time + timedelta(seconds=20 + index)).isoformat().replace("+00:00", "Z"))
         event_id, alerts, _ = ingest_event(connection, event, run["user_id"], run["workspace_id"], run["id"])
-        connection.execute("INSERT OR IGNORE INTO training_run_events (run_id, step_id, event_id, sequence_number) VALUES (?, ?, ?, ?)", (run["id"], f"noise-{step['step_id']}", event_id, int(step["position"]) * 100 + 50 + index))
+        connection.execute(
+            "INSERT OR IGNORE INTO training_run_events (run_id, step_id, event_id, sequence_number) VALUES (?, ?, ?, ?)",
+            (run["id"], f"noise-{step['step_id']}", event_id, int(step["position"]) * 100 + 50 + index),
+        )
         event_ids.append(event_id)
         alert_ids.extend(alerts)
     return event_ids, alert_ids
@@ -338,7 +549,14 @@ def _play_run(run_id: int, steps_requested: int):
         return error_response("RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
     if run["state"] != "running":
         return error_response("RUN_NOT_RUNNING", "جلسة التدريب ليست في حالة تشغيل", 409)
-    steps = get_db().execute("SELECT * FROM scenario_steps WHERE scenario_version_id = ? AND position > ? ORDER BY position LIMIT ?", (run["scenario_version_id"], run["current_step"], min(max(steps_requested, 1), 50))).fetchall()
+    steps = (
+        get_db()
+        .execute(
+            "SELECT * FROM scenario_steps WHERE scenario_version_id = ? AND position > ? ORDER BY position LIMIT ?",
+            (run["scenario_version_id"], run["current_step"], min(max(steps_requested, 1), 50)),
+        )
+        .fetchall()
+    )
     generated_events: list[int] = []
     generated_alerts: list[int] = []
     with transaction():
@@ -353,9 +571,22 @@ def _play_run(run_id: int, steps_requested: int):
         if completed:
             get_db().execute("UPDATE training_runs SET state = 'awaiting_submission', completed_at = ? WHERE id = ?", (iso_now(), run_id))
             record_training_action(get_db(), run_id, run["user_id"], "playback_finished", "training_run", run_id, {}, f"playback-finish:{run_id}")
-        record_audit(get_db(), "play", "training_run", run_id, details={"steps": len(steps), "events": len(generated_events), "alerts": len(generated_alerts), "completed": completed})
+        record_audit(
+            get_db(),
+            "play",
+            "training_run",
+            run_id,
+            details={"steps": len(steps), "events": len(generated_events), "alerts": len(generated_alerts), "completed": completed},
+        )
         insert_outbox(get_db(), run["workspace_id"], "training_run.updated", {"id": run_id, "current_step": current, "completed": completed})
-    response: dict[str, Any] = {"id": run_id, "state": "awaiting_submission" if completed else "running", "current_step": current, "total_steps": total_steps, "event_ids": generated_events, "alert_ids": generated_alerts}
+    response: dict[str, Any] = {
+        "id": run_id,
+        "state": "awaiting_submission" if completed else "running",
+        "current_step": current,
+        "total_steps": total_steps,
+        "event_ids": generated_events,
+        "alert_ids": generated_alerts,
+    }
     if completed:
         response["assessment_status"] = "awaiting_submission"
     return jsonify(response)
@@ -372,6 +603,7 @@ def submit_run(run_id: int):
     if run["state"] not in {"awaiting_submission", "completed"}:
         return error_response("RUN_NOT_READY_FOR_SUBMISSION", "يجب إنهاء عرض السيناريو أولًا", 409)
     from .scoring import calculate_assessment
+
     if run["state"] == "completed" and run["submitted_at"]:
         return jsonify({"state": "completed", "assessment": calculate_assessment(get_db(), run_id)})
     with transaction():
@@ -435,7 +667,13 @@ def restart_run(run_id: int):
         return error_response("RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
     get_db().execute("UPDATE training_runs SET state = 'cancelled' WHERE id = ? AND state IN ('running', 'paused', 'ready')", (run_id,))
     scenario = get_db().execute("SELECT scenario_id FROM scenario_versions WHERE id = ?", (run["scenario_version_id"],)).fetchone()
-    data = {"scenario_id": scenario["scenario_id"], "difficulty": run["difficulty"], "seed": run["seed"], "playback_rate": run["playback_rate"], "auto_play": False}
+    data = {
+        "scenario_id": scenario["scenario_id"],
+        "difficulty": run["difficulty"],
+        "seed": run["seed"],
+        "playback_rate": run["playback_rate"],
+        "auto_play": False,
+    }
     return _start_run(data)
 
 
@@ -445,7 +683,14 @@ def consume_hint(run_id: int):
     run = _run_access(run_id)
     if not run:
         return error_response("RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
-    step = get_db().execute("SELECT visible_hint FROM scenario_steps WHERE scenario_version_id = ? AND position = ?", (run["scenario_version_id"], max(int(run["current_step"]), 1))).fetchone()
+    step = (
+        get_db()
+        .execute(
+            "SELECT visible_hint FROM scenario_steps WHERE scenario_version_id = ? AND position = ?",
+            (run["scenario_version_id"], max(int(run["current_step"]), 1)),
+        )
+        .fetchone()
+    )
     if not step or not step["visible_hint"]:
         return error_response("HINT_NOT_AVAILABLE", "لا يتوفر تلميح لهذه الخطوة", 404)
     get_db().execute("UPDATE training_runs SET hints_used = hints_used + 1 WHERE id = ?", (run_id,))
@@ -461,11 +706,21 @@ def run_detail(run_id: int):
         return error_response("RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
     item = dict(run)
     item["snapshot"] = json.loads(item["snapshot"])
-    item["events"] = [dict(row) for row in get_db().execute("SELECT tre.step_id, tre.sequence_number, e.id, e.event_id, e.event_time, e.severity, e.event_type, e.title FROM training_run_events tre JOIN security_events e ON e.id = tre.event_id WHERE tre.run_id = ? ORDER BY tre.sequence_number", (run_id,)).fetchall()]
+    item["events"] = [
+        dict(row)
+        for row in get_db()
+        .execute(
+            "SELECT tre.step_id, tre.sequence_number, e.id, e.event_id, e.event_time, e.severity, e.event_type, e.title FROM training_run_events tre JOIN security_events e ON e.id = tre.event_id WHERE tre.run_id = ? ORDER BY tre.sequence_number",
+            (run_id,),
+        )
+        .fetchall()
+    ]
     total_steps = int(get_db().execute("SELECT COUNT(*) FROM scenario_steps WHERE scenario_version_id = ?", (run["scenario_version_id"],)).fetchone()[0])
     item["total_steps"] = total_steps
     item["progress"] = int(run["current_step"]) / total_steps if total_steps else 0
-    item["ground_truth_visible"] = has_permission(current_user(), "ground_truth.read") or run["state"] == "completed" and has_permission(current_user(), "training.manage")
+    item["ground_truth_visible"] = (
+        has_permission(current_user(), "ground_truth.read") or run["state"] == "completed" and has_permission(current_user(), "training.manage")
+    )
     return jsonify(item)
 
 
@@ -475,7 +730,14 @@ def run_ground_truth(run_id: int):
     run = _run_access(run_id)
     if not run:
         return error_response("RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
-    rows = get_db().execute("SELECT step_id, expected_detections, relevant_evidence, allowed_responses, score_weight FROM scenario_ground_truth WHERE scenario_version_id = ? ORDER BY id", (run["scenario_version_id"],)).fetchall()
+    rows = (
+        get_db()
+        .execute(
+            "SELECT step_id, expected_detections, relevant_evidence, allowed_responses, score_weight FROM scenario_ground_truth WHERE scenario_version_id = ? ORDER BY id",
+            (run["scenario_version_id"],),
+        )
+        .fetchall()
+    )
     items = []
     for row in rows:
         item = dict(row)

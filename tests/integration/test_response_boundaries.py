@@ -16,7 +16,14 @@ def test_playbook_version_preview_and_context_validation(client, login_as):
     assert client.post("/api/playbooks/99999/versions", json=payload).status_code == 404
     preview_url = f"/api/playbooks/{identifier}/preview"
     assert client.post(preview_url, json=[]).status_code == 400
-    for patch, expected in [({"case_id": "bad"}, 422), ({"case_id": 99999}, 404), ({"training_run_id": 99999}, 404), ({"parameters": []}, 422), ({"parameters": {str(i): i for i in range(31)}}, 422), ({"parameters": {"x": "x" * 10001}}, 422)]:
+    for patch, expected in [
+        ({"case_id": "bad"}, 422),
+        ({"case_id": 99999}, 404),
+        ({"training_run_id": 99999}, 404),
+        ({"parameters": []}, 422),
+        ({"parameters": {str(i): i for i in range(31)}}, 422),
+        ({"parameters": {"x": "x" * 10001}}, 422),
+    ]:
         assert client.post(preview_url, json=patch).status_code == expected
         assert client.post("/api/playbook-runs", json={"playbook_id": identifier, **patch}).status_code == expected
     assert client.post("/api/playbook-runs", json={"playbook_id": identifier}).status_code == 422
@@ -65,12 +72,15 @@ def test_all_simulation_actions_record_real_internal_effects(client, login_as, d
     assert client.get(f"/api/playbook-runs/{result.json['id']}").status_code == 404
 
 
-@pytest.mark.parametrize("action,parameters,error", [
-    ("collect_evidence", {}, "requires a case"),
-    ("escalate_to_manager", {}, "requires a case"),
-    ("tag_ioc", {}, "required"),
-    ("tag_ioc", {"ioc_id": 99999, "tag": "review"}, "not found"),
-])
+@pytest.mark.parametrize(
+    "action,parameters,error",
+    [
+        ("collect_evidence", {}, "requires a case"),
+        ("escalate_to_manager", {}, "requires a case"),
+        ("tag_ioc", {}, "required"),
+        ("tag_ioc", {"ioc_id": 99999, "tag": "review"}, "not found"),
+    ],
+)
 def test_failed_response_keeps_error_and_limits_retry(client, login_as, action, parameters, error):
     login_as("admin")
     identifier, _ = make_playbook(client, [{"action": action, "parameters": parameters, "retry_limit": 2}])

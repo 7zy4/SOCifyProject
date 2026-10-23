@@ -12,8 +12,15 @@ def generate() -> dict[str, object]:
             continue
         path = rule.rule
         for argument in rule.arguments:
-            path = path.replace(f"<int:{argument}>", "{" + argument + "}").replace(f"<path:{argument}>", "{" + argument + "}").replace(f"<{argument}>", "{" + argument + "}")
-        parameters = [{"name": argument, "in": "path", "required": True, "schema": {"type": "integer" if f"<int:{argument}>" in rule.rule else "string"}} for argument in sorted(rule.arguments)]
+            path = (
+                path.replace(f"<int:{argument}>", "{" + argument + "}")
+                .replace(f"<path:{argument}>", "{" + argument + "}")
+                .replace(f"<{argument}>", "{" + argument + "}")
+            )
+        parameters = [
+            {"name": argument, "in": "path", "required": True, "schema": {"type": "integer" if f"<int:{argument}>" in rule.rule else "string"}}
+            for argument in sorted(rule.arguments)
+        ]
         for method in sorted(set(rule.methods or ()) - {"HEAD", "OPTIONS"}):
             operation: dict[str, object] = {
                 "operationId": rule.endpoint.replace(".", "_") + "_" + method.lower() + "_" + path.replace("/", "_").replace("{", "").replace("}", ""),
@@ -35,7 +42,20 @@ def generate() -> dict[str, object]:
         "servers": [{"url": "/"}],
         "paths": paths,
         "components": {
-            "schemas": {"Error": {"type": "object", "required": ["error", "correlation_id"], "properties": {"error": {"type": "object", "required": ["code", "message"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "details": {"type": "object"}}}, "correlation_id": {"type": "string"}}}},
+            "schemas": {
+                "Error": {
+                    "type": "object",
+                    "required": ["error", "correlation_id"],
+                    "properties": {
+                        "error": {
+                            "type": "object",
+                            "required": ["code", "message"],
+                            "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "details": {"type": "object"}},
+                        },
+                        "correlation_id": {"type": "string"},
+                    },
+                }
+            },
             "responses": {
                 "BadRequest": {"description": "Invalid request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
                 "Unauthorized": {"description": "Authentication required", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},

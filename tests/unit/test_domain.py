@@ -52,12 +52,14 @@ def test_detection_nested_logic_and_normalized_field_lookup() -> None:
 
 
 def test_rule_validation_normalizes_dsl() -> None:
-    dsl = validate_dsl({
-        "logic": "and",
-        "conditions": [{"field": "event_type", "operator": "equals", "value": "failed_login"}],
-        "window": {"seconds": 600, "threshold": 5, "group_by": ["source_ip"], "mode": "count"},
-        "mitre_ids": ["T1110"],
-    })
+    dsl = validate_dsl(
+        {
+            "logic": "and",
+            "conditions": [{"field": "event_type", "operator": "equals", "value": "failed_login"}],
+            "window": {"seconds": 600, "threshold": 5, "group_by": ["source_ip"], "mode": "count"},
+            "mitre_ids": ["T1110"],
+        }
+    )
     assert dsl["condition"]["logic"] == "and"
     assert "logic" not in dsl
 
@@ -177,7 +179,13 @@ def test_xml_entity_declaration_is_rejected(app) -> None:
         ("legacy.log", b"<34>Oct 19 10:00:00 host sshd[1]: Accepted publickey for analyst from 198.51.100.2", "syslog", "syslog", "syslog"),
         ("access.log", b'198.51.100.2 - analyst [19/Oct/2026:10:00:00 +0000] "GET /training HTTP/1.1" 200 12', "web", "web", "web_request"),
         ("auth.log", b"Oct 19 10:00:00 host sshd[1]: Failed password for analyst from 198.51.100.2", "linux_auth", "linux_auth", "failed_login"),
-        ("event.xml", b'<Event><System><EventID>1</EventID><Computer>host</Computer><TimeCreated SystemTime="2026-10-19T10:00:00Z"/></System><EventData><Data Name="Image">cmd.exe</Data></EventData></Event>', "sysmon_xml", "sysmon_xml", "sysmon_1"),
+        (
+            "event.xml",
+            b'<Event><System><EventID>1</EventID><Computer>host</Computer><TimeCreated SystemTime="2026-10-19T10:00:00Z"/></System><EventData><Data Name="Image">cmd.exe</Data></EventData></Event>',
+            "sysmon_xml",
+            "sysmon_xml",
+            "sysmon_1",
+        ),
     ],
 )
 def test_supported_import_parsers(app, filename: str, content: bytes, selected_format: str, expected_format: str, expected_type: str) -> None:

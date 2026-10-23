@@ -16,7 +16,24 @@ def test_platform_read_models_and_ui_routes(client: FlaskClient, login_as: Calla
     assert client.get("/test").status_code == 302
     assert client.get("/dashboard").status_code == 302
     login_as("admin")
-    for path in ("/dashboard", "/events", "/alerts", "/rules", "/sources", "/imports", "/incidents", "/lab", "/attack", "/hunt", "/graph", "/playbooks", "/scores", "/audit", "/admin", "/profile"):
+    for path in (
+        "/dashboard",
+        "/events",
+        "/alerts",
+        "/rules",
+        "/sources",
+        "/imports",
+        "/incidents",
+        "/lab",
+        "/attack",
+        "/hunt",
+        "/graph",
+        "/playbooks",
+        "/scores",
+        "/audit",
+        "/admin",
+        "/profile",
+    ):
         response = client.get(path)
         assert response.status_code == 200
         assert 'dir="rtl"' in response.text
@@ -112,7 +129,12 @@ def test_scenario_authoring_versioning_and_state_machine(client: FlaskClient, lo
     versioned = client.post(f"/api/scenarios/{scenario_id}/versions", json={**payload, "difficulty": "advanced"})
     assert versioned.status_code == 201
     assert versioned.json["version"] == 2
-    for bad in ({}, {**payload, "steps": []}, {**payload, "difficulty": "impossible"}, {**payload, "steps": [{"name": "Unsafe", "event": {"url": "https://public.example"}}]}):
+    for bad in (
+        {},
+        {**payload, "steps": []},
+        {**payload, "difficulty": "impossible"},
+        {**payload, "steps": [{"name": "Unsafe", "event": {"url": "https://public.example"}}]},
+    ):
         assert client.post("/api/scenarios", json=bad).status_code == 422
 
 

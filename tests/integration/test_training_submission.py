@@ -40,7 +40,9 @@ def test_submission_is_required_after_playback(client: FlaskClient, login_as: Ca
     assert database.execute("SELECT COUNT(*) FROM assessment_snapshots WHERE run_id = ?", (run_id,)).fetchone()[0] == 1
 
 
-def test_training_decisions_not_automated_alerts_earn_detection_credit(client: FlaskClient, login_as: Callable[[str], None], database: sqlite3.Connection) -> None:
+def test_training_decisions_not_automated_alerts_earn_detection_credit(
+    client: FlaskClient, login_as: Callable[[str], None], database: sqlite3.Connection
+) -> None:
     login_as("analyst")
     empty_run = _start(client)
     _finish_playback(client, empty_run)

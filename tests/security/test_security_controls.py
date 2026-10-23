@@ -55,10 +55,13 @@ def test_e2e_04_password_change_invalidates_old_value(
     login_as: Callable[[str], None],
 ) -> None:
     login_as("analyst")
-    assert client.post(
-        "/api/profile/password",
-        json={"current_password": "Wrong-Training-Value!", "new_password": "Updated-Training-Value-2026!"},
-    ).status_code == 403
+    assert (
+        client.post(
+            "/api/profile/password",
+            json={"current_password": "Wrong-Training-Value!", "new_password": "Updated-Training-Value-2026!"},
+        ).status_code
+        == 403
+    )
     changed = client.post(
         "/api/profile/password",
         json={"current_password": DEMO_LOGIN_VALUE, "new_password": "Updated-Training-Value-2026!"},

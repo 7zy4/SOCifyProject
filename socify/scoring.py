@@ -36,7 +36,10 @@ def _training_ground_truth(connection: sqlite3.Connection, scenario_version_id: 
 
 
 def _learner_detection_results(
-    connection: sqlite3.Connection, run_id: int, user_id: int, expected: set[tuple[str, str]],
+    connection: sqlite3.Connection,
+    run_id: int,
+    user_id: int,
+    expected: set[tuple[str, str]],
 ) -> tuple[set[tuple[str, str]], int, int, list[float]]:
     rows = connection.execute(
         """SELECT a.id AS alert_id, a.detected_at, r.name AS rule_name,
@@ -84,7 +87,10 @@ def _learner_detection_results(
 
 
 def _learner_evidence(
-    connection: sqlite3.Connection, run_id: int, user_id: int, expected: set[tuple[str, str]],
+    connection: sqlite3.Connection,
+    run_id: int,
+    user_id: int,
+    expected: set[tuple[str, str]],
 ) -> set[tuple[str, str]]:
     rows = connection.execute(
         """SELECT ta.target_id, tre.step_id, e.source_ip, e.destination_ip, e.username,
@@ -132,17 +138,11 @@ def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[st
     run = connection.execute("SELECT * FROM training_runs WHERE id = ?", (run_id,)).fetchone()
     if not run or run["state"] != "completed" or not run["submitted_at"]:
         raise ValueError("training run requires explicit learner submission before scoring")
-    version = connection.execute(
-        "SELECT * FROM scenario_versions WHERE id = ?", (run["scenario_version_id"],)
-    ).fetchone()
+    version = connection.execute("SELECT * FROM scenario_versions WHERE id = ?", (run["scenario_version_id"],)).fetchone()
     if version is None:
         raise RuntimeError("scenario version is missing")
-    expected_detection, expected_evidence, expected_responses = _training_ground_truth(
-        connection, int(run["scenario_version_id"])
-    )
-    detected, true_positives, false_positives, latencies = _learner_detection_results(
-        connection, run_id, int(run["user_id"]), expected_detection
-    )
+    expected_detection, expected_evidence, expected_responses = _training_ground_truth(connection, int(run["scenario_version_id"]))
+    detected, true_positives, false_positives, latencies = _learner_detection_results(connection, run_id, int(run["user_id"]), expected_detection)
     false_negatives = len(expected_detection - detected)
     precision = true_positives / (true_positives + false_positives) if true_positives + false_positives else 0.0
     recall = true_positives / len(expected_detection) if expected_detection else 1.0
@@ -158,22 +158,20 @@ def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[st
     ).fetchall()
     transitions = [json.loads(action["payload"]).get("to") for action in actions if action["action_type"] == "case_transition"]
     closed_cases = [case for case in cases if case["status"] == "closed"]
-    investigation_progress = (0.40 if cases else 0.0) + (
-        0.30 if any(status in {"triaged", "investigating", "contained", "recovered"} for status in transitions) else 0.0
-    ) + (0.30 if closed_cases else 0.0)
+    investigation_progress = (
+        (0.40 if cases else 0.0)
+        + (0.30 if any(status in {"triaged", "investigating", "contained", "recovered"} for status in transitions) else 0.0)
+        + (0.30 if closed_cases else 0.0)
+    )
     completed_at = parse_timestamp(run["submitted_at"])
     started_at = parse_timestamp(run["started_at"])
     elapsed_seconds = max((completed_at - started_at).total_seconds(), 0.0)
     allowed_seconds = max(int(version["duration_minutes"]) * 60, 1)
     hints = int(run["hints_used"] or 0)
     timing = _bounded((100 if elapsed_seconds <= allowed_seconds else 100 * allowed_seconds / max(elapsed_seconds, 1)) - 5 * hints)
-    false_positive_accuracy = (
-        _bounded(100 * (1 - false_positives / max(true_positives + false_positives, 1)))
-        if true_positives + false_positives else 0.0
-    )
+    false_positive_accuracy = _bounded(100 * (1 - false_positives / max(true_positives + false_positives, 1))) if true_positives + false_positives else 0.0
     case_resolution_seconds = [
-        max((parse_timestamp(case["closed_at"]) - parse_timestamp(case["created_at"])).total_seconds(), 0.0)
-        for case in closed_cases if case["closed_at"]
+        max((parse_timestamp(case["closed_at"]) - parse_timestamp(case["created_at"])).total_seconds(), 0.0) for case in closed_cases if case["closed_at"]
     ]
     metrics: dict[str, Any] = {
         "true_positives": true_positives,
@@ -224,18 +222,25 @@ def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[st
            (assessment_id, workspace_id, run_id, user_id, policy_version, weights, inputs, components, total_score, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
-            public_id("ASM"), run["workspace_id"], run_id, run["user_id"], policy_version,
+            public_id("ASM"),
+            run["workspace_id"],
+            run_id,
+            run["user_id"],
+            policy_version,
             json.dumps(weights, sort_keys=True, separators=(",", ":")),
             json.dumps(inputs, sort_keys=True, separators=(",", ":")),
             json.dumps(components, sort_keys=True, separators=(",", ":")),
-            total, iso_now(),
+            total,
+            iso_now(),
         ),
     )
     assessment_id = inserted_id(cursor)
     row = connection.execute("SELECT * FROM assessment_snapshots WHERE id = ?", (assessment_id,)).fetchone()
     if row is None:
         raise RuntimeError("assessment disappeared during request")
-    record_audit(connection, "create", "assessment", assessment_id, details={"run_id": run_id, "score": total}, actor=run["user_id"], workspace=run["workspace_id"])
+    record_audit(
+        connection, "create", "assessment", assessment_id, details={"run_id": run_id, "score": total}, actor=run["user_id"], workspace=run["workspace_id"]
+    )
     return assessment_view(row)
 
 
@@ -243,7 +248,13 @@ def assessment_view(row: sqlite3.Row) -> dict[str, Any]:
     item = dict(row)
     for field in ("weights", "inputs", "components"):
         item[field] = json.loads(item[field])
-    fingerprint = hashlib.sha256(json.dumps({"weights": item["weights"], "inputs": item["inputs"], "components": item["components"], "total": item["total_score"]}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    fingerprint = hashlib.sha256(
+        json.dumps(
+            {"weights": item["weights"], "inputs": item["inputs"], "components": item["components"], "total": item["total_score"]},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
     item["calculation_fingerprint"] = fingerprint
     return item
 
@@ -252,19 +263,27 @@ def _assessment_access(assessment_id: int) -> sqlite3.Row | None:
     user = current_user()
     if has_permission(user, "scores.read_team"):
         return get_db().execute("SELECT * FROM assessment_snapshots WHERE id = ? AND workspace_id = ?", (assessment_id, workspace_id())).fetchone()
-    return get_db().execute("SELECT * FROM assessment_snapshots WHERE id = ? AND workspace_id = ? AND user_id = ?", (assessment_id, workspace_id(), actor_id())).fetchone()
+    return (
+        get_db()
+        .execute("SELECT * FROM assessment_snapshots WHERE id = ? AND workspace_id = ? AND user_id = ?", (assessment_id, workspace_id(), actor_id()))
+        .fetchone()
+    )
 
 
 @scoring_api.get("/api/scores/me")
 @require_permission("scores.read_own")
 def my_scores():
-    rows = get_db().execute(
-        """SELECT a.*, tr.difficulty, s.name AS scenario_name
+    rows = (
+        get_db()
+        .execute(
+            """SELECT a.*, tr.difficulty, s.name AS scenario_name
         FROM assessment_snapshots a JOIN training_runs tr ON tr.id = a.run_id
         JOIN scenario_versions sv ON sv.id = tr.scenario_version_id JOIN attack_scenarios s ON s.id = sv.scenario_id
         WHERE a.workspace_id = ? AND a.user_id = ? ORDER BY a.created_at DESC""",
-        (workspace_id(), actor_id()),
-    ).fetchall()
+            (workspace_id(), actor_id()),
+        )
+        .fetchall()
+    )
     return jsonify({"items": [assessment_view(row) | {"difficulty": row["difficulty"], "scenario_name": row["scenario_name"]} for row in rows]})
 
 
@@ -303,17 +322,32 @@ def leaderboard():
     if difficulty:
         clauses.append("tr.difficulty = ?")
         parameters.append(difficulty)
-    rows = get_db().execute(
-        f"""SELECT a.id, a.user_id, a.total_score, a.created_at, tr.difficulty, s.id AS scenario_id, s.name AS scenario_name, u.name
+    rows = (
+        get_db()
+        .execute(
+            f"""SELECT a.id, a.user_id, a.total_score, a.created_at, tr.difficulty, s.id AS scenario_id, s.name AS scenario_name, u.name
         FROM assessment_snapshots a JOIN training_runs tr ON tr.id = a.run_id
         JOIN scenario_versions sv ON sv.id = tr.scenario_version_id JOIN attack_scenarios s ON s.id = sv.scenario_id
-        JOIN users u ON u.id = a.user_id WHERE {' AND '.join(clauses)}
+        JOIN users u ON u.id = a.user_id WHERE {" AND ".join(clauses)}
         ORDER BY a.total_score DESC, a.created_at ASC LIMIT 100""",
-        parameters,
-    ).fetchall()
+            parameters,
+        )
+        .fetchall()
+    )
     manager = has_permission(current_user(), "scores.read_team")
     items = []
     for rank, row in enumerate(rows, 1):
         pseudonym = "متدرب-" + hashlib.sha256(f"{workspace_id()}:{row['user_id']}".encode()).hexdigest()[:8]
-        items.append({"rank": rank, "assessment_id": row["id"] if manager or row["user_id"] == actor_id() else None, "name": row["name"] if manager or row["user_id"] == actor_id() else pseudonym, "score": row["total_score"], "difficulty": row["difficulty"], "scenario_id": row["scenario_id"], "scenario_name": row["scenario_name"], "is_current_user": row["user_id"] == actor_id()})
+        items.append(
+            {
+                "rank": rank,
+                "assessment_id": row["id"] if manager or row["user_id"] == actor_id() else None,
+                "name": row["name"] if manager or row["user_id"] == actor_id() else pseudonym,
+                "score": row["total_score"],
+                "difficulty": row["difficulty"],
+                "scenario_id": row["scenario_id"],
+                "scenario_name": row["scenario_name"],
+                "is_current_user": row["user_id"] == actor_id(),
+            }
+        )
     return jsonify({"items": items, "grouping": ["scenario_id", "difficulty"]})

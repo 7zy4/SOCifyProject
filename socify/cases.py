@@ -39,7 +39,10 @@ def _case_row(case_id: int) -> sqlite3.Row | None:
 
 
 def _user_valid(user_id: object) -> bool:
-    return isinstance(user_id, int) and get_db().execute("SELECT 1 FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (user_id, workspace_id())).fetchone() is not None
+    return (
+        isinstance(user_id, int)
+        and get_db().execute("SELECT 1 FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (user_id, workspace_id())).fetchone() is not None
+    )
 
 
 def _json_list(value: object, field: str, maximum: int = 50) -> list[str]:
@@ -52,6 +55,7 @@ def _json_list(value: object, field: str, maximum: int = 50) -> list[str]:
 
 def _history(connection: sqlite3.Connection, case_id: int, action: str, previous: object = None, new: object = None, reason: str | None = None) -> None:
     from .security import correlation_id
+
     connection.execute(
         """INSERT INTO case_history
         (case_id, actor_id, action, previous_value, new_value, reason, correlation_id, created_at)
@@ -72,38 +76,64 @@ def _history(connection: sqlite3.Connection, case_id: int, action: str, previous
 def _reference(connection: sqlite3.Connection) -> str:
     year = utc_now().year
     prefix = f"CASE-{year}-"
-    count = int(connection.execute("SELECT COUNT(*) FROM incident_cases WHERE workspace_id = ? AND reference LIKE ?", (workspace_id(), prefix + "%")).fetchone()[0])
+    count = int(
+        connection.execute("SELECT COUNT(*) FROM incident_cases WHERE workspace_id = ? AND reference LIKE ?", (workspace_id(), prefix + "%")).fetchone()[0]
+    )
     return f"{prefix}{count + 1:06d}"
 
 
 def _attach_event(connection: sqlite3.Connection, case_id: int, event_id: int) -> bool:
-    event = connection.execute("SELECT id, event_id, title, raw_hash, provenance, training_run_id FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, workspace_id())).fetchone()
+    event = connection.execute(
+        "SELECT id, event_id, title, raw_hash, provenance, training_run_id FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, workspace_id())
+    ).fetchone()
     case = connection.execute("SELECT training_run_id FROM incident_cases WHERE id = ? AND workspace_id = ?", (case_id, workspace_id())).fetchone()
     if not event or not case or event["training_run_id"] != case["training_run_id"] or not can_access_training_run(event["training_run_id"]):
         return False
     now = iso_now()
-    connection.execute("INSERT OR IGNORE INTO case_events (case_id, event_id, attached_by, attached_at) VALUES (?, ?, ?, ?)", (case_id, event_id, actor_id(), now))
+    connection.execute(
+        "INSERT OR IGNORE INTO case_events (case_id, event_id, attached_by, attached_at) VALUES (?, ?, ?, ?)", (case_id, event_id, actor_id(), now)
+    )
     connection.execute(
         """INSERT OR IGNORE INTO case_evidence
         (case_id, evidence_type, reference_id, title, sha256, provenance, added_by, added_at)
         VALUES (?, 'event', ?, ?, ?, ?, ?, ?)""",
-        (case_id, str(event_id), event["title"], event["raw_hash"] or hashlib.sha256(str(event["event_id"]).encode()).hexdigest(), event["provenance"] or "{}", actor_id(), now),
+        (
+            case_id,
+            str(event_id),
+            event["title"],
+            event["raw_hash"] or hashlib.sha256(str(event["event_id"]).encode()).hexdigest(),
+            event["provenance"] or "{}",
+            actor_id(),
+            now,
+        ),
     )
     return True
 
 
 def _attach_alert(connection: sqlite3.Connection, case_id: int, alert_id: int) -> bool:
-    alert = connection.execute("SELECT id, alert_id, reason, dedup_key, evidence, training_run_id FROM alerts WHERE id = ? AND workspace_id = ?", (alert_id, workspace_id())).fetchone()
+    alert = connection.execute(
+        "SELECT id, alert_id, reason, dedup_key, evidence, training_run_id FROM alerts WHERE id = ? AND workspace_id = ?", (alert_id, workspace_id())
+    ).fetchone()
     case = connection.execute("SELECT training_run_id FROM incident_cases WHERE id = ? AND workspace_id = ?", (case_id, workspace_id())).fetchone()
     if not alert or not case or alert["training_run_id"] != case["training_run_id"] or not can_access_training_run(alert["training_run_id"]):
         return False
     now = iso_now()
-    connection.execute("INSERT OR IGNORE INTO case_alerts (case_id, alert_id, attached_by, attached_at) VALUES (?, ?, ?, ?)", (case_id, alert_id, actor_id(), now))
+    connection.execute(
+        "INSERT OR IGNORE INTO case_alerts (case_id, alert_id, attached_by, attached_at) VALUES (?, ?, ?, ?)", (case_id, alert_id, actor_id(), now)
+    )
     connection.execute(
         """INSERT OR IGNORE INTO case_evidence
         (case_id, evidence_type, reference_id, title, sha256, provenance, added_by, added_at)
         VALUES (?, 'alert', ?, ?, ?, ?, ?, ?)""",
-        (case_id, str(alert_id), f"Alert {alert['alert_id']}", hashlib.sha256(str(alert["dedup_key"]).encode()).hexdigest(), alert["evidence"], actor_id(), now),
+        (
+            case_id,
+            str(alert_id),
+            f"Alert {alert['alert_id']}",
+            hashlib.sha256(str(alert["dedup_key"]).encode()).hexdigest(),
+            alert["evidence"],
+            actor_id(),
+            now,
+        ),
     )
     event_ids = connection.execute("SELECT event_id FROM alert_events WHERE alert_id = ?", (alert_id,)).fetchall()
     for event in event_ids:
@@ -135,7 +165,13 @@ def list_cases():
     if scope:
         clauses.append(scope.removeprefix(" AND "))
         parameters.extend(scope_parameters)
-    for parameter, column in (("status", "c.status"), ("severity", "c.severity"), ("priority", "c.priority"), ("assignee", "c.assignee"), ("training_run_id", "c.training_run_id")):
+    for parameter, column in (
+        ("status", "c.status"),
+        ("severity", "c.severity"),
+        ("priority", "c.priority"),
+        ("assignee", "c.assignee"),
+        ("training_run_id", "c.training_run_id"),
+    ):
         value = request.args.get(parameter)
         if value:
             clauses.append(f"{column} = ?")
@@ -149,14 +185,18 @@ def list_cases():
         parameters.extend([like, like, like])
     where = " AND ".join(clauses)
     total = int(get_db().execute(f"SELECT COUNT(*) FROM incident_cases c WHERE {where}", parameters).fetchone()[0])
-    rows = get_db().execute(
-        f"""SELECT c.*, u.name AS assignee_name,
+    rows = (
+        get_db()
+        .execute(
+            f"""SELECT c.*, u.name AS assignee_name,
         (SELECT COUNT(*) FROM case_evidence e WHERE e.case_id = c.id) AS evidence_count,
         (SELECT COUNT(*) FROM case_tasks t WHERE t.case_id = c.id AND t.status != 'completed') AS pending_tasks
         FROM incident_cases c LEFT JOIN users u ON u.id = c.assignee
         WHERE {where} ORDER BY c.updated_at DESC LIMIT ? OFFSET ?""",
-        (*parameters, page_size, (page - 1) * page_size),
-    ).fetchall()
+            (*parameters, page_size, (page - 1) * page_size),
+        )
+        .fetchall()
+    )
     return jsonify({"items": [_case_view(row) for row in rows], "total": total, "page": page, "page_size": page_size})
 
 
@@ -197,7 +237,9 @@ def _create_case(data: dict[str, Any]):
         source_alert = get_db().execute("SELECT training_run_id FROM alerts WHERE id = ? AND workspace_id = ?", (alert_ids[0], workspace_id())).fetchone()
         training_run_id = source_alert["training_run_id"] if source_alert else None
     if training_run_id is None and event_ids:
-        source_event = get_db().execute("SELECT training_run_id FROM security_events WHERE id = ? AND workspace_id = ?", (event_ids[0], workspace_id())).fetchone()
+        source_event = (
+            get_db().execute("SELECT training_run_id FROM security_events WHERE id = ? AND workspace_id = ?", (event_ids[0], workspace_id())).fetchone()
+        )
         training_run_id = source_event["training_run_id"] if source_event else None
     if not can_access_training_run(training_run_id):
         return error_response("TRAINING_RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
@@ -221,9 +263,23 @@ def _create_case(data: dict[str, Any]):
             assignee, team, sla_due_at, creator, reporter, tags, mitre_ids, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                _reference(get_db()), workspace_id(), training_run_id, title.strip(), description.strip(), str(data.get("case_type") or "investigation")[:80],
-                severity, priority, assignee, team, sla_due,
-                actor_id(), actor_id(), json.dumps(tags, ensure_ascii=False), json.dumps(mitre_ids), now, now,
+                _reference(get_db()),
+                workspace_id(),
+                training_run_id,
+                title.strip(),
+                description.strip(),
+                str(data.get("case_type") or "investigation")[:80],
+                severity,
+                priority,
+                assignee,
+                team,
+                sla_due,
+                actor_id(),
+                actor_id(),
+                json.dumps(tags, ensure_ascii=False),
+                json.dumps(mitre_ids),
+                now,
+                now,
             ),
         )
         case_id = inserted_id(cursor)
@@ -239,7 +295,16 @@ def _create_case(data: dict[str, Any]):
         )
         _history(get_db(), case_id, "case_created", None, {"status": "new"})
         record_audit(get_db(), "create", "case", case_id, details={"events": event_ids, "alerts": alert_ids})
-        record_training_action(get_db(), training_run_id if isinstance(training_run_id, int) else None, actor_id(), "case_created", "case", case_id, {"alert_ids": alert_ids}, f"case-create:{case_id}")
+        record_training_action(
+            get_db(),
+            training_run_id if isinstance(training_run_id, int) else None,
+            actor_id(),
+            "case_created",
+            "case",
+            case_id,
+            {"alert_ids": alert_ids},
+            f"case-create:{case_id}",
+        )
         insert_outbox(get_db(), workspace_id(), "incident.created", {"id": case_id})
     row = _case_row(case_id)
     return jsonify(_case_view(row)), 201, {"Location": f"/api/incidents/{case_id}"}
@@ -248,7 +313,11 @@ def _create_case(data: dict[str, Any]):
 @cases_api.post("/api/alerts/<int:alert_id>/case")
 @require_permission("cases.create")
 def case_from_alert(alert_id: int):
-    alert = get_db().execute("SELECT reason, severity, training_run_id, mitre_technique_ids FROM alerts WHERE id = ? AND workspace_id = ?", (alert_id, workspace_id())).fetchone()
+    alert = (
+        get_db()
+        .execute("SELECT reason, severity, training_run_id, mitre_technique_ids FROM alerts WHERE id = ? AND workspace_id = ?", (alert_id, workspace_id()))
+        .fetchone()
+    )
     if not alert or not can_access_training_run(alert["training_run_id"]):
         return error_response("ALERT_NOT_FOUND", "التنبيه غير موجود", 404)
     data = request.get_json(silent=True)
@@ -270,18 +339,60 @@ def case_detail(case_id: int):
     if not row:
         return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
     item = _case_view(row)
-    item["events"] = [dict(value) for value in get_db().execute("SELECT e.id, e.event_id, e.event_time, e.source, e.severity, e.event_type, e.title, ce.attached_at FROM case_events ce JOIN security_events e ON e.id = ce.event_id WHERE ce.case_id = ? ORDER BY e.event_time", (case_id,)).fetchall()]
-    item["alerts"] = [dict(value) for value in get_db().execute("SELECT a.id, a.alert_id, a.severity, a.status, a.reason, ca.attached_at FROM case_alerts ca JOIN alerts a ON a.id = ca.alert_id WHERE ca.case_id = ? ORDER BY a.detected_at", (case_id,)).fetchall()]
+    item["events"] = [
+        dict(value)
+        for value in get_db()
+        .execute(
+            "SELECT e.id, e.event_id, e.event_time, e.source, e.severity, e.event_type, e.title, ce.attached_at FROM case_events ce JOIN security_events e ON e.id = ce.event_id WHERE ce.case_id = ? ORDER BY e.event_time",
+            (case_id,),
+        )
+        .fetchall()
+    ]
+    item["alerts"] = [
+        dict(value)
+        for value in get_db()
+        .execute(
+            "SELECT a.id, a.alert_id, a.severity, a.status, a.reason, ca.attached_at FROM case_alerts ca JOIN alerts a ON a.id = ca.alert_id WHERE ca.case_id = ? ORDER BY a.detected_at",
+            (case_id,),
+        )
+        .fetchall()
+    ]
     note_scope = "" if has_permission(current_user(), "cases.override") else " AND (n.visibility = 'team' OR n.author_id = ?)"
     note_parameters: tuple[object, ...] = (case_id,) if not note_scope else (case_id, actor_id())
-    item["notes"] = [{**dict(value), "note": value["body"]} for value in get_db().execute(f"SELECT n.*, u.name AS author_name FROM case_notes n JOIN users u ON u.id = n.author_id WHERE n.case_id = ?{note_scope} ORDER BY n.created_at", note_parameters).fetchall()]
-    item["evidence"] = [dict(value) for value in get_db().execute("SELECT e.*, u.name AS added_by_name FROM case_evidence e JOIN users u ON u.id = e.added_by WHERE e.case_id = ? ORDER BY e.added_at", (case_id,)).fetchall()]
+    item["notes"] = [
+        {**dict(value), "note": value["body"]}
+        for value in get_db()
+        .execute(
+            f"SELECT n.*, u.name AS author_name FROM case_notes n JOIN users u ON u.id = n.author_id WHERE n.case_id = ?{note_scope} ORDER BY n.created_at",
+            note_parameters,
+        )
+        .fetchall()
+    ]
+    item["evidence"] = [
+        dict(value)
+        for value in get_db()
+        .execute(
+            "SELECT e.*, u.name AS added_by_name FROM case_evidence e JOIN users u ON u.id = e.added_by WHERE e.case_id = ? ORDER BY e.added_at", (case_id,)
+        )
+        .fetchall()
+    ]
     item["tasks"] = [dict(value) for value in get_db().execute("SELECT * FROM case_tasks WHERE case_id = ? ORDER BY id", (case_id,)).fetchall()]
-    item["history"] = [dict(value) for value in get_db().execute("SELECT h.*, u.name AS actor_name FROM case_history h JOIN users u ON u.id = h.actor_id WHERE h.case_id = ? ORDER BY h.created_at", (case_id,)).fetchall()]
-    item["reports"] = [dict(value) for value in get_db().execute("SELECT id, revision, format, sha256, created_by, created_at FROM case_reports WHERE case_id = ? ORDER BY revision DESC", (case_id,)).fetchall()]
+    item["history"] = [
+        dict(value)
+        for value in get_db()
+        .execute("SELECT h.*, u.name AS actor_name FROM case_history h JOIN users u ON u.id = h.actor_id WHERE h.case_id = ? ORDER BY h.created_at", (case_id,))
+        .fetchall()
+    ]
+    item["reports"] = [
+        dict(value)
+        for value in get_db()
+        .execute("SELECT id, revision, format, sha256, created_by, created_at FROM case_reports WHERE case_id = ? ORDER BY revision DESC", (case_id,))
+        .fetchall()
+    ]
     item["observables"] = [
         {**dict(value), "tags": json.loads(value["tags"] or "[]")}
-        for value in get_db().execute(
+        for value in get_db()
+        .execute(
             """SELECT i.id, i.type, i.value, i.confidence, i.source, i.tags,
             MIN(o.created_at) AS first_seen, MAX(o.created_at) AS last_seen, COUNT(DISTINCT o.event_id) AS observation_count
             FROM case_events ce
@@ -291,10 +402,13 @@ def case_detail(case_id: int):
             GROUP BY i.id, i.type, i.value, i.confidence, i.source, i.tags
             ORDER BY observation_count DESC, last_seen DESC""",
             (workspace_id(), case_id),
-        ).fetchall()
+        )
+        .fetchall()
     ]
-    candidates = get_db().execute(
-        """SELECT c.id, c.reference, c.title, c.status, c.severity, c.training_run_id,
+    candidates = (
+        get_db()
+        .execute(
+            """SELECT c.id, c.reference, c.title, c.status, c.severity, c.training_run_id,
         COUNT(DISTINCT source_o.ioc_id) AS shared_observables
         FROM case_events source_ce
         JOIN ioc_observations source_o ON source_o.event_id = source_ce.event_id
@@ -305,8 +419,10 @@ def case_detail(case_id: int):
         GROUP BY c.id, c.reference, c.title, c.status, c.severity, c.training_run_id
         ORDER BY shared_observables DESC, c.updated_at DESC
         LIMIT 20""",
-        (case_id, case_id, workspace_id()),
-    ).fetchall()
+            (case_id, case_id, workspace_id()),
+        )
+        .fetchall()
+    )
     item["similar_cases"] = [dict(value) for value in candidates if can_access_training_run(value["training_run_id"])]
     return jsonify(item)
 
@@ -353,7 +469,10 @@ def update_case(case_id: int):
     now = iso_now()
     assignments = ", ".join(f"{field} = ?" for field in updates)
     with transaction():
-        changed = get_db().execute(f"UPDATE incident_cases SET {assignments}, updated_at = ?, version = version + 1 WHERE id = ? AND version = ?", (*updates.values(), now, case_id, row["version"]))
+        changed = get_db().execute(
+            f"UPDATE incident_cases SET {assignments}, updated_at = ?, version = version + 1 WHERE id = ? AND version = ?",
+            (*updates.values(), now, case_id, row["version"]),
+        )
         if changed.rowcount != 1:
             return error_response("CASE_VERSION_CONFLICT", "تم تعديل التحقيق في جلسة أخرى", 409)
         _history(get_db(), case_id, "case_updated", {key: row[key] for key in updates}, updates, str(data.get("reason") or "")[:500] or None)
@@ -375,9 +494,19 @@ def _transition(case_id: int, row: sqlite3.Row, target: str, reason: str, data: 
         missing = [field for field in required if not isinstance(data.get(field), str) or len(str(data[field]).strip()) < 3]
         evidence_count = int(get_db().execute("SELECT COUNT(*) FROM case_evidence WHERE case_id = ?", (case_id,)).fetchone()[0])
         tasks = int(get_db().execute("SELECT COUNT(*) FROM case_tasks WHERE case_id = ? AND required = 1 AND status != 'completed'", (case_id,)).fetchone()[0])
-        override = bool(data.get("override")) and has_permission(user, "cases.override") and isinstance(data.get("override_reason"), str) and len(str(data["override_reason"]).strip()) >= 10
+        override = (
+            bool(data.get("override"))
+            and has_permission(user, "cases.override")
+            and isinstance(data.get("override_reason"), str)
+            and len(str(data["override_reason"]).strip()) >= 10
+        )
         if (missing or evidence_count == 0 or tasks > 0) and not override:
-            return error_response("CASE_CLOSURE_INCOMPLETE", "لا يمكن إغلاق التحقيق قبل إكمال الأدلة والمهام والتقرير", 409, {"missing_fields": missing, "evidence_count": evidence_count, "pending_required_tasks": tasks})
+            return error_response(
+                "CASE_CLOSURE_INCOMPLETE",
+                "لا يمكن إغلاق التحقيق قبل إكمال الأدلة والمهام والتقرير",
+                409,
+                {"missing_fields": missing, "evidence_count": evidence_count, "pending_required_tasks": tasks},
+            )
     now = iso_now()
     extra: dict[str, Any] = {}
     for field in ("disposition", "root_cause", "impact", "response_summary", "lessons_learned"):
@@ -392,12 +521,23 @@ def _transition(case_id: int, row: sqlite3.Row, target: str, reason: str, data: 
         extra["closed_at"] = None
     assignments = ["status = ?", "updated_at = ?", "version = version + 1"] + [f"{field} = ?" for field in extra]
     with transaction():
-        changed = get_db().execute(f"UPDATE incident_cases SET {', '.join(assignments)} WHERE id = ? AND version = ?", (target, now, *extra.values(), case_id, row["version"]))
+        changed = get_db().execute(
+            f"UPDATE incident_cases SET {', '.join(assignments)} WHERE id = ? AND version = ?", (target, now, *extra.values(), case_id, row["version"])
+        )
         if changed.rowcount != 1:
             return error_response("CASE_VERSION_CONFLICT", "تم تعديل التحقيق في جلسة أخرى", 409)
         _history(get_db(), case_id, "status_changed", row["status"], target, reason)
         record_audit(get_db(), "transition", "case", case_id, details={"from": row["status"], "to": target, "reason": reason})
-        record_training_action(get_db(), row["training_run_id"], actor_id(), "case_transition", "case", case_id, {"from": row["status"], "to": target}, f"case-transition:{case_id}:{row['version']}:{target}")
+        record_training_action(
+            get_db(),
+            row["training_run_id"],
+            actor_id(),
+            "case_transition",
+            "case",
+            case_id,
+            {"from": row["status"], "to": target},
+            f"case-transition:{case_id}:{row['version']}:{target}",
+        )
         insert_outbox(get_db(), workspace_id(), "incident.updated", {"id": case_id, "status": target})
     if target == "closed":
         _generate_reports(case_id)
@@ -432,7 +572,10 @@ def add_note(case_id: int):
         return error_response("INVALID_NOTE", "نص الملاحظة مطلوب وبحد أقصى 5000 محرف", 422)
     now = iso_now()
     with transaction():
-        cursor = get_db().execute("INSERT INTO case_notes (case_id, author_id, body, visibility, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)", (case_id, actor_id(), body.strip(), visibility, now, now))
+        cursor = get_db().execute(
+            "INSERT INTO case_notes (case_id, author_id, body, visibility, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (case_id, actor_id(), body.strip(), visibility, now, now),
+        )
         note_id = inserted_id(cursor)
         _history(get_db(), case_id, "note_added", None, {"note_id": note_id})
         record_audit(get_db(), "create", "case_note", note_id, details={"case_id": case_id})
@@ -458,7 +601,9 @@ def add_case_event(case_id: int):
             return error_response("EVENT_NOT_FOUND", "السجل غير موجود", 404)
         _history(get_db(), case_id, "evidence_added", None, {"event_id": event_id})
         record_audit(get_db(), "attach", "case_event", event_id, details={"case_id": case_id})
-        record_training_action(get_db(), row["training_run_id"], actor_id(), "evidence_added", "event", event_id, {"case_id": case_id}, f"evidence:event:{case_id}:{event_id}")
+        record_training_action(
+            get_db(), row["training_run_id"], actor_id(), "evidence_added", "event", event_id, {"case_id": case_id}, f"evidence:event:{case_id}:{event_id}"
+        )
     return jsonify({"case_id": case_id, "event_id": event_id}), 201
 
 
@@ -479,7 +624,9 @@ def add_case_alert(case_id: int):
             return error_response("ALERT_NOT_FOUND", "التنبيه غير موجود", 404)
         _history(get_db(), case_id, "alert_attached", None, {"alert_id": alert_id})
         record_audit(get_db(), "attach", "case_alert", alert_id, details={"case_id": case_id})
-        record_training_action(get_db(), row["training_run_id"], actor_id(), "alert_attached", "alert", alert_id, {"case_id": case_id}, f"evidence:alert:{case_id}:{alert_id}")
+        record_training_action(
+            get_db(), row["training_run_id"], actor_id(), "alert_attached", "alert", alert_id, {"case_id": case_id}, f"evidence:alert:{case_id}:{alert_id}"
+        )
     return jsonify({"case_id": case_id, "alert_id": alert_id}), 201
 
 
@@ -498,13 +645,24 @@ def add_evidence(case_id: int):
     reference = data.get("reference_id")
     title = data.get("title")
     content = data.get("content")
-    if evidence_type not in {"ioc", "training_artifact", "raw_log"} or not isinstance(reference, str) or not 1 <= len(reference) <= 255 or not isinstance(title, str) or not 1 <= len(title) <= 255 or not isinstance(content, str) or len(content.encode()) > 1048576:
+    if (
+        evidence_type not in {"ioc", "training_artifact", "raw_log"}
+        or not isinstance(reference, str)
+        or not 1 <= len(reference) <= 255
+        or not isinstance(title, str)
+        or not 1 <= len(title) <= 255
+        or not isinstance(content, str)
+        or len(content.encode()) > 1048576
+    ):
         return error_response("INVALID_EVIDENCE", "بيانات الدليل غير صالحة أو تتجاوز الحجم المسموح", 422)
     digest = hashlib.sha256(content.encode()).hexdigest()
     now = iso_now()
     try:
         with transaction():
-            cursor = get_db().execute("INSERT INTO case_evidence (case_id, evidence_type, reference_id, title, sha256, provenance, added_by, added_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (case_id, evidence_type, reference, title, digest, json.dumps({"source": "user", "content_length": len(content.encode())}), actor_id(), now))
+            cursor = get_db().execute(
+                "INSERT INTO case_evidence (case_id, evidence_type, reference_id, title, sha256, provenance, added_by, added_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (case_id, evidence_type, reference, title, digest, json.dumps({"source": "user", "content_length": len(content.encode())}), actor_id(), now),
+            )
             evidence_id = inserted_id(cursor)
             _history(get_db(), case_id, "evidence_added", None, {"evidence_id": evidence_id, "sha256": digest})
             record_audit(get_db(), "create", "case_evidence", evidence_id, details={"case_id": case_id, "sha256": digest})
@@ -524,7 +682,10 @@ def add_task(case_id: int):
     assignee = payload.get("assignee")
     if not isinstance(title, str) or not 2 <= len(title.strip()) <= 255 or assignee is not None and not _user_valid(assignee):
         return error_response("INVALID_TASK", "بيانات المهمة غير صالحة", 422)
-    cursor = get_db().execute("INSERT INTO case_tasks (case_id, title, required, status, assignee, created_at) VALUES (?, ?, ?, 'pending', ?, ?)", (case_id, title.strip(), 1 if payload.get("required") else 0, assignee, iso_now()))
+    cursor = get_db().execute(
+        "INSERT INTO case_tasks (case_id, title, required, status, assignee, created_at) VALUES (?, ?, ?, 'pending', ?, ?)",
+        (case_id, title.strip(), 1 if payload.get("required") else 0, assignee, iso_now()),
+    )
     task_id = inserted_id(cursor)
     _history(get_db(), case_id, "task_added", None, {"task_id": task_id})
     return jsonify({"id": task_id}), 201
@@ -549,15 +710,28 @@ def update_task(case_id: int, task_id: int):
 
 def _report_payload(case_id: int) -> dict[str, Any]:
     case = _case_row(case_id)
-    evidence = [dict(row) for row in get_db().execute("SELECT evidence_type, reference_id, title, sha256, added_at FROM case_evidence WHERE case_id = ? ORDER BY added_at", (case_id,)).fetchall()]
-    history = [dict(row) for row in get_db().execute("SELECT action, previous_value, new_value, reason, created_at FROM case_history WHERE case_id = ? ORDER BY created_at", (case_id,)).fetchall()]
+    evidence = [
+        dict(row)
+        for row in get_db()
+        .execute("SELECT evidence_type, reference_id, title, sha256, added_at FROM case_evidence WHERE case_id = ? ORDER BY added_at", (case_id,))
+        .fetchall()
+    ]
+    history = [
+        dict(row)
+        for row in get_db()
+        .execute("SELECT action, previous_value, new_value, reason, created_at FROM case_history WHERE case_id = ? ORDER BY created_at", (case_id,))
+        .fetchall()
+    ]
     return {"case": _case_view(case), "evidence": evidence, "timeline": history, "generated_at": iso_now()}
 
 
 def _report_html(payload: dict[str, Any]) -> str:
     case = payload["case"]
-    evidence_rows = "".join(f"<tr><td>{html.escape(str(item['evidence_type']))}</td><td>{html.escape(str(item['title']))}</td><td dir=\"ltr\">{html.escape(str(item['sha256']))}</td></tr>" for item in payload["evidence"])
-    return f"<!doctype html><html lang=\"ar\" dir=\"rtl\"><head><meta charset=\"utf-8\"><title>{html.escape(str(case['reference']))}</title><style>body{{font-family:Arial,sans-serif;margin:2rem;line-height:1.7}}table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #bbb;padding:.5rem}}h1{{color:#123b66}}</style></head><body><h1>{html.escape(str(case['reference']))}: {html.escape(str(case['title']))}</h1><p><strong>الحالة:</strong> {html.escape(str(case['status']))}</p><p><strong>السبب الجذري:</strong> {html.escape(str(case.get('root_cause') or 'غير محدد'))}</p><p><strong>الأثر:</strong> {html.escape(str(case.get('impact') or 'غير محدد'))}</p><p><strong>الاستجابة:</strong> {html.escape(str(case.get('response_summary') or 'غير محدد'))}</p><h2>الأدلة</h2><table><thead><tr><th>النوع</th><th>العنوان</th><th>SHA-256</th></tr></thead><tbody>{evidence_rows}</tbody></table><p>وقت التوليد: {html.escape(str(payload['generated_at']))}</p></body></html>"
+    evidence_rows = "".join(
+        f'<tr><td>{html.escape(str(item["evidence_type"]))}</td><td>{html.escape(str(item["title"]))}</td><td dir="ltr">{html.escape(str(item["sha256"]))}</td></tr>'
+        for item in payload["evidence"]
+    )
+    return f'<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{html.escape(str(case["reference"]))}</title><style>body{{font-family:Arial,sans-serif;margin:2rem;line-height:1.7}}table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #bbb;padding:.5rem}}h1{{color:#123b66}}</style></head><body><h1>{html.escape(str(case["reference"]))}: {html.escape(str(case["title"]))}</h1><p><strong>الحالة:</strong> {html.escape(str(case["status"]))}</p><p><strong>السبب الجذري:</strong> {html.escape(str(case.get("root_cause") or "غير محدد"))}</p><p><strong>الأثر:</strong> {html.escape(str(case.get("impact") or "غير محدد"))}</p><p><strong>الاستجابة:</strong> {html.escape(str(case.get("response_summary") or "غير محدد"))}</p><h2>الأدلة</h2><table><thead><tr><th>النوع</th><th>العنوان</th><th>SHA-256</th></tr></thead><tbody>{evidence_rows}</tbody></table><p>وقت التوليد: {html.escape(str(payload["generated_at"]))}</p></body></html>'
 
 
 def _generate_reports(case_id: int) -> None:
@@ -567,7 +741,10 @@ def _generate_reports(case_id: int) -> None:
     html_content = _report_html(payload)
     now = iso_now()
     for report_format, content in (("json", json_content), ("html", html_content)):
-        get_db().execute("INSERT INTO case_reports (case_id, revision, format, content, sha256, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", (case_id, revision, report_format, content, hashlib.sha256(content.encode()).hexdigest(), actor_id(), now))
+        get_db().execute(
+            "INSERT INTO case_reports (case_id, revision, format, content, sha256, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (case_id, revision, report_format, content, hashlib.sha256(content.encode()).hexdigest(), actor_id(), now),
+        )
     record_audit(get_db(), "generate", "case_report", case_id, details={"revision": revision})
 
 
@@ -585,8 +762,14 @@ def get_report(case_id: int):
         if case["status"] != "closed":
             return error_response("REPORT_NOT_READY", "يتوفر التقرير النهائي بعد إغلاق التحقيق", 409)
         _generate_reports(case_id)
-        row = get_db().execute("SELECT * FROM case_reports WHERE case_id = ? AND format = ? ORDER BY revision DESC LIMIT 1", (case_id, report_format)).fetchone()
+        row = (
+            get_db().execute("SELECT * FROM case_reports WHERE case_id = ? AND format = ? ORDER BY revision DESC LIMIT 1", (case_id, report_format)).fetchone()
+        )
     if row is None:
         raise RuntimeError("Report generation returned no result")
     mimetype = "application/json" if report_format == "json" else "text/html; charset=utf-8"
-    return Response(row["content"], mimetype=mimetype, headers={"Content-Disposition": f"attachment; filename={case['reference']}.{report_format}", "X-Report-SHA256": row["sha256"]})
+    return Response(
+        row["content"],
+        mimetype=mimetype,
+        headers={"Content-Disposition": f"attachment; filename={case['reference']}.{report_format}", "X-Report-SHA256": row["sha256"]},
+    )

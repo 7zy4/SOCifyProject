@@ -732,9 +732,16 @@ def _normalize_existing_rows(connection: sqlite3.Connection) -> None:
     for indicator in connection.execute("SELECT id, workspace_id, context, last_seen FROM ioc_indicators WHERE source = 'SOCify extraction'").fetchall():
         context = json.loads(indicator["context"])
         event_id = context.get("event_id") if isinstance(context, dict) else None
-        event = connection.execute("SELECT id FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, indicator["workspace_id"])).fetchone() if type(event_id) is int else None
+        event = (
+            connection.execute("SELECT id FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, indicator["workspace_id"])).fetchone()
+            if type(event_id) is int
+            else None
+        )
         if event:
-            connection.execute("INSERT OR IGNORE INTO ioc_observations (ioc_id, event_id, context, tags, created_at) VALUES (?, ?, ?, '[\"training\"]', ?)", (indicator["id"], event_id, indicator["context"], indicator["last_seen"]))
+            connection.execute(
+                "INSERT OR IGNORE INTO ioc_observations (ioc_id, event_id, context, tags, created_at) VALUES (?, ?, ?, '[\"training\"]', ?)",
+                (indicator["id"], event_id, indicator["context"], indicator["last_seen"]),
+            )
     connection.execute("UPDATE users SET workspace_id = 1 WHERE workspace_id IS NULL")
     connection.execute("UPDATE users SET created_at = COALESCE(created_at, ?)", (now,))
     if _table_exists(connection, "security_events"):
@@ -790,16 +797,27 @@ def _migrate_legacy_incidents(connection: sqlite3.Connection) -> None:
         for row in connection.execute("SELECT incident_id, event_id FROM incident_events").fetchall():
             case = connection.execute("SELECT creator, created_at FROM incident_cases WHERE id = ?", (row["incident_id"],)).fetchone()
             if case:
-                connection.execute("INSERT OR IGNORE INTO case_events (case_id, event_id, attached_by, attached_at) VALUES (?, ?, ?, ?)", (row["incident_id"], row["event_id"], case["creator"], case["created_at"]))
+                connection.execute(
+                    "INSERT OR IGNORE INTO case_events (case_id, event_id, attached_by, attached_at) VALUES (?, ?, ?, ?)",
+                    (row["incident_id"], row["event_id"], case["creator"], case["created_at"]),
+                )
     if _table_exists(connection, "incident_notes"):
         for row in connection.execute("SELECT incident_id, user_id, note, created_at FROM incident_notes").fetchall():
-            connection.execute("INSERT INTO case_notes (case_id, author_id, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)", (row["incident_id"], row["user_id"], row["note"], row["created_at"] or now, row["created_at"] or now))
-    connection.execute("INSERT INTO schema_meta (key, value, updated_at) VALUES ('legacy_incidents_migrated', '1', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at", (now,))
+            connection.execute(
+                "INSERT INTO case_notes (case_id, author_id, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                (row["incident_id"], row["user_id"], row["note"], row["created_at"] or now, row["created_at"] or now),
+            )
+    connection.execute(
+        "INSERT INTO schema_meta (key, value, updated_at) VALUES ('legacy_incidents_migrated', '1', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+        (now,),
+    )
 
 
 def seed_reference_data(connection: sqlite3.Connection) -> None:
     now = iso_now()
-    connection.execute("INSERT OR IGNORE INTO training_workspaces (id, public_id, name, created_at) VALUES (1, 'workspace-default', 'SOCify Training', ?)", (now,))
+    connection.execute(
+        "INSERT OR IGNORE INTO training_workspaces (id, public_id, name, created_at) VALUES (1, 'workspace-default', 'SOCify Training', ?)", (now,)
+    )
     existing_catalog = connection.execute("SELECT value FROM schema_meta WHERE key = 'attack_version'").fetchone()
     if existing_catalog:
         return

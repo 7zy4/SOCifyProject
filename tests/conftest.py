@@ -31,17 +31,19 @@ def template_database(tmp_path_factory: pytest.TempPathFactory) -> Path:
 def app(tmp_path: Path, template_database: Path) -> Iterator[Flask]:
     database = tmp_path / "test.db"
     shutil.copy2(template_database, database)
-    application = create_app({
-        "DATABASE": str(database),
-        "TESTING": True,
-        "WTF_CSRF_ENABLED": False,
-        "SECRET_KEY": "test-session-key",
-        "CREDENTIAL_KEY": "test-credential-key",
-        "ALLOW_REGISTRATION": True,
-        "RATE_LIMIT_LOGIN_ATTEMPTS": 3,
-        "MAX_CONTENT_LENGTH": 2 * 1024 * 1024,
-        "MAX_IMPORT_ROWS": 10000,
-    })
+    application = create_app(
+        {
+            "DATABASE": str(database),
+            "TESTING": True,
+            "WTF_CSRF_ENABLED": False,
+            "SECRET_KEY": "test-session-key",
+            "CREDENTIAL_KEY": "test-credential-key",
+            "ALLOW_REGISTRATION": True,
+            "RATE_LIMIT_LOGIN_ATTEMPTS": 3,
+            "MAX_CONTENT_LENGTH": 2 * 1024 * 1024,
+            "MAX_IMPORT_ROWS": 10000,
+        }
+    )
     yield application
 
 

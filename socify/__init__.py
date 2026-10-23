@@ -34,7 +34,22 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     CSRFProtect(app)
     app.teardown_appcontext(close_db)
-    for blueprint in (ui, auth_api, events_api, detection_api, cases_api, sources_api, ingestion_api, training_api, attack_api, hunting_api, visualization_api, playbooks_api, scoring_api, platform_api):
+    for blueprint in (
+        ui,
+        auth_api,
+        events_api,
+        detection_api,
+        cases_api,
+        sources_api,
+        ingestion_api,
+        training_api,
+        attack_api,
+        hunting_api,
+        visualization_api,
+        playbooks_api,
+        scoring_api,
+        platform_api,
+    ):
         app.register_blueprint(blueprint)
 
     @app.before_request
@@ -47,7 +62,9 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
-        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+        )
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
         response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
         response.headers["X-Correlation-ID"] = correlation_id()

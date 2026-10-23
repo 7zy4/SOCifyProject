@@ -84,15 +84,17 @@ def run(output: Path, bulk_count: int, import_count: int, samples: int) -> dict[
         bulk_seconds = time.perf_counter() - bulk_started
         connection.close()
 
-        application = create_app({
-            "DATABASE": str(database_path),
-            "TESTING": True,
-            "WTF_CSRF_ENABLED": False,
-            "SECRET_KEY": "benchmark-session-key",  # pragma: allowlist secret
-            "CREDENTIAL_KEY": "benchmark-credential-key",  # pragma: allowlist secret
-            "MAX_CONTENT_LENGTH": 10 * 1024 * 1024,
-            "MAX_IMPORT_ROWS": import_count,
-        })
+        application = create_app(
+            {
+                "DATABASE": str(database_path),
+                "TESTING": True,
+                "WTF_CSRF_ENABLED": False,
+                "SECRET_KEY": "benchmark-session-key",  # pragma: allowlist secret
+                "CREDENTIAL_KEY": "benchmark-credential-key",  # pragma: allowlist secret
+                "MAX_CONTENT_LENGTH": 10 * 1024 * 1024,
+                "MAX_IMPORT_ROWS": import_count,
+            }
+        )
         client = application.test_client()
         with client.session_transaction() as session:
             session["user_id"] = actor
@@ -100,15 +102,18 @@ def run(output: Path, bulk_count: int, import_count: int, samples: int) -> dict[
             session["user_role"] = "admin"
 
         import_payload = "\n".join(
-            json.dumps({
-                "external_id": f"import-{index:09d}",
-                "source": "benchmark-import",
-                "event_type": "benchmark_import",
-                "category": "benchmark",
-                "severity": "low",
-                "title": "Reference import event",
-                "event_time": "2026-01-01T00:00:00Z",
-            }, separators=(",", ":"))
+            json.dumps(
+                {
+                    "external_id": f"import-{index:09d}",
+                    "source": "benchmark-import",
+                    "event_type": "benchmark_import",
+                    "category": "benchmark",
+                    "severity": "low",
+                    "title": "Reference import event",
+                    "event_time": "2026-01-01T00:00:00Z",
+                },
+                separators=(",", ":"),
+            )
             for index in range(import_count)
         )
         import_started = time.perf_counter()
@@ -130,15 +135,18 @@ def run(output: Path, bulk_count: int, import_count: int, samples: int) -> dict[
         detection_latencies: list[float] = []
         for index in range(samples):
             sample_started = time.perf_counter()
-            response = client.post("/api/events", json={
-                "external_id": f"detection-{index:09d}",
-                "source": "benchmark-detection",
-                "event_type": "benchmark_detection",
-                "category": "benchmark",
-                "severity": "low",
-                "title": "Detection latency benchmark",
-                "event_time": "2026-01-01T00:00:00Z",
-            })
+            response = client.post(
+                "/api/events",
+                json={
+                    "external_id": f"detection-{index:09d}",
+                    "source": "benchmark-detection",
+                    "event_type": "benchmark_detection",
+                    "category": "benchmark",
+                    "severity": "low",
+                    "title": "Detection latency benchmark",
+                    "event_time": "2026-01-01T00:00:00Z",
+                },
+            )
             detection_latencies.append(time.perf_counter() - sample_started)
             if response.status_code != 201:
                 errors += 1
@@ -185,12 +193,7 @@ def main() -> int:
         parser.error("workload counts must be positive")
     result = run(arguments.output, arguments.bulk_events, arguments.import_events, arguments.samples)
     print(json.dumps(result, indent=2, sort_keys=True))
-    failed = (
-        result["errors"] != 0
-        or result["import"]["seconds"] > 60
-        or result["hunt"]["p95_ms"] > 1500
-        or result["detection"]["p95_ms"] > 150
-    )
+    failed = result["errors"] != 0 or result["import"]["seconds"] > 60 or result["hunt"]["p95_ms"] > 1500 or result["detection"]["p95_ms"] > 150
     return int(failed)
 
 

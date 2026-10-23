@@ -23,22 +23,76 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 ROLE_PERMISSIONS: dict[str, set[str]] = {
     "analyst": {
-        "events.read", "events.create", "alerts.read", "alerts.triage", "cases.read", "cases.create",
-        "cases.update", "evidence.add", "notes.add", "training.run", "hunt.execute", "hunt.save",
-        "graph.read", "playbooks.request", "scores.read_own", "sources.read", "rules.read",
+        "events.read",
+        "events.create",
+        "alerts.read",
+        "alerts.triage",
+        "cases.read",
+        "cases.create",
+        "cases.update",
+        "evidence.add",
+        "notes.add",
+        "training.run",
+        "hunt.execute",
+        "hunt.save",
+        "graph.read",
+        "playbooks.request",
+        "scores.read_own",
+        "sources.read",
+        "rules.read",
     },
     "soc_manager": {
-        "events.read", "events.create", "events.delete", "alerts.read", "alerts.triage", "cases.read",
-        "cases.create", "cases.update", "cases.close", "cases.override", "evidence.add", "notes.add",
-        "training.run", "training.manage", "hunt.execute", "hunt.save", "hunt.share", "graph.read",
-        "playbooks.request", "playbooks.approve", "playbooks.manage", "scores.read_own", "scores.read_team",
-        "sources.read", "sources.manage", "rules.read", "rules.manage", "audit.read", "users.read",
+        "events.read",
+        "events.create",
+        "events.delete",
+        "alerts.read",
+        "alerts.triage",
+        "cases.read",
+        "cases.create",
+        "cases.update",
+        "cases.close",
+        "cases.override",
+        "evidence.add",
+        "notes.add",
+        "training.run",
+        "training.manage",
+        "hunt.execute",
+        "hunt.save",
+        "hunt.share",
+        "graph.read",
+        "playbooks.request",
+        "playbooks.approve",
+        "playbooks.manage",
+        "scores.read_own",
+        "scores.read_team",
+        "sources.read",
+        "sources.manage",
+        "rules.read",
+        "rules.manage",
+        "audit.read",
+        "users.read",
     },
     "admin": {"*"},
     "instructor": {
-        "events.read", "alerts.read", "cases.read", "cases.create", "cases.update", "evidence.add", "notes.add",
-        "training.run", "training.manage", "ground_truth.read", "hunt.execute", "hunt.save", "hunt.share",
-        "graph.read", "playbooks.request", "scores.read_own", "scores.read_team", "rules.read", "sources.read",
+        "events.read",
+        "alerts.read",
+        "cases.read",
+        "cases.create",
+        "cases.update",
+        "evidence.add",
+        "notes.add",
+        "training.run",
+        "training.manage",
+        "ground_truth.read",
+        "hunt.execute",
+        "hunt.save",
+        "hunt.share",
+        "graph.read",
+        "playbooks.request",
+        "scores.read_own",
+        "scores.read_team",
+        "rules.read",
+        "sources.read",
     },
     "auditor": {"events.read", "alerts.read", "cases.read", "graph.read", "audit.read", "scores.read_team", "rules.read", "sources.read"},
 }
@@ -81,10 +135,14 @@ def _session_valid(user_id: int) -> bool:
     if not isinstance(raw, str):
         return False
     digest = hashlib.sha256(raw.encode()).hexdigest()
-    record = get_db().execute(
-        "SELECT id, expires_at, revoked_at FROM auth_sessions WHERE session_hash = ? AND user_id = ?",
-        (digest, user_id),
-    ).fetchone()
+    record = (
+        get_db()
+        .execute(
+            "SELECT id, expires_at, revoked_at FROM auth_sessions WHERE session_hash = ? AND user_id = ?",
+            (digest, user_id),
+        )
+        .fetchone()
+    )
     if not record or record["revoked_at"] or record["expires_at"] <= iso_now():
         return False
     get_db().execute("UPDATE auth_sessions SET last_seen_at = ? WHERE id = ?", (iso_now(), record["id"]))
@@ -98,10 +156,14 @@ def current_user() -> dict[str, Any] | None:
     user_id = session.get("user_id")
     if not isinstance(user_id, int) or not _session_valid(user_id):
         return None
-    row = get_db().execute(
-        "SELECT id, email, name, role, team, workspace_id, is_active FROM users WHERE id = ? AND is_active = 1",
-        (user_id,),
-    ).fetchone()
+    row = (
+        get_db()
+        .execute(
+            "SELECT id, email, name, role, team, workspace_id, is_active FROM users WHERE id = ? AND is_active = 1",
+            (user_id,),
+        )
+        .fetchone()
+    )
     if not row:
         return None
     user = dict(row)
@@ -118,6 +180,7 @@ def login_required(function: F) -> F:
                 return error_response("AUTHENTICATION_REQUIRED", "يلزم تسجيل الدخول للوصول إلى هذا المورد", 401)
             return redirect(url_for("auth.login_page", next=request.full_path))
         return function(*args, **kwargs)
+
     return cast(F, wrapped)
 
 
@@ -139,7 +202,9 @@ def require_permission(permission: str) -> Callable[[F], F]:
             if not has_permission(user, permission):
                 return error_response("PERMISSION_DENIED", "ليست لديك الصلاحية اللازمة لهذا الإجراء", 403)
             return function(*args, **kwargs)
+
         return cast(F, wrapped)
+
     return decorator
 
 
@@ -167,7 +232,12 @@ def can_access_training_run(training_run_id: object) -> bool:
         return False
     if has_permission(user, "training.manage") or has_permission(user, "scores.read_team"):
         return get_db().execute("SELECT 1 FROM training_runs WHERE id = ? AND workspace_id = ?", (training_run_id, workspace_id())).fetchone() is not None
-    return get_db().execute("SELECT 1 FROM training_runs WHERE id = ? AND workspace_id = ? AND user_id = ?", (training_run_id, workspace_id(), actor_id())).fetchone() is not None
+    return (
+        get_db()
+        .execute("SELECT 1 FROM training_runs WHERE id = ? AND workspace_id = ? AND user_id = ?", (training_run_id, workspace_id(), actor_id()))
+        .fetchone()
+        is not None
+    )
 
 
 def training_scope_sql(column: str) -> tuple[str, list[object]]:
@@ -208,7 +278,7 @@ def totp_code(secret: str, moment: int | None = None) -> str:
     counter = struct.pack(">Q", timestamp // 30)
     digest = hmac.new(key, counter, hashlib.sha1).digest()
     offset = digest[-1] & 15
-    value = (struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7FFFFFFF) % 1000000
+    value = (struct.unpack(">I", digest[offset : offset + 4])[0] & 0x7FFFFFFF) % 1000000
     return f"{value:06d}"
 
 

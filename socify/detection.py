@@ -19,13 +19,41 @@ from .timeutils import iso_now, parse_timestamp
 detection_api = Blueprint("detection", __name__)
 
 FIELDS = {
-    "event_type", "category", "severity", "source", "source_ip", "destination_ip", "username", "hostname",
-    "process", "process_name", "parent_process", "file_hash", "http_status", "action", "outcome", "anomaly_score",
-    "title", "training_run_id", "mitre_ids",
+    "event_type",
+    "category",
+    "severity",
+    "source",
+    "source_ip",
+    "destination_ip",
+    "username",
+    "hostname",
+    "process",
+    "process_name",
+    "parent_process",
+    "file_hash",
+    "http_status",
+    "action",
+    "outcome",
+    "anomaly_score",
+    "title",
+    "training_run_id",
+    "mitre_ids",
 }
 OPERATORS = {
-    "equals", "not_equals", "contains", "not_contains", "starts_with", "ends_with", "in", "gt", "gte", "lt",
-    "lte", "cidr", "exists", "boolean",
+    "equals",
+    "not_equals",
+    "contains",
+    "not_contains",
+    "starts_with",
+    "ends_with",
+    "in",
+    "gt",
+    "gte",
+    "lt",
+    "lte",
+    "cidr",
+    "exists",
+    "boolean",
 }
 SEVERITIES = {"critical", "high", "medium", "low"}
 
@@ -224,14 +252,19 @@ def legacy_dsl(rule: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
             seconds = int(timeframe[:-1]) * multiplier
         except ValueError:
             seconds = 600
-        return validate_dsl({
-            "condition": {"logic": "or", "conditions": [
-                {"field": "event_type", "operator": "equals", "value": "failed_login"},
-                {"field": "category", "operator": "contains", "value": "brute force"},
-            ]},
-            "window": {"seconds": seconds, "threshold": int(condition.get("threshold", 5)), "group_by": ["source_ip", "username"], "mode": "count"},
-            "mitre_ids": ["T1110"],
-        })
+        return validate_dsl(
+            {
+                "condition": {
+                    "logic": "or",
+                    "conditions": [
+                        {"field": "event_type", "operator": "equals", "value": "failed_login"},
+                        {"field": "category", "operator": "contains", "value": "brute force"},
+                    ],
+                },
+                "window": {"seconds": seconds, "threshold": int(condition.get("threshold", 5)), "group_by": ["source_ip", "username"], "mode": "count"},
+                "mitre_ids": ["T1110"],
+            }
+        )
     if kind == "network_anomaly":
         return validate_dsl({"condition": {"field": "anomaly_score", "operator": "gte", "value": condition.get("threshold", 0.8)}, "mitre_ids": []})
     if kind == "error_level":
@@ -273,24 +306,36 @@ def evaluate_dsl(connection: sqlite3.Connection, dsl: dict[str, Any], event: dic
     direct, direct_trace = _condition_matches(root, event)
     window = dsl.get("window")
     if not isinstance(window, dict):
-        return Evaluation(direct, (int(event["id"]),) if direct else (), {"condition": direct_trace, "event_time": event["event_time"], "policy": "single_event"}, "single")
+        return Evaluation(
+            direct, (int(event["id"]),) if direct else (), {"condition": direct_trace, "event_time": event["event_time"], "policy": "single_event"}, "single"
+        )
     if not direct:
         return Evaluation(False, (), {"condition": direct_trace, "event_time": event["event_time"], "policy": "event_time_window", "count": 0}, "unmatched")
     sequence = dsl.get("sequence")
     if isinstance(sequence, list) and sequence:
         final_step, final_trace = _condition_matches(sequence[-1], event)
         if not final_step:
-            return Evaluation(False, (), {"condition": direct_trace, "final_step": final_trace, "event_time": event["event_time"], "policy": "ordered_sequence"}, "unmatched")
+            return Evaluation(
+                False, (), {"condition": direct_trace, "final_step": final_trace, "event_time": event["event_time"], "policy": "ordered_sequence"}, "unmatched"
+            )
     seconds = int(window["seconds"])
     threshold = int(window["threshold"])
     group_fields = [str(item) for item in window.get("group_by", [])]
     target_group = _group_key(event, group_fields)
-    max_time_row = connection.execute("SELECT MAX(event_time) FROM security_events WHERE workspace_id = ? AND training_run_id IS ? AND source != 'rules_engine'", (event["workspace_id"], event.get("training_run_id"))).fetchone()
+    max_time_row = connection.execute(
+        "SELECT MAX(event_time) FROM security_events WHERE workspace_id = ? AND training_run_id IS ? AND source != 'rules_engine'",
+        (event["workspace_id"], event.get("training_run_id")),
+    ).fetchone()
     max_time = parse_timestamp(max_time_row[0]) if max_time_row and max_time_row[0] else parse_timestamp(event["event_time"])
     lateness = int((max_time - parse_timestamp(event["event_time"])).total_seconds())
     allowed_lateness = int(window.get("allowed_lateness_seconds", 86400))
     if lateness > allowed_lateness:
-        return Evaluation(False, (), {"condition": direct_trace, "policy": "event_time", "late_by_seconds": lateness, "allowed_lateness_seconds": allowed_lateness, "suppressed": True}, target_group)
+        return Evaluation(
+            False,
+            (),
+            {"condition": direct_trace, "policy": "event_time", "late_by_seconds": lateness, "allowed_lateness_seconds": allowed_lateness, "suppressed": True},
+            target_group,
+        )
     candidates = _candidate_events(connection, event, seconds)
     matching: list[tuple[dict[str, Any], dict[str, Any]]] = []
     for candidate in candidates:
@@ -310,7 +355,12 @@ def evaluate_dsl(connection: sqlite3.Connection, dsl: dict[str, Any], event: dic
                 if position == len(sequence):
                     break
         matched = position == len(sequence)
-        return Evaluation(matched, tuple(ordered_ids) if matched else (), {"policy": "ordered_sequence", "group": target_group, "matched_steps": position, "required_steps": len(sequence), "window_seconds": seconds}, target_group)
+        return Evaluation(
+            matched,
+            tuple(ordered_ids) if matched else (),
+            {"policy": "ordered_sequence", "group": target_group, "matched_steps": position, "required_steps": len(sequence), "window_seconds": seconds},
+            target_group,
+        )
     mode = str(window.get("mode", "count"))
     if mode == "distinct_count":
         distinct_field = str(window["distinct_field"])
@@ -466,10 +516,15 @@ def _rule_payload() -> tuple[dict[str, Any] | None, object | None]:
     mitre_ids = dsl.get("mitre_ids", [])
     if mitre_ids:
         placeholders = ",".join("?" for _ in mitre_ids)
-        known = {row["technique_id"] for row in get_db().execute(f"SELECT technique_id FROM attack_techniques WHERE technique_id IN ({placeholders})", mitre_ids).fetchall()}
+        known = {
+            row["technique_id"]
+            for row in get_db().execute(f"SELECT technique_id FROM attack_techniques WHERE technique_id IN ({placeholders})", mitre_ids).fetchall()
+        }
         unknown = sorted(set(mitre_ids) - known)
         if unknown:
-            return None, error_response("UNKNOWN_MITRE_TECHNIQUE", "تحتوي القاعدة على تقنيات غير موجودة في نسخة ATT&CK المثبتة", 422, {"technique_ids": unknown})
+            return None, error_response(
+                "UNKNOWN_MITRE_TECHNIQUE", "تحتوي القاعدة على تقنيات غير موجودة في نسخة ATT&CK المثبتة", 422, {"technique_ids": unknown}
+            )
     name = data.get("name")
     description = data.get("description", "")
     if not isinstance(name, str) or not 3 <= len(name.strip()) <= 150 or not isinstance(description, str) or len(description) > 2000:
@@ -477,7 +532,14 @@ def _rule_payload() -> tuple[dict[str, Any] | None, object | None]:
     action = data.get("action", {"severity": "medium", "confidence": 0.85})
     if not isinstance(action, dict) or not isinstance(action.get("severity", "medium"), str) or action.get("severity", "medium") not in SEVERITIES:
         return None, error_response("INVALID_RULE_ACTION", "إجراء القاعدة غير صالح", 422)
-    return {"name": name.strip(), "description": description.strip(), "dsl": dsl, "action": action, "active": bool(data.get("active", False)), "change_summary": str(data.get("change_summary") or "Rule created")[:500]}, None
+    return {
+        "name": name.strip(),
+        "description": description.strip(),
+        "dsl": dsl,
+        "action": action,
+        "active": bool(data.get("active", False)),
+        "change_summary": str(data.get("change_summary") or "Rule created")[:500],
+    }, None
 
 
 def _rule_view(row: sqlite3.Row) -> dict[str, Any]:
@@ -521,16 +583,31 @@ def create_rule():
             version, deployment_state, workspace_id, created_by, deployed_by, created_at, updated_at)
             VALUES (?, ?, 'dsl', ?, ?, 'create_alert', ?, ?, 1, ?, ?, ?, ?, ?, ?)""",
             (
-                payload["name"], payload["description"], json.dumps(payload["dsl"], separators=(",", ":")),
-                json.dumps(payload["dsl"], separators=(",", ":")), json.dumps(payload["action"], separators=(",", ":")),
-                1 if payload["active"] else 0, "published" if payload["active"] else "draft", workspace_id(), actor_id(),
-                actor_id() if payload["active"] else None, now, now,
+                payload["name"],
+                payload["description"],
+                json.dumps(payload["dsl"], separators=(",", ":")),
+                json.dumps(payload["dsl"], separators=(",", ":")),
+                json.dumps(payload["action"], separators=(",", ":")),
+                1 if payload["active"] else 0,
+                "published" if payload["active"] else "draft",
+                workspace_id(),
+                actor_id(),
+                actor_id() if payload["active"] else None,
+                now,
+                now,
             ),
         )
         rule_id = inserted_id(cursor)
         get_db().execute(
             "INSERT INTO rule_versions (rule_id, version, dsl_json, action_json, change_summary, created_by, created_at) VALUES (?, 1, ?, ?, ?, ?, ?)",
-            (rule_id, json.dumps(payload["dsl"], separators=(",", ":")), json.dumps(payload["action"], separators=(",", ":")), payload["change_summary"], actor_id(), now),
+            (
+                rule_id,
+                json.dumps(payload["dsl"], separators=(",", ":")),
+                json.dumps(payload["action"], separators=(",", ":")),
+                payload["change_summary"],
+                actor_id(),
+                now,
+            ),
         )
         record_audit(get_db(), "create", "rule", rule_id, details={"active": payload["active"]})
     row = get_db().execute("SELECT * FROM rules WHERE id = ?", (rule_id,)).fetchone()
@@ -564,15 +641,30 @@ def update_rule(rule_id: int):
             """UPDATE rules SET name = ?, description = ?, condition_value = ?, dsl_json = ?, action_value = ?, is_active = ?,
             version = ?, deployment_state = ?, deployed_by = ?, updated_at = ? WHERE id = ?""",
             (
-                payload["name"], payload["description"], json.dumps(payload["dsl"], separators=(",", ":")),
-                json.dumps(payload["dsl"], separators=(",", ":")), json.dumps(payload["action"], separators=(",", ":")),
-                1 if payload["active"] else 0, version, "published" if payload["active"] else "draft",
-                actor_id() if payload["active"] else current["deployed_by"], now, rule_id,
+                payload["name"],
+                payload["description"],
+                json.dumps(payload["dsl"], separators=(",", ":")),
+                json.dumps(payload["dsl"], separators=(",", ":")),
+                json.dumps(payload["action"], separators=(",", ":")),
+                1 if payload["active"] else 0,
+                version,
+                "published" if payload["active"] else "draft",
+                actor_id() if payload["active"] else current["deployed_by"],
+                now,
+                rule_id,
             ),
         )
         get_db().execute(
             "INSERT INTO rule_versions (rule_id, version, dsl_json, action_json, change_summary, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (rule_id, version, json.dumps(payload["dsl"], separators=(",", ":")), json.dumps(payload["action"], separators=(",", ":")), payload["change_summary"], actor_id(), now),
+            (
+                rule_id,
+                version,
+                json.dumps(payload["dsl"], separators=(",", ":")),
+                json.dumps(payload["action"], separators=(",", ":")),
+                payload["change_summary"],
+                actor_id(),
+                now,
+            ),
         )
         record_audit(get_db(), "update", "rule", rule_id, details={"version": version, "active": payload["active"]})
     return jsonify(_rule_view(get_db().execute("SELECT * FROM rules WHERE id = ?", (rule_id,)).fetchone()))
@@ -587,7 +679,10 @@ def toggle_rule(rule_id: int):
     row = get_db().execute("SELECT id FROM rules WHERE id = ? AND workspace_id = ? AND archived_at IS NULL", (rule_id, workspace_id())).fetchone()
     if not row:
         return error_response("RULE_NOT_FOUND", "القاعدة غير موجودة", 404)
-    get_db().execute("UPDATE rules SET is_active = ?, deployment_state = ?, deployed_by = ?, updated_at = ? WHERE id = ?", (1 if data["active"] else 0, "published" if data["active"] else "disabled", actor_id(), iso_now(), rule_id))
+    get_db().execute(
+        "UPDATE rules SET is_active = ?, deployment_state = ?, deployed_by = ?, updated_at = ? WHERE id = ?",
+        (1 if data["active"] else 0, "published" if data["active"] else "disabled", actor_id(), iso_now(), rule_id),
+    )
     record_audit(get_db(), "activate" if data["active"] else "disable", "rule", rule_id)
     return jsonify({"id": rule_id, "active": data["active"]})
 
@@ -598,7 +693,9 @@ def archive_rule(rule_id: int):
     row = get_db().execute("SELECT id FROM rules WHERE id = ? AND workspace_id = ? AND archived_at IS NULL", (rule_id, workspace_id())).fetchone()
     if not row:
         return error_response("RULE_NOT_FOUND", "القاعدة غير موجودة", 404)
-    get_db().execute("UPDATE rules SET archived_at = ?, is_active = 0, deployment_state = 'archived', updated_at = ? WHERE id = ?", (iso_now(), iso_now(), rule_id))
+    get_db().execute(
+        "UPDATE rules SET archived_at = ?, is_active = 0, deployment_state = 'archived', updated_at = ? WHERE id = ?", (iso_now(), iso_now(), rule_id)
+    )
     record_audit(get_db(), "archive", "rule", rule_id)
     return "", 204
 
@@ -622,7 +719,10 @@ def clone_rule(rule_id: int):
             (name, source["description"], source["dsl_json"], source["dsl_json"], source["action_value"], workspace_id(), actor_id(), now, now),
         )
         cloned_id = inserted_id(cursor)
-        get_db().execute("INSERT INTO rule_versions (rule_id, version, dsl_json, action_json, change_summary, created_by, created_at) VALUES (?, 1, ?, ?, ?, ?, ?)", (cloned_id, source["dsl_json"], source["action_value"], f"Cloned from rule {rule_id}", actor_id(), now))
+        get_db().execute(
+            "INSERT INTO rule_versions (rule_id, version, dsl_json, action_json, change_summary, created_by, created_at) VALUES (?, 1, ?, ?, ?, ?, ?)",
+            (cloned_id, source["dsl_json"], source["action_value"], f"Cloned from rule {rule_id}", actor_id(), now),
+        )
         record_audit(get_db(), "clone", "rule", cloned_id, details={"source_rule_id": rule_id})
     return jsonify(_rule_view(get_db().execute("SELECT * FROM rules WHERE id = ?", (cloned_id,)).fetchone())), 201
 
@@ -641,18 +741,40 @@ def backfill_rule(rule_id: int):
     except (TypeError, ValueError):
         return error_response("INVALID_BACKFILL_LIMIT", "حد إعادة المعالجة غير صالح", 422)
     scope, parameters = training_scope_sql("training_run_id")
-    rows = get_db().execute(f"SELECT id FROM security_events WHERE workspace_id = ? AND source != 'rules_engine'{scope} ORDER BY event_time, id LIMIT ?", (workspace_id(), *parameters, limit)).fetchall()
+    rows = (
+        get_db()
+        .execute(
+            f"SELECT id FROM security_events WHERE workspace_id = ? AND source != 'rules_engine'{scope} ORDER BY event_time, id LIMIT ?",
+            (workspace_id(), *parameters, limit),
+        )
+        .fetchall()
+    )
     created: set[int] = set()
     started = time.perf_counter()
     with transaction():
-        active_rule_ids = [int(row["id"]) for row in get_db().execute("SELECT id FROM rules WHERE workspace_id = ? AND is_active = 1 AND archived_at IS NULL", (workspace_id(),)).fetchall()]
-        get_db().execute("UPDATE rules SET is_active = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE workspace_id = ? AND archived_at IS NULL", (rule_id, workspace_id()))
+        active_rule_ids = [
+            int(row["id"])
+            for row in get_db().execute("SELECT id FROM rules WHERE workspace_id = ? AND is_active = 1 AND archived_at IS NULL", (workspace_id(),)).fetchall()
+        ]
+        get_db().execute(
+            "UPDATE rules SET is_active = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE workspace_id = ? AND archived_at IS NULL", (rule_id, workspace_id())
+        )
         for event in rows:
             created.update(evaluate_rules(get_db(), int(event["id"])))
         get_db().execute("UPDATE rules SET is_active = 0 WHERE workspace_id = ? AND archived_at IS NULL", (workspace_id(),))
         get_db().executemany("UPDATE rules SET is_active = 1 WHERE id = ?", [(identifier,) for identifier in active_rule_ids])
-        record_audit(get_db(), "backfill", "rule", rule_id, details={"events": len(rows), "alerts": len(created), "reason": data["reason"].strip(), "limit": limit})
-    return jsonify({"rule_id": rule_id, "processed_events": len(rows), "created_alert_ids": sorted(created), "elapsed_ms": round((time.perf_counter() - started) * 1000, 3), "bounded": True})
+        record_audit(
+            get_db(), "backfill", "rule", rule_id, details={"events": len(rows), "alerts": len(created), "reason": data["reason"].strip(), "limit": limit}
+        )
+    return jsonify(
+        {
+            "rule_id": rule_id,
+            "processed_events": len(rows),
+            "created_alert_ids": sorted(created),
+            "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
+            "bounded": True,
+        }
+    )
 
 
 @detection_api.post("/api/rules/<int:rule_id>/test")
@@ -670,7 +792,15 @@ def test_rule(rule_id: int):
         return error_response("EVENT_NOT_FOUND", "السجل غير موجود", 404)
     started = time.perf_counter()
     evaluation = evaluate_dsl(get_db(), legacy_dsl(rule), _event_dict(event))
-    return jsonify({"matched": evaluation.matched, "event_ids": list(evaluation.event_ids), "trace": evaluation.trace, "evaluation_ms": round((time.perf_counter() - started) * 1000, 3), "persisted_alert": False})
+    return jsonify(
+        {
+            "matched": evaluation.matched,
+            "event_ids": list(evaluation.event_ids),
+            "trace": evaluation.trace,
+            "evaluation_ms": round((time.perf_counter() - started) * 1000, 3),
+            "persisted_alert": False,
+        }
+    )
 
 
 @detection_api.get("/api/rules/<int:rule_id>/versions")
@@ -679,7 +809,11 @@ def rule_versions(rule_id: int):
     rule = get_db().execute("SELECT id FROM rules WHERE id = ? AND workspace_id = ?", (rule_id, workspace_id())).fetchone()
     if not rule:
         return error_response("RULE_NOT_FOUND", "القاعدة غير موجودة", 404)
-    rows = get_db().execute("SELECT id, version, change_summary, created_by, created_at FROM rule_versions WHERE rule_id = ? ORDER BY version DESC", (rule_id,)).fetchall()
+    rows = (
+        get_db()
+        .execute("SELECT id, version, change_summary, created_by, created_at FROM rule_versions WHERE rule_id = ? ORDER BY version DESC", (rule_id,))
+        .fetchall()
+    )
     return jsonify({"items": [dict(row) for row in rows]})
 
 
@@ -697,8 +831,14 @@ def rollback_rule(rule_id: int):
     next_version = int(rule["version"]) + 1
     now = iso_now()
     with transaction():
-        get_db().execute("UPDATE rules SET dsl_json = ?, condition_value = ?, action_value = ?, version = ?, updated_at = ? WHERE id = ?", (version["dsl_json"], version["dsl_json"], version["action_json"], next_version, now, rule_id))
-        get_db().execute("INSERT INTO rule_versions (rule_id, version, dsl_json, action_json, change_summary, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", (rule_id, next_version, version["dsl_json"], version["action_json"], f"Rollback to version {target}", actor_id(), now))
+        get_db().execute(
+            "UPDATE rules SET dsl_json = ?, condition_value = ?, action_value = ?, version = ?, updated_at = ? WHERE id = ?",
+            (version["dsl_json"], version["dsl_json"], version["action_json"], next_version, now, rule_id),
+        )
+        get_db().execute(
+            "INSERT INTO rule_versions (rule_id, version, dsl_json, action_json, change_summary, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (rule_id, next_version, version["dsl_json"], version["action_json"], f"Rollback to version {target}", actor_id(), now),
+        )
         record_audit(get_db(), "rollback", "rule", rule_id, details={"from": rule["version"], "target": target, "new_version": next_version})
     return jsonify({"id": rule_id, "version": next_version, "rolled_back_to": target})
 
@@ -727,12 +867,16 @@ def list_alerts():
         params.append(severity)
     where = " AND ".join(clauses)
     total = get_db().execute(f"SELECT COUNT(*) FROM alerts a WHERE {where}", params).fetchone()[0]
-    rows = get_db().execute(
-        f"""SELECT a.*, r.name AS rule_name, u.name AS assignee_name
+    rows = (
+        get_db()
+        .execute(
+            f"""SELECT a.*, r.name AS rule_name, u.name AS assignee_name
         FROM alerts a JOIN rules r ON r.id = a.rule_id LEFT JOIN users u ON u.id = a.assignee
         WHERE {where} ORDER BY a.detected_at DESC LIMIT ? OFFSET ?""",
-        (*params, page_size, (page - 1) * page_size),
-    ).fetchall()
+            (*params, page_size, (page - 1) * page_size),
+        )
+        .fetchall()
+    )
     items = []
     for row in rows:
         item = dict(row)
@@ -751,7 +895,14 @@ def alert_detail(alert_id: int):
     item = dict(row)
     for field in ("evidence", "mitre_technique_ids", "trace"):
         item[field] = json.loads(item[field])
-    events = get_db().execute("SELECT e.id, e.event_id, e.event_time, e.source, e.event_type, e.severity, e.title FROM alert_events ae JOIN security_events e ON e.id = ae.event_id WHERE ae.alert_id = ? ORDER BY e.event_time", (alert_id,)).fetchall()
+    events = (
+        get_db()
+        .execute(
+            "SELECT e.id, e.event_id, e.event_time, e.source, e.event_type, e.severity, e.title FROM alert_events ae JOIN security_events e ON e.id = ae.event_id WHERE ae.alert_id = ? ORDER BY e.event_time",
+            (alert_id,),
+        )
+        .fetchall()
+    )
     item["events"] = [dict(event) for event in events]
     return jsonify(item)
 
@@ -769,12 +920,27 @@ def triage_alert(alert_id: int):
     if data["status"] in {"false_positive", "suppressed"} and (not isinstance(reason, str) or len(reason.strip()) < 5):
         return error_response("REASON_REQUIRED", "يلزم سبب واضح لهذا القرار", 422)
     assignee = data.get("assignee", row["assignee"])
-    if assignee is not None and (not isinstance(assignee, int) or not get_db().execute("SELECT 1 FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (assignee, workspace_id())).fetchone()):
+    if assignee is not None and (
+        not isinstance(assignee, int)
+        or not get_db().execute("SELECT 1 FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (assignee, workspace_id())).fetchone()
+    ):
         return error_response("INVALID_ASSIGNEE", "المحلل المحدد غير متاح في مساحة العمل", 422)
     with transaction():
-        get_db().execute("UPDATE alerts SET status = ?, assignee = ?, false_positive_reason = ? WHERE id = ?", (data["status"], assignee, reason.strip() if isinstance(reason, str) else None, alert_id))
+        get_db().execute(
+            "UPDATE alerts SET status = ?, assignee = ?, false_positive_reason = ? WHERE id = ?",
+            (data["status"], assignee, reason.strip() if isinstance(reason, str) else None, alert_id),
+        )
         if data["status"] == "false_positive":
             get_db().execute("UPDATE rules SET false_positive_count = false_positive_count + 1 WHERE id = ?", (row["rule_id"],))
         record_audit(get_db(), "triage", "alert", alert_id, details={"status": data["status"], "reason": reason or ""})
-        record_training_action(get_db(), row["training_run_id"], actor_id(), "alert_triage", "alert", alert_id, {"status": data["status"]}, f"alert-triage:{alert_id}:{data['status']}")
+        record_training_action(
+            get_db(),
+            row["training_run_id"],
+            actor_id(),
+            "alert_triage",
+            "alert",
+            alert_id,
+            {"status": data["status"]},
+            f"alert-triage:{alert_id}:{data['status']}",
+        )
     return jsonify({"id": alert_id, "status": data["status"], "assignee": assignee})

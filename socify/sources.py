@@ -80,7 +80,17 @@ def create_source():
             (workspace_id, name, type, endpoint, api_key, credential_ciphertext, credential_configured, status,
             is_active, rows_ingested, error_rate, created_at, updated_at)
             VALUES (?, ?, ?, ?, NULL, ?, ?, 'not_tested', ?, 0, 0, ?, ?)""",
-            (workspace_id(), data["name"], data["type"], data.get("endpoint"), ciphertext, 1 if ciphertext else 0, 1 if data.get("is_active", True) else 0, now, now),
+            (
+                workspace_id(),
+                data["name"],
+                data["type"],
+                data.get("endpoint"),
+                ciphertext,
+                1 if ciphertext else 0,
+                1 if data.get("is_active", True) else 0,
+                now,
+                now,
+            ),
         )
         source_id = inserted_id(cursor)
         record_audit(get_db(), "create", "source", source_id, details={"type": data["type"], "credential_configured": bool(ciphertext)})

@@ -49,10 +49,14 @@ def _identifier_hash(email: str) -> str:
 
 def _rate_limited(email: str, ip_address: str) -> bool:
     cutoff = (utc_now() - timedelta(seconds=int(current_app.config["RATE_LIMIT_LOGIN_WINDOW_SECONDS"]))).isoformat().replace("+00:00", "Z")
-    count = get_db().execute(
-        "SELECT COUNT(*) FROM login_attempts WHERE identifier_hash = ? AND ip_address = ? AND succeeded = 0 AND occurred_at >= ?",
-        (_identifier_hash(email), ip_address, cutoff),
-    ).fetchone()[0]
+    count = (
+        get_db()
+        .execute(
+            "SELECT COUNT(*) FROM login_attempts WHERE identifier_hash = ? AND ip_address = ? AND succeeded = 0 AND occurred_at >= ?",
+            (_identifier_hash(email), ip_address, cutoff),
+        )
+        .fetchone()[0]
+    )
     return int(count) >= int(current_app.config["RATE_LIMIT_LOGIN_ATTEMPTS"])
 
 
@@ -65,10 +69,14 @@ def _record_attempt(email: str, ip_address: str, succeeded: bool) -> None:
 
 def _backup_code_valid(user_id: int, code: str) -> bool:
     digest = hashlib.sha256(code.strip().upper().encode()).hexdigest()
-    row = get_db().execute(
-        "SELECT id, code_hash FROM mfa_backup_codes WHERE user_id = ? AND consumed_at IS NULL",
-        (user_id,),
-    ).fetchall()
+    row = (
+        get_db()
+        .execute(
+            "SELECT id, code_hash FROM mfa_backup_codes WHERE user_id = ? AND consumed_at IS NULL",
+            (user_id,),
+        )
+        .fetchall()
+    )
     for candidate in row:
         if secrets.compare_digest(candidate["code_hash"], digest):
             get_db().execute("UPDATE mfa_backup_codes SET consumed_at = ? WHERE id = ?", (iso_now(), candidate["id"]))
@@ -130,15 +138,28 @@ def _login_response(data: dict[str, Any]):
     normalized_email = email.strip().lower()
     if _rate_limited(normalized_email, ip_address):
         return error_response("LOGIN_RATE_LIMITED", "تجاوزت الحد المسموح لمحاولات الدخول. حاول لاحقًا", 429)
-    user = get_db().execute(
-        "SELECT id, email, password_hash, name, role, workspace_id, is_active FROM users WHERE lower(email) = ?",
-        (normalized_email,),
-    ).fetchone()
+    user = (
+        get_db()
+        .execute(
+            "SELECT id, email, password_hash, name, role, workspace_id, is_active FROM users WHERE lower(email) = ?",
+            (normalized_email,),
+        )
+        .fetchone()
+    )
     valid_password = bool(user and user["is_active"] and bcrypt.checkpw(password.encode(), str(user["password_hash"]).encode()))
     if not valid_password:
         _record_attempt(normalized_email, ip_address, False)
         if user:
-            record_audit(get_db(), "login", "auth", user["id"], "denied", {"reason": "invalid_credentials"}, actor=int(user["id"]), workspace=int(user["workspace_id"] or 1))
+            record_audit(
+                get_db(),
+                "login",
+                "auth",
+                user["id"],
+                "denied",
+                {"reason": "invalid_credentials"},
+                actor=int(user["id"]),
+                workspace=int(user["workspace_id"] or 1),
+            )
         return error_response("INVALID_CREDENTIALS", "بيانات الدخول غير صحيحة", 401)
     if not _mfa_valid(int(user["id"]), data.get("mfa_code")):
         _record_attempt(normalized_email, ip_address, False)
@@ -201,7 +222,9 @@ def _register(data: dict[str, Any]):
                 (email.strip().lower(), password_hash, name.strip(), str(data.get("team") or "المتدربون")[:120], iso_now(), iso_now()),
             )
             user_id = inserted_id(cursor)
-            get_db().execute("INSERT OR IGNORE INTO workspace_memberships (workspace_id, user_id, role, created_at) VALUES (1, ?, 'analyst', ?)", (user_id, iso_now()))
+            get_db().execute(
+                "INSERT OR IGNORE INTO workspace_memberships (workspace_id, user_id, role, created_at) VALUES (1, ?, 'analyst', ?)", (user_id, iso_now())
+            )
             record_audit(get_db(), "register", "user", user_id, actor=user_id, workspace=1)
     except Exception as exc:
         if "UNIQUE" in str(exc).upper():
@@ -274,17 +297,22 @@ def me():
 
 def current_permissions(role: str) -> set[str]:
     from .security import ROLE_PERMISSIONS
+
     return ROLE_PERMISSIONS.get(role, set())
 
 
 @auth_api.get("/api/auth/sessions")
 @login_required
 def sessions_list():
-    rows = get_db().execute(
-        """SELECT id, created_at, last_seen_at, expires_at, revoked_at, ip_address, user_agent
+    rows = (
+        get_db()
+        .execute(
+            """SELECT id, created_at, last_seen_at, expires_at, revoked_at, ip_address, user_agent
         FROM auth_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 50""",
-        (actor_id(),),
-    ).fetchall()
+            (actor_id(),),
+        )
+        .fetchall()
+    )
     return jsonify({"items": [dict(row) for row in rows]})
 
 
@@ -317,7 +345,9 @@ def change_password():
         get_db().execute("UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?", (replacement, iso_now(), actor_id()))
         raw = session.get("session_id")
         current_hash = hashlib.sha256(raw.encode()).hexdigest() if isinstance(raw, str) else ""
-        get_db().execute("UPDATE auth_sessions SET revoked_at = ? WHERE user_id = ? AND session_hash != ? AND revoked_at IS NULL", (iso_now(), actor_id(), current_hash))
+        get_db().execute(
+            "UPDATE auth_sessions SET revoked_at = ? WHERE user_id = ? AND session_hash != ? AND revoked_at IS NULL", (iso_now(), actor_id(), current_hash)
+        )
         record_audit(get_db(), "password_change", "user", actor_id())
     return jsonify({"message": "تم تغيير كلمة المرور وإلغاء الجلسات الأخرى"})
 
@@ -377,7 +407,13 @@ def mfa_disable():
     password = data.get("current_password")
     code = data.get("code")
     user = get_db().execute("SELECT password_hash FROM users WHERE id = ?", (actor_id(),)).fetchone()
-    if not isinstance(password, str) or len(password.encode()) > 72 or not user or not bcrypt.checkpw(password.encode(), user["password_hash"].encode()) or not _mfa_valid(actor_id(), code):
+    if (
+        not isinstance(password, str)
+        or len(password.encode()) > 72
+        or not user
+        or not bcrypt.checkpw(password.encode(), user["password_hash"].encode())
+        or not _mfa_valid(actor_id(), code)
+    ):
         return error_response("REAUTHENTICATION_FAILED", "يلزم التحقق من كلمة المرور ورمز المصادقة", 403)
     with transaction():
         get_db().execute("DELETE FROM mfa_backup_codes WHERE user_id = ?", (actor_id(),))
@@ -390,10 +426,14 @@ def mfa_disable():
 @require_permission("users.read")
 def users_list():
     workspace = int(_active_user()["workspace_id"])
-    rows = get_db().execute(
-        "SELECT id, email, name, role, team, is_active, created_at, last_login FROM users WHERE workspace_id = ? ORDER BY name",
-        (workspace,),
-    ).fetchall()
+    rows = (
+        get_db()
+        .execute(
+            "SELECT id, email, name, role, team, is_active, created_at, last_login FROM users WHERE workspace_id = ? ORDER BY name",
+            (workspace,),
+        )
+        .fetchall()
+    )
     return jsonify({"items": [dict(row) for row in rows]})
 
 
@@ -421,7 +461,10 @@ def update_user(user_id: int):
     with transaction():
         get_db().execute(f"UPDATE users SET {assignments} WHERE id = ?", (*updates.values(), user_id))
         if "role" in updates:
-            get_db().execute("UPDATE workspace_memberships SET role = ? WHERE workspace_id = ? AND user_id = ?", (updates["role"], int(_active_user()["workspace_id"]), user_id))
+            get_db().execute(
+                "UPDATE workspace_memberships SET role = ? WHERE workspace_id = ? AND user_id = ?",
+                (updates["role"], int(_active_user()["workspace_id"]), user_id),
+            )
         if updates.get("is_active") == 0:
             get_db().execute("UPDATE auth_sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL", (iso_now(), user_id))
         record_audit(get_db(), "update", "user", user_id, details={"fields": list(updates)})

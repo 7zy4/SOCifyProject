@@ -130,7 +130,7 @@ def test_evtx_adapter_normalizes_records_without_executing_uploaded_content(app,
     queued = client.post("/api/imports?defer=1", json={"filename": "training.evtx", "format": "evtx", "content": "synthetic-evtx-fixture"})
     assert queued.status_code == 202
     assert queued.json["estimated_total"] == 0
-    xml = '<Events><Event><System><EventID>1</EventID><Computer>training-host</Computer></System></Event></Events>'
+    xml = "<Events><Event><System><EventID>1</EventID><Computer>training-host</Computer></System></Event></Events>"
     sysmon = client.post("/api/imports?defer=1", json={"filename": "training.xml", "format": "sysmon_xml", "content": xml})
     assert sysmon.status_code == 202
     assert sysmon.json["estimated_total"] == 1

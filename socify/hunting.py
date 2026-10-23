@@ -176,7 +176,10 @@ def _run_scope() -> tuple[str, list[object]]:
     user = current_user()
     if has_permission(user, "scores.read_team") or has_permission(user, "training.manage"):
         return "", []
-    return " AND (e.training_run_id IS NULL OR e.training_run_id IN (SELECT id FROM training_runs WHERE user_id = ? AND workspace_id = ?))", [actor_id(), workspace_id()]
+    return " AND (e.training_run_id IS NULL OR e.training_run_id IN (SELECT id FROM training_runs WHERE user_id = ? AND workspace_id = ?))", [
+        actor_id(),
+        workspace_id(),
+    ]
 
 
 @hunting_api.post("/api/hunt/query")
@@ -200,16 +203,43 @@ def execute_query():
     base_parameters: list[object] = [workspace_id(), *compiled.parameters, *scope_parameters]
     where = f"e.workspace_id = ? AND ({compiled.sql}){scope}"
     total = int(get_db().execute(f"SELECT COUNT(*) FROM security_events e WHERE {where}", base_parameters).fetchone()[0])
-    rows = get_db().execute(f"SELECT e.* FROM security_events e WHERE {where} ORDER BY e.event_time DESC, e.id DESC LIMIT ? OFFSET ?", (*base_parameters, page_size, (page - 1) * page_size)).fetchall()
-    aggregation = get_db().execute(f"SELECT e.source, COUNT(*) AS count FROM security_events e WHERE {where} GROUP BY e.source ORDER BY count DESC LIMIT 20", base_parameters).fetchall()
+    rows = (
+        get_db()
+        .execute(
+            f"SELECT e.* FROM security_events e WHERE {where} ORDER BY e.event_time DESC, e.id DESC LIMIT ? OFFSET ?",
+            (*base_parameters, page_size, (page - 1) * page_size),
+        )
+        .fetchall()
+    )
+    aggregation = (
+        get_db()
+        .execute(f"SELECT e.source, COUNT(*) AS count FROM security_events e WHERE {where} GROUP BY e.source ORDER BY count DESC LIMIT 20", base_parameters)
+        .fetchall()
+    )
     record_audit(get_db(), "execute", "hunt_query", None, details={"tokens": compiled.token_count, "results": total})
-    return jsonify({"items": [_event_view(row) for row in rows], "total": total, "page": page, "page_size": page_size, "aggregation": [dict(row) for row in aggregation], "query_plan": {"parameterized": True, "tokens": compiled.token_count}})
+    return jsonify(
+        {
+            "items": [_event_view(row) for row in rows],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "aggregation": [dict(row) for row in aggregation],
+            "query_plan": {"parameterized": True, "tokens": compiled.token_count},
+        }
+    )
 
 
 @hunting_api.get("/api/hunt/saved-queries")
 @require_permission("hunt.save")
 def list_saved_queries():
-    rows = get_db().execute("SELECT * FROM saved_hunt_queries WHERE workspace_id = ? AND (owner_id = ? OR visibility = 'workspace') ORDER BY updated_at DESC", (workspace_id(), actor_id())).fetchall()
+    rows = (
+        get_db()
+        .execute(
+            "SELECT * FROM saved_hunt_queries WHERE workspace_id = ? AND (owner_id = ? OR visibility = 'workspace') ORDER BY updated_at DESC",
+            (workspace_id(), actor_id()),
+        )
+        .fetchall()
+    )
     items = []
     for row in rows:
         item = dict(row)
@@ -222,7 +252,12 @@ def list_saved_queries():
 @require_permission("hunt.save")
 def save_query():
     data = request.get_json(silent=True)
-    if not isinstance(data, dict) or not isinstance(data.get("name"), str) or not 2 <= len(data["name"].strip()) <= 150 or not isinstance(data.get("query"), str):
+    if (
+        not isinstance(data, dict)
+        or not isinstance(data.get("name"), str)
+        or not 2 <= len(data["name"].strip()) <= 150
+        or not isinstance(data.get("query"), str)
+    ):
         return error_response("INVALID_SAVED_QUERY", "اسم الاستعلام ونصه مطلوبان", 422)
     visibility = data.get("visibility", "private")
     if visibility not in {"private", "workspace"} or visibility == "workspace" and not has_permission(current_user(), "hunt.share"):
@@ -235,7 +270,20 @@ def save_query():
     if not isinstance(tags, list) or len(tags) > 20 or any(not isinstance(item, str) or len(item) > 80 for item in tags):
         return error_response("INVALID_TAGS", "الوسوم غير صالحة", 422)
     now = iso_now()
-    cursor = get_db().execute("INSERT INTO saved_hunt_queries (workspace_id, owner_id, name, description, query, visibility, tags, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (workspace_id(), actor_id(), data["name"].strip(), str(data.get("description") or "")[:1000], data["query"], visibility, json.dumps(tags, ensure_ascii=False), now, now))
+    cursor = get_db().execute(
+        "INSERT INTO saved_hunt_queries (workspace_id, owner_id, name, description, query, visibility, tags, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            workspace_id(),
+            actor_id(),
+            data["name"].strip(),
+            str(data.get("description") or "")[:1000],
+            data["query"],
+            visibility,
+            json.dumps(tags, ensure_ascii=False),
+            now,
+            now,
+        ),
+    )
     query_id = inserted_id(cursor)
     record_audit(get_db(), "create", "saved_hunt_query", query_id, details={"visibility": visibility})
     return jsonify({"id": query_id, "name": data["name"].strip(), "query": data["query"], "visibility": visibility}), 201
@@ -244,7 +292,11 @@ def save_query():
 @hunting_api.delete("/api/hunt/saved-queries/<int:query_id>")
 @require_permission("hunt.save")
 def delete_saved_query(query_id: int):
-    row = get_db().execute("SELECT id FROM saved_hunt_queries WHERE id = ? AND workspace_id = ? AND owner_id = ?", (query_id, workspace_id(), actor_id())).fetchone()
+    row = (
+        get_db()
+        .execute("SELECT id FROM saved_hunt_queries WHERE id = ? AND workspace_id = ? AND owner_id = ?", (query_id, workspace_id(), actor_id()))
+        .fetchone()
+    )
     if not row:
         return error_response("SAVED_QUERY_NOT_FOUND", "الاستعلام المحفوظ غير موجود", 404)
     get_db().execute("DELETE FROM saved_hunt_queries WHERE id = ?", (query_id,))
@@ -276,19 +328,34 @@ def _ioc_type(value: str) -> tuple[str, str] | None:
 
 def _upsert_ioc(value_type: str, value: str, context: dict[str, Any]) -> int:
     now = iso_now()
-    existing = get_db().execute("SELECT id FROM ioc_indicators WHERE workspace_id = ? AND type = ? AND value = ?", (workspace_id(), value_type, value)).fetchone()
+    existing = (
+        get_db().execute("SELECT id FROM ioc_indicators WHERE workspace_id = ? AND type = ? AND value = ?", (workspace_id(), value_type, value)).fetchone()
+    )
     if existing:
         identifier = int(existing["id"])
     else:
-        cursor = get_db().execute("INSERT INTO ioc_indicators (workspace_id, type, value, first_seen, last_seen, confidence, source, context, tags) VALUES (?, ?, ?, ?, ?, 0.5, 'SOCify extraction', '{}', '[\"training\"]')", (workspace_id(), value_type, value, now, now))
+        cursor = get_db().execute(
+            "INSERT INTO ioc_indicators (workspace_id, type, value, first_seen, last_seen, confidence, source, context, tags) VALUES (?, ?, ?, ?, ?, 0.5, 'SOCify extraction', '{}', '[\"training\"]')",
+            (workspace_id(), value_type, value, now, now),
+        )
         identifier = inserted_id(cursor)
-    get_db().execute("INSERT OR IGNORE INTO ioc_observations (ioc_id, event_id, context, tags, created_at) VALUES (?, ?, ?, '[\"training\"]', ?)", (identifier, context["event_id"], json.dumps(context, ensure_ascii=False), now))
+    get_db().execute(
+        "INSERT OR IGNORE INTO ioc_observations (ioc_id, event_id, context, tags, created_at) VALUES (?, ?, ?, '[\"training\"]', ?)",
+        (identifier, context["event_id"], json.dumps(context, ensure_ascii=False), now),
+    )
     return identifier
 
 
 def _ioc_view(row: sqlite3.Row) -> dict[str, Any] | None:
     scope, parameters = _run_scope()
-    observations = get_db().execute(f"SELECT o.* FROM ioc_observations o JOIN security_events e ON e.id = o.event_id WHERE o.ioc_id = ? AND e.workspace_id = ?{scope} ORDER BY o.created_at, o.event_id", (row["id"], workspace_id(), *parameters)).fetchall()
+    observations = (
+        get_db()
+        .execute(
+            f"SELECT o.* FROM ioc_observations o JOIN security_events e ON e.id = o.event_id WHERE o.ioc_id = ? AND e.workspace_id = ?{scope} ORDER BY o.created_at, o.event_id",
+            (row["id"], workspace_id(), *parameters),
+        )
+        .fetchall()
+    )
     item = dict(row)
     if observations:
         item["first_seen"] = observations[0]["created_at"]
@@ -311,12 +378,21 @@ def extract_iocs():
     if not isinstance(event_id, int):
         return error_response("EVENT_ID_REQUIRED", "حدد السجل المطلوب", 422)
     scope, scope_parameters = _run_scope()
-    event = get_db().execute(f"SELECT e.* FROM security_events e WHERE e.id = ? AND e.workspace_id = ?{scope}", (event_id, workspace_id(), *scope_parameters)).fetchone()
+    event = (
+        get_db()
+        .execute(f"SELECT e.* FROM security_events e WHERE e.id = ? AND e.workspace_id = ?{scope}", (event_id, workspace_id(), *scope_parameters))
+        .fetchone()
+    )
     if not event:
         return error_response("EVENT_NOT_FOUND", "السجل غير موجود", 404)
     candidates = [event["source_ip"], event["destination_ip"], event["file_hash"]]
     raw = str(event["raw_data"] or "")
-    candidates.extend(re.findall(r"(?:https?://[^\s\"'<>]+|\b(?:[A-Fa-f0-9]{64}|[A-Fa-f0-9]{40}|[A-Fa-f0-9]{32})\b|\b(?:\d{1,3}\.){3}\d{1,3}\b|\b(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,63}\b)", raw))
+    candidates.extend(
+        re.findall(
+            r"(?:https?://[^\s\"'<>]+|\b(?:[A-Fa-f0-9]{64}|[A-Fa-f0-9]{40}|[A-Fa-f0-9]{32})\b|\b(?:\d{1,3}\.){3}\d{1,3}\b|\b(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,63}\b)",
+            raw,
+        )
+    )
     found: dict[tuple[str, str], int] = {}
     with transaction():
         for candidate in candidates:
@@ -352,10 +428,24 @@ def enrich_ioc(ioc_id: int):
     now = iso_now()
     if provider != "offline":
         provider_result = {"provider": provider, "status": "not_configured", "message": "لم يتم تفعيل موفر خارجي ولم تُرسل أي بيانات"}
-        cursor = get_db().execute("INSERT INTO ioc_enrichment_results (ioc_id, provider, status, result, created_at) VALUES (?, ?, 'not_configured', ?, ?)", (ioc_id, provider, json.dumps(provider_result, ensure_ascii=False), now))
+        cursor = get_db().execute(
+            "INSERT INTO ioc_enrichment_results (ioc_id, provider, status, result, created_at) VALUES (?, ?, 'not_configured', ?, ?)",
+            (ioc_id, provider, json.dumps(provider_result, ensure_ascii=False), now),
+        )
         return jsonify({"id": inserted_id(cursor), **provider_result})
-    intelligence = OFFLINE_INTELLIGENCE.get((row["type"], row["value"]), {"verdict": "unknown", "confidence": 0.2, "reason": "No match in the versioned synthetic offline dataset"})
-    result: dict[str, Any] = {"provider": "socify-offline-training-v1", "status": "successful", "training_synthetic": True, **intelligence, "attribution": "SOCify synthetic fixtures"}
-    cursor = get_db().execute("INSERT INTO ioc_enrichment_results (ioc_id, provider, status, result, confidence, expires_at, created_at) VALUES (?, 'socify-offline-training-v1', 'successful', ?, ?, ?, ?)", (ioc_id, json.dumps(result, ensure_ascii=False), intelligence["confidence"], "9999-12-31T23:59:59Z", now))
+    intelligence = OFFLINE_INTELLIGENCE.get(
+        (row["type"], row["value"]), {"verdict": "unknown", "confidence": 0.2, "reason": "No match in the versioned synthetic offline dataset"}
+    )
+    result: dict[str, Any] = {
+        "provider": "socify-offline-training-v1",
+        "status": "successful",
+        "training_synthetic": True,
+        **intelligence,
+        "attribution": "SOCify synthetic fixtures",
+    }
+    cursor = get_db().execute(
+        "INSERT INTO ioc_enrichment_results (ioc_id, provider, status, result, confidence, expires_at, created_at) VALUES (?, 'socify-offline-training-v1', 'successful', ?, ?, ?, ?)",
+        (ioc_id, json.dumps(result, ensure_ascii=False), intelligence["confidence"], "9999-12-31T23:59:59Z", now),
+    )
     record_audit(get_db(), "enrich", "ioc", ioc_id, details={"provider": "offline", "verdict": intelligence["verdict"]})
     return jsonify({"id": inserted_id(cursor), **result})

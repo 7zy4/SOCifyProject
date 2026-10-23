@@ -9,9 +9,19 @@ attack_api = Blueprint("attack", __name__)
 
 
 def _metadata() -> dict[str, object]:
-    values = {row["key"]: row["value"] for row in get_db().execute("SELECT key, value FROM schema_meta WHERE key IN ('attack_version', 'attack_snapshot_count', 'attack_snapshot_source')").fetchall()}
+    values = {
+        row["key"]: row["value"]
+        for row in get_db()
+        .execute("SELECT key, value FROM schema_meta WHERE key IN ('attack_version', 'attack_snapshot_count', 'attack_snapshot_source')")
+        .fetchall()
+    }
     count = int(get_db().execute("SELECT COUNT(*) FROM attack_techniques").fetchone()[0])
-    return {"attack_version": values.get("attack_version", "unknown"), "snapshot_count": int(values.get("attack_snapshot_count", count)), "snapshot_source": values.get("attack_snapshot_source", "unknown"), "offline_snapshot": True}
+    return {
+        "attack_version": values.get("attack_version", "unknown"),
+        "snapshot_count": int(values.get("attack_snapshot_count", count)),
+        "snapshot_source": values.get("attack_snapshot_source", "unknown"),
+        "offline_snapshot": True,
+    }
 
 
 def _technique_counts(technique_id: str) -> dict[str, int]:
@@ -20,10 +30,37 @@ def _technique_counts(technique_id: str) -> dict[str, int]:
     alert_scope, alert_parameters = training_scope_sql("training_run_id")
     case_scope, case_parameters = training_scope_sql("training_run_id")
     run_scope, run_parameters = training_scope_sql("r.id")
-    seen = int(get_db().execute(f"SELECT COUNT(*) FROM security_events WHERE workspace_id = ? AND source != 'rules_engine' AND mitre_ids LIKE ?{event_scope}", (workspace_id(), pattern, *event_parameters)).fetchone()[0])
-    detected = int(get_db().execute(f"SELECT COUNT(*) FROM alerts WHERE workspace_id = ? AND mitre_technique_ids LIKE ?{alert_scope}", (workspace_id(), pattern, *alert_parameters)).fetchone()[0])
-    investigated = int(get_db().execute(f"SELECT COUNT(DISTINCT id) FROM incident_cases WHERE workspace_id = ? AND mitre_ids LIKE ?{case_scope}", (workspace_id(), pattern, *case_parameters)).fetchone()[0])
-    validated = int(get_db().execute(f"SELECT COUNT(*) FROM assessment_snapshots a JOIN training_runs r ON r.id = a.run_id WHERE a.workspace_id = ? AND a.total_score >= 70 AND EXISTS (SELECT 1 FROM training_run_events tre JOIN security_events e ON e.id = tre.event_id WHERE tre.run_id = r.id AND e.mitre_ids LIKE ?){run_scope}", (workspace_id(), pattern, *run_parameters)).fetchone()[0])
+    seen = int(
+        get_db()
+        .execute(
+            f"SELECT COUNT(*) FROM security_events WHERE workspace_id = ? AND source != 'rules_engine' AND mitre_ids LIKE ?{event_scope}",
+            (workspace_id(), pattern, *event_parameters),
+        )
+        .fetchone()[0]
+    )
+    detected = int(
+        get_db()
+        .execute(
+            f"SELECT COUNT(*) FROM alerts WHERE workspace_id = ? AND mitre_technique_ids LIKE ?{alert_scope}", (workspace_id(), pattern, *alert_parameters)
+        )
+        .fetchone()[0]
+    )
+    investigated = int(
+        get_db()
+        .execute(
+            f"SELECT COUNT(DISTINCT id) FROM incident_cases WHERE workspace_id = ? AND mitre_ids LIKE ?{case_scope}",
+            (workspace_id(), pattern, *case_parameters),
+        )
+        .fetchone()[0]
+    )
+    validated = int(
+        get_db()
+        .execute(
+            f"SELECT COUNT(*) FROM assessment_snapshots a JOIN training_runs r ON r.id = a.run_id WHERE a.workspace_id = ? AND a.total_score >= 70 AND EXISTS (SELECT 1 FROM training_run_events tre JOIN security_events e ON e.id = tre.event_id WHERE tre.run_id = r.id AND e.mitre_ids LIKE ?){run_scope}",
+            (workspace_id(), pattern, *run_parameters),
+        )
+        .fetchone()[0]
+    )
     return {"seen": seen, "detected_in_run": detected, "investigated": investigated, "validated": validated}
 
 
@@ -34,7 +71,11 @@ def list_techniques():
     if len(query) > 100:
         return error_response("QUERY_TOO_LONG", "نص البحث طويل جدًا", 422)
     if query:
-        rows = get_db().execute("SELECT * FROM attack_techniques WHERE technique_id LIKE ? OR name LIKE ? ORDER BY technique_id", (f"%{query}%", f"%{query}%")).fetchall()
+        rows = (
+            get_db()
+            .execute("SELECT * FROM attack_techniques WHERE technique_id LIKE ? OR name LIKE ? ORDER BY technique_id", (f"%{query}%", f"%{query}%"))
+            .fetchall()
+        )
     else:
         rows = get_db().execute("SELECT * FROM attack_techniques ORDER BY technique_id").fetchall()
     items = []
@@ -53,27 +94,59 @@ def technique_detail(technique_id: str):
         return error_response("TECHNIQUE_NOT_FOUND", "تقنية ATT&CK غير موجودة في النسخة المثبتة", 404)
     item = dict(row)
     item["coverage"] = _technique_counts(row["technique_id"])
-    item["rules"] = [dict(value) for value in get_db().execute("SELECT id, name, version, is_active FROM rules WHERE workspace_id = ? AND dsl_json LIKE ? AND archived_at IS NULL", (workspace_id(), f'%"{technique_id.upper()}"%')).fetchall()]
+    item["rules"] = [
+        dict(value)
+        for value in get_db()
+        .execute(
+            "SELECT id, name, version, is_active FROM rules WHERE workspace_id = ? AND dsl_json LIKE ? AND archived_at IS NULL",
+            (workspace_id(), f'%"{technique_id.upper()}"%'),
+        )
+        .fetchall()
+    ]
     event_scope, event_parameters = training_scope_sql("training_run_id")
     case_scope, case_parameters = training_scope_sql("training_run_id")
-    item["events"] = [dict(value) for value in get_db().execute(f"SELECT id, event_id, event_time, title, severity FROM security_events WHERE workspace_id = ? AND source != 'rules_engine' AND mitre_ids LIKE ?{event_scope} ORDER BY event_time DESC LIMIT 100", (workspace_id(), f'%"{technique_id.upper()}"%', *event_parameters)).fetchall()]
-    item["cases"] = [dict(value) for value in get_db().execute(f"SELECT id, reference, title, status FROM incident_cases WHERE workspace_id = ? AND mitre_ids LIKE ?{case_scope} ORDER BY updated_at DESC LIMIT 100", (workspace_id(), f'%"{technique_id.upper()}"%', *case_parameters)).fetchall()]
+    item["events"] = [
+        dict(value)
+        for value in get_db()
+        .execute(
+            f"SELECT id, event_id, event_time, title, severity FROM security_events WHERE workspace_id = ? AND source != 'rules_engine' AND mitre_ids LIKE ?{event_scope} ORDER BY event_time DESC LIMIT 100",
+            (workspace_id(), f'%"{technique_id.upper()}"%', *event_parameters),
+        )
+        .fetchall()
+    ]
+    item["cases"] = [
+        dict(value)
+        for value in get_db()
+        .execute(
+            f"SELECT id, reference, title, status FROM incident_cases WHERE workspace_id = ? AND mitre_ids LIKE ?{case_scope} ORDER BY updated_at DESC LIMIT 100",
+            (workspace_id(), f'%"{technique_id.upper()}"%', *case_parameters),
+        )
+        .fetchall()
+    ]
     item["interpretation_notice"] = "ATT&CK classifies observed behavior and does not independently prove a real attack."
     return jsonify(item)
 
 
 def _missed_counts() -> dict[str, int]:
     scope, parameters = training_scope_sql("tr.id")
-    rows = get_db().execute(
-        f"""SELECT DISTINCT st.mitre_ids, tr.id AS run_id
+    rows = (
+        get_db()
+        .execute(
+            f"""SELECT DISTINCT st.mitre_ids, tr.id AS run_id
         FROM training_runs tr JOIN scenario_steps st ON st.scenario_version_id = tr.scenario_version_id
         WHERE tr.workspace_id = ? AND tr.state = 'completed'{scope}""",
-        (workspace_id(), *parameters),
-    ).fetchall()
+            (workspace_id(), *parameters),
+        )
+        .fetchall()
+    )
     missed: dict[str, int] = {}
     for row in rows:
         for technique_id in json.loads(row["mitre_ids"] or "[]"):
-            detected = get_db().execute("SELECT 1 FROM alerts WHERE training_run_id = ? AND mitre_technique_ids LIKE ? LIMIT 1", (row["run_id"], f'%"{technique_id}"%')).fetchone()
+            detected = (
+                get_db()
+                .execute("SELECT 1 FROM alerts WHERE training_run_id = ? AND mitre_technique_ids LIKE ? LIMIT 1", (row["run_id"], f'%"{technique_id}"%'))
+                .fetchone()
+            )
             if not detected:
                 missed[technique_id] = missed.get(technique_id, 0) + 1
     return missed
@@ -91,7 +164,13 @@ def matrix():
         item = {"technique_id": row["technique_id"], "name": row["name"], "coverage": coverage}
         for tactic in str(row["tactic"]).split(","):
             tactics.setdefault(tactic, []).append(item)
-    return jsonify({"tactics": [{"name": key, "techniques": value} for key, value in tactics.items()], "levels": ["configured", "tested", "detected_in_run", "investigated", "validated"], **_metadata()})
+    return jsonify(
+        {
+            "tactics": [{"name": key, "techniques": value} for key, value in tactics.items()],
+            "levels": ["configured", "tested", "detected_in_run", "investigated", "validated"],
+            **_metadata(),
+        }
+    )
 
 
 @attack_api.get("/api/attack/coverage")
@@ -102,9 +181,31 @@ def coverage():
     items = []
     for row in rows:
         counts = _technique_counts(row["technique_id"])
-        configured = int(get_db().execute("SELECT COUNT(*) FROM rules WHERE workspace_id = ? AND archived_at IS NULL AND dsl_json LIKE ?", (workspace_id(), f'%"{row["technique_id"]}"%')).fetchone()[0])
-        tested = int(get_db().execute("SELECT COUNT(*) FROM rule_versions rv JOIN rules r ON r.id = rv.rule_id WHERE r.workspace_id = ? AND rv.dsl_json LIKE ?", (workspace_id(), f'%"{row["technique_id"]}"%')).fetchone()[0])
-        items.append({"technique_id": row["technique_id"], "name": row["name"], "configured": configured, "tested": tested, **counts, "missed": missed.get(row["technique_id"], 0)})
+        configured = int(
+            get_db()
+            .execute(
+                "SELECT COUNT(*) FROM rules WHERE workspace_id = ? AND archived_at IS NULL AND dsl_json LIKE ?", (workspace_id(), f'%"{row["technique_id"]}"%')
+            )
+            .fetchone()[0]
+        )
+        tested = int(
+            get_db()
+            .execute(
+                "SELECT COUNT(*) FROM rule_versions rv JOIN rules r ON r.id = rv.rule_id WHERE r.workspace_id = ? AND rv.dsl_json LIKE ?",
+                (workspace_id(), f'%"{row["technique_id"]}"%'),
+            )
+            .fetchone()[0]
+        )
+        items.append(
+            {
+                "technique_id": row["technique_id"],
+                "name": row["name"],
+                "configured": configured,
+                "tested": tested,
+                **counts,
+                "missed": missed.get(row["technique_id"], 0),
+            }
+        )
     return jsonify({"items": items, **_metadata()})
 
 
@@ -116,6 +217,38 @@ def navigator_layer():
     for row in rows:
         coverage = _technique_counts(row["technique_id"])
         score = min(100, coverage["detected_in_run"] * 20 + coverage["investigated"] * 30 + coverage["validated"] * 50)
-        techniques.append({"techniqueID": row["technique_id"], "score": score, "comment": f"seen={coverage['seen']}; detected={coverage['detected_in_run']}; investigated={coverage['investigated']}; validated={coverage['validated']}"})
+        techniques.append(
+            {
+                "techniqueID": row["technique_id"],
+                "score": score,
+                "comment": f"seen={coverage['seen']}; detected={coverage['detected_in_run']}; investigated={coverage['investigated']}; validated={coverage['validated']}",
+            }
+        )
     metadata = _metadata()
-    return jsonify({"name": "SOCify ATT&CK Coverage", "version": "4.5", "domain": "enterprise-attack", "description": "Evidence-backed SOCify training coverage", "filters": {"platforms": []}, "sorting": 0, "layout": {"layout": "side", "aggregateFunction": "average", "showID": True, "showName": True, "showAggregateScores": False, "countUnscored": False}, "hideDisabled": False, "techniques": techniques, "gradient": {"colors": ["#8b1e3f", "#d6a23d", "#1f8f5f"], "minValue": 0, "maxValue": 100}, "legendItems": [], "metadata": [{"name": "ATT&CK release", "value": metadata["attack_version"]}, {"name": "Snapshot techniques", "value": str(metadata["snapshot_count"])}], "links": []})
+    return jsonify(
+        {
+            "name": "SOCify ATT&CK Coverage",
+            "version": "4.5",
+            "domain": "enterprise-attack",
+            "description": "Evidence-backed SOCify training coverage",
+            "filters": {"platforms": []},
+            "sorting": 0,
+            "layout": {
+                "layout": "side",
+                "aggregateFunction": "average",
+                "showID": True,
+                "showName": True,
+                "showAggregateScores": False,
+                "countUnscored": False,
+            },
+            "hideDisabled": False,
+            "techniques": techniques,
+            "gradient": {"colors": ["#8b1e3f", "#d6a23d", "#1f8f5f"], "minValue": 0, "maxValue": 100},
+            "legendItems": [],
+            "metadata": [
+                {"name": "ATT&CK release", "value": metadata["attack_version"]},
+                {"name": "Snapshot techniques", "value": str(metadata["snapshot_count"])},
+            ],
+            "links": [],
+        }
+    )

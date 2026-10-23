@@ -14,8 +14,7 @@ class PhaseOneTests(unittest.TestCase):
         self.old_database = app.config["DATABASE"]
         self.old_testing = app.config.get("TESTING")
         self.old_csrf = app.config.get("WTF_CSRF_ENABLED")
-        app.config.update(DATABASE=os.path.join(self.temp.name, "test.db"),
-                          TESTING=True, WTF_CSRF_ENABLED=False)
+        app.config.update(DATABASE=os.path.join(self.temp.name, "test.db"), TESTING=True, WTF_CSRF_ENABLED=False)
         with sqlite3.connect(app.config["DATABASE"]) as db:
             db.executescript("""
             CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, name TEXT,
@@ -37,10 +36,14 @@ class PhaseOneTests(unittest.TestCase):
                 type TEXT, endpoint TEXT, api_key TEXT, is_active INTEGER,
                 last_sync TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
             """)
-            db.execute("INSERT INTO users (id, email, name, password_hash, role) VALUES (1, 'admin@test', 'Admin', ?, 'admin')",
-                       (bcrypt.hashpw(b'testpassword', bcrypt.gensalt()).decode(),))
-            db.execute("INSERT INTO users (id, email, name, password_hash, role) VALUES (2, 'analyst@test', 'Analyst', ?, 'analyst')",
-                       (bcrypt.hashpw(b'testpassword', bcrypt.gensalt()).decode(),))
+            db.execute(
+                "INSERT INTO users (id, email, name, password_hash, role) VALUES (1, 'admin@test', 'Admin', ?, 'admin')",
+                (bcrypt.hashpw(b"testpassword", bcrypt.gensalt()).decode(),),
+            )
+            db.execute(
+                "INSERT INTO users (id, email, name, password_hash, role) VALUES (2, 'analyst@test', 'Analyst', ?, 'analyst')",
+                (bcrypt.hashpw(b"testpassword", bcrypt.gensalt()).decode(),),
+            )
             db.execute("""INSERT INTO rules (name, condition_type, condition_value,
                 action_type, action_value, created_by) VALUES
                 ('Brute force', 'failed_login_count', '{"threshold": 2, "timeframe": "10m"}',
@@ -53,8 +56,7 @@ class PhaseOneTests(unittest.TestCase):
         self.client = app.test_client()
 
     def tearDown(self):
-        app.config.update(DATABASE=self.old_database, TESTING=self.old_testing,
-                          WTF_CSRF_ENABLED=self.old_csrf)
+        app.config.update(DATABASE=self.old_database, TESTING=self.old_testing, WTF_CSRF_ENABLED=self.old_csrf)
         self.temp.cleanup()
 
     def auth(self, uid):
@@ -62,11 +64,17 @@ class PhaseOneTests(unittest.TestCase):
             s["user_id"] = uid
 
     def event(self):
-        return self.client.post("/api/lab/event", json={
-            "source": "lab", "severity": "medium", "category": "Brute Force",
-            "title": "Failed login", "description": "Simulated failure",
-            "raw_data": '{"source_ip":"192.0.2.9","username":"training"}'
-        })
+        return self.client.post(
+            "/api/lab/event",
+            json={
+                "source": "lab",
+                "severity": "medium",
+                "category": "Brute Force",
+                "title": "Failed login",
+                "description": "Simulated failure",
+                "raw_data": '{"source_ip":"192.0.2.9","username":"training"}',
+            },
+        )
 
     def test_rule_triggers_on_threshold_only(self):
         self.auth(2)
@@ -77,8 +85,7 @@ class PhaseOneTests(unittest.TestCase):
         self.assertEqual(two.status_code, 200)
         self.assertEqual(len(two.json["detections"]), 1)
         with sqlite3.connect(app.config["DATABASE"]) as db:
-            self.assertEqual(db.execute(
-                "SELECT COUNT(*) FROM detection_matches").fetchone()[0], 1)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM detection_matches").fetchone()[0], 1)
 
     def test_analyst_cannot_delete_security_events(self):
         self.auth(2)
@@ -89,19 +96,15 @@ class PhaseOneTests(unittest.TestCase):
     def test_case_workflow_and_notes(self):
         self.auth(2)
         event = self.event()
-        case = self.client.post("/api/incidents", json={
-            "title": "Investigate failed login",
-            "event_ids": [event.json["id"]]})
+        case = self.client.post("/api/incidents", json={"title": "Investigate failed login", "event_ids": [event.json["id"]]})
         self.assertEqual(case.status_code, 201)
         case_id = case.json["id"]
-        note = self.client.post(f"/api/incidents/{case_id}/notes",
-                                json={"note": "Checked IP and username"})
+        note = self.client.post(f"/api/incidents/{case_id}/notes", json={"note": "Checked IP and username"})
         self.assertEqual(note.status_code, 201)
         detail = self.client.get(f"/api/incidents/{case_id}").json
         self.assertEqual(len(detail["events"]), 1)
         self.assertEqual(detail["notes"][0]["note"], "Checked IP and username")
-        self.assertEqual(self.client.patch(f"/api/incidents/{case_id}",
-            json={"status": "investigating"}).status_code, 200)
+        self.assertEqual(self.client.patch(f"/api/incidents/{case_id}", json={"status": "investigating"}).status_code, 200)
 
     def test_source_secret_redaction(self):
         self.auth(2)
@@ -112,19 +115,13 @@ class PhaseOneTests(unittest.TestCase):
 
     def test_password_change_rejects_wrong_password_and_accepts_correct(self):
         self.auth(2)
-        rejected = self.client.post("/api/profile/password", json={
-            "current_password": "incorrect",
-            "new_password": "updated-strong-password"})
+        rejected = self.client.post("/api/profile/password", json={"current_password": "incorrect", "new_password": "updated-strong-password"})
         self.assertEqual(rejected.status_code, 403)
-        accepted = self.client.post("/api/profile/password", json={
-            "current_password": "testpassword",
-            "new_password": "updated-strong-password"})
+        accepted = self.client.post("/api/profile/password", json={"current_password": "testpassword", "new_password": "updated-strong-password"})
         self.assertEqual(accepted.status_code, 200)
         with sqlite3.connect(app.config["DATABASE"]) as db:
-            password_hash = db.execute(
-                "SELECT password_hash FROM users WHERE id = 2").fetchone()[0]
-        self.assertTrue(bcrypt.checkpw(b"updated-strong-password",
-                                       password_hash.encode()))
+            password_hash = db.execute("SELECT password_hash FROM users WHERE id = 2").fetchone()[0]
+        self.assertTrue(bcrypt.checkpw(b"updated-strong-password", password_hash.encode()))
 
     def test_anonymous_incidents_returns_401(self):
         self.assertEqual(self.client.get("/api/incidents").status_code, 401)
