@@ -81,6 +81,12 @@ def test_browser_training_requires_explicit_assessment_submission(app) -> None:
             page.locator("#workspace table tbody tr").first.wait_for()
             assert page.locator("#workspace table tbody tr").count() >= 1
             assert page.get_by_text("لا توجد نتائج", exact=True).count() == 0
+            with page.expect_download() as report_download:
+                page.get_by_role("link", name="تنزيل").first.click()
+            assert report_download.value.suggested_filename.endswith(".html")
+            page.get_by_role("button", name="الاشتراك في الترتيب").click()
+            page.get_by_role("button", name="إيقاف الظهور في الترتيب").wait_for()
+            assert page.get_by_text("متدرب-", exact=False).count() == 0
             browser.close()
     finally:
         server.shutdown()

@@ -297,24 +297,72 @@ def test_e2e_40_and_41_score_snapshot_is_deterministic(client: FlaskClient, logi
     assert first.json["calculation_fingerprint"] == second.json["calculation_fingerprint"]
     assert first.json["total_score"] == completed["assessment"]["total_score"]
     assert sum(first.json["weights"].values()) == 100
-    assert {"detection_recall", "detection_precision", "false_positive_rate", "elapsed_seconds"}.issubset(first.json["components"]["metrics"])
+    assert {
+        "detection_recall",
+        "detection_precision",
+        "false_positive_rate",
+        "elapsed_seconds",
+        "machine_detection_latency_seconds",
+        "learner_discovery_latency_seconds",
+        "mean_time_to_acknowledge_seconds",
+        "mean_time_to_resolve_seconds",
+        "classification_accuracy",
+        "evidence_completeness",
+        "response_decision_quality",
+        "playbook_compliance",
+    }.issubset(first.json["components"]["metrics"])
+    report = first.json["components"]["report"]
+    assert report["timeline"][-1]["action_type"] == "run_submitted"
+    assert report["missed_detection_targets"]
+    assert report["suggested_learning_path"]
+    assert "machine_detection_latency_seconds" in report["timestamp_definitions"]
+    html_report = client.get(f"/api/assessments/{first.json['id']}/report")
+    assert html_report.status_code == 200
+    assert html_report.mimetype == "text/html"
+    assert "attachment;" in html_report.headers["Content-Disposition"]
+    assert html_report.headers["Digest"].startswith("sha-256=")
+    assert "تقرير تقييم SOCify" in html_report.text
+    json_report = client.get(f"/api/assessments/{first.json['id']}/report?format=json")
+    assert json_report.status_code == 200
+    assert json_report.json["calculation_fingerprint"] == first.json["calculation_fingerprint"]
+    assert client.get(f"/api/assessments/{first.json['id']}/report?format=pdf").status_code == 422
     tamper = client.post(f"/api/assessments/{first.json['id']}", json={"total_score": 100})
     assert tamper.status_code == 405
 
 
 def test_e2e_42_leaderboard_masks_other_identity(client: FlaskClient, login_as: Callable[[str], None], database: sqlite3.Connection) -> None:
     login_as("analyst")
+    private = client.get("/api/leaderboards")
+    assert private.status_code == 200
+    assert private.json["opted_in"] is False
+    assert private.json["items"] == []
+    assert client.put("/api/profile/leaderboard", json={"opt_in": "yes"}).status_code == 422
+    preference = client.put("/api/profile/leaderboard", json={"opt_in": True})
+    assert preference.status_code == 200
+    assert preference.json["opt_in"] is True
+    assert client.get("/api/profile").json["user"]["leaderboard_opt_in"] is True
     _, own = complete_run(client, seed=101)
+    teammate_id = database.execute("SELECT id FROM users WHERE role = 'soc_manager'").fetchone()[0]
     instructor_id = database.execute("SELECT id FROM users WHERE role = 'instructor'").fetchone()[0]
+    database.execute("UPDATE users SET leaderboard_opt_in = 1 WHERE id IN (?, ?)", (teammate_id, instructor_id))
     scenario_version = database.execute("SELECT id FROM scenario_versions LIMIT 1").fetchone()[0]
     database.execute(
         "INSERT INTO training_runs (run_id, workspace_id, scenario_version_id, user_id, difficulty, seed, state, current_step, playback_rate, started_at, completed_at, snapshot) VALUES ('RUN-OTHER', 1, ?, ?, 'beginner', 3, 'completed', 6, 1, '2026-10-19T10:00:00Z', '2026-10-19T10:05:00Z', '{}')",
-        (scenario_version, instructor_id),
+        (scenario_version, teammate_id),
     )
     other_run = database.execute("SELECT id FROM training_runs WHERE run_id = 'RUN-OTHER'").fetchone()[0]
     database.execute(
         "INSERT INTO assessment_snapshots (assessment_id, workspace_id, run_id, user_id, policy_version, weights, inputs, components, total_score, created_at) VALUES ('ASM-OTHER', 1, ?, ?, 'socify-score-v1', '{}', '{}', '{}', 99, '2026-10-19T10:06:00Z')",
-        (other_run, instructor_id),
+        (other_run, teammate_id),
+    )
+    database.execute(
+        "INSERT INTO training_runs (run_id, workspace_id, scenario_version_id, user_id, difficulty, seed, state, current_step, playback_rate, started_at, completed_at, snapshot) VALUES ('RUN-OTHER-COHORT', 1, ?, ?, 'beginner', 4, 'completed', 6, 1, '2026-10-19T10:00:00Z', '2026-10-19T10:05:00Z', '{}')",
+        (scenario_version, instructor_id),
+    )
+    other_cohort_run = database.execute("SELECT id FROM training_runs WHERE run_id = 'RUN-OTHER-COHORT'").fetchone()[0]
+    database.execute(
+        "INSERT INTO assessment_snapshots (assessment_id, workspace_id, run_id, user_id, policy_version, weights, inputs, components, total_score, created_at) VALUES ('ASM-OTHER-COHORT', 1, ?, ?, 'socify-score-v1', '{}', '{}', '{}', 98, '2026-10-19T10:06:00Z')",
+        (other_cohort_run, instructor_id),
     )
     leaderboard = client.get("/api/leaderboards")
     assert leaderboard.status_code == 200
@@ -322,4 +370,8 @@ def test_e2e_42_leaderboard_masks_other_identity(client: FlaskClient, login_as: 
     current = next(item for item in leaderboard.json["items"] if item["score"] == own["assessment"]["total_score"])
     assert other["name"].startswith("متدرب-")
     assert other["assessment_id"] is None
+    assert other["cohort"] == "فريق SOC"
     assert current["is_current_user"] is True
+    assert all(item["score"] != 98 for item in leaderboard.json["items"])
+    assert client.put("/api/profile/leaderboard", json={"opt_in": False}).status_code == 200
+    assert client.get("/api/leaderboards").json["items"] == []

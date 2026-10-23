@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TEXT,
     last_login TEXT,
     password_changed_at TEXT,
+    leaderboard_opt_in INTEGER NOT NULL DEFAULT 0,
     is_active INTEGER NOT NULL DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS workspace_memberships (
@@ -607,6 +608,7 @@ COLUMN_MIGRATIONS: dict[str, dict[str, str]] = {
         "created_at": "TEXT",
         "last_login": "TEXT",
         "password_changed_at": "TEXT",
+        "leaderboard_opt_in": "INTEGER NOT NULL DEFAULT 0",
         "is_active": "INTEGER NOT NULL DEFAULT 1",
     },
     "security_events": {

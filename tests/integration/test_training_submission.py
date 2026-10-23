@@ -32,7 +32,7 @@ def test_submission_is_required_after_playback(client: FlaskClient, login_as: Ca
     submitted = client.post(f"/api/training/runs/{run_id}/submit", json={})
     assert submitted.status_code == 200
     assert submitted.json["state"] == "completed"
-    assert submitted.json["assessment"]["policy_version"] == "socify-score-v2"
+    assert submitted.json["assessment"]["policy_version"] == "socify-score-v3"
     assert submitted.json["assessment"]["components"]["metrics"]["true_positives"] == 0
     again = client.post(f"/api/training/runs/{run_id}/submit", json={})
     assert again.status_code == 200

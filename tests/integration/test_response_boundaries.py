@@ -130,6 +130,7 @@ def test_training_hints_and_score_read_models(client, login_as, database):
     assert client.get(f"/api/assessments/{score['id']}").json["calculation_fingerprint"] == score["calculation_fingerprint"]
     assert client.get("/api/assessments/99999").status_code == 404
     assert len(client.get("/api/scores/me").json["items"]) == 1
+    assert client.put("/api/profile/leaderboard", json={"opt_in": True}).status_code == 200
     assert len(client.get(f"/api/leaderboards?scenario_id={scenario['id']}&difficulty=beginner").json["items"]) == 1
     login_as("admin")
     assert client.get(f"/api/assessments/{score['id']}").status_code == 200

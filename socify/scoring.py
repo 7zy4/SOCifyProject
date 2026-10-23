@@ -1,9 +1,11 @@
+import base64
 import hashlib
+import html
 import json
 import sqlite3
 from typing import Any
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 
 from .audit import record_audit
 from .db import get_db, inserted_id
@@ -40,12 +42,13 @@ def _learner_detection_results(
     run_id: int,
     user_id: int,
     expected: set[tuple[str, str]],
-) -> tuple[set[tuple[str, str]], int, int, list[float]]:
+) -> tuple[set[tuple[str, str]], dict[str, int], list[float], list[float]]:
     rows = connection.execute(
-        """SELECT a.id AS alert_id, a.detected_at, r.name AS rule_name,
+        """SELECT a.id AS alert_id, a.detected_at, r.name AS rule_name, e.ingested_at,
                   tre.step_id, ta.action_type, ta.payload, ta.occurred_at, ta.id AS action_id
            FROM alerts a JOIN rules r ON r.id = a.rule_id
            LEFT JOIN alert_events ae ON ae.alert_id = a.id
+           LEFT JOIN security_events e ON e.id = ae.event_id
            LEFT JOIN training_run_events tre ON tre.event_id = ae.event_id AND tre.run_id = ?
            LEFT JOIN trainee_actions ta ON ta.run_id = ? AND ta.user_id = ?
                 AND ta.target_type = 'alert' AND ta.target_id = CAST(a.id AS TEXT)
@@ -58,32 +61,51 @@ def _learner_detection_results(
     for row in rows:
         item = alerts.setdefault(
             int(row["alert_id"]),
-            {"name": str(row["rule_name"]), "steps": set(), "decision": None, "detected_at": row["detected_at"], "triaged_at": None},
+            {
+                "name": str(row["rule_name"]),
+                "steps": set(),
+                "decision": None,
+                "detected_at": row["detected_at"],
+                "triaged_at": None,
+                "event_ingested_at": [],
+            },
         )
         if row["step_id"]:
             item["steps"].add(str(row["step_id"]))
+        if row["ingested_at"]:
+            item["event_ingested_at"].append(str(row["ingested_at"]))
         if row["action_id"] is not None and (item["decision"] is None or int(row["action_id"]) >= int(item["decision"][0])):
             payload = json.loads(row["payload"])
             item["decision"] = (int(row["action_id"]), payload.get("status"))
             item["triaged_at"] = row["occurred_at"]
     matched: set[tuple[str, str]] = set()
-    true_positive = 0
-    false_positive = 0
+    counts = {"true_positives": 0, "false_positives": 0, "correct_rejections": 0, "incorrect_rejections": 0, "decisions": 0}
     analyst_latency: list[float] = []
+    machine_latency: list[float] = []
     for item in alerts.values():
-        if item["decision"] is None or item["decision"][1] not in {"triaged", "investigating", "closed"}:
+        if item["detected_at"] and item["event_ingested_at"]:
+            triggering_ingestion = max(parse_timestamp(value) for value in item["event_ingested_at"])
+            machine_latency.append(max((parse_timestamp(item["detected_at"]) - triggering_ingestion).total_seconds(), 0.0))
+        if item["decision"] is None:
             continue
+        counts["decisions"] += 1
         candidates = {(step, item["name"]) for step in item["steps"]} & expected
-        unused = candidates - matched
-        if unused:
-            matched.add(sorted(unused)[0])
-            true_positive += 1
+        positive = item["decision"][1] in {"triaged", "investigating", "closed"}
+        if positive:
+            unused = candidates - matched
+            if unused:
+                matched.add(sorted(unused)[0])
+                counts["true_positives"] += 1
+            else:
+                counts["false_positives"] += 1
+            if item["triaged_at"] and item["detected_at"]:
+                seconds = (parse_timestamp(item["triaged_at"]) - parse_timestamp(item["detected_at"])).total_seconds()
+                analyst_latency.append(max(seconds, 0.0))
+        elif candidates:
+            counts["incorrect_rejections"] += 1
         else:
-            false_positive += 1
-        if item["triaged_at"] and item["detected_at"]:
-            seconds = (parse_timestamp(item["triaged_at"]) - parse_timestamp(item["detected_at"])).total_seconds()
-            analyst_latency.append(max(seconds, 0.0))
-    return matched, true_positive, false_positive, analyst_latency
+            counts["correct_rejections"] += 1
+    return matched, counts, analyst_latency, machine_latency
 
 
 def _learner_evidence(
@@ -128,7 +150,7 @@ def _learner_responses(connection: sqlite3.Connection, run_id: int, user_id: int
 
 
 def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[str, Any]:
-    policy_version = "socify-score-v2"
+    policy_version = "socify-score-v3"
     existing = connection.execute(
         "SELECT * FROM assessment_snapshots WHERE run_id = ? AND policy_version = ? ORDER BY revision DESC LIMIT 1",
         (run_id, policy_version),
@@ -142,7 +164,9 @@ def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[st
     if version is None:
         raise RuntimeError("scenario version is missing")
     expected_detection, expected_evidence, expected_responses = _training_ground_truth(connection, int(run["scenario_version_id"]))
-    detected, true_positives, false_positives, latencies = _learner_detection_results(connection, run_id, int(run["user_id"]), expected_detection)
+    detected, detection_counts, learner_latencies, machine_latencies = _learner_detection_results(connection, run_id, int(run["user_id"]), expected_detection)
+    true_positives = detection_counts["true_positives"]
+    false_positives = detection_counts["false_positives"]
     false_negatives = len(expected_detection - detected)
     precision = true_positives / (true_positives + false_positives) if true_positives + false_positives else 0.0
     recall = true_positives / len(expected_detection) if expected_detection else 1.0
@@ -153,7 +177,7 @@ def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[st
         (run_id, run["workspace_id"]),
     ).fetchall()
     actions = connection.execute(
-        "SELECT action_type, payload FROM trainee_actions WHERE run_id = ? AND user_id = ? ORDER BY id",
+        "SELECT action_type, target_type, target_id, payload, occurred_at FROM trainee_actions WHERE run_id = ? AND user_id = ? ORDER BY id",
         (run_id, run["user_id"]),
     ).fetchall()
     transitions = [json.loads(action["payload"]).get("to") for action in actions if action["action_type"] == "case_transition"]
@@ -173,6 +197,11 @@ def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[st
     case_resolution_seconds = [
         max((parse_timestamp(case["closed_at"]) - parse_timestamp(case["created_at"])).total_seconds(), 0.0) for case in closed_cases if case["closed_at"]
     ]
+    classification_accuracy = (
+        (true_positives + detection_counts["correct_rejections"]) / detection_counts["decisions"] if detection_counts["decisions"] else 0.0
+    )
+    response_quality = len(response_found) / len(expected_responses) if expected_responses else 1.0
+    evidence_completeness = len(evidence_found) / len(expected_evidence) if expected_evidence else 1.0
     metrics: dict[str, Any] = {
         "true_positives": true_positives,
         "false_positives": false_positives,
@@ -180,8 +209,17 @@ def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[st
         "detection_precision": round(precision, 4),
         "detection_recall": round(recall, 4),
         "false_positive_rate": round(false_positives / max(true_positives + false_positives, 1), 4),
-        "analyst_triage_latency_seconds": round(sum(latencies) / len(latencies), 3) if latencies else None,
+        "machine_detection_latency_seconds": round(sum(machine_latencies) / len(machine_latencies), 3) if machine_latencies else None,
+        "learner_discovery_latency_seconds": round(sum(learner_latencies) / len(learner_latencies), 3) if learner_latencies else None,
+        "mean_time_to_acknowledge_seconds": round(sum(learner_latencies) / len(learner_latencies), 3) if learner_latencies else None,
+        "mean_time_to_resolve_seconds": round(sum(case_resolution_seconds) / len(case_resolution_seconds), 3) if case_resolution_seconds else None,
         "case_resolution_seconds": round(sum(case_resolution_seconds) / len(case_resolution_seconds), 3) if case_resolution_seconds else None,
+        "classification_accuracy": round(classification_accuracy, 4),
+        "correct_rejections": detection_counts["correct_rejections"],
+        "incorrect_rejections": detection_counts["incorrect_rejections"],
+        "evidence_completeness": round(evidence_completeness, 4),
+        "response_decision_quality": round(response_quality, 4),
+        "playbook_compliance": round(response_quality, 4),
         "elapsed_seconds": round(elapsed_seconds, 3),
         "actions": len(actions),
         "hints_used": hints,
@@ -189,11 +227,55 @@ def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[st
     components: dict[str, Any] = {
         "detection": _bounded(100 * precision * recall),
         "investigation": _bounded(100 * investigation_progress),
-        "response": _bounded(100 * len(response_found) / len(expected_responses)) if expected_responses else 100.0,
-        "evidence": _bounded(100 * len(evidence_found) / len(expected_evidence)) if expected_evidence else 100.0,
+        "response": _bounded(100 * response_quality),
+        "evidence": _bounded(100 * evidence_completeness),
         "time": timing,
         "false_positive": false_positive_accuracy,
         "metrics": metrics,
+    }
+    missed_detection = expected_detection - detected
+    missed_evidence = expected_evidence - evidence_found
+    missed_responses = expected_responses - response_found
+    missed_steps = sorted({step for step, _ in missed_detection | missed_evidence})
+    technique_rows = connection.execute(
+        "SELECT step_id, mitre_ids FROM scenario_steps WHERE scenario_version_id = ? ORDER BY position",
+        (run["scenario_version_id"],),
+    ).fetchall()
+    learning_techniques = sorted({technique for row in technique_rows if row["step_id"] in missed_steps for technique in json.loads(row["mitre_ids"] or "[]")})
+    strength_labels = {
+        "detection": "detection decisions",
+        "investigation": "case investigation",
+        "response": "response decisions",
+        "evidence": "evidence collection",
+        "time": "time management",
+        "false_positive": "false-positive handling",
+    }
+    strengths = [label for key, label in strength_labels.items() if float(components[key]) >= 80]
+    opportunities = [label for key, label in strength_labels.items() if float(components[key]) < 80]
+    components["report"] = {
+        "timeline": [
+            {
+                "action_type": action["action_type"],
+                "target_type": action["target_type"],
+                "target_id": action["target_id"],
+                "occurred_at": action["occurred_at"],
+            }
+            for action in actions
+        ],
+        "missed_detection_targets": sorted([list(item) for item in missed_detection]),
+        "missed_evidence_targets": sorted([list(item) for item in missed_evidence]),
+        "missed_response_actions": sorted(missed_responses),
+        "false_positive_decisions": false_positives,
+        "incorrect_rejections": detection_counts["incorrect_rejections"],
+        "strengths": strengths,
+        "improvement_opportunities": opportunities,
+        "suggested_learning_path": learning_techniques,
+        "timestamp_definitions": {
+            "machine_detection_latency_seconds": "alert.detected_at minus latest supporting event.ingested_at",
+            "learner_discovery_latency_seconds": "learner alert-triage action time minus alert.detected_at",
+            "mean_time_to_resolve_seconds": "closed case.closed_at minus case.created_at",
+            "elapsed_seconds": "server training_run.submitted_at minus training_run.started_at",
+        },
     }
     configured_weights = json.loads(version["scoring_policy"] or "{}")
     weights = {key: float(configured_weights.get(key, value)) for key, value in DEFAULT_WEIGHTS.items()}
@@ -296,6 +378,55 @@ def assessment_detail(assessment_id: int):
     return jsonify(assessment_view(row))
 
 
+@scoring_api.get("/api/assessments/<int:assessment_id>/report")
+@require_permission("scores.read_own")
+def assessment_report(assessment_id: int):
+    row = _assessment_access(assessment_id)
+    if not row:
+        return error_response("ASSESSMENT_NOT_FOUND", "نتيجة التقييم غير موجودة", 404)
+    assessment = assessment_view(row)
+    requested_format = request.args.get("format", "html")
+    if requested_format not in {"html", "json"}:
+        return error_response("INVALID_REPORT_FORMAT", "صيغة التقرير غير مدعومة", 422)
+    payload = {
+        "assessment_id": assessment["assessment_id"],
+        "run_id": assessment["run_id"],
+        "policy_version": assessment["policy_version"],
+        "total_score": assessment["total_score"],
+        "weights": assessment["weights"],
+        "components": assessment["components"],
+        "calculation_fingerprint": assessment["calculation_fingerprint"],
+        "created_at": assessment["created_at"],
+    }
+    if requested_format == "json":
+        content = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True).encode()
+        response = Response(content, mimetype="application/json")
+        extension = "json"
+    else:
+        metrics = assessment["components"].get("metrics", {})
+        report = assessment["components"].get("report", {})
+        component_rows = "".join(
+            f"<tr><th>{html.escape(key)}</th><td>{html.escape(str(value))}</td></tr>"
+            for key, value in assessment["components"].items()
+            if key not in {"metrics", "report"}
+        )
+        metric_rows = "".join(f"<tr><th>{html.escape(key)}</th><td>{html.escape(str(value))}</td></tr>" for key, value in metrics.items())
+        missed = html.escape(json.dumps({key: value for key, value in report.items() if key.startswith("missed_")}, ensure_ascii=False))
+        content = (
+            '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير تقييم SOCify</title>'
+            "<style>body{font-family:Arial,sans-serif;margin:2rem;line-height:1.7}table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #bbb;padding:.5rem;text-align:right}h1{color:#123b66}@media print{body{margin:0}}</style>"
+            f"</head><body><h1>تقرير تقييم SOCify</h1><p>المحاولة: {html.escape(str(assessment['run_id']))}</p>"
+            f"<p>السياسة: {html.escape(str(assessment['policy_version']))} · الدرجة: {html.escape(str(assessment['total_score']))}</p>"
+            f"<h2>المكونات</h2><table>{component_rows}</table><h2>المقاييس</h2><table>{metric_rows}</table>"
+            f"<h2>العناصر الفائتة</h2><p>{missed}</p><p>البصمة: {assessment['calculation_fingerprint']}</p></body></html>"
+        ).encode()
+        response = Response(content, mimetype="text/html")
+        extension = "html"
+    response.headers["Content-Disposition"] = f"attachment; filename={assessment['assessment_id']}.{extension}"
+    response.headers["Digest"] = f"sha-256={base64.b64encode(hashlib.sha256(content).digest()).decode()}"
+    return response
+
+
 @scoring_api.get("/api/training/runs/<int:run_id>/score")
 @require_permission("scores.read_own")
 def run_score(run_id: int):
@@ -314,8 +445,22 @@ def run_score(run_id: int):
 def leaderboard():
     scenario_id = request.args.get("scenario_id")
     difficulty = request.args.get("difficulty")
-    clauses = ["a.workspace_id = ?"]
+    cohort = request.args.get("cohort")
+    user = current_user()
+    if user is None:
+        raise RuntimeError("authenticated leaderboard has no user")
+    manager = has_permission(user, "scores.read_team")
+    opted_in = bool(user["leaderboard_opt_in"])
+    if not manager and not opted_in:
+        return jsonify({"items": [], "grouping": ["scenario_id", "difficulty", "cohort"], "opted_in": False, "cohort": user.get("team")})
+    clauses = ["a.workspace_id = ?", "u.leaderboard_opt_in = 1"]
     parameters: list[object] = [workspace_id()]
+    if manager and cohort:
+        clauses.append("u.team = ?")
+        parameters.append(cohort)
+    elif not manager:
+        clauses.append("u.team IS ?")
+        parameters.append(user.get("team"))
     if scenario_id:
         clauses.append("s.id = ?")
         parameters.append(scenario_id)
@@ -325,7 +470,7 @@ def leaderboard():
     rows = (
         get_db()
         .execute(
-            f"""SELECT a.id, a.user_id, a.total_score, a.created_at, tr.difficulty, s.id AS scenario_id, s.name AS scenario_name, u.name
+            f"""SELECT a.id, a.user_id, a.total_score, a.created_at, tr.difficulty, s.id AS scenario_id, s.name AS scenario_name, u.name, u.team
         FROM assessment_snapshots a JOIN training_runs tr ON tr.id = a.run_id
         JOIN scenario_versions sv ON sv.id = tr.scenario_version_id JOIN attack_scenarios s ON s.id = sv.scenario_id
         JOIN users u ON u.id = a.user_id WHERE {" AND ".join(clauses)}
@@ -334,7 +479,6 @@ def leaderboard():
         )
         .fetchall()
     )
-    manager = has_permission(current_user(), "scores.read_team")
     items = []
     for rank, row in enumerate(rows, 1):
         pseudonym = "متدرب-" + hashlib.sha256(f"{workspace_id()}:{row['user_id']}".encode()).hexdigest()[:8]
@@ -347,7 +491,8 @@ def leaderboard():
                 "difficulty": row["difficulty"],
                 "scenario_id": row["scenario_id"],
                 "scenario_name": row["scenario_name"],
+                "cohort": row["team"],
                 "is_current_user": row["user_id"] == actor_id(),
             }
         )
-    return jsonify({"items": items, "grouping": ["scenario_id", "difficulty"]})
+    return jsonify({"items": items, "grouping": ["scenario_id", "difficulty", "cohort"], "opted_in": opted_in, "cohort": user.get("team")})

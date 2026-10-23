@@ -4,6 +4,7 @@ from typing import Any
 
 from flask import Blueprint, current_app, jsonify, request
 
+from .audit import record_audit
 from .db import get_db
 from .security import ROLE_PERMISSIONS, actor_id, current_user, error_response, has_permission, login_required, require_permission, workspace_id
 from .timeutils import iso_now
@@ -192,6 +193,9 @@ def audit_logs():
 @login_required
 def profile():
     user = current_user()
+    if user is None:
+        raise RuntimeError("authenticated profile has no user")
+    user["leaderboard_opt_in"] = bool(user["leaderboard_opt_in"])
     sessions = int(
         get_db()
         .execute("SELECT COUNT(*) FROM auth_sessions WHERE user_id = ? AND revoked_at IS NULL AND expires_at > ?", (actor_id(), iso_now()))
@@ -201,6 +205,18 @@ def profile():
     return jsonify(
         {"user": user, "active_sessions": sessions, "mfa": {"enabled": bool(mfa and mfa["enabled"]), "verified_at": mfa["verified_at"] if mfa else None}}
     )
+
+
+@platform_api.put("/api/profile/leaderboard")
+@login_required
+def leaderboard_preference():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or type(data.get("opt_in")) is not bool:
+        return error_response("INVALID_LEADERBOARD_PREFERENCE", "يلزم تحديد خيار مشاركة صالح", 422)
+    enabled = int(data["opt_in"])
+    get_db().execute("UPDATE users SET leaderboard_opt_in = ? WHERE id = ? AND workspace_id = ?", (enabled, actor_id(), workspace_id()))
+    record_audit(get_db(), "update", "leaderboard_preference", actor_id(), details={"opt_in": bool(enabled)})
+    return jsonify({"opt_in": bool(enabled)})
 
 
 @platform_api.get("/api/settings")

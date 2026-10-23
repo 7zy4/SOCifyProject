@@ -159,7 +159,7 @@ def current_user() -> dict[str, Any] | None:
     row = (
         get_db()
         .execute(
-            "SELECT id, email, name, role, team, workspace_id, is_active FROM users WHERE id = ? AND is_active = 1",
+            "SELECT id, email, name, role, team, workspace_id, leaderboard_opt_in, is_active FROM users WHERE id = ? AND is_active = 1",
             (user_id,),
         )
         .fetchone()
