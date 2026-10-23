@@ -64,13 +64,11 @@ def _depth(value: object, level: int = 0) -> int:
 def _detect_format(filename: str, content: bytes) -> str:
     suffix = Path(filename).suffix.lower()
     sample = content[:4096].lstrip()
-    if suffix == ".evtx":
+    if sample.startswith(b"ElfFile\x00"):
         return "evtx"
-    if suffix in {".xml"} or sample.startswith(b"<"):
+    if sample.startswith(b"<"):
         return "sysmon_xml"
-    if suffix == ".csv":
-        return "csv"
-    if suffix in {".jsonl", ".ndjson"}:
+    if suffix in {".jsonl", ".ndjson"} and sample.startswith(b"{"):
         return "jsonl"
     if suffix == ".json" or sample.startswith((b"[", b"{")):
         return "json"
@@ -79,12 +77,16 @@ def _detect_format(filename: str, content: bytes) -> str:
         return "web"
     if AUTH_LOG.match(text.splitlines()[0] if text.splitlines() else "") and "sshd" in text:
         return "linux_auth"
+    if suffix == ".csv" and "," in (text.splitlines()[0] if text.splitlines() else ""):
+        return "csv"
     return "syslog"
 
 
 def _decode(content: bytes) -> str:
     if b"\x00" in content[:4096]:
         raise ValueError("binary content is not valid for the selected text format")
+    if any(len(line) > 1048576 for line in content.splitlines()):
+        raise ValueError("text line exceeds 1 MiB")
     try:
         return content.decode("utf-8-sig")
     except UnicodeDecodeError as exc:

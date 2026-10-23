@@ -154,7 +154,8 @@ def test_parser_resource_budgets_and_auto_detection(app):
             with pytest.raises(ValueError, match=error):
                 _, records = parse_records(filename, content, fmt, "lab")
                 list(records)
-    assert _detect_format("events.evtx", b"") == "evtx"
+    assert _detect_format("events.evtx", b"ElfFile\x00") == "evtx"
+    assert _detect_format("events.evtx", b'{"event_type":"test"}') == "json"
     assert _detect_format("unknown", b"") == "syslog"
     assert _detect_format("access.log", b'192.0.2.1 - - [19/Oct/2026:10:00:00 +0000] "GET / HTTP/1.1" 200 1') == "web"
     assert _detect_format("auth.log", b"Oct 19 10:00:00 host sshd: Failed password") == "linux_auth"

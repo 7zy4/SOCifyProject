@@ -59,3 +59,60 @@ def test_import_row_budget_is_enforced(app, client, login_as):
     errors = client.get(f"/api/imports/{result.json['id']}").json["errors"]
     assert errors[0]["error_code"] == "ROW_LIMIT"
     assert client.get("/api/events").json["total"] == 1
+
+
+def test_auto_detection_uses_content_and_sanitizes_filename(client, login_as, database):
+    login_as("admin")
+    payload = b'{"source":"content-sniff","event_type":"safe","title":"Content wins"}'
+    imported = client.post(
+        "/api/imports",
+        data={"file": (io.BytesIO(payload), "../../misleading.evtx"), "format": "auto"},
+    )
+    assert imported.status_code == 201
+    assert imported.json["format"] == "json"
+    stored = database.execute("SELECT filename FROM ingestion_jobs WHERE id = ?", (imported.json["id"],)).fetchone()[0]
+    assert stored == "misleading.evtx"
+
+
+def test_accepted_import_runs_detection_and_preserves_explorer_provenance(client, login_as, database):
+    login_as("admin")
+    rule = client.post(
+        "/api/rules",
+        json={
+            "name": "Imported pipeline detection",
+            "dsl": {"condition": {"field": "source", "operator": "equals", "value": "pipeline-import"}},
+            "active": True,
+        },
+    )
+    assert rule.status_code == 201
+    imported = client.post(
+        "/api/imports",
+        json={
+            "filename": "pipeline.jsonl",
+            "format": "jsonl",
+            "content": '{"source":"pipeline-import","event_type":"pipeline_event","title":"Pipeline event"}',
+        },
+    )
+    assert imported.status_code == 201
+    explorer = client.get("/api/events?source=pipeline-import")
+    assert explorer.json["total"] == 1
+    event_id = explorer.json["items"][0]["id"]
+    raw = client.get(f"/api/events/{event_id}/raw").json
+    assert raw["provenance"]["file_sha256"] == imported.json["content_hash"]
+    assert client.post("/api/hunt/query", json={"query": 'source="pipeline-import"'}).json["total"] == 1
+    assert "Pipeline event" in client.get("/api/events/export").get_data(as_text=True)
+    assert database.execute("SELECT COUNT(*) FROM detection_matches WHERE event_id = ?", (event_id,)).fetchone()[0] == 1
+
+
+def test_imported_spreadsheet_formula_is_neutralized_on_export(client, login_as):
+    login_as("analyst")
+    content = 'source,event_type,title\nformula-import,test,"=HYPERLINK(""https://invalid.test"")"\n'
+    imported = client.post(
+        "/api/imports",
+        json={"filename": "formula.csv", "format": "csv", "content": content},
+    )
+    assert imported.status_code == 201
+    assert imported.json["accepted"] == 1
+    exported = client.get("/api/events/export")
+    assert exported.status_code == 200
+    assert "'=HYPERLINK" in exported.get_data(as_text=True)

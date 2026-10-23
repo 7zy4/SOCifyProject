@@ -143,7 +143,17 @@ def test_safe_external_endpoint_enforces_https_allowlist_and_public_ip(monkeypat
     assert safe_external_endpoint("https://sandbox.example/path", {"sandbox.example"}) == (True, "ok")
     assert safe_external_endpoint("http://sandbox.example", {"sandbox.example"})[0] is False
     assert safe_external_endpoint("https://other.example", {"sandbox.example"})[0] is False
+    assert safe_external_endpoint("https://user:password@sandbox.example", {"sandbox.example"})[0] is False
     monkeypatch.setattr(socket, "getaddrinfo", lambda *args, **kwargs: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443))])
+    assert safe_external_endpoint("https://sandbox.example", {"sandbox.example"})[0] is False
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443)),
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("169.254.169.254", 443)),
+        ],
+    )
     assert safe_external_endpoint("https://sandbox.example", {"sandbox.example"})[0] is False
 
 
@@ -201,6 +211,8 @@ def test_import_parser_negative_boundaries(app) -> None:
         _decode(b"bad\x00text")
     with pytest.raises(ValueError, match="UTF-8"):
         _decode(b"\xff\xfe")
+    with pytest.raises(ValueError, match="1 MiB"):
+        _decode(b"x" * 1048577)
     with app.app_context():
         for filename, content, selected_format in (
             ("bad.csv", b"", "csv"),

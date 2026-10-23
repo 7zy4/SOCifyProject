@@ -304,6 +304,8 @@ def safe_external_endpoint(endpoint: str, allowed_hosts: set[str]) -> tuple[bool
     parsed = urlparse(endpoint)
     if parsed.scheme not in {"https"} or not parsed.hostname:
         return False, "يلزم عنوان HTTPS صالح"
+    if parsed.username is not None or parsed.password is not None:
+        return False, "بيانات الاعتماد غير مسموحة داخل عنوان المصدر"
     hostname = parsed.hostname.lower().rstrip(".")
     if hostname not in allowed_hosts:
         return False, "المضيف غير موجود في قائمة السماح"
