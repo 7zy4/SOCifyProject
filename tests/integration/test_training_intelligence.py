@@ -287,7 +287,7 @@ def test_e2e_39_playbook_failure_retry_limit_and_cancel(client: FlaskClient, log
     assert cancelled.json["state"] == "cancelled"
 
 
-def test_e2e_40_and_41_score_snapshot_is_deterministic(client: FlaskClient, login_as: Callable[[str], None]) -> None:
+def test_e2e_40_and_41_score_snapshot_is_deterministic(client: FlaskClient, login_as: Callable[[str], None], database: sqlite3.Connection) -> None:
     login_as("analyst")
     run_id, completed = complete_run(client)
     first = client.get(f"/api/training/runs/{run_id}/score")
@@ -328,6 +328,12 @@ def test_e2e_40_and_41_score_snapshot_is_deterministic(client: FlaskClient, logi
     assert client.get(f"/api/assessments/{first.json['id']}/report?format=pdf").status_code == 422
     tamper = client.post(f"/api/assessments/{first.json['id']}", json={"total_score": 100})
     assert tamper.status_code == 405
+    audit = database.execute(
+        "SELECT result, details FROM security_audit_logs WHERE action = 'tamper' AND resource_type = 'assessment' AND resource_id = ?",
+        (str(first.json["id"]),),
+    ).fetchone()
+    assert audit["result"] == "denied"
+    assert "total_score" in audit["details"]
 
 
 def test_e2e_42_leaderboard_masks_other_identity(client: FlaskClient, login_as: Callable[[str], None], database: sqlite3.Connection) -> None:

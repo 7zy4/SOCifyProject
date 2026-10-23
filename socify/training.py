@@ -600,6 +600,11 @@ def submit_run(run_id: int):
         return error_response("RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
     if int(run["user_id"]) != actor_id():
         return error_response("PERMISSION_DENIED", "لا يمكنك تسليم جلسة متدرب آخر", 403)
+    data = request.get_json(silent=True)
+    if data not in (None, {}):
+        attempted_fields = sorted(data) if isinstance(data, dict) else []
+        record_audit(get_db(), "tamper", "training_submission", run_id, result="denied", details={"attempted_fields": attempted_fields})
+        return error_response("SUBMISSION_FIELDS_FORBIDDEN", "لا يقبل التسليم درجات أو أوقاتًا أو Ground Truth من العميل", 422)
     if run["state"] not in {"awaiting_submission", "completed"}:
         return error_response("RUN_NOT_READY_FOR_SUBMISSION", "يجب إنهاء عرض السيناريو أولًا", 409)
     from .scoring import calculate_assessment
@@ -745,3 +750,15 @@ def run_ground_truth(run_id: int):
             item[field] = json.loads(item[field])
         items.append(item)
     return jsonify({"items": items})
+
+
+@training_api.post("/api/training/runs/<int:run_id>/ground-truth")
+@require_permission("training.run")
+def reject_ground_truth_mutation(run_id: int):
+    run = _run_access(run_id)
+    if not run:
+        return error_response("RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
+    data = request.get_json(silent=True)
+    attempted_fields = sorted(data) if isinstance(data, dict) else []
+    record_audit(get_db(), "tamper", "scenario_ground_truth", run_id, result="denied", details={"attempted_fields": attempted_fields})
+    return error_response("GROUND_TRUTH_IMMUTABLE", "لا يمكن تعديل Ground Truth من جلسة التدريب", 405)

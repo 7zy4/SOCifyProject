@@ -22,18 +22,18 @@ def _bounded(value: float) -> float:
     return round(min(max(value, 0.0), 100.0), 4)
 
 
-def _training_ground_truth(connection: sqlite3.Connection, scenario_version_id: int) -> tuple[set[tuple[str, str]], set[tuple[str, str]], set[str]]:
+def _training_ground_truth(connection: sqlite3.Connection, scenario_version_id: int) -> tuple[set[tuple[str, str]], set[tuple[str, str]], set[tuple[str, str]]]:
     rows = connection.execute(
         "SELECT step_id, expected_detections, relevant_evidence, allowed_responses FROM scenario_ground_truth WHERE scenario_version_id = ?",
         (scenario_version_id,),
     ).fetchall()
     detection_targets: set[tuple[str, str]] = set()
     evidence_targets: set[tuple[str, str]] = set()
-    response_targets: set[str] = set()
+    response_targets: set[tuple[str, str]] = set()
     for row in rows:
         detection_targets.update((row["step_id"], str(value)) for value in json.loads(row["expected_detections"]))
         evidence_targets.update((row["step_id"], str(value)) for value in json.loads(row["relevant_evidence"]))
-        response_targets.update(str(value) for value in json.loads(row["allowed_responses"]))
+        response_targets.update((row["step_id"], str(value)) for value in json.loads(row["allowed_responses"]))
     return detection_targets, evidence_targets, response_targets
 
 
@@ -137,20 +137,47 @@ def _learner_evidence(
     return matched
 
 
-def _learner_responses(connection: sqlite3.Connection, run_id: int, user_id: int) -> set[str]:
+def _learner_responses(
+    connection: sqlite3.Connection,
+    run_id: int,
+    user_id: int,
+    expected: set[tuple[str, str]],
+) -> tuple[set[tuple[str, str]], int]:
     rows = connection.execute(
-        """SELECT DISTINCT ps.action_type
+        """SELECT DISTINCT ps.action_type, psr.completed_at
            FROM playbook_runs pr
            JOIN playbook_step_runs psr ON psr.run_id = pr.id AND psr.status = 'succeeded'
            JOIN playbook_steps ps ON ps.id = psr.step_id
            WHERE pr.training_run_id = ? AND pr.requested_by = ? AND pr.state = 'succeeded'""",
         (run_id, user_id),
     ).fetchall()
-    return {str(row["action_type"]) for row in rows}
+    step_times = {
+        str(row["step_id"]): parse_timestamp(row["occurred_at"])
+        for row in connection.execute(
+            """SELECT tre.step_id, MAX(e.ingested_at) AS occurred_at
+               FROM training_run_events tre JOIN security_events e ON e.id = tre.event_id
+               WHERE tre.run_id = ? GROUP BY tre.step_id""",
+            (run_id,),
+        ).fetchall()
+        if row["occurred_at"]
+    }
+    matched: set[tuple[str, str]] = set()
+    invalid = 0
+    expected_actions = {action for _, action in expected}
+    for row in rows:
+        action = str(row["action_type"])
+        completed_at = parse_timestamp(row["completed_at"]) if row["completed_at"] else None
+        candidates = sorted(target for target in expected if target[1] == action and target not in matched)
+        valid = next((target for target in candidates if completed_at and target[0] in step_times and completed_at >= step_times[target[0]]), None)
+        if valid:
+            matched.add(valid)
+        elif action in expected_actions:
+            invalid += 1
+    return matched, invalid
 
 
 def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[str, Any]:
-    policy_version = "socify-score-v3"
+    policy_version = "socify-score-v4"
     existing = connection.execute(
         "SELECT * FROM assessment_snapshots WHERE run_id = ? AND policy_version = ? ORDER BY revision DESC LIMIT 1",
         (run_id, policy_version),
@@ -171,7 +198,7 @@ def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[st
     precision = true_positives / (true_positives + false_positives) if true_positives + false_positives else 0.0
     recall = true_positives / len(expected_detection) if expected_detection else 1.0
     evidence_found = _learner_evidence(connection, run_id, int(run["user_id"]), expected_evidence)
-    response_found = _learner_responses(connection, run_id, int(run["user_id"])) & expected_responses
+    response_found, invalid_responses = _learner_responses(connection, run_id, int(run["user_id"]), expected_responses)
     cases = connection.execute(
         "SELECT status, created_at, closed_at FROM incident_cases WHERE training_run_id = ? AND workspace_id = ?",
         (run_id, run["workspace_id"]),
@@ -200,7 +227,10 @@ def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[st
     classification_accuracy = (
         (true_positives + detection_counts["correct_rejections"]) / detection_counts["decisions"] if detection_counts["decisions"] else 0.0
     )
-    response_quality = len(response_found) / len(expected_responses) if expected_responses else 1.0
+    response_compliance = len(response_found) / len(expected_responses) if expected_responses else 1.0
+    response_quality = (
+        len(response_found) / (len(response_found) + invalid_responses) if response_found or invalid_responses else (1.0 if not expected_responses else 0.0)
+    )
     evidence_completeness = len(evidence_found) / len(expected_evidence) if expected_evidence else 1.0
     metrics: dict[str, Any] = {
         "true_positives": true_positives,
@@ -219,7 +249,8 @@ def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[st
         "incorrect_rejections": detection_counts["incorrect_rejections"],
         "evidence_completeness": round(evidence_completeness, 4),
         "response_decision_quality": round(response_quality, 4),
-        "playbook_compliance": round(response_quality, 4),
+        "playbook_compliance": round(response_compliance, 4),
+        "incorrect_response_actions": invalid_responses,
         "elapsed_seconds": round(elapsed_seconds, 3),
         "actions": len(actions),
         "hints_used": hints,
@@ -227,7 +258,7 @@ def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[st
     components: dict[str, Any] = {
         "detection": _bounded(100 * precision * recall),
         "investigation": _bounded(100 * investigation_progress),
-        "response": _bounded(100 * response_quality),
+        "response": _bounded(100 * response_compliance - 10 * invalid_responses),
         "evidence": _bounded(100 * evidence_completeness),
         "time": timing,
         "false_positive": false_positive_accuracy,
@@ -236,7 +267,7 @@ def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[st
     missed_detection = expected_detection - detected
     missed_evidence = expected_evidence - evidence_found
     missed_responses = expected_responses - response_found
-    missed_steps = sorted({step for step, _ in missed_detection | missed_evidence})
+    missed_steps = sorted({step for step, _ in missed_detection | missed_evidence | missed_responses})
     technique_rows = connection.execute(
         "SELECT step_id, mitre_ids FROM scenario_steps WHERE scenario_version_id = ? ORDER BY position",
         (run["scenario_version_id"],),
@@ -264,7 +295,7 @@ def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[st
         ],
         "missed_detection_targets": sorted([list(item) for item in missed_detection]),
         "missed_evidence_targets": sorted([list(item) for item in missed_evidence]),
-        "missed_response_actions": sorted(missed_responses),
+        "missed_response_actions": sorted([list(item) for item in missed_responses]),
         "false_positive_decisions": false_positives,
         "incorrect_rejections": detection_counts["incorrect_rejections"],
         "strengths": strengths,
@@ -291,7 +322,7 @@ def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[st
         "expected_responses": len(expected_responses),
         "matched_detection_targets": sorted([list(item) for item in detected]),
         "matched_evidence_targets": sorted([list(item) for item in evidence_found]),
-        "matched_response_actions": sorted(response_found),
+        "matched_response_actions": sorted([list(item) for item in response_found]),
         "false_negatives": false_negatives,
         "true_positives": true_positives,
         "false_positives": false_positives,
@@ -376,6 +407,18 @@ def assessment_detail(assessment_id: int):
     if not row:
         return error_response("ASSESSMENT_NOT_FOUND", "نتيجة التقييم غير موجودة", 404)
     return jsonify(assessment_view(row))
+
+
+@scoring_api.post("/api/assessments/<int:assessment_id>")
+@require_permission("scores.read_own")
+def reject_assessment_mutation(assessment_id: int):
+    row = _assessment_access(assessment_id)
+    if not row:
+        return error_response("ASSESSMENT_NOT_FOUND", "نتيجة التقييم غير موجودة", 404)
+    data = request.get_json(silent=True)
+    attempted_fields = sorted(data) if isinstance(data, dict) else []
+    record_audit(get_db(), "tamper", "assessment", assessment_id, result="denied", details={"attempted_fields": attempted_fields})
+    return error_response("ASSESSMENT_IMMUTABLE", "نتيجة التقييم ثابتة ولا تقبل التعديل", 405)
 
 
 @scoring_api.get("/api/assessments/<int:assessment_id>/report")
