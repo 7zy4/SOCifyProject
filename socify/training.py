@@ -421,7 +421,8 @@ def list_my_runs():
         get_db()
         .execute(
             """SELECT tr.id, tr.run_id, tr.difficulty, tr.state, tr.started_at,
-                  tr.completed_at, tr.submitted_at, tr.current_step, s.name AS scenario_name
+                  tr.completed_at, tr.submitted_at, tr.current_step,
+                  s.id AS scenario_id, s.name AS scenario_name
            FROM training_runs tr
            JOIN scenario_versions sv ON sv.id = tr.scenario_version_id
            JOIN attack_scenarios s ON s.id = sv.scenario_id
@@ -520,7 +521,7 @@ def _materialize_step(connection: sqlite3.Connection, run: sqlite3.Row, step: sq
         event = dict(template)
         event["event_time"] = (base_time + timedelta(seconds=index)).isoformat().replace("+00:00", "Z")
         event["idempotency_key"] = f"run:{run['id']}:step:{step['step_id']}:{index}"
-        event["tags"] = list(set(event.get("tags", []) + ["training", f"difficulty:{run['difficulty']}"]))
+        event["tags"] = sorted(set(event.get("tags", []) + ["training", f"difficulty:{run['difficulty']}"]))
         event["mitre_ids"] = json.loads(step["mitre_ids"])
         event["provenance"] = {"scenario_step": step["step_id"], "seed": run["seed"], "synthetic": True}
         event_id, alerts, _ = ingest_event(connection, event, run["user_id"], run["workspace_id"], run["id"])

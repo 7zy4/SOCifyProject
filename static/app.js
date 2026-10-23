@@ -456,8 +456,8 @@ async function renderLab() {
     const start = button("بدء جلسة", async () => {
       try {
         const run = await api("/api/training/runs", { method: "POST", body: { scenario_id: scenario.id, difficulty: scenario.difficulty, auto_play: false } });
-        const result = await api(`/api/training/runs/${run.id}/play`, { method: "POST", body: { steps: 50 } });
-        showMessage(`أُنشئت ${result.event_ids?.length || 0} واقعة تدريبية. يمكنك التحقيق قبل تسليم محاولتك ${run.id}.`, "success");
+        const result = await api(`/api/training/runs/${run.id}/play`, { method: "POST", body: { steps: 1 } });
+        showMessage(`بدأت المحاولة ${run.id} وأُنشئت ${result.event_ids?.length || 0} واقعة تدريبية.`, "success");
         await renderLab();
       } catch (error) {
         handleError(error);
@@ -488,8 +488,77 @@ async function renderLab() {
       }, "primary")
       : run.state === "completed" ? linkedButton("عرض التقييم", "/scores") : badge(run.state) },
   ];
+  const activeRun = runs.items.find((run) => ["running", "paused", "awaiting_submission"].includes(run.state));
+  let mission = null;
+  if (activeRun) {
+    const [detail, scenario, timeline] = await Promise.all([
+      api(`/api/training/runs/${activeRun.id}`),
+      api(`/api/scenarios/${activeRun.scenario_id}`),
+      api(`/api/visualizations/timeline?training_run_id=${activeRun.id}&limit=100`),
+    ]);
+    const objectiveList = node("ul", { class: "mission-objectives" }, scenario.objectives.map((objective) => node("li", { text: objective })));
+    const progressValue = Math.round(Number(detail.progress) * 100);
+    const progressView = node("div", { class: "mission-progress" }, [
+      node("progress", { max: 100, value: progressValue, "aria-label": "تقدم السيناريو" }),
+      node("strong", { text: `${detail.current_step} من ${detail.total_steps} خطوات · ${progressValue}%` }),
+      node("small", { text: `البذرة ${detail.seed} · السرعة ${detail.playback_rate}x · التلميحات المستخدمة ${detail.hints_used}` }),
+    ]);
+    const eventColumns = [
+      { label: "الوقت", value: (event) => formatTime(event.event_time) },
+      { label: "النوع", value: "event_type" },
+      { label: "الواقعة", value: "title" },
+      { label: "الخطورة", value: (event) => badge(event.severity) },
+    ];
+    const timelineView = node("ol", { class: "timeline" }, timeline.items.map((item) => node("li", {}, [
+      node("time", { datetime: item.event_time, text: formatTime(item.event_time) }),
+      node("i", { "aria-hidden": "true" }),
+      node("p", { text: `${item.title} · ${item.event_type}` }),
+    ])));
+    const actions = [];
+    if (detail.state === "running") {
+      actions.push(button("تشغيل الخطوة التالية", async () => {
+        try {
+          await api(`/api/training/runs/${detail.id}/play`, { method: "POST", body: { steps: 1 } });
+          await renderLab();
+        } catch (error) { handleError(error); }
+      }, "primary"));
+      actions.push(button("إيقاف مؤقت", async () => {
+        try {
+          await api(`/api/training/runs/${detail.id}/pause`, { method: "POST", body: {} });
+          await renderLab();
+        } catch (error) { handleError(error); }
+      }));
+    }
+    if (detail.state === "paused") {
+      actions.push(button("استئناف", async () => {
+        try {
+          await api(`/api/training/runs/${detail.id}/resume`, { method: "POST", body: {} });
+          await renderLab();
+        } catch (error) { handleError(error); }
+      }, "primary"));
+    }
+    if (["running", "paused"].includes(detail.state)) {
+      actions.push(button("طلب تلميح", async () => {
+        try {
+          const hint = await api(`/api/training/runs/${detail.id}/hints`, { method: "POST", body: {} });
+          showMessage(`التلميح: ${hint.hint} · مرات الاستخدام ${hint.hints_used}`, "success");
+          await renderLab();
+        } catch (error) { handleError(error); }
+      }));
+    }
+    mission = node("section", { class: "mission-console", "aria-label": "جلسة التدريب النشطة" }, [
+      pageHead("Mission Briefing", scenario.description, actions),
+      node("div", { class: "panel-grid" }, [
+        panel("Objectives", objectiveList),
+        panel("Progress", progressView),
+      ]),
+      panel("Live Event Feed", detail.events.length ? table(eventColumns, detail.events) : emptyState("لا توجد وقائع", "شغّل الخطوة التالية لتوليد وقائع التدريب."), true),
+      panel("Timeline", timeline.items.length ? timelineView : emptyState("الخط الزمني فارغ", "ستظهر الوقائع بترتيب وقت الحدث."), true),
+    ]);
+  }
+  root.append(pageHead("سيناريوهات سلاسل الهجوم", "المختبر يولّد أحداثًا تدريبية؛ التقييم لا يُحتسب حتى تسلّم المحاولة بنفسك"));
+  if (mission) root.append(mission);
   root.append(
-    pageHead("سيناريوهات سلاسل الهجوم", "المختبر يولّد أحداثًا تدريبية؛ التقييم لا يُحتسب حتى تسلّم المحاولة بنفسك"),
     data.items.length ? cards : emptyState("لا توجد سيناريوهات منشورة", "شغّل seed-data في بيئة development أو أنشئ سيناريو كمدرّب."),
     panel("محاولاتي التدريبية", runs.items.length ? table(runColumns, runs.items) : emptyState("لا توجد محاولات", "ابدأ جلسة ثم عالج الأحداث والتنبيهات في التحقيقات قبل تسليم تقييمك."), true),
   );

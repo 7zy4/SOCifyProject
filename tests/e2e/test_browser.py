@@ -71,7 +71,23 @@ def test_browser_training_requires_explicit_assessment_submission(app) -> None:
             page.wait_for_url("**/dashboard")
             page.goto(base + "/lab")
             page.get_by_role("button", name="بدء جلسة").first.click()
+            page.get_by_role("heading", name="Mission Briefing").wait_for()
+            assert page.get_by_role("heading", name="Objectives").is_visible()
+            assert page.get_by_role("heading", name="Progress").is_visible()
+            assert page.get_by_role("heading", name="Live Event Feed").is_visible()
+            assert page.get_by_role("heading", name="Timeline").is_visible()
+            assert page.get_by_role("progressbar", name="تقدم السيناريو").get_attribute("value") == "17"
+            assert "expected_detections" not in page.locator("body").inner_text()
+            page.get_by_role("button", name="طلب تلميح").click()
+            page.get_by_text("التلميح:", exact=False).wait_for()
+            page.get_by_role("button", name="إيقاف مؤقت").click()
+            page.get_by_role("button", name="استئناف").wait_for()
+            page.get_by_role("button", name="استئناف").click()
+            for _ in range(5):
+                page.get_by_role("button", name="تشغيل الخطوة التالية").click()
             page.get_by_role("button", name="تسليم التقييم بعد التحقيق").first.wait_for()
+            assert page.get_by_role("progressbar", name="تقدم السيناريو").get_attribute("value") == "100"
+            assert_accessible(page)
             page.goto(base + "/scores")
             page.get_by_text("لا توجد نتائج", exact=True).first.wait_for(state="visible")
             page.goto(base + "/lab")

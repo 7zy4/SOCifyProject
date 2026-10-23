@@ -1,5 +1,6 @@
 import sqlite3
 from collections.abc import Callable
+from datetime import datetime
 
 from flask.testing import FlaskClient
 
@@ -60,6 +61,66 @@ def test_e2e_28_difficulty_changes_noise_not_only_label(client: FlaskClient, log
     assert not any(item["step_id"].startswith("noise-") for item in beginner_events)
     assert sum(item["step_id"].startswith("noise-") for item in intermediate_events) == 6
     assert sum(item["step_id"].startswith("noise-") for item in advanced_events) == 18
+
+
+def test_seeded_run_reproduces_event_sequence_and_detection_outcomes(
+    client: FlaskClient,
+    login_as: Callable[[str], None],
+    database: sqlite3.Connection,
+) -> None:
+    login_as("analyst")
+    first_id = start_run(client, "advanced", 4242)
+    second_id = start_run(client, "advanced", 4242)
+    different_id = start_run(client, "advanced", 4243)
+    for run_id in (first_id, second_id, different_id):
+        response = client.post(f"/api/training/runs/{run_id}/play", json={"steps": 50})
+        assert response.status_code == 200
+        assert response.json["state"] == "awaiting_submission"
+
+    def event_signature(run_id: int) -> list[tuple[object, ...]]:
+        started_at = datetime.fromisoformat(
+            database.execute("SELECT started_at FROM training_runs WHERE id = ?", (run_id,)).fetchone()[0].replace("Z", "+00:00")
+        )
+        rows = database.execute(
+            """SELECT tre.step_id, tre.sequence_number, e.event_time, e.source, e.event_type,
+                      e.source_ip, e.username, e.title, e.severity, e.tags, e.mitre_ids
+               FROM training_run_events tre
+               JOIN security_events e ON e.id = tre.event_id
+               WHERE tre.run_id = ? ORDER BY tre.sequence_number, e.id""",
+            (run_id,),
+        ).fetchall()
+        return [
+            (
+                row["step_id"],
+                row["sequence_number"],
+                (datetime.fromisoformat(row["event_time"].replace("Z", "+00:00")) - started_at).total_seconds(),
+                row["source"],
+                row["event_type"],
+                row["source_ip"],
+                row["username"],
+                row["title"],
+                row["severity"],
+                row["tags"],
+                row["mitre_ids"],
+            )
+            for row in rows
+        ]
+
+    def alert_signature(run_id: int) -> list[tuple[object, ...]]:
+        rows = database.execute(
+            """SELECT rule_id, rule_version, reason, severity, confidence, mitre_technique_ids
+               FROM alerts WHERE training_run_id = ?
+               ORDER BY rule_id, rule_version, reason, severity, confidence, mitre_technique_ids""",
+            (run_id,),
+        ).fetchall()
+        return [tuple(row) for row in rows]
+
+    first_detail = client.get(f"/api/training/runs/{first_id}").json
+    second_detail = client.get(f"/api/training/runs/{second_id}").json
+    assert first_detail["snapshot"] == second_detail["snapshot"] == {"scenario_version": 1, "difficulty": "advanced", "seed": 4242}
+    assert event_signature(first_id) == event_signature(second_id)
+    assert alert_signature(first_id) == alert_signature(second_id)
+    assert event_signature(first_id) != event_signature(different_id)
 
 
 def test_e2e_29_pause_resume_restart_and_replay_are_idempotent(client: FlaskClient, login_as: Callable[[str], None]) -> None:

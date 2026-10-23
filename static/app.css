@@ -160,6 +160,12 @@ tbody tr:hover { background: rgba(95, 242, 178, .025); }
 .card-meta { display: flex; gap: 7px; flex-wrap: wrap; }
 .progress { overflow: hidden; height: 7px; border-radius: 20px; background: #06100d; }
 .progress span { display: block; height: 100%; background: var(--green); }
+.mission-console { display: grid; margin-bottom: 18px; gap: 14px; }
+.mission-console .workspace-head { margin-bottom: 0; padding: 18px; border: 1px solid #315a4f; border-radius: 12px; background: linear-gradient(145deg, #10261f, #0b1714); }
+.mission-objectives { margin: 0; padding: 18px 38px 18px 18px; color: #d8e4e0; line-height: 1.9; }
+.mission-progress { display: grid; padding: 20px; gap: 12px; }
+.mission-progress progress { width: 100%; height: 12px; accent-color: var(--green); }
+.mission-progress small { color: var(--muted); }
 .graph-canvas { position: relative; overflow: auto; min-height: 440px; border: 1px solid var(--line); border-radius: 12px; background: radial-gradient(circle, #21413a 1px, transparent 1px); background-size: 24px 24px; }
 .graph-canvas svg { min-width: 900px; min-height: 430px; }
 .graph-node { cursor: pointer; }
