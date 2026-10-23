@@ -3,12 +3,12 @@ import json
 import sqlite3
 from typing import Any
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 
 from .audit import record_audit, record_training_action
 from .db import get_db, inserted_id, transaction
 from .schema import insert_outbox, public_id
-from .security import actor_id, can_access_training_run, error_response, require_permission, workspace_id
+from .security import actor_id, can_access_training_run, error_response, redact, require_permission, workspace_id
 from .timeutils import iso_now
 
 playbooks_api = Blueprint("playbooks", __name__)
@@ -261,7 +261,7 @@ def preview_playbook(playbook_id: int):
             "version": version["version"],
             "case_id": case_id,
             "training_run_id": training_run_id,
-            "parameters": parameters,
+            "parameters": redact(parameters),
             "steps": [
                 {
                     "position": step["position"],
@@ -317,12 +317,22 @@ def create_playbook_run():
         if not _run_access(int(existing["id"])):
             return error_response("PLAYBOOK_RUN_NOT_FOUND", "تشغيل الاستجابة غير موجود", 404)
         return jsonify(_run_view(existing) | {"duplicate": True})
+    queued = int(
+        get_db()
+        .execute(
+            "SELECT COUNT(*) FROM playbook_runs WHERE workspace_id = ? AND state IN ('pending', 'approved', 'retry_wait', 'running')",
+            (workspace_id(),),
+        )
+        .fetchone()[0]
+    )
+    if queued >= int(current_app.config["MAX_PENDING_PLAYBOOK_RUNS"]):
+        return error_response("PLAYBOOK_QUEUE_FULL", "قائمة مهام الاستجابة ممتلئة؛ أعد المحاولة لاحقًا", 429)
     steps = _steps(int(version["id"]))
     approval_required = any(step["approval_role"] for step in steps)
     now = iso_now()
     with transaction():
         cursor = get_db().execute(
-            "INSERT INTO playbook_runs (run_id, workspace_id, playbook_version_id, case_id, training_run_id, state, requested_by, idempotency_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO playbook_runs (run_id, workspace_id, playbook_version_id, case_id, training_run_id, state, requested_by, idempotency_key, created_at, updated_at, available_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 public_id("PBR"),
                 workspace_id(),
@@ -334,18 +344,20 @@ def create_playbook_run():
                 idempotency_key,
                 now,
                 now,
+                now,
             ),
         )
         run_id = inserted_id(cursor)
         for step in steps:
             step_parameters = {**json.loads(step["parameters"]), **parameters}
             get_db().execute(
-                "INSERT INTO playbook_step_runs (run_id, step_id, status, attempt, input) VALUES (?, ?, ?, 0, ?)",
+                "INSERT INTO playbook_step_runs (run_id, step_id, status, attempt, input, effect_key) VALUES (?, ?, ?, 0, ?, ?)",
                 (
                     run_id,
                     step["id"],
                     "awaiting_approval" if step["approval_role"] else "pending",
-                    json.dumps(step_parameters, ensure_ascii=False, separators=(",", ":")),
+                    json.dumps(redact(step_parameters), ensure_ascii=False, separators=(",", ":")),
+                    f"playbook-step:{run_id}:{step['id']}",
                 ),
             )
         record_audit(
@@ -365,7 +377,7 @@ def create_playbook_run():
             {"playbook_id": data["playbook_id"]},
             f"playbook-request:{idempotency_key}",
         )
-    if not approval_required:
+    if not approval_required and current_app.config["PLAYBOOK_INLINE_EXECUTION"]:
         _execute_run(run_id)
     return jsonify(_run_view(get_db().execute("SELECT * FROM playbook_runs WHERE id = ?", (run_id,)).fetchone())), 201
 
@@ -489,7 +501,10 @@ def _execute_run(run_id: int) -> None:
     run = get_db().execute("SELECT * FROM playbook_runs WHERE id = ?", (run_id,)).fetchone()
     if not run or run["state"] not in {"pending", "approved", "failed"}:
         return
-    get_db().execute("UPDATE playbook_runs SET state = 'running', updated_at = ? WHERE id = ?", (iso_now(), run_id))
+    get_db().execute(
+        "UPDATE playbook_runs SET state = 'running', worker_id = 'inline', started_at = COALESCE(started_at, ?), updated_at = ? WHERE id = ?",
+        (iso_now(), iso_now(), run_id),
+    )
     step_runs = (
         get_db()
         .execute(
@@ -521,7 +536,10 @@ def _execute_run(run_id: int) -> None:
             )
             break
     state = "failed" if failed else "succeeded"
-    get_db().execute("UPDATE playbook_runs SET state = ?, updated_at = ? WHERE id = ?", (state, iso_now(), run_id))
+    get_db().execute(
+        "UPDATE playbook_runs SET state = ?, worker_id = NULL, completed_at = ?, updated_at = ? WHERE id = ?",
+        (state, iso_now(), iso_now(), run_id),
+    )
     record_audit(get_db(), "execute", "playbook_run", run_id, result="failed" if failed else "success", details={"state": state})
     record_training_action(
         get_db(),
@@ -547,7 +565,8 @@ def approve_run(run_id: int):
     get_db().execute("UPDATE playbook_runs SET state = 'approved', approved_by = ?, updated_at = ? WHERE id = ?", (actor_id(), iso_now(), run_id))
     get_db().execute("UPDATE playbook_step_runs SET status = 'pending' WHERE run_id = ? AND status = 'awaiting_approval'", (run_id,))
     record_audit(get_db(), "approve", "playbook_run", run_id)
-    _execute_run(run_id)
+    if current_app.config["PLAYBOOK_INLINE_EXECUTION"]:
+        _execute_run(run_id)
     return jsonify(_run_view(get_db().execute("SELECT * FROM playbook_runs WHERE id = ?", (run_id,)).fetchone()))
 
 
@@ -557,20 +576,27 @@ def retry_run(run_id: int):
     run = _run_access(run_id)
     if not run:
         return error_response("PLAYBOOK_RUN_NOT_FOUND", "تشغيل الاستجابة غير موجود", 404)
-    if run["state"] != "failed":
+    if run["state"] not in {"failed", "retry_wait"}:
         return error_response("RETRY_NOT_AVAILABLE", "إعادة المحاولة متاحة للتشغيل الفاشل فقط", 409)
     failed_steps = (
         get_db()
         .execute(
-            "SELECT psr.id, psr.attempt, ps.retry_limit FROM playbook_step_runs psr JOIN playbook_steps ps ON ps.id = psr.step_id WHERE psr.run_id = ? AND psr.status = 'failed'",
+            "SELECT psr.id, psr.attempt, ps.retry_limit FROM playbook_step_runs psr JOIN playbook_steps ps ON ps.id = psr.step_id WHERE psr.run_id = ? AND psr.status IN ('failed', 'retry_wait')",
             (run_id,),
         )
         .fetchall()
     )
     if any(step["attempt"] >= step["retry_limit"] for step in failed_steps):
         return error_response("RETRY_LIMIT_REACHED", "بلغت إحدى الخطوات حد إعادة المحاولة", 409)
-    get_db().execute("UPDATE playbook_step_runs SET status = 'pending' WHERE run_id = ? AND status = 'failed'", (run_id,))
-    _execute_run(run_id)
+    get_db().execute(
+        "UPDATE playbook_step_runs SET status = 'pending', next_attempt_at = NULL WHERE run_id = ? AND status IN ('failed', 'retry_wait')", (run_id,)
+    )
+    get_db().execute(
+        "UPDATE playbook_runs SET state = 'pending', available_at = ?, worker_id = NULL, lease_expires_at = NULL, updated_at = ? WHERE id = ?",
+        (iso_now(), iso_now(), run_id),
+    )
+    if current_app.config["PLAYBOOK_INLINE_EXECUTION"]:
+        _execute_run(run_id)
     return jsonify(_run_view(get_db().execute("SELECT * FROM playbook_runs WHERE id = ?", (run_id,)).fetchone()))
 
 
@@ -580,11 +606,15 @@ def cancel_run(run_id: int):
     run = _run_access(run_id)
     if not run:
         return error_response("PLAYBOOK_RUN_NOT_FOUND", "تشغيل الاستجابة غير موجود", 404)
-    if run["state"] not in {"pending", "awaiting_approval", "approved", "failed"}:
+    if run["state"] == "running":
+        get_db().execute("UPDATE playbook_runs SET cancel_requested = 1, updated_at = ? WHERE id = ?", (iso_now(), run_id))
+        record_audit(get_db(), "cancel_requested", "playbook_run", run_id)
+        return jsonify({"id": run_id, "state": "cancellation_requested"}), 202
+    if run["state"] not in {"pending", "awaiting_approval", "approved", "failed", "retry_wait"}:
         return error_response("CANCEL_NOT_AVAILABLE", "لا يمكن إلغاء التشغيل في حالته الحالية", 409)
     get_db().execute("UPDATE playbook_runs SET state = 'cancelled', updated_at = ? WHERE id = ?", (iso_now(), run_id))
     get_db().execute(
-        "UPDATE playbook_step_runs SET status = 'skipped', completed_at = ? WHERE run_id = ? AND status IN ('pending', 'awaiting_approval')",
+        "UPDATE playbook_step_runs SET status = 'skipped', completed_at = ? WHERE run_id = ? AND status IN ('pending', 'awaiting_approval', 'retry_wait')",
         (iso_now(), run_id),
     )
     record_audit(get_db(), "cancel", "playbook_run", run_id)
@@ -627,7 +657,7 @@ def _run_view(row: sqlite3.Row) -> dict[str, Any]:
     steps = (
         get_db()
         .execute(
-            "SELECT psr.id, ps.position, ps.action_type, ps.approval_role, psr.status, psr.attempt, psr.output, psr.impact, psr.error, psr.started_at, psr.completed_at FROM playbook_step_runs psr JOIN playbook_steps ps ON ps.id = psr.step_id WHERE psr.run_id = ? ORDER BY ps.position",
+            "SELECT psr.id, ps.position, ps.action_type, ps.approval_role, psr.status, psr.attempt, psr.output, psr.impact, psr.error, psr.started_at, psr.completed_at, psr.next_attempt_at, psr.duration_ms, psr.effect_key FROM playbook_step_runs psr JOIN playbook_steps ps ON ps.id = psr.step_id WHERE psr.run_id = ? ORDER BY ps.position",
             (row["id"],),
         )
         .fetchall()

@@ -39,13 +39,32 @@ def health_ready():
 def health_api():
     queue = int(get_db().execute("SELECT COUNT(*) FROM ingestion_jobs WHERE workspace_id = ? AND status = 'processing'", (workspace_id(),)).fetchone()[0])
     failed_rules = int(get_db().execute("SELECT COALESCE(SUM(failed_evaluations), 0) FROM rules WHERE workspace_id = ?", (workspace_id(),)).fetchone()[0])
+    playbook_states = {
+        row["state"]: int(row["count"])
+        for row in get_db().execute("SELECT state, COUNT(*) AS count FROM playbook_runs WHERE workspace_id = ? GROUP BY state", (workspace_id(),)).fetchall()
+    }
+    expired_leases = int(
+        get_db()
+        .execute(
+            "SELECT COUNT(*) FROM playbook_runs WHERE workspace_id = ? AND state = 'running' AND lease_expires_at <= ?",
+            (workspace_id(), iso_now()),
+        )
+        .fetchone()[0]
+    )
+    attack_version = get_db().execute("SELECT value FROM schema_meta WHERE key = 'attack_version'").fetchone()
     return jsonify(
         {
             "status": "healthy",
             "database": "available",
             "import_jobs_processing": queue,
             "rule_evaluation_failures": failed_rules,
-            "attack_version": "20.0",
+            "playbook_jobs": {
+                "queued": sum(playbook_states.get(state, 0) for state in ("pending", "approved", "retry_wait")),
+                "running": playbook_states.get("running", 0),
+                "failed": playbook_states.get("failed", 0),
+                "expired_leases": expired_leases,
+            },
+            "attack_version": attack_version["value"] if attack_version else "unknown",
             "time": iso_now(),
         }
     )

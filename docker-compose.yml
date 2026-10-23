@@ -22,6 +22,24 @@ services:
     cap_drop:
       - ALL
     restart: unless-stopped
+  playbook-worker:
+    build:
+      context: .
+      target: runtime
+    command: ["python", "-m", "scripts.run_playbook_worker", "--database", "/data/socify.db"]
+    environment:
+      SOCIFY_ENV: production
+      SOCIFY_DATABASE: /data/socify.db
+    volumes:
+      - socify-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
 
 volumes:
   socify-data:

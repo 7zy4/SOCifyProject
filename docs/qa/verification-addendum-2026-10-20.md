@@ -13,6 +13,7 @@ This addendum follows the attached `SOCify_Enterprise_Master_Implementation_Prom
 3. Score semantics: `socify/scoring.py` uses immutable `socify-score-v4` snapshots after submission and compares recorded analyst triage decisions, evidence attachments, and successful simulated response actions against the scenario's stored ground-truth expectations and step timing. Detection TP/FP/FN, precision/recall, machine detection latency, learner decision latency, MTTA, MTTR, classification accuracy, evidence completeness, response quality, elapsed time, hints, and dimension weights are recorded separately. The downloadable report derives missed targets and recommendations from the same immutable inputs. **This materially improves OPEN-03 but does not replace independent educational validation.**
 4. Frontend: `static/app.js` shows ongoing and awaiting-submission runs with an explicit submission button; score tables read actual API fields and label unavailable timing metrics rather than displaying `undefined` or `NaN`.
 5. API and tests: Updated `docs/api/openapi.yaml` matches Flask's generated API route and method ordering. Existing API tests were adapted to explicit submission, `tests/integration/test_training_submission.py` verifies no premature scores, decision-based credit, idempotency, and ownership; `tests/e2e/test_browser.py` exercises the relevant browser path.
+6. Durable simulated response: production requests enqueue playbook runs for `scripts/run_playbook_worker.py`. The worker uses persisted leases, atomic step effects, unique effect identities, retry backoff, timeout rollback, cancellation and queue bounds. `tests/integration/test_playbook_worker.py` covers concurrent claims, interruption recovery, exact internal effects, pinned versions, timeout, cancellation and monitoring.
 
 ## Evidence at last tested source revision
 
@@ -21,7 +22,7 @@ Commit `04c45e46ffafb9f4ef15fe20cd4092117f93adc9` passed the configured jobs `qu
 ## Explicit unresolved acceptance
 
 - OPEN-01 historical case/event/report confidentiality audit and quarantine/repair migration.
-- OPEN-02 durable worker lifecycle, cancellation, recovery and compensation for imports and simulated response jobs.
+- OPEN-02 bounded import worker and black-box process kill/restart evidence; the simulated response worker lifecycle is implemented and integration-tested.
 - OPEN-03 remaining fidelity to ground truth across complete learner decisions and validated timing definitions, false-positive judgments, fairness and report accuracy.
 - OPEN-05 full security evidence: secret scanning, SAST review including dynamic SQL, license/SBOM, DAST and standards mapping.
 - OPEN-06 complete F01–F10 visual workflows, accessibility and all 60 browser/operational journeys.

@@ -71,13 +71,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - run: docker build --tag socify:ci .
-      - run: docker run --detach --name socify-ci --read-only --cap-drop=ALL --security-opt=no-new-privileges --tmpfs /tmp:size=64m,noexec,nosuid,nodev --publish 127.0.0.1:5000:5000 --env SOCIFY_SECRET_KEY=ci-only-secret-key-with-at-least-32-bytes --env SOCIFY_CREDENTIAL_KEY=ci-only-distinct-credential-key-with-at-least-32-bytes --env SOCIFY_HTTPS=0 --env SOCIFY_TRUSTED_HOSTS=localhost,127.0.0.1 socify:ci  # pragma: allowlist secret
+      - run: SOCIFY_SECRET_KEY=ci-only-secret-key-with-at-least-32-bytes SOCIFY_CREDENTIAL_KEY=ci-only-distinct-credential-key-with-at-least-32-bytes docker compose up --detach --build  # pragma: allowlist secret
       - run: curl --fail --retry 20 --retry-delay 2 --retry-all-errors http://127.0.0.1:5000/health/ready
+      - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp playbook-worker
       - if: always()
-        run: docker logs socify-ci
+        run: docker compose logs
       - if: always()
-        run: docker rm --force socify-ci
+        run: docker compose down --volumes
   performance:
     runs-on: ubuntu-latest
     steps:

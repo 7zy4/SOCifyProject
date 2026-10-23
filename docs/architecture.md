@@ -12,7 +12,9 @@ flowchart TD
     EVT --> DET["Typed Detection Engine"]
     DET --> ALT["Alerts"]
     ALT --> CASE["Cases + Evidence"]
-    CASE --> SOAR["Simulated Playbooks"]
+    CASE --> QUEUE["Durable Playbook Queue"]
+    QUEUE --> WORKER["Bounded Worker + Lease"]
+    WORKER --> SOAR["Simulated Playbooks"]
     EVT --> VIEW["Hunt + Graph + ATT&CK"]
     SOAR --> SCORE["Assessment Snapshots"]
     API --> AUDIT["Audit + Outbox"]
@@ -48,9 +50,11 @@ flowchart TD
 | ADR-005: SSE + durable outbox | مقبول | استئناف بسيط ومعرفات ثابتة دون فقد أثناء إعادة الاتصال |
 | ADR-006: Simulated SOAR only | إلزامي | يمنع الأثر على أجهزة أو حسابات أو Firewalls حقيقية |
 | ADR-007: Full STIX loader + offline subset | مرحلي صادق | تعمل التقنيات الأساسية offline؛ قبول التغطية الكاملة يتطلب تحميل Bundle MITRE الرسمي بالإصدار المثبت |
+| ADR-008: Durable simulated-response worker | مقبول | عملية الويب تضيف المهمة فقط في الإنتاج؛ عامل محدود يملك lease ويستعيد المنقطع وينفذ كل أثر وحالة خطوته في transaction واحدة |
 
 ## حدود معروفة
 
 - Queue الاستيراد متزامن في MVP، مع Job/Checkpoint model محفوظ. عامل موزع مطلوب للأحمال الإنتاجية ولـworker crash recovery الفعلي.
+- Playbook jobs تعمل بعامل مستقل محدود بعملية واحدة لكل instance. الاستلام at-least-once؛ أثر قاعدة البيانات وحالة الخطوة exactly-once ضمن transaction محلية، ويمنع `effect_key` تكرار هوية الأثر. لا توجد آثار أجهزة أو شبكة خارجية.
 - الرسم Vanilla SVG بحد 1000 حدث وجدول بديل؛ التجميع الضخم يحتاج Cytoscape/WebGL.
 - مصدر ATT&CK المضمن يغطي تقنيات السيناريو المرجعي. أداة STIX ترفض ادعاء الاكتمال إذا كان Bundle أقل من 600 تقنية.

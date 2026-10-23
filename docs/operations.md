@@ -9,6 +9,17 @@
 
 راقب زمن الاستجابة ومعدل 5xx وحجم/WAL القاعدة وjobs في `processing` و`failed_evaluations` وتأخر استهلاك outbox.
 
+## عامل الاستجابة المحاكية
+
+في الإنتاج تكون `SOCIFY_PLAYBOOK_INLINE_EXECUTION=0`، وتضيف API التشغيل إلى قائمة محفوظة. يشغّل Compose خدمة `playbook-worker`، أو شغّلها مستقلًا:
+
+```bash
+python -m scripts.run_playbook_worker --database instance/socify.db
+python -m scripts.run_playbook_worker --database instance/socify.db --once
+```
+
+يعرض `/api/health` أعداد queued/running/failed وleases المنتهية. يسترد العامل أي تشغيل انقضت مدة ملكيته، وينفذ أثر كل خطوة مع تحديث حالتها في transaction واحدة. الفشل القابل للإعادة ينتظر backoff أسيًا حتى `retry_limit`. الإلغاء أثناء التنفيذ يضع طلبًا محفوظًا ويفحصه العامل قبل الأثر التالي. اضبط `SOCIFY_MAX_PENDING_PLAYBOOK_RUNS` لتحديد backpressure، ولا تشغّل inline في الإنتاج.
+
 ## النسخ الاحتياطي
 
 أوقف الكتابة أو ضع الخدمة في وضع صيانة، ثم:

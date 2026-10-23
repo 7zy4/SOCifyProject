@@ -567,6 +567,13 @@ CREATE TABLE IF NOT EXISTS playbook_runs (
     idempotency_key TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
+    available_at TEXT,
+    worker_id TEXT,
+    lease_expires_at TEXT,
+    cancel_requested INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT,
+    started_at TEXT,
+    completed_at TEXT,
     UNIQUE (workspace_id, idempotency_key)
 );
 CREATE TABLE IF NOT EXISTS playbook_step_runs (
@@ -581,6 +588,9 @@ CREATE TABLE IF NOT EXISTS playbook_step_runs (
     started_at TEXT,
     completed_at TEXT,
     error TEXT,
+    next_attempt_at TEXT,
+    duration_ms INTEGER,
+    effect_key TEXT,
     UNIQUE (run_id, step_id)
 );
 CREATE TABLE IF NOT EXISTS response_simulation_state (
@@ -708,6 +718,20 @@ COLUMN_MIGRATIONS: dict[str, dict[str, str]] = {
         "source_name": "TEXT NOT NULL DEFAULT 'file-import'",
         "updated_at": "TEXT",
     },
+    "playbook_runs": {
+        "available_at": "TEXT",
+        "worker_id": "TEXT",
+        "lease_expires_at": "TEXT",
+        "cancel_requested": "INTEGER NOT NULL DEFAULT 0",
+        "last_error": "TEXT",
+        "started_at": "TEXT",
+        "completed_at": "TEXT",
+    },
+    "playbook_step_runs": {
+        "next_attempt_at": "TEXT",
+        "duration_ms": "INTEGER",
+        "effect_key": "TEXT",
+    },
 }
 
 
@@ -728,6 +752,8 @@ CREATE INDEX IF NOT EXISTS idx_runs_workspace ON training_runs(workspace_id, sta
 CREATE INDEX IF NOT EXISTS idx_audit_workspace ON security_audit_logs(workspace_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_outbox_workspace ON outbox_events(workspace_id, id);
 CREATE INDEX IF NOT EXISTS idx_login_attempts ON login_attempts(identifier_hash, ip_address, occurred_at);
+CREATE INDEX IF NOT EXISTS idx_playbook_worker_queue ON playbook_runs(state, available_at, lease_expires_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_playbook_step_effect ON playbook_step_runs(effect_key) WHERE effect_key IS NOT NULL;
 """
 
 
@@ -794,6 +820,9 @@ def _normalize_existing_rows(connection: sqlite3.Connection) -> None:
     if _table_exists(connection, "ingestion_jobs"):
         connection.execute("UPDATE ingestion_jobs SET status = 'interrupted', updated_at = ? WHERE status = 'processing'", (now,))
         connection.execute("UPDATE ingestion_jobs SET updated_at = COALESCE(updated_at, created_at, ?)", (now,))
+    if _table_exists(connection, "playbook_runs"):
+        connection.execute("UPDATE playbook_runs SET available_at = COALESCE(available_at, created_at, ?)", (now,))
+        connection.execute("UPDATE playbook_step_runs SET effect_key = 'playbook-step:' || run_id || ':' || step_id WHERE effect_key IS NULL")
 
 
 def _migrate_legacy_incidents(connection: sqlite3.Connection) -> None:

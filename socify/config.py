@@ -52,4 +52,6 @@ def build_config() -> dict[str, object]:
         "RATE_LIMIT_LOGIN_WINDOW_SECONDS": _integer("SOCIFY_LOGIN_WINDOW_SECONDS", 900),
         "SSE_POLL_SECONDS": 1.0,
         "SSE_HEARTBEAT_SECONDS": 15.0,
+        "PLAYBOOK_INLINE_EXECUTION": _boolean("SOCIFY_PLAYBOOK_INLINE_EXECUTION", environment != "production"),
+        "MAX_PENDING_PLAYBOOK_RUNS": _integer("SOCIFY_MAX_PENDING_PLAYBOOK_RUNS", 1000),
     }
