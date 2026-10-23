@@ -1,5 +1,6 @@
 import shutil
 import threading
+from pathlib import Path
 
 import pytest
 from playwright.sync_api import sync_playwright
@@ -11,6 +12,21 @@ def launch_browser(playwright):
     return playwright.chromium.launch(executable_path=executable) if executable else playwright.chromium.launch()
 
 
+def new_page(browser, **kwargs):
+    axe_path = Path("node_modules/axe-core/axe.min.js").resolve()
+    if not axe_path.exists():
+        raise AssertionError("axe-core is required for browser accessibility tests")
+    page = browser.new_page(**kwargs)
+    page.add_init_script(path=str(axe_path))
+    return page
+
+
+def assert_accessible(page) -> None:
+    results = page.evaluate("async () => await axe.run(document, {resultTypes: ['violations']})")
+    violations = [item for item in results["violations"] if item["impact"] in {"serious", "critical"}]
+    assert not violations, [(item["id"], item["impact"], [node["target"] for node in item["nodes"]]) for item in violations]
+
+
 @pytest.mark.e2e
 def test_browser_login_rtl_navigation_and_mobile_layout(app) -> None:
     server = make_server("127.0.0.1", 0, app)
@@ -19,7 +35,7 @@ def test_browser_login_rtl_navigation_and_mobile_layout(app) -> None:
     try:
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
-            page = browser.new_page(viewport={"width": 390, "height": 844})
+            page = new_page(browser, viewport={"width": 390, "height": 844})
             response = page.goto(f"http://127.0.0.1:{server.server_port}/login")
             assert response is not None and response.ok
             assert page.locator("html").get_attribute("dir") == "rtl"
@@ -31,6 +47,7 @@ def test_browser_login_rtl_navigation_and_mobile_layout(app) -> None:
             page.wait_for_url("**/dashboard")
             assert page.locator("main").is_visible()
             assert page.locator("nav").is_visible()
+            assert_accessible(page)
             browser.close()
     finally:
         server.shutdown()
@@ -45,7 +62,7 @@ def test_browser_training_requires_explicit_assessment_submission(app) -> None:
     try:
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
-            page = browser.new_page()
+            page = new_page(browser)
             base = f"http://127.0.0.1:{server.server_port}"
             page.goto(base + "/login")
             page.locator("input[name=email]").fill("analyst@socify.local")
@@ -78,7 +95,7 @@ def test_browser_case_workspace_supports_investigation_actions(app) -> None:
     try:
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
-            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            page = new_page(browser, viewport={"width": 1440, "height": 1000})
             base = f"http://127.0.0.1:{server.server_port}"
             page.goto(base + "/login")
             page.locator("input[name=email]").fill("analyst@socify.local")
@@ -104,6 +121,7 @@ def test_browser_case_workspace_supports_investigation_actions(app) -> None:
             page.locator(".case-workspace").get_by_text("open", exact=True).first.wait_for()
             assert page.get_by_role("heading", name="الأدلة وسلسلة الحيازة").is_visible()
             assert page.get_by_role("heading", name="سجل النشاط").is_visible()
+            assert_accessible(page)
             browser.close()
     finally:
         server.shutdown()
@@ -118,7 +136,7 @@ def test_browser_import_preview_commit_and_evidence_controls(app) -> None:
     try:
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
-            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            page = new_page(browser, viewport={"width": 1440, "height": 1000})
             base = f"http://127.0.0.1:{server.server_port}"
             page.goto(base + "/login")
             page.locator("input[name=email]").fill("analyst@socify.local")
@@ -137,6 +155,7 @@ def test_browser_import_preview_commit_and_evidence_controls(app) -> None:
             row.get_by_text("completed", exact=True).wait_for()
             assert row.get_by_role("link", name="الدليل الخام").is_visible()
             assert row.get_by_text("100%", exact=True).is_visible()
+            assert_accessible(page)
             browser.close()
     finally:
         server.shutdown()

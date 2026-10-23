@@ -156,7 +156,7 @@ def ingest_event(
             raise ValueError(f"unknown ATT&CK technique identifiers: {', '.join(unknown)}")
     idempotency_key = normalized["idempotency_key"]
     if idempotency_key:
-        existing = connection.execute("SELECT id FROM security_events WHERE workspace_id = ? AND training_run_id IS ? AND idempotency_key = ?", (workspace, training_run_id, idempotency_key)).fetchone()
+        existing = connection.execute("SELECT id FROM security_events WHERE workspace_id = ? AND COALESCE(training_run_id, 0) = COALESCE(?, 0) AND idempotency_key = ?", (workspace, training_run_id, idempotency_key)).fetchone()
         if existing:
             return int(existing["id"]), [], True
     event_public_id = _string(data.get("event_id"), 80) or public_id("EVT")

@@ -13,8 +13,8 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
           cache: pip
@@ -24,29 +24,70 @@ jobs:
       - run: python -m scripts.generate_openapi
       - run: git diff --exit-code docs/api/openapi.yaml
       - run: python -m pytest -q --cov=socify --cov-branch --cov-report=xml --cov-fail-under=90
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: coverage
           path: coverage.xml
   security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
           cache: pip
       - run: python -m pip install -r requirements.txt -r requirements-dev.txt
       - run: python -m bandit -c pyproject.toml -r socify scripts app.py create_db.py init_db.py run.py
       - run: python -m pip_audit -r requirements.txt
+      - run: git ls-files -z | xargs -0 detect-secrets-hook -c 1 --baseline .secrets.baseline --exclude-files '^(data/enterprise-attack-v20.0.json|fixtures/windows/sysmon-sample.evtx.b64)$'
+      - run: cyclonedx-py requirements requirements.txt --output-reproducible --of JSON -o sbom.json
+      - run: pip-licenses --format=json --with-urls --output-file=licenses.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: supply-chain-evidence
+          path: |
+            sbom.json
+            licenses.json
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261
   browser:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
           cache: pip
       - run: python -m pip install -r requirements.txt -r requirements-dev.txt
       - run: python -m playwright install --with-deps chromium
+      - run: npm install --no-save --ignore-scripts axe-core@4.14.0
       - run: python -m pytest -m e2e tests/e2e
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - run: docker build --tag socify:ci .
+      - run: docker run --detach --name socify-ci --read-only --cap-drop=ALL --security-opt=no-new-privileges --tmpfs /tmp:size=64m,noexec,nosuid,nodev --publish 127.0.0.1:5000:5000 --env SOCIFY_SECRET_KEY=ci-only-secret-key-with-at-least-32-bytes --env SOCIFY_CREDENTIAL_KEY=ci-only-distinct-credential-key-with-at-least-32-bytes --env SOCIFY_HTTPS=0 --env SOCIFY_TRUSTED_HOSTS=localhost,127.0.0.1 socify:ci  # pragma: allowlist secret
+      - run: curl --fail --retry 20 --retry-delay 2 --retry-all-errors http://127.0.0.1:5000/health/ready
+      - if: always()
+        run: docker logs socify-ci
+      - if: always()
+        run: docker rm --force socify-ci
+  performance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - run: python -m scripts.benchmark_reference
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: performance-reference
+          path: artifacts/performance-reference.json

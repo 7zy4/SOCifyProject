@@ -26,3 +26,4 @@ pytest-of-root/
 socify-benchmark-*/
 artifacts/
 tmp*/
+node_modules/

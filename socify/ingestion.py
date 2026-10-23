@@ -269,7 +269,8 @@ def _estimated_rows(format_name: str, content: bytes) -> int:
             return 1
         return len(value) if isinstance(value, list) else 1
     if format_name == "sysmon_xml":
-        return max(content.count(b"<Event"), 1)
+        root = ElementTree.fromstring(content)
+        return 1 if root.tag.rsplit("}", 1)[-1] == "Event" else sum(1 for item in root.iter() if item.tag.rsplit("}", 1)[-1] == "Event")
     if format_name == "evtx":
         return 0
     lines = sum(1 for line in _decode(content).splitlines() if line.strip())

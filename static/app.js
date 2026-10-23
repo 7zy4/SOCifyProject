@@ -121,7 +121,7 @@ function table(columns, rows) {
       return node("td", {}, value instanceof Node ? value : value == null || value === "" ? "—" : String(value));
     })));
   });
-  return node("div", { class: "table-wrap" }, node("table", {}, [head, body]));
+  return node("div", { class: "table-wrap", tabindex: "0", role: "region", "aria-label": `جدول بيانات: ${columns.map((column) => column.label).join("، ")}` }, node("table", {}, [head, body]));
 }
 
 function panel(title, content, wide = false, extra = null) {

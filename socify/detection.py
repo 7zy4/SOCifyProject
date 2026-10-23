@@ -274,6 +274,13 @@ def evaluate_dsl(connection: sqlite3.Connection, dsl: dict[str, Any], event: dic
     window = dsl.get("window")
     if not isinstance(window, dict):
         return Evaluation(direct, (int(event["id"]),) if direct else (), {"condition": direct_trace, "event_time": event["event_time"], "policy": "single_event"}, "single")
+    if not direct:
+        return Evaluation(False, (), {"condition": direct_trace, "event_time": event["event_time"], "policy": "event_time_window", "count": 0}, "unmatched")
+    sequence = dsl.get("sequence")
+    if isinstance(sequence, list) and sequence:
+        final_step, final_trace = _condition_matches(sequence[-1], event)
+        if not final_step:
+            return Evaluation(False, (), {"condition": direct_trace, "final_step": final_trace, "event_time": event["event_time"], "policy": "ordered_sequence"}, "unmatched")
     seconds = int(window["seconds"])
     threshold = int(window["threshold"])
     group_fields = [str(item) for item in window.get("group_by", [])]
@@ -290,10 +297,9 @@ def evaluate_dsl(connection: sqlite3.Connection, dsl: dict[str, Any], event: dic
         matched, trace = _condition_matches(root, candidate)
         if matched and _group_key(candidate, group_fields) == target_group:
             matching.append((candidate, trace))
-    if dsl.get("sequence"):
+    if sequence:
         ordered_ids: list[int] = []
         position = 0
-        sequence = dsl["sequence"]
         for candidate in candidates:
             if _group_key(candidate, group_fields) != target_group:
                 continue
