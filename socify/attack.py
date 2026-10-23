@@ -2,6 +2,8 @@ import json
 
 from flask import Blueprint, jsonify, request
 
+from .attack_snapshot import activate_attack_version
+from .audit import record_audit
 from .db import get_db
 from .security import error_response, require_permission, training_scope_sql, workspace_id
 
@@ -12,7 +14,9 @@ def _metadata() -> dict[str, object]:
     values = {
         row["key"]: row["value"]
         for row in get_db()
-        .execute("SELECT key, value FROM schema_meta WHERE key IN ('attack_version', 'attack_snapshot_count', 'attack_snapshot_source')")
+        .execute(
+            "SELECT key, value FROM schema_meta WHERE key IN ('attack_version', 'attack_snapshot_count', 'attack_snapshot_source', 'attack_snapshot_sha256')"
+        )
         .fetchall()
     }
     count = int(get_db().execute("SELECT COUNT(*) FROM attack_techniques").fetchone()[0])
@@ -20,8 +24,37 @@ def _metadata() -> dict[str, object]:
         "attack_version": values.get("attack_version", "unknown"),
         "snapshot_count": int(values.get("attack_snapshot_count", count)),
         "snapshot_source": values.get("attack_snapshot_source", "unknown"),
+        "snapshot_sha256": values.get("attack_snapshot_sha256", "unknown"),
         "offline_snapshot": True,
     }
+
+
+@attack_api.get("/api/attack/catalogs")
+@require_permission("events.read")
+def catalog_versions():
+    catalogs = [dict(row) for row in get_db().execute("SELECT * FROM attack_catalog_versions ORDER BY imported_at DESC, version DESC").fetchall()]
+    transitions = [dict(row) for row in get_db().execute("SELECT * FROM attack_catalog_transitions ORDER BY id DESC LIMIT 100").fetchall()]
+    return jsonify({"items": catalogs, "transitions": transitions})
+
+
+@attack_api.post("/api/attack/catalogs/<version>/activate")
+@require_permission("rules.manage")
+def activate_catalog(version: str):
+    connection = get_db()
+    try:
+        changed = activate_attack_version(connection, version)
+    except ValueError as exc:
+        return error_response("ATTACK_VERSION_NOT_FOUND", str(exc), 404)
+    record_audit(
+        connection,
+        "activate",
+        "attack_catalog",
+        version,
+        details={"changed": changed},
+        workspace=workspace_id(),
+    )
+    connection.commit()
+    return jsonify({"version": version, "active": True, "changed": changed, **_metadata()})
 
 
 def _technique_counts(technique_id: str) -> dict[str, int]:

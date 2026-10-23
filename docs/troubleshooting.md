@@ -8,6 +8,6 @@
 | DB locked | عدد workers ومدة transactions | استخدم workers محدودة مع SQLite أو انتقل إلى PostgreSQL |
 | Import rejected | `/api/imports/{id}` | صحح UTF-8/format/timezone/line size ثم أعد ملفًا جديدًا |
 | HTTP source `not_configured` | allowlist | النتيجة متوقعة؛ لا يوجد اتصال فعلي قبل worker Sandbox |
-| ATT&CK technique missing | metadata count/version | حمّل Bundle STIX الرسمي عبر script ثم أعد الاستعلام |
+| ATT&CK technique missing | `GET /api/attack/catalogs` وmetadata count/version | حمّل Bundle STIX الرسمي بإصدار جديد أو فعّل snapshot محفوظًا؛ لا تعِد استخدام اسم إصدار بمحتوى مختلف |
 | Playbook awaiting approval | الدور والحالة | Manager فقط يوافق؛ لا تتجاوز البوابة عبر DB |
 | Codespace لا يفتح | Ports وlog | اجعل 5000 Private وافحص `/tmp/socify-gunicorn.log` |

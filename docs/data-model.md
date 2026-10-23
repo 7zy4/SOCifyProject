@@ -9,7 +9,7 @@
 | الكشف | `rules`, `rule_versions`, `alerts`, `alert_events`, `detection_matches` | إصدار ثابت في Alert، dedup key فريد، روابط events بقيود FK |
 | التحقيق | `incident_cases`, `case_events`, `case_alerts`, `case_evidence`, `case_notes`, `case_tasks`, `case_history`, `case_reports` | reference فريد، optimistic version، hash للأدلة، report revisions |
 | التدريب | `attack_scenarios`, `scenario_versions`, `scenario_steps`, `scenario_ground_truth`, `training_runs`, `trainee_actions` | version immutable، seed محفوظ، idempotency للأفعال |
-| المعرفة | `attack_techniques`, `saved_hunt_queries`, `ioc_indicators`, `ioc_enrichment_results` | ATT&CK version مثبت، IoC فريد ضمن workspace |
+| المعرفة | `attack_techniques`, `attack_catalog_versions`, `attack_technique_versions`, `attack_catalog_transitions`, `saved_hunt_queries`, `ioc_indicators`, `ioc_enrichment_results` | ATT&CK active read model ذري، snapshots ثابتة مع SHA-256 وسجل انتقال/رجوع، IoC فريد ضمن workspace |
 | الاستجابة | `playbooks`, `playbook_versions`, `playbook_steps`, `playbook_runs`, `playbook_step_runs`, `response_simulation_state` | run مرتبط بإصدار، idempotency key، حالة محاكاة فقط |
 | القياس | `assessment_snapshots`, `security_audit_logs`, `outbox_events`, `schema_meta` | snapshot input/weights ثابت، audit redacted، schema version |
 

@@ -32,6 +32,17 @@ SOCIFY_DATABASE=instance/socify-restored.db gunicorn --config gunicorn.conf.py a
 
 تحقق من `/health/ready` وعدد users/events/alerts/cases وتقارير audit قبل تبديل المسار. احتفظ بالقاعدة القديمة إلى نهاية التحقق.
 
+## ترقية ATT&CK والرجوع
+
+حمّل نسخة MITRE Enterprise STIX محفوظة محليًا مع اسم إصدار صريح. يرفض الأمر الحزمة الناقصة افتراضيًا، ويحسب SHA-256، ويحفظ الإصدار دون تعديل الإصدارات السابقة، ثم يفعّله ذريًا:
+
+```bash
+python -m scripts.load_attack_snapshot enterprise-attack.json --version 20.1 --database instance/socify.db
+python -m scripts.load_attack_snapshot --activate-version 20.0 --database instance/socify.db
+```
+
+راجع `GET /api/attack/catalogs` وسجل `attack_catalog_transitions` بعد الترقية. لا تعِد استخدام اسم إصدار لمحتوى مختلف؛ يرفضه النظام بدل الكتابة فوق الدليل السابق.
+
 ## Rollback التطبيق
 
 ابنِ image سابقًا من commit SHA موثق، أوقف الجديد، أعد Volume إلى نسخة متوافقة عند وجود migration غير عكوسة، شغّل readiness ثم أعد توجيه Proxy. الإصدار الحالي يدعم migrations إضافية forward-only؛ لا توجد أداة downgrade آلية ويجب ألا يدّعي CI خلاف ذلك.

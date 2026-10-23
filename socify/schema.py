@@ -445,6 +445,37 @@ CREATE TABLE IF NOT EXISTS attack_techniques (
     deprecated INTEGER NOT NULL DEFAULT 0,
     revoked INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS attack_catalog_versions (
+    version TEXT PRIMARY KEY,
+    source_url TEXT NOT NULL,
+    source_sha256 TEXT NOT NULL,
+    technique_count INTEGER NOT NULL,
+    imported_at TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS attack_technique_versions (
+    version TEXT NOT NULL REFERENCES attack_catalog_versions(version),
+    technique_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    tactic TEXT NOT NULL,
+    description TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    is_subtechnique INTEGER NOT NULL DEFAULT 0,
+    deprecated INTEGER NOT NULL DEFAULT 0,
+    revoked INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (version, technique_id)
+);
+CREATE TABLE IF NOT EXISTS attack_catalog_transitions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_version TEXT,
+    to_version TEXT NOT NULL REFERENCES attack_catalog_versions(version),
+    added_count INTEGER NOT NULL,
+    removed_count INTEGER NOT NULL,
+    changed_count INTEGER NOT NULL,
+    deprecated_count INTEGER NOT NULL,
+    revoked_count INTEGER NOT NULL,
+    activated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS saved_hunt_queries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
@@ -822,6 +853,7 @@ def seed_reference_data(connection: sqlite3.Connection) -> None:
     )
     existing_catalog = connection.execute("SELECT value FROM schema_meta WHERE key = 'attack_version'").fetchone()
     if existing_catalog:
+        _record_existing_attack_catalog(connection, str(existing_catalog["value"]), now)
         return
     existing_rows = int(connection.execute("SELECT COUNT(*) FROM attack_techniques").fetchone()[0])
     if existing_rows:
@@ -845,6 +877,51 @@ def seed_reference_data(connection: sqlite3.Connection) -> None:
     connection.execute("INSERT INTO schema_meta (key, value, updated_at) VALUES ('attack_version', '20.0', ?)", (now,))
     connection.execute("INSERT INTO schema_meta (key, value, updated_at) VALUES ('attack_snapshot_count', ?, ?)", (str(catalog["total_active"]), now))
     connection.execute("INSERT INTO schema_meta (key, value, updated_at) VALUES ('attack_snapshot_source', ?, ?)", (catalog["source_url"], now))
+    connection.execute(
+        "INSERT INTO schema_meta (key, value, updated_at) VALUES ('attack_snapshot_sha256', ?, ?)",
+        (hashlib.sha256(ATTACK_CATALOG_PATH.read_bytes()).hexdigest(), now),
+    )
+    _record_existing_attack_catalog(connection, "20.0", now)
+
+
+def _record_existing_attack_catalog(connection: sqlite3.Connection, version: str, imported_at: str) -> None:
+    if connection.execute("SELECT 1 FROM attack_catalog_versions WHERE version = ?", (version,)).fetchone():
+        connection.execute("UPDATE attack_catalog_versions SET active = CASE WHEN version = ? THEN 1 ELSE 0 END", (version,))
+        return
+    rows = connection.execute(
+        "SELECT technique_id, name, tactic, description, source_url, is_subtechnique, deprecated, revoked FROM attack_techniques ORDER BY technique_id"
+    ).fetchall()
+    if not rows:
+        raise RuntimeError("ATT&CK catalog metadata exists without technique records")
+    canonical = json.dumps([dict(row) for row in rows], sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    source_row = connection.execute("SELECT value FROM schema_meta WHERE key = 'attack_snapshot_source'").fetchone()
+    digest_row = connection.execute("SELECT value FROM schema_meta WHERE key = 'attack_snapshot_sha256'").fetchone()
+    source = str(source_row["value"]) if source_row else "unknown"
+    digest = str(digest_row["value"]) if digest_row else hashlib.sha256(canonical).hexdigest()
+    connection.execute("UPDATE attack_catalog_versions SET active = 0")
+    connection.execute(
+        "INSERT INTO attack_catalog_versions (version, source_url, source_sha256, technique_count, imported_at, active) VALUES (?, ?, ?, ?, ?, 1)",
+        (version, source, digest, len(rows), imported_at),
+    )
+    connection.executemany(
+        """INSERT INTO attack_technique_versions
+        (version, technique_id, name, tactic, description, source_url, is_subtechnique, deprecated, revoked)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        [
+            (
+                version,
+                row["technique_id"],
+                row["name"],
+                row["tactic"],
+                row["description"],
+                row["source_url"],
+                row["is_subtechnique"],
+                row["deprecated"],
+                row["revoked"],
+            )
+            for row in rows
+        ],
+    )
 
 
 def _execute_schema(connection: sqlite3.Connection, schema: str) -> None:

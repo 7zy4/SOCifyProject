@@ -149,6 +149,17 @@ def test_attack_catalog_search_coverage_and_navigator(client: FlaskClient, login
     navigator = client.get("/api/attack/navigator-layer")
     assert navigator.status_code == 200
     assert navigator.json["domain"] == "enterprise-attack"
+    catalogs = client.get("/api/attack/catalogs")
+    assert catalogs.status_code == 200
+    assert catalogs.json["items"][0]["version"] == "20.0"
+    assert catalogs.json["items"][0]["active"] == 1
+    assert client.post("/api/attack/catalogs/20.0/activate").status_code == 403
+
+    login_as("admin")
+    activated = client.post("/api/attack/catalogs/20.0/activate")
+    assert activated.status_code == 200
+    assert activated.json["active"] is True
+    assert activated.json["changed"] is False
 
 
 def test_event_filters_mutations_and_validation(client: FlaskClient, login_as: Callable[[str], None], event_payload: dict[str, object]) -> None:

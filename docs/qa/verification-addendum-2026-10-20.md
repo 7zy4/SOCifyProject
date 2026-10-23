@@ -8,7 +8,7 @@ This addendum follows the attached `SOCify_Enterprise_Master_Implementation_Prom
 
 ## New implementation and verified changes
 
-1. MITRE ATT&CK version integrity: `socify/schema.py` no longer overwrites an explicitly imported catalog/metadata on application restart. `tests/integration/test_attack_catalog_upgrade.py` checks three repeated schema starts and preservation of the imported T1110 row and catalog version. **This addresses the startup-overwrite defect in OPEN-04, but not the full upgrade/version-history problem.**
+1. MITRE ATT&CK version integrity: `socify/schema.py` and `socify/attack_snapshot.py` preserve immutable catalogs, SHA-256 source provenance, versioned technique data and transition history. Activation and rollback atomically rebuild the current read model while retaining deprecated/revoked records. `tests/integration/test_attack_catalog_upgrade.py` checks repeated startup, upgrade deltas, rollback and same-version content collision rejection. **OPEN-04 is resolved for the implemented offline catalog lifecycle.**
 2. Training lifecycle: `socify/training.py` now distinguishes completed **playback** (`awaiting_submission`) from the trainee's explicit `POST /api/training/runs/{id}/submit`. Attempts are listed via `GET /api/training/runs`, scoped to the owner. A completed playback alone never produces a new assessment. The `submitted_at` column is migrated additively without erasing prior data.
 3. Score semantics: `socify/scoring.py` uses immutable `socify-score-v4` snapshots after submission and compares recorded analyst triage decisions, evidence attachments, and successful simulated response actions against the scenario's stored ground-truth expectations and step timing. Detection TP/FP/FN, precision/recall, machine detection latency, learner decision latency, MTTA, MTTR, classification accuracy, evidence completeness, response quality, elapsed time, hints, and dimension weights are recorded separately. The downloadable report derives missed targets and recommendations from the same immutable inputs. **This materially improves OPEN-03 but does not replace independent educational validation.**
 4. Frontend: `static/app.js` shows ongoing and awaiting-submission runs with an explicit submission button; score tables read actual API fields and label unavailable timing metrics rather than displaying `undefined` or `NaN`.
@@ -23,7 +23,6 @@ Commit `04c45e46ffafb9f4ef15fe20cd4092117f93adc9` passed the configured jobs `qu
 - OPEN-01 historical case/event/report confidentiality audit and quarantine/repair migration.
 - OPEN-02 durable worker lifecycle, cancellation, recovery and compensation for imports and simulated response jobs.
 - OPEN-03 remaining fidelity to ground truth across complete learner decisions and validated timing definitions, false-positive judgments, fairness and report accuracy.
-- OPEN-04 complete ATT&CK catalog versioned upgrade/rollback, invalidation and provenance, beyond preserving explicitly imported rows on startup.
 - OPEN-05 full security evidence: secret scanning, SAST review including dynamic SQL, license/SBOM, DAST and standards mapping.
 - OPEN-06 complete F01–F10 visual workflows, accessibility and all 60 browser/operational journeys.
 - OPEN-07 fresh Codespaces/Docker startup, load/soak, recovery and reference performance proof.
