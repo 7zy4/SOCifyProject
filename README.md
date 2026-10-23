@@ -61,7 +61,7 @@ export SOCIFY_CREDENTIAL_KEY="$(python -c 'import secrets; print(secrets.token_u
 docker compose up --build
 ```
 
-خدمة الويب مربوطة بـ`127.0.0.1` افتراضيًا، ويشغّل Compose عامل Playbook منفصلًا يستهلك قائمة المهام المحفوظة. تعمل الخدمتان كمستخدم غير root وتستخدمان Volume مستمرًا وقاعدة ملفات للقراءة فقط عدا `/data` و`/tmp`. النشر العام يحتاج Reverse Proxy موثوقًا وTLS ونسخًا احتياطية ومراقبة.
+خدمة الويب مربوطة بـ`127.0.0.1` افتراضيًا، ويشغّل Compose عاملي Import وPlaybook منفصلين يستهلكان قوائم المهام المحفوظة. تعمل الخدمات كمستخدم غير root وتستخدم Volume مستمرًا وقاعدة ملفات للقراءة فقط عدا `/data` و`/tmp`. النشر العام يحتاج Reverse Proxy موثوقًا وTLS ونسخًا احتياطية ومراقبة.
 
 ## Codespaces
 

@@ -20,6 +20,15 @@ python -m scripts.run_playbook_worker --database instance/socify.db --once
 
 يعرض `/api/health` أعداد queued/running/failed وleases المنتهية. يسترد العامل أي تشغيل انقضت مدة ملكيته، وينفذ أثر كل خطوة مع تحديث حالتها في transaction واحدة. الفشل القابل للإعادة ينتظر backoff أسيًا حتى `retry_limit`. الإلغاء أثناء التنفيذ يضع طلبًا محفوظًا ويفحصه العامل قبل الأثر التالي. اضبط `SOCIFY_MAX_PENDING_PLAYBOOK_RUNS` لتحديد backpressure، ولا تشغّل inline في الإنتاج.
 
+يعمل استيراد الإنتاج بالطريقة نفسها عبر خدمة `import-worker`، ويستأنف من checkpoint ذري كل 100 سجل:
+
+```bash
+SOCIFY_DATABASE=instance/socify.db python -m scripts.run_import_worker
+SOCIFY_DATABASE=instance/socify.db python -m scripts.run_import_worker --once
+```
+
+استخدم مفتاح الاعتماد نفسه الذي شفّر دليل الرفع. يعرض `/api/health` queued/processing/failed وleases المنتهية. يحدد `SOCIFY_MAX_PENDING_IMPORT_JOBS` backpressure، ويجب أن تبقى `SOCIFY_IMPORT_INLINE_EXECUTION=0` في الإنتاج.
+
 ## النسخ الاحتياطي
 
 أوقف الكتابة أو ضع الخدمة في وضع صيانة، ثم:

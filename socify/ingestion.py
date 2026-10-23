@@ -8,7 +8,7 @@ import re
 import sqlite3
 import tempfile
 from collections.abc import Iterable, Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +32,7 @@ from .security import (
     training_scope_sql,
     workspace_id,
 )
-from .timeutils import iso_now
+from .timeutils import iso_now, utc_now
 
 ingestion_api = Blueprint("ingestion", __name__)
 IMPORT_CHUNK_SIZE = 100
@@ -421,17 +421,22 @@ def _job_content(row: sqlite3.Row) -> bytes:
 
 def _mark_job_failed(job_id: int, message: str) -> None:
     now = iso_now()
-    get_db().execute("UPDATE ingestion_jobs SET status = 'failed', updated_at = ? WHERE id = ?", (now, job_id))
+    get_db().execute(
+        "UPDATE ingestion_jobs SET status = 'failed', worker_id = NULL, lease_expires_at = NULL, last_error = ?, updated_at = ? WHERE id = ?",
+        (message[:500], now, job_id),
+    )
     get_db().execute(
         "INSERT INTO ingestion_errors (job_id, row_number, error_code, message, sample, created_at) VALUES (?, NULL, 'JOB_FAILURE', ?, NULL, ?)",
         (job_id, message[:500], now),
     )
 
 
-def _process_job(job_id: int) -> sqlite3.Row:
+def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int = 60) -> sqlite3.Row:
     job = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
     if job is None:
         raise RuntimeError("import job disappeared during processing")
+    if worker_id is not None and (job["status"] != "processing" or job["worker_id"] != worker_id):
+        raise RuntimeError("import job is not leased by this worker")
     try:
         content = _job_content(job)
         _, records = parse_records(job["filename"], content, job["format"], job["source_name"])
@@ -457,7 +462,8 @@ def _process_job(job_id: int) -> sqlite3.Row:
         except (ValueError, json.JSONDecodeError, csv.Error, ElementTree.ParseError):
             exhausted = True
             break
-    get_db().execute("UPDATE ingestion_jobs SET status = 'processing', updated_at = ? WHERE id = ?", (iso_now(), job_id))
+    now = iso_now()
+    get_db().execute("UPDATE ingestion_jobs SET status = 'processing', started_at = COALESCE(started_at, ?), updated_at = ? WHERE id = ?", (now, now, job_id))
     while checkpoint < maximum_rows and not exhausted:
         batch: list[tuple[int, dict[str, Any] | None, Exception | None]] = []
         while len(batch) < IMPORT_CHUNK_SIZE and checkpoint + len(batch) < maximum_rows:
@@ -474,6 +480,14 @@ def _process_job(job_id: int) -> sqlite3.Row:
         if not batch:
             break
         with transaction():
+            if worker_id is not None:
+                lease = (utc_now() + timedelta(seconds=lease_seconds)).isoformat().replace("+00:00", "Z")
+                owned = get_db().execute(
+                    "UPDATE ingestion_jobs SET lease_expires_at = ? WHERE id = ? AND status = 'processing' AND worker_id = ?",
+                    (lease, job_id, worker_id),
+                )
+                if owned.rowcount != 1:
+                    raise RuntimeError("import worker lease was lost")
             for row_number, record, parse_error in batch:
                 if parse_error is not None:
                     rejected += 1
@@ -509,7 +523,10 @@ def _process_job(job_id: int) -> sqlite3.Row:
             )
         state = get_db().execute("SELECT status FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
         if state and state["status"] == "cancel_requested":
-            get_db().execute("UPDATE ingestion_jobs SET status = 'cancelled', updated_at = ?, completed_at = ? WHERE id = ?", (iso_now(), iso_now(), job_id))
+            get_db().execute(
+                "UPDATE ingestion_jobs SET status = 'cancelled', worker_id = NULL, lease_expires_at = NULL, updated_at = ?, completed_at = ? WHERE id = ?",
+                (iso_now(), iso_now(), job_id),
+            )
             cancelled = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
             if cancelled is None:
                 raise RuntimeError("import job disappeared after cancellation")
@@ -526,7 +543,8 @@ def _process_job(job_id: int) -> sqlite3.Row:
     completed = iso_now()
     status = "completed" if rejected == 0 else "completed_with_errors"
     get_db().execute(
-        "UPDATE ingestion_jobs SET status = ?, accepted = ?, rejected = ?, skipped = ?, total = ?, checkpoint = ?, progress = 1, updated_at = ?, completed_at = ? WHERE id = ?",
+        """UPDATE ingestion_jobs SET status = ?, accepted = ?, rejected = ?, skipped = ?, total = ?, checkpoint = ?, progress = 1,
+        worker_id = NULL, lease_expires_at = NULL, last_error = NULL, updated_at = ?, completed_at = ? WHERE id = ?""",
         (status, accepted, rejected, skipped, checkpoint, checkpoint, completed, completed, job_id),
     )
     if job["source_id"]:
@@ -626,6 +644,16 @@ def create_import():
     )
     if duplicate:
         return jsonify({**_job_view(duplicate), "duplicate": True})
+    queued = int(
+        get_db()
+        .execute(
+            "SELECT COUNT(*) FROM ingestion_jobs WHERE workspace_id = ? AND status IN ('queued', 'processing', 'interrupted')",
+            (workspace_id(),),
+        )
+        .fetchone()[0]
+    )
+    if queued >= int(current_app.config["MAX_PENDING_IMPORT_JOBS"]):
+        return error_response("IMPORT_QUEUE_FULL", "قائمة مهام الاستيراد ممتلئة؛ أعد المحاولة لاحقًا", 429)
     try:
         format_name, _ = parse_records(filename, content, selected_format, source_name)
         estimated_total = _estimated_rows(format_name, content)
@@ -637,8 +665,8 @@ def create_import():
         cursor = get_db().execute(
             """INSERT INTO ingestion_jobs
             (job_id, workspace_id, source_id, training_run_id, filename, format, content_hash, evidence_ciphertext,
-            raw_size, estimated_total, source_name, status, parser_version, created_by, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 'socify-import-2', ?, ?, ?)""",
+            raw_size, estimated_total, source_name, status, parser_version, created_by, created_at, updated_at, available_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 'socify-import-2', ?, ?, ?, ?)""",
             (
                 public_id("IMP"),
                 workspace_id(),
@@ -654,11 +682,12 @@ def create_import():
                 actor_id(),
                 now,
                 now,
+                now,
             ),
         )
         job_database_id = inserted_id(cursor)
         record_audit(get_db(), "create", "import", job_database_id, details={"format": format_name, "sha256": content_hash, "size": len(content)})
-    if request.args.get("defer") == "1":
+    if request.args.get("defer") == "1" or not current_app.config["IMPORT_INLINE_EXECUTION"]:
         queued = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_database_id,)).fetchone()
         if queued is None:
             raise RuntimeError("import job disappeared after creation")
@@ -702,8 +731,17 @@ def resume_import(job_id: int):
         return error_response("IMPORT_NOT_FOUND", "مهمة الاستيراد غير موجودة", 404)
     if row["status"] not in {"queued", "interrupted", "failed"}:
         return error_response("IMPORT_NOT_RESUMABLE", "مهمة الاستيراد ليست في حالة قابلة للاستئناف", 409)
-    get_db().execute("UPDATE ingestion_jobs SET retry_count = retry_count + 1, completed_at = NULL, updated_at = ? WHERE id = ?", (iso_now(), job_id))
+    get_db().execute(
+        """UPDATE ingestion_jobs SET status = 'queued', retry_count = retry_count + 1, completed_at = NULL,
+        available_at = ?, worker_id = NULL, lease_expires_at = NULL, updated_at = ? WHERE id = ?""",
+        (iso_now(), iso_now(), job_id),
+    )
     record_audit(get_db(), "resume", "import", job_id, details={"checkpoint": row["checkpoint"], "retry": int(row["retry_count"]) + 1})
+    if not current_app.config["IMPORT_INLINE_EXECUTION"]:
+        queued = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
+        if queued is None:
+            raise RuntimeError("import job disappeared after resume")
+        return jsonify(_job_view(queued)), 202
     return jsonify(_job_view(_process_job(job_id)))
 
 

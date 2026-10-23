@@ -337,6 +337,11 @@ CREATE TABLE IF NOT EXISTS ingestion_jobs (
     created_at TEXT NOT NULL,
     updated_at TEXT,
     completed_at TEXT,
+    available_at TEXT,
+    worker_id TEXT,
+    lease_expires_at TEXT,
+    last_error TEXT,
+    started_at TEXT,
     UNIQUE (workspace_id, content_hash, training_run_id)
 );
 CREATE TABLE IF NOT EXISTS ingestion_errors (
@@ -717,6 +722,11 @@ COLUMN_MIGRATIONS: dict[str, dict[str, str]] = {
         "retry_count": "INTEGER NOT NULL DEFAULT 0",
         "source_name": "TEXT NOT NULL DEFAULT 'file-import'",
         "updated_at": "TEXT",
+        "available_at": "TEXT",
+        "worker_id": "TEXT",
+        "lease_expires_at": "TEXT",
+        "last_error": "TEXT",
+        "started_at": "TEXT",
     },
     "playbook_runs": {
         "available_at": "TEXT",
@@ -748,6 +758,7 @@ CREATE INDEX IF NOT EXISTS idx_alerts_workspace_status ON alerts(workspace_id, s
 CREATE INDEX IF NOT EXISTS idx_cases_workspace_status ON incident_cases(workspace_id, status, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_case_history_case ON case_history(case_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_ingestion_workspace ON ingestion_jobs(workspace_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ingestion_worker_queue ON ingestion_jobs(status, available_at, lease_expires_at);
 CREATE INDEX IF NOT EXISTS idx_runs_workspace ON training_runs(workspace_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_workspace ON security_audit_logs(workspace_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_outbox_workspace ON outbox_events(workspace_id, id);
@@ -818,8 +829,14 @@ def _normalize_existing_rows(connection: sqlite3.Connection) -> None:
         connection.execute("UPDATE event_sources SET workspace_id = 1 WHERE workspace_id IS NULL")
         connection.execute("UPDATE event_sources SET updated_at = COALESCE(updated_at, created_at, ?)", (now,))
     if _table_exists(connection, "ingestion_jobs"):
-        connection.execute("UPDATE ingestion_jobs SET status = 'interrupted', updated_at = ? WHERE status = 'processing'", (now,))
+        connection.execute(
+            """UPDATE ingestion_jobs SET status = 'interrupted', worker_id = NULL, lease_expires_at = NULL,
+            available_at = COALESCE(available_at, ?), last_error = 'worker lease expired before completion', updated_at = ?
+            WHERE status = 'processing' AND (lease_expires_at IS NULL OR lease_expires_at <= ?)""",
+            (now, now, now),
+        )
         connection.execute("UPDATE ingestion_jobs SET updated_at = COALESCE(updated_at, created_at, ?)", (now,))
+        connection.execute("UPDATE ingestion_jobs SET available_at = COALESCE(available_at, created_at, ?)", (now,))
     if _table_exists(connection, "playbook_runs"):
         connection.execute("UPDATE playbook_runs SET available_at = COALESCE(available_at, created_at, ?)", (now,))
         connection.execute("UPDATE playbook_step_runs SET effect_key = 'playbook-step:' || run_id || ':' || step_id WHERE effect_key IS NULL")

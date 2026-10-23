@@ -41,6 +41,8 @@ def build_config() -> dict[str, object]:
         "WTF_CSRF_TIME_LIMIT": 3600,
         "MAX_CONTENT_LENGTH": _integer("SOCIFY_MAX_UPLOAD_BYTES", 10 * 1024 * 1024),
         "MAX_IMPORT_ROWS": _integer("SOCIFY_MAX_IMPORT_ROWS", 100000),
+        "IMPORT_INLINE_EXECUTION": _boolean("SOCIFY_IMPORT_INLINE_EXECUTION", environment != "production"),
+        "MAX_PENDING_IMPORT_JOBS": _integer("SOCIFY_MAX_PENDING_IMPORT_JOBS", 100),
         "SESSION_COOKIE_HTTPONLY": True,
         "SESSION_COOKIE_SAMESITE": "Lax",
         "SESSION_COOKIE_SECURE": _boolean("SOCIFY_HTTPS"),

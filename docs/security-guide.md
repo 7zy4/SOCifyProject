@@ -31,3 +31,4 @@
 - ATT&CK snapshot version/count موثقان.
 - Health endpoint داخلي ومراقبة error rate وqueue lag.
 - `SOCIFY_PLAYBOOK_INLINE_EXECUTION=0` وعامل Playbook منفصل على Volume القاعدة نفسه، مع تنبيه على failed وexpired leases.
+- `SOCIFY_IMPORT_INLINE_EXECUTION=0` وعامل Import منفصل يملك مفتاح فك دليل الرفع، مع حد queue وتنبيه على failed وexpired leases.

@@ -7,7 +7,9 @@ SOCify تطبيق Flask أحادي قابل للفصل منطقيًا إلى و�
 ```mermaid
 flowchart TD
     UI["RTL Web UI"] --> API["Flask API + RBAC + CSRF"]
-    API --> ING["Ingestion + Normalization"]
+    API --> IQUEUE["Durable Import Queue"]
+    IQUEUE --> IWORKER["Bounded Import Worker"]
+    IWORKER --> ING["Ingestion + Normalization"]
     ING --> EVT["Immutable Events"]
     EVT --> DET["Typed Detection Engine"]
     DET --> ALT["Alerts"]
@@ -54,7 +56,7 @@ flowchart TD
 
 ## حدود معروفة
 
-- Queue الاستيراد متزامن في MVP، مع Job/Checkpoint model محفوظ. عامل موزع مطلوب للأحمال الإنتاجية ولـworker crash recovery الفعلي.
+- استيراد الإنتاج ينفذه عامل مستقل محدود مع lease، و100-row checkpoints، وbackpressure واستعادة من آخر checkpoint بعد انقضاء الملكية. الاستلام at-least-once وتمنع مفاتيح الحدث إعادة إدخال الصف المقبول.
 - Playbook jobs تعمل بعامل مستقل محدود بعملية واحدة لكل instance. الاستلام at-least-once؛ أثر قاعدة البيانات وحالة الخطوة exactly-once ضمن transaction محلية، ويمنع `effect_key` تكرار هوية الأثر. لا توجد آثار أجهزة أو شبكة خارجية.
 - الرسم Vanilla SVG بحد 1000 حدث وجدول بديل؛ التجميع الضخم يحتاج Cytoscape/WebGL.
 - مصدر ATT&CK المضمن يغطي تقنيات السيناريو المرجعي. أداة STIX ترفض ادعاء الاكتمال إذا كان Bundle أقل من 600 تقنية.

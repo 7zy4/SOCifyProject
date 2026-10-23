@@ -37,7 +37,19 @@ def health_ready():
 @platform_api.get("/api/health")
 @login_required
 def health_api():
-    queue = int(get_db().execute("SELECT COUNT(*) FROM ingestion_jobs WHERE workspace_id = ? AND status = 'processing'", (workspace_id(),)).fetchone()[0])
+    import_states = {
+        row["status"]: int(row["count"])
+        for row in get_db().execute("SELECT status, COUNT(*) AS count FROM ingestion_jobs WHERE workspace_id = ? GROUP BY status", (workspace_id(),)).fetchall()
+    }
+    queue = import_states.get("processing", 0)
+    expired_import_leases = int(
+        get_db()
+        .execute(
+            "SELECT COUNT(*) FROM ingestion_jobs WHERE workspace_id = ? AND status = 'processing' AND lease_expires_at <= ?",
+            (workspace_id(), iso_now()),
+        )
+        .fetchone()[0]
+    )
     failed_rules = int(get_db().execute("SELECT COALESCE(SUM(failed_evaluations), 0) FROM rules WHERE workspace_id = ?", (workspace_id(),)).fetchone()[0])
     playbook_states = {
         row["state"]: int(row["count"])
@@ -57,6 +69,12 @@ def health_api():
             "status": "healthy",
             "database": "available",
             "import_jobs_processing": queue,
+            "import_jobs": {
+                "queued": sum(import_states.get(state, 0) for state in ("queued", "interrupted")),
+                "processing": queue,
+                "failed": import_states.get("failed", 0),
+                "expired_leases": expired_import_leases,
+            },
             "rule_evaluation_failures": failed_rules,
             "playbook_jobs": {
                 "queued": sum(playbook_states.get(state, 0) for state in ("pending", "approved", "retry_wait")),

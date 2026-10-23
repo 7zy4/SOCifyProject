@@ -40,6 +40,26 @@ services:
     cap_drop:
       - ALL
     restart: unless-stopped
+  import-worker:
+    build:
+      context: .
+      target: runtime
+    command: ["python", "-m", "scripts.run_import_worker", "--lease-seconds", "120"]
+    environment:
+      SOCIFY_ENV: production
+      SOCIFY_SECRET_KEY: ${SOCIFY_SECRET_KEY:?Set SOCIFY_SECRET_KEY to a random value of at least 32 bytes}
+      SOCIFY_CREDENTIAL_KEY: ${SOCIFY_CREDENTIAL_KEY:?Set SOCIFY_CREDENTIAL_KEY to a separate random value}
+      SOCIFY_DATABASE: /data/socify.db
+    volumes:
+      - socify-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
 
 volumes:
   socify-data:

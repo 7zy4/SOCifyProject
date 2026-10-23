@@ -312,7 +312,7 @@ async function renderImports() {
       const result = await api(submitter === "preview" ? "/api/imports/preview" : "/api/imports", { method: "POST", body: data });
       const output = document.getElementById("import-result");
       output.replaceChildren(node("pre", { class: "code-box", text: JSON.stringify(result, null, 2) }));
-      if (submitter === "commit") showMessage("اكتملت مهمة الاستيراد وتقييم الكشف", "success");
+      if (submitter === "commit") showMessage(result.status === "queued" ? "أضيفت مهمة الاستيراد إلى العامل" : "اكتملت مهمة الاستيراد وتقييم الكشف", "success");
     } catch (error) { handleError(error); }
   });
 }
