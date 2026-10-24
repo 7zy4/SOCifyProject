@@ -1,0 +1,163 @@
+{
+  "tool": {
+    "repository": "7zy4/rea",
+    "commit": "2250e67bc271c83f9e200ee298aa04a2457438a6",
+    "package_version": "6.7.0",
+    "execution": "Local node CLI; inert JavaScript analysis; no target code execution"
+  },
+  "targets": [
+    {
+      "repository": "7zy4/SOCifyProject",
+      "source_commit": "ebef507",
+      "target_layout": "Preserve static/ and templates/ directories",
+      "files": [
+        {
+          "path": "static/app.js",
+          "sha256": "e551af0b8d5ec85e913d79660d1d161cb5b8d16cbcf69b9aa8e977de10e3c84c",
+          "byte_count": 76692
+        },
+        {
+          "path": "templates/app.html",
+          "sha256": "ab4f39019009f9f01a8004a68e649f1ce2780b545389eb41574278b4a0a1c47a",
+          "byte_count": 3670
+        },
+        {
+          "path": "templates/register.html",
+          "sha256": "a85b0972a60251ce9a4e19e3224bf9cd2647f9d19c984232f42eb24019404c5d",
+          "byte_count": 3017
+        }
+      ],
+      "evidence_file": "rea-current-app-2026-10-24.json.gz",
+      "evidence_id": "ev_dc938af8c5fda9d0283cb124eb941bc5c3ebd78c8afa3facceb042a10d9e2a55",
+      "evidence_sha256_uncompressed": "8c921d90fe39cace3409b017d7409a598dbd5b320ea68b650969dc6f95bc98d3",
+      "evidence_sha256_compressed": "9d61f01405b9983576fe25593bf84b4d8a7415b8d7b569545acf7db2a663cda6",
+      "target_digest": {
+        "sha256": "201533a0fa00d10a52e313a6a6faf5e36ee85a983e270d01961dda5293fb3af3"
+      },
+      "statistics": {
+        "relevant_files": 3,
+        "nested_asar_containers": 0,
+        "text_bytes_read": 83379,
+        "invalid_utf8_files": 0,
+        "parsed_javascript_files": 1,
+        "skipped_javascript_files": 0,
+        "visited_ast_nodes": 11624,
+        "findings": 24,
+        "modules": 0,
+        "parse_failures": 0
+      },
+      "graph_id": "jag_1949cfad1a11b18050b56dd050b8ada3696ead59f9175fe3ef14f26a17359d31",
+      "semantic_graph_id": "jsrg_338d97b0a0aca3c4da35e5f9c8587181bcb89cffa0427c8cab0c8f35788aa256",
+      "unknowns": 2005,
+      "limitations": [
+        "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+        "Graph coverage is incomplete; unavailable facts remain explicit and must not be read as absence.",
+        "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+        "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+        "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+        "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
+      ],
+      "compressed_bytes": 2514327
+    },
+    {
+      "repository": "TheHive-Project/TheHive",
+      "source_commit": "d390a0316ccd7780df6a49eccc773e5c28b43cc2",
+      "target_layout": "Selected files copied to target root using their basenames",
+      "files": [
+        {
+          "path": "frontend/app/scripts/controllers/case/CaseCreationCtrl.js",
+          "sha256": "2073742d3f7217d2fa305ecb51405707c8fdd7ecab3d7dc7ddad744a64d56cc5",
+          "bytes": 4050
+        },
+        {
+          "path": "frontend/app/scripts/controllers/case/CaseDetailsCtrl.js",
+          "sha256": "c5e5e2dc95a45fbbdc1d5db8d2f8d204d290e74e924ac3f965d8a54b94b1a44e",
+          "bytes": 5499
+        },
+        {
+          "path": "frontend/app/scripts/controllers/case/CaseTasksCtrl.js",
+          "sha256": "4b820d24bc73fc80f79a84a4d5c0ad5813d7579feb91ef0e65c7902e48819f32",
+          "bytes": 15180
+        },
+        {
+          "path": "frontend/app/scripts/controllers/case/CaseObservablesCtrl.js",
+          "sha256": "9414e2ea81befec7a7a276497561f9ab9572eb477d50fc4222f30e770d6dae44",
+          "bytes": 18345
+        }
+      ],
+      "evidence_file": "rea-thehive-2026-10-24.json.gz",
+      "evidence_id": "ev_a157ac9fc8f595234a45a4b357c334c6cdd88dd27c5149460634a4342a0c0457",
+      "evidence_sha256_uncompressed": "66f103d543c22487e5be16276969e8c4afefa0f8468e43d22429336327f8d049",
+      "evidence_sha256_compressed": "63a42057503e3c7e4a22ea459eb6d4cf80bf398da671261ae84cfd0f69eed96f",
+      "target_digest": {
+        "sha256": "f4e2e7ec0577e4c3dd26dffc6420ea6fbbca720ecf4d32796a719724d36f1a65"
+      },
+      "statistics": {
+        "relevant_files": 4,
+        "nested_asar_containers": 0,
+        "text_bytes_read": 43074,
+        "invalid_utf8_files": 0,
+        "parsed_javascript_files": 4,
+        "skipped_javascript_files": 0,
+        "visited_ast_nodes": 4747,
+        "findings": 0,
+        "modules": 0,
+        "parse_failures": 0
+      },
+      "graph_id": "jag_00dc99ba9a94fd3e6abc36618dcdf14fb4eb15d693444f2467a1bb15a5f12eb1",
+      "semantic_graph_id": "jsrg_5a3f48f08e09d99723fdd5d586eb98ca390623bd9b1acf956ab88703a01749d2",
+      "unknowns": 1240,
+      "limitations": [
+        "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+        "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+        "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+        "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+        "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
+      ],
+      "compressed_bytes": 973170
+    },
+    {
+      "repository": "google/timesketch",
+      "source_commit": "8f86c29f1fa86c5c0fb016f51fc76959f8e2ced6",
+      "target_layout": "One checked-in frontend-ng bundle copied to target root using its basename",
+      "files": [
+        {
+          "path": "timesketch/frontend-ng/dist/js/index.d93f0885.js",
+          "sha256": "73d84ad28a8483560e810faf0d64c8d0822df72df77e3e0c0be5104f63b72534",
+          "byte_count": 434127
+        }
+      ],
+      "evidence_file": "rea-timesketch-2026-10-24.json.gz",
+      "evidence_id": "ev_5176e36e1d0b0e2259c5838de6cbb4f23932d420b75815e596d6977521625e4a",
+      "evidence_sha256_uncompressed": "c20d1f2fcb1738ce11ecb225e5da50b182336c2db5bd10b2b69963ca138b7d8c",
+      "evidence_sha256_compressed": "3c81ed25adbf445773d7d1196fa4f0a4cccb6b3b2bb9f33d126053b5ea113251",
+      "target_digest": {
+        "sha256": "d3e76e9a36d4434e1ed47103d7b404b243b74a07ffd67c59327fee043c8c7b5e"
+      },
+      "statistics": {
+        "relevant_files": 1,
+        "nested_asar_containers": 0,
+        "text_bytes_read": 434127,
+        "invalid_utf8_files": 0,
+        "parsed_javascript_files": 1,
+        "skipped_javascript_files": 0,
+        "visited_ast_nodes": 109705,
+        "findings": 106,
+        "modules": 19,
+        "parse_failures": 0
+      },
+      "graph_id": "jag_d5301dd85ff1edced9571c84cea6ec79b1933e4ef101d5623d8b7fb4557ab6cb",
+      "semantic_graph_id": "jsrg_e030845f128203b63bc79b62c3d18d758f8a08b335d630a2062a889ad07ab961",
+      "unknowns": 20000,
+      "limitations": [
+        "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+        "Graph coverage is incomplete; unavailable facts remain explicit and must not be read as absence.",
+        "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+        "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+        "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+        "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
+      ],
+      "compressed_bytes": 6338803
+    }
+  ]
+}

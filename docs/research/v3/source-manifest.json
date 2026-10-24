@@ -1,0 +1,623 @@
+{
+  "scope": "Public primary-source research; not authenticated commercial product testing",
+  "verified_files": 32,
+  "github_sources": [
+    {
+      "id": "timesketch",
+      "repository": "google/timesketch",
+      "retrieved_at": "2026-10-24T14:16:10.831214+00:00",
+      "files": [
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/google/timesketch/8f86c29f1fa86c5c0fb016f51fc76959f8e2ced6/README.md",
+          "status": 200,
+          "sha256": "fed863cc3cf210047df855acf5ed99776cb3afb99b97c208c08c91e0c77dff2b",
+          "byte_count": 2282,
+          "truncated": false
+        },
+        {
+          "path": "docs/README.md",
+          "url": "https://raw.githubusercontent.com/google/timesketch/8f86c29f1fa86c5c0fb016f51fc76959f8e2ced6/docs/README.md",
+          "status": 200,
+          "sha256": "9bdec5d294610b480178f366e2cc6bef63b505992fe9d8f4d022364d01634c10",
+          "byte_count": 776,
+          "truncated": false
+        },
+        {
+          "path": "docs/guides/user/basic-concepts.md",
+          "url": "https://raw.githubusercontent.com/google/timesketch/8f86c29f1fa86c5c0fb016f51fc76959f8e2ced6/docs/guides/user/basic-concepts.md",
+          "retrieved_at": "2026-10-24T14:19:41.113860+00:00",
+          "status": 200,
+          "sha256": "f83bd0fde5ec03f5395ad0eddbdb32f3a1a1ae5f12ce08854b8147f5708101f5",
+          "byte_count": 11499,
+          "truncated": false
+        },
+        {
+          "path": "docs/guides/user/sketch-overview.md",
+          "url": "https://raw.githubusercontent.com/google/timesketch/8f86c29f1fa86c5c0fb016f51fc76959f8e2ced6/docs/guides/user/sketch-overview.md",
+          "retrieved_at": "2026-10-24T14:19:41.117134+00:00",
+          "status": 200,
+          "sha256": "50db7e96212cee32eb8b93a2146ce32da2aca3c3da90e6837275538cddcbdcf0",
+          "byte_count": 10087,
+          "truncated": false
+        },
+        {
+          "path": "docs/guides/user/sigma.md",
+          "url": "https://raw.githubusercontent.com/google/timesketch/8f86c29f1fa86c5c0fb016f51fc76959f8e2ced6/docs/guides/user/sigma.md",
+          "retrieved_at": "2026-10-24T14:19:41.120099+00:00",
+          "status": 200,
+          "sha256": "36630adbc331c024fbf10577000a2e786e90c782b0233a9c26b301a7f6e9c6a4",
+          "byte_count": 10100,
+          "truncated": false
+        },
+        {
+          "path": "docs/guides/user/import-from-json-csv.md",
+          "url": "https://raw.githubusercontent.com/google/timesketch/8f86c29f1fa86c5c0fb016f51fc76959f8e2ced6/docs/guides/user/import-from-json-csv.md",
+          "retrieved_at": "2026-10-24T14:19:41.125137+00:00",
+          "status": 200,
+          "sha256": "260b28d2201a7cc895c634f00b384d21cddb440a88b1f484bb9706051dbaa9d7",
+          "byte_count": 4993,
+          "truncated": false
+        }
+      ],
+      "commit": "8f86c29f1fa86c5c0fb016f51fc76959f8e2ced6",
+      "ref_requested": "master",
+      "status": "reviewable"
+    },
+    {
+      "id": "thehive",
+      "repository": "TheHive-Project/TheHive",
+      "retrieved_at": "2026-10-24T14:16:10.832700+00:00",
+      "files": [
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/TheHive-Project/TheHive/47072312bfc5fd56ae4892addbb140b6be833468/README.md",
+          "status": 200,
+          "sha256": "ad79ffe74e8f0e16e22c4a8e43b28e7c55f60246de94b6039356d2edd61a29ea",
+          "byte_count": 11628,
+          "truncated": false
+        }
+      ],
+      "commit": "47072312bfc5fd56ae4892addbb140b6be833468",
+      "ref_requested": "master",
+      "status": "reviewable"
+    },
+    {
+      "id": "cortex",
+      "repository": "TheHive-Project/Cortex",
+      "retrieved_at": "2026-10-24T14:16:10.833507+00:00",
+      "files": [
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/TheHive-Project/Cortex/f3b23eaed858cb2412c4af621df4ab6f051e2ada/README.md",
+          "status": 200,
+          "sha256": "0965eac9dfe188f479da77ce275dc9b68e23203dc6c36c8654a08d3379b779c6",
+          "byte_count": 5293,
+          "truncated": false
+        }
+      ],
+      "commit": "f3b23eaed858cb2412c4af621df4ab6f051e2ada",
+      "ref_requested": "master",
+      "status": "reviewable"
+    },
+    {
+      "id": "autopsy",
+      "repository": "sleuthkit/autopsy",
+      "retrieved_at": "2026-10-24T14:16:10.834452+00:00",
+      "files": [
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/sleuthkit/autopsy/cb3dacdcad67abe7cf863c74f10dcdb8e25a5c21/README.md",
+          "status": "unavailable",
+          "error": "HTTP Error 404: Not Found"
+        },
+        {
+          "path": "README.txt",
+          "url": "https://raw.githubusercontent.com/sleuthkit/autopsy/cb3dacdcad67abe7cf863c74f10dcdb8e25a5c21/README.txt",
+          "status": 200,
+          "sha256": "4f555289cff3ce57bea8e39c0af795dba0626b01bf1adddc3ea54eb02f14f276",
+          "byte_count": 5635,
+          "truncated": false
+        },
+        {
+          "path": "README",
+          "url": "https://raw.githubusercontent.com/sleuthkit/autopsy/cb3dacdcad67abe7cf863c74f10dcdb8e25a5c21/README",
+          "status": "unavailable",
+          "error": "HTTP Error 404: Not Found"
+        },
+        {
+          "path": "Core/src/org/sleuthkit/autopsy/ingest/IngestModule.java",
+          "url": "https://raw.githubusercontent.com/sleuthkit/autopsy/cb3dacdcad67abe7cf863c74f10dcdb8e25a5c21/Core/src/org/sleuthkit/autopsy/ingest/IngestModule.java",
+          "retrieved_at": "2026-10-24T14:19:41.132793+00:00",
+          "status": 200,
+          "sha256": "5fe249d96a11e66b2ef693421380416cfc79da4573de63018d5d72b7afbcbf94",
+          "byte_count": 5119,
+          "truncated": false
+        }
+      ],
+      "commit": "cb3dacdcad67abe7cf863c74f10dcdb8e25a5c21",
+      "ref_requested": "develop",
+      "status": "reviewable"
+    },
+    {
+      "id": "splunk",
+      "repository": "splunk/security_content",
+      "retrieved_at": "2026-10-24T14:16:10.837129+00:00",
+      "files": [
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/splunk/security_content/a3f6523eabf696d66e20fdd80766bfae95575577/README.md",
+          "status": 200,
+          "sha256": "2cc1bec78717157bd662519abf9536dbbc56b63fe88ca9b13061cef35ecad94d",
+          "byte_count": 11160,
+          "truncated": false
+        }
+      ],
+      "commit": "a3f6523eabf696d66e20fdd80766bfae95575577",
+      "ref_requested": "develop",
+      "status": "reviewable"
+    },
+    {
+      "id": "elastic-timeline",
+      "repository": "elastic/docs-content",
+      "retrieved_at": "2026-10-24T14:16:10.838671+00:00",
+      "files": [
+        {
+          "path": "solutions/security/investigate/timeline.md",
+          "url": "https://raw.githubusercontent.com/elastic/docs-content/01d5e64efb0141cc55076dd96c932f0f2d059b18/solutions/security/investigate/timeline.md",
+          "status": 200,
+          "sha256": "7a04823cb0ac4286c56df1d307781e0fffdf2758c82a06f45c35633f4f0ec011",
+          "byte_count": 16198,
+          "truncated": false
+        }
+      ],
+      "commit": "01d5e64efb0141cc55076dd96c932f0f2d059b18",
+      "ref_requested": "main",
+      "status": "reviewable"
+    },
+    {
+      "id": "elastic",
+      "repository": "elastic/detection-rules",
+      "retrieved_at": "2026-10-24T14:16:11.991159+00:00",
+      "files": [
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/elastic/detection-rules/52ef7a06c71a513f4209844c025ec8eb341871eb/README.md",
+          "status": 200,
+          "sha256": "d7a3468cfa4fb40e378242bc5723455c0253898eb3c8d486c02f71a67a45e054",
+          "byte_count": 11709,
+          "truncated": false
+        }
+      ],
+      "commit": "52ef7a06c71a513f4209844c025ec8eb341871eb",
+      "ref_requested": "main",
+      "status": "reviewable"
+    },
+    {
+      "id": "velociraptor",
+      "repository": "Velocidex/velociraptor-docs",
+      "retrieved_at": "2026-10-24T14:16:12.172537+00:00",
+      "files": [
+        {
+          "path": "content/docs/artifacts/_index.md",
+          "url": "https://raw.githubusercontent.com/Velocidex/velociraptor-docs/ce3b91a7870eb450cab73ee0b28359119f5e47e9/content/docs/artifacts/_index.md",
+          "status": 200,
+          "sha256": "6b72f19d3577ed05eafb898092a7b1b0de5cbde00b7bb43021e4fa4bce3a9eaa",
+          "byte_count": 22031,
+          "truncated": false
+        },
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/Velocidex/velociraptor-docs/ce3b91a7870eb450cab73ee0b28359119f5e47e9/README.md",
+          "status": 200,
+          "sha256": "3e4c828b29890ef536cbaf0e30cc06ee91856d30c563d14941d1951557458d2b",
+          "byte_count": 757,
+          "truncated": false
+        }
+      ],
+      "commit": "ce3b91a7870eb450cab73ee0b28359119f5e47e9",
+      "ref_requested": "master",
+      "status": "reviewable"
+    },
+    {
+      "id": "wazuh",
+      "repository": "wazuh/wazuh-documentation",
+      "retrieved_at": "2026-10-24T14:16:12.195022+00:00",
+      "files": [
+        {
+          "path": "source/user-manual/ruleset/decoders/index.rst",
+          "url": "https://raw.githubusercontent.com/wazuh/wazuh-documentation/ef19184ea37743f9f50289cb2c68976dc18b3961/source/user-manual/ruleset/decoders/index.rst",
+          "status": 200,
+          "sha256": "6b70a356446ce7a0a9057835c31f593f78eba189c400297f066d2cee324685bf",
+          "byte_count": 2086,
+          "truncated": false
+        }
+      ],
+      "commit": "ef19184ea37743f9f50289cb2c68976dc18b3961",
+      "ref_requested": "master",
+      "status": "reviewable"
+    },
+    {
+      "id": "xsoar",
+      "repository": "demisto/content",
+      "retrieved_at": "2026-10-24T14:16:12.350633+00:00",
+      "files": [
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/demisto/content/c884e7014cb9b6f85ab6c2c402148e87c2d641d4/README.md",
+          "status": 200,
+          "sha256": "6c43f7f63dd4464b6dc0ab9068ddb0903f78042e7100d80d65b9d3851ffa0522",
+          "byte_count": 4831,
+          "truncated": false
+        },
+        {
+          "path": "Packs/CommonPlaybooks/Playbooks/playbook-GenericPolling.yml",
+          "url": "https://raw.githubusercontent.com/demisto/content/c884e7014cb9b6f85ab6c2c402148e87c2d641d4/Packs/CommonPlaybooks/Playbooks/playbook-GenericPolling.yml",
+          "retrieved_at": "2026-10-24T14:19:41.634510+00:00",
+          "status": 200,
+          "sha256": "be5593be376df8e43c5408370b4f2f5dbae490fc48042f6d6c0e65daf9859280",
+          "byte_count": 7776,
+          "truncated": false
+        }
+      ],
+      "commit": "c884e7014cb9b6f85ab6c2c402148e87c2d641d4",
+      "ref_requested": "master",
+      "status": "reviewable"
+    },
+    {
+      "id": "graylog",
+      "repository": "Graylog2/graylog-plugin-pipeline-processor",
+      "retrieved_at": "2026-10-24T14:16:12.642372+00:00",
+      "files": [
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/Graylog2/graylog-plugin-pipeline-processor/9e7ac9cf3e7595abfcaf09fd391c6ac9f49eca43/README.md",
+          "status": 200,
+          "sha256": "58940d39fa586a775d984ddfa6aa64a7171be0a357d0aa4a88687b44f557f5c7",
+          "byte_count": 2486,
+          "truncated": false
+        }
+      ],
+      "commit": "9e7ac9cf3e7595abfcaf09fd391c6ac9f49eca43",
+      "ref_requested": "master",
+      "status": "reviewable"
+    },
+    {
+      "id": "rootly",
+      "repository": "rootlyhq/terraform-provider-rootly",
+      "retrieved_at": "2026-10-24T14:16:12.896254+00:00",
+      "files": [
+        {
+          "path": "docs/resources/incident_retrospective.md",
+          "url": "https://raw.githubusercontent.com/rootlyhq/terraform-provider-rootly/d504fdf6f1edcd29fc18d4c414abc7ccc090c42b/docs/resources/incident_retrospective.md",
+          "status": "unavailable",
+          "error": "HTTP Error 404: Not Found"
+        },
+        {
+          "path": "docs/resources/incident.md",
+          "url": "https://raw.githubusercontent.com/rootlyhq/terraform-provider-rootly/d504fdf6f1edcd29fc18d4c414abc7ccc090c42b/docs/resources/incident.md",
+          "status": "unavailable",
+          "error": "HTTP Error 404: Not Found"
+        },
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/rootlyhq/terraform-provider-rootly/d504fdf6f1edcd29fc18d4c414abc7ccc090c42b/README.md",
+          "status": 200,
+          "sha256": "e67d170eade6b17fb9cd9b87609b075a858828ab9a6f700dd94b5cb52e266289",
+          "byte_count": 4940,
+          "truncated": false
+        },
+        {
+          "path": "docs/resources/workflow_task_create_incident_postmortem.md",
+          "url": "https://raw.githubusercontent.com/rootlyhq/terraform-provider-rootly/d504fdf6f1edcd29fc18d4c414abc7ccc090c42b/docs/resources/workflow_task_create_incident_postmortem.md",
+          "retrieved_at": "2026-10-24T14:19:41.512040+00:00",
+          "status": 200,
+          "sha256": "1e8f8e741880897b024baa4cdfdc4ab97a3016437ffb8b87347370939c7e2492",
+          "byte_count": 2053,
+          "truncated": false
+        },
+        {
+          "path": "docs/resources/retrospective_step.md",
+          "url": "https://raw.githubusercontent.com/rootlyhq/terraform-provider-rootly/d504fdf6f1edcd29fc18d4c414abc7ccc090c42b/docs/resources/retrospective_step.md",
+          "retrieved_at": "2026-10-24T14:19:41.559359+00:00",
+          "status": 200,
+          "sha256": "032c6d4dc4722275e6bc97e69d8894537aaf2e358fcfbfd44aa047c0b73e57fd",
+          "byte_count": 1495,
+          "truncated": false
+        },
+        {
+          "path": "docs/resources/retrospective_configuration.md",
+          "url": "https://raw.githubusercontent.com/rootlyhq/terraform-provider-rootly/d504fdf6f1edcd29fc18d4c414abc7ccc090c42b/docs/resources/retrospective_configuration.md",
+          "retrieved_at": "2026-10-24T14:19:41.583627+00:00",
+          "status": 200,
+          "sha256": "1d09b1ed917d1f269b2b3b702c9bdb1b47b8fb07267b424a1ab212ef6f5a400e",
+          "byte_count": 1402,
+          "truncated": false
+        }
+      ],
+      "commit": "d504fdf6f1edcd29fc18d4c414abc7ccc090c42b",
+      "ref_requested": "master",
+      "status": "reviewable"
+    },
+    {
+      "id": "sentinel",
+      "repository": "Azure/Azure-Sentinel",
+      "retrieved_at": "2026-10-24T14:16:13.051820+00:00",
+      "files": [
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/Azure/Azure-Sentinel/17150da3a0a3043a2da898c2f85652419e7042c5/README.md",
+          "status": 200,
+          "sha256": "6c788523a5ca13c182c6f2171cd5de2a64bc18670c64eb85903893d8c88dec62",
+          "byte_count": 11837,
+          "truncated": false
+        }
+      ],
+      "commit": "17150da3a0a3043a2da898c2f85652419e7042c5",
+      "ref_requested": "master",
+      "status": "reviewable"
+    },
+    {
+      "id": "google-secops",
+      "repository": "chronicle/soar-custom-integrations",
+      "retrieved_at": "2026-10-24T14:16:13.677063+00:00",
+      "files": [],
+      "status": "unavailable",
+      "error": "Cannot resolve public repository ref"
+    },
+    {
+      "id": "iris",
+      "repository": "dfir-iris/iris-web",
+      "retrieved_at": "2026-10-24T14:16:13.680028+00:00",
+      "files": [
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/dfir-iris/iris-web/37c5521ac009bd018a2fac7bc01d70735d130c6c/README.md",
+          "status": 200,
+          "sha256": "a2d24e01454487749db050fe43d8037e12d78103f6219e5339c93fbd0c222433",
+          "byte_count": 6528,
+          "truncated": false
+        }
+      ],
+      "commit": "37c5521ac009bd018a2fac7bc01d70735d130c6c",
+      "ref_requested": "master",
+      "status": "reviewable"
+    },
+    {
+      "id": "security-onion",
+      "repository": "Security-Onion-Solutions/securityonion-docs",
+      "retrieved_at": "2026-10-24T14:16:13.849827+00:00",
+      "files": [
+        {
+          "path": "cases.rst",
+          "url": "https://raw.githubusercontent.com/Security-Onion-Solutions/securityonion-docs/499531f0ee4ccdceb615b611b791b844e5d0c1cb/cases.rst",
+          "status": 200,
+          "sha256": "018102f91a7e88acc225f58824a33892ba8ab161d047a8d669be1f3245aa036e",
+          "byte_count": 12237,
+          "truncated": false
+        },
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/Security-Onion-Solutions/securityonion-docs/499531f0ee4ccdceb615b611b791b844e5d0c1cb/README.md",
+          "status": 200,
+          "sha256": "5f6d3a82c0547619edeea6bf7c81e15c5cba1e8f70baa68e120c226756b20669",
+          "byte_count": 1141,
+          "truncated": false
+        }
+      ],
+      "commit": "499531f0ee4ccdceb615b611b791b844e5d0c1cb",
+      "ref_requested": "2.4",
+      "status": "reviewable"
+    },
+    {
+      "id": "misp",
+      "repository": "MISP/MISP",
+      "retrieved_at": "2026-10-24T14:16:13.888382+00:00",
+      "files": [
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/MISP/MISP/fc99c9e3fc85beddc6ef18835359f3c8b7f44608/README.md",
+          "status": 200,
+          "sha256": "b9ecc3e99ba06644282e4457746af16a327403b1ececdab7b4cb2026b126e435",
+          "byte_count": 16625,
+          "truncated": false
+        }
+      ],
+      "commit": "fc99c9e3fc85beddc6ef18835359f3c8b7f44608",
+      "ref_requested": "2.5",
+      "status": "reviewable"
+    },
+    {
+      "id": "sigma",
+      "repository": "SigmaHQ/sigma",
+      "retrieved_at": "2026-10-24T14:16:13.925830+00:00",
+      "files": [
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/SigmaHQ/sigma/05d1031f537e830b76da53bae2400c5814c89165/README.md",
+          "status": 200,
+          "sha256": "3e321fa527d6f8608ba0682c2f6639ff615437fa57437eb92577a43d5f19e84a",
+          "byte_count": 12943,
+          "truncated": false
+        }
+      ],
+      "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+      "ref_requested": "master",
+      "status": "reviewable"
+    },
+    {
+      "id": "virustotal",
+      "repository": "VirusTotal/vt-py",
+      "retrieved_at": "2026-10-24T14:16:14.290564+00:00",
+      "files": [
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/VirusTotal/vt-py/09a98c8f36d7b1cf04236b9f0fa4853c5b3325c1/README.md",
+          "status": 200,
+          "sha256": "8d2b5eb040252e0ebf8b52d5c8987a7fbf07d4f194b1a6ab7442d698a2be9594",
+          "byte_count": 1089,
+          "truncated": false
+        }
+      ],
+      "commit": "09a98c8f36d7b1cf04236b9f0fa4853c5b3325c1",
+      "ref_requested": "master",
+      "status": "reviewable"
+    },
+    {
+      "id": "graylog-current-pipeline",
+      "repository": "Graylog2/graylog2-server",
+      "files": [
+        {
+          "path": "graylog2-server/src/main/java/org/graylog/plugins/pipelineprocessor/ast/Pipeline.java",
+          "url": "https://raw.githubusercontent.com/Graylog2/graylog2-server/e7bca344db1fc17ff39d3dc021c2c42196ff6290/graylog2-server/src/main/java/org/graylog/plugins/pipelineprocessor/ast/Pipeline.java",
+          "status": 200,
+          "sha256": "a98f50025b620be98c350d1c08535adc2e975a686271fc29c10ac61990c25680",
+          "byte_count": 2841
+        },
+        {
+          "path": "graylog2-server/src/main/java/org/graylog/plugins/pipelineprocessor/ast/Stage.java",
+          "url": "https://raw.githubusercontent.com/Graylog2/graylog2-server/e7bca344db1fc17ff39d3dc021c2c42196ff6290/graylog2-server/src/main/java/org/graylog/plugins/pipelineprocessor/ast/Stage.java",
+          "status": 200,
+          "sha256": "2221a2cd2fdc7bc28388bd3d02bd83cca7ee5341f6a9aca5ef5b677754841d43",
+          "byte_count": 2803
+        }
+      ],
+      "commit": "e7bca344db1fc17ff39d3dc021c2c42196ff6290",
+      "status": "reviewable",
+      "retrieved_at": "2026-10-24T14:28:14.387596+00:00"
+    }
+  ],
+  "blocked_documentation_attempts": [
+    {
+      "id": "timesketch",
+      "requested_url": "https://timesketch.org/guides/user/",
+      "retrieved_at": "2026-10-24T14:11:55.275633+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "thehive",
+      "requested_url": "https://docs.strangebee.com/thehive/user-guides/analyst-corner/cases/",
+      "retrieved_at": "2026-10-24T14:11:55.277452+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "cortex",
+      "requested_url": "https://docs.strangebee.com/cortex/",
+      "retrieved_at": "2026-10-24T14:11:55.278174+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "autopsy",
+      "requested_url": "https://www.sleuthkit.org/autopsy/docs/user-docs/4.21.0/ingest_page.html",
+      "retrieved_at": "2026-10-24T14:11:55.279049+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "splunk",
+      "requested_url": "https://help.splunk.com/en/splunk-enterprise-security-8/enterprise-security-editions",
+      "retrieved_at": "2026-10-24T14:11:55.279874+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "elastic",
+      "requested_url": "https://www.elastic.co/docs/solutions/security/investigate/timeline",
+      "retrieved_at": "2026-10-24T14:11:55.280739+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "velociraptor",
+      "requested_url": "https://docs.velociraptor.app/docs/artifacts/",
+      "retrieved_at": "2026-10-24T14:11:55.340518+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "wazuh",
+      "requested_url": "https://documentation.wazuh.com/current/user-manual/ruleset/decoders/index.html",
+      "retrieved_at": "2026-10-24T14:11:55.346557+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "xsoar",
+      "requested_url": "https://docs-cortex.paloaltonetworks.com/r/Cortex-XSOAR/8.9/Cortex-XSOAR-On-prem-Documentation/War-Room",
+      "retrieved_at": "2026-10-24T14:11:55.352364+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "graylog",
+      "requested_url": "https://go2docs.graylog.org/current/making_sense_of_your_log_data/pipelines.html",
+      "retrieved_at": "2026-10-24T14:11:55.358561+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "rootly",
+      "requested_url": "https://rootly.com/incident-postmortems",
+      "retrieved_at": "2026-10-24T14:11:55.363712+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "sentinel",
+      "requested_url": "https://learn.microsoft.com/en-us/azure/sentinel/investigate-cases",
+      "retrieved_at": "2026-10-24T14:11:55.368223+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "google-secops",
+      "requested_url": "https://cloud.google.com/chronicle/docs/soar/investigate/working-with-cases",
+      "retrieved_at": "2026-10-24T14:11:55.373333+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "iris",
+      "requested_url": "https://docs.dfir-iris.org/latest/",
+      "retrieved_at": "2026-10-24T14:11:55.377999+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "security-onion",
+      "requested_url": "https://docs.securityonion.net/en/2.4/cases.html",
+      "retrieved_at": "2026-10-24T14:11:55.383422+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "misp",
+      "requested_url": "https://www.misp-project.org/features.html",
+      "retrieved_at": "2026-10-24T14:11:55.387332+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "sigma",
+      "requested_url": "https://sigmahq.io/docs/basics/rules.html",
+      "retrieved_at": "2026-10-24T14:11:55.393621+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "id": "virustotal",
+      "requested_url": "https://docs.virustotal.com/reference/files",
+      "retrieved_at": "2026-10-24T14:11:55.399455+00:00",
+      "status": "unavailable",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    }
+  ],
+  "limitations": [
+    "Commercial interfaces and provider integrations were not exercised.",
+    "An archived Graylog plugin is retained as a discovery reference; current Pipeline and Stage source were checked separately.",
+    "Failed guessed paths and inaccessible sources are retained instead of silently marked reviewed."
+  ]
+}
