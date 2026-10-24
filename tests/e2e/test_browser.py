@@ -228,6 +228,9 @@ def test_browser_case_closure_requires_complete_report(app, client, login_as):
             assert download.value.suggested_filename.endswith(".html")
             page.get_by_role("button", name="عرض بيانات الدليل").click()
             page.get_by_role("region", name="بيانات الدليل").wait_for()
+            with page.expect_download() as evidence_download:
+                page.get_by_role("link", name="تنزيل المحتوى الأصلي").click()
+            assert Path(evidence_download.value.path()).read_bytes() == b"Synthetic proof"
             assert_accessible(page)
             browser.close()
     finally:

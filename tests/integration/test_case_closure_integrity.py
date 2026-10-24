@@ -4,7 +4,7 @@ import sqlite3
 
 import pytest
 
-from socify import cases
+from socify import cases, create_app
 
 
 def prepared_case(client, login_as):
@@ -130,7 +130,7 @@ def test_private_case_subresources_deny_other_trainee(client, login_as, database
     url = f"/api/incidents/{case_id}"
     assert client.post(url + "/transitions", json=closure_payload()).status_code == 200
     login_as("analyst")
-    for suffix in ("", "/report", "/report?format=html", f"/evidence/{evidence_id}"):
+    for suffix in ("", "/report", "/report?format=html", f"/evidence/{evidence_id}", f"/evidence/{evidence_id}/content"):
         response = client.get(url + suffix)
         assert response.status_code == 404
         assert "Training evidence" not in response.text
@@ -138,3 +138,69 @@ def test_private_case_subresources_deny_other_trainee(client, login_as, database
     assert client.patch(url, json={"title": "Unauthorized replacement"}).status_code == 404
     assert client.post(url + "/notes", json={"body": "Unauthorized note"}).status_code == 404
     assert client.post(url + "/transitions", json={"status": "reopened", "reason": "Unauthorized reopen"}).status_code == 404
+
+
+def test_evidence_content_encrypted_preserved_and_downloaded_after_closure(client, login_as, database):
+    case_id, evidence_id = prepared_case(client, login_as)
+    url = f"/api/incidents/{case_id}"
+    stored = database.execute("SELECT ciphertext FROM case_evidence_content WHERE evidence_id = ?", (evidence_id,)).fetchone()[0]
+    assert "Training evidence" not in stored
+    assert stored
+    assert "ciphertext" not in client.get(url).text
+    detail = client.get(f"{url}/evidence/{evidence_id}")
+    assert detail.json["content_available"] is True
+    assert "ciphertext" not in detail.text
+    assert client.post(url + "/transitions", json=closure_payload()).status_code == 200
+    response = client.get(f"{url}/evidence/{evidence_id}/content")
+    assert response.status_code == 200
+    assert response.data == b"Training evidence"
+    assert response.headers["X-Evidence-SHA256"] == hashlib.sha256(response.data).hexdigest()
+    assert response.mimetype == "application/octet-stream"
+    assert response.headers["Content-Disposition"].startswith("attachment;")
+    assert response.headers["Cache-Control"] == "no-store"
+    for sql in ("UPDATE case_evidence_content SET ciphertext = 'replacement' WHERE evidence_id = ?", "DELETE FROM case_evidence_content WHERE evidence_id = ?"):
+        with pytest.raises(sqlite3.IntegrityError, match="immutable evidence content"):
+            database.execute(sql, (evidence_id,))
+    assert database.execute("SELECT COUNT(*) FROM case_history WHERE case_id = ? AND action = 'evidence_downloaded'", (case_id,)).fetchone()[0] == 1
+
+
+@pytest.mark.parametrize("corruption", ["wrong-content", None])
+def test_evidence_integrity_failure_never_returns_unverified_content(client, login_as, monkeypatch, corruption):
+    case_id, evidence_id = prepared_case(client, login_as)
+
+    def decrypt(_):
+        if corruption is None:
+            raise ValueError("sensitive decryption detail")
+        return corruption
+
+    monkeypatch.setattr(cases, "decrypt_secret", decrypt)
+    response = client.get(f"/api/incidents/{case_id}/evidence/{evidence_id}/content")
+    assert response.status_code == 409
+    assert response.json["error"]["code"] == "EVIDENCE_INTEGRITY_FAILURE"
+    assert "sensitive decryption detail" not in response.text
+    assert "wrong-content" not in response.text
+
+
+def test_evidence_reference_without_retained_content_is_explicit(client, login_as):
+    login_as("soc_manager")
+    event_id = client.post("/api/events", json={"source": "evidence-reference", "title": "Source event"}).json["id"]
+    case_id = client.post("/api/incidents", json={"title": "Referenced evidence", "event_ids": [event_id]}).json["id"]
+    url = f"/api/incidents/{case_id}"
+    evidence_id = client.get(url).json["evidence"][0]["id"]
+    assert client.get(f"{url}/evidence/{evidence_id}").json["content_available"] is False
+    response = client.get(f"{url}/evidence/{evidence_id}/content")
+    assert response.status_code == 409
+    assert response.json["error"]["code"] == "EVIDENCE_CONTENT_UNAVAILABLE"
+
+
+def test_retained_evidence_survives_application_restart(app, client, login_as, user_ids):
+    case_id, evidence_id = prepared_case(client, login_as)
+    restarted = create_app(dict(app.config))
+    with restarted.test_client() as restored_client:
+        with restored_client.session_transaction() as session:
+            session["user_id"] = user_ids["soc_manager"]
+            session["workspace_id"] = 1
+            session["user_role"] = "soc_manager"
+        response = restored_client.get(f"/api/incidents/{case_id}/evidence/{evidence_id}/content")
+        assert response.status_code == 200
+        assert response.data == b"Training evidence"

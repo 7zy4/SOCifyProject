@@ -1598,6 +1598,43 @@
         ]
       }
     },
+    "/api/incidents/{case_id}/evidence/{evidence_id}/content": {
+      "get": {
+        "operationId": "cases_evidence_content_get__api_incidents_case_id_evidence_evidence_id_content",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
     "/api/incidents/{case_id}/notes": {
       "post": {
         "operationId": "cases_add_note_post__api_incidents_case_id_notes",

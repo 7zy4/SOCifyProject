@@ -418,6 +418,9 @@ function caseDetailView(item) {
           node("p", { text: `أضافه المستخدم ${detail.added_by} · ${formatTime(detail.added_at)}` }),
           node("p", { text: `آخر وصول ${formatTime(detail.accessed_at)}` }),
           node("pre", { class: "code-box", text: JSON.stringify(detail.provenance, null, 2) }),
+          detail.content_available
+            ? linkedButton("تنزيل المحتوى الأصلي", `/api/incidents/${item.id}/evidence/${evidence.id}/content`)
+            : node("p", { text: "المحتوى الأصلي غير محفوظ هنا؛ راجع مرجع المصدر." }),
         ]));
       } catch (error) { handleError(error); }
     }, "compact") }

@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 import html
 import json
 import sqlite3
@@ -10,7 +11,18 @@ from flask import Blueprint, Response, jsonify, request
 from .audit import record_audit, record_training_action
 from .db import get_db, inserted_id, transaction
 from .schema import insert_outbox
-from .security import actor_id, can_access_training_run, current_user, error_response, has_permission, require_permission, training_scope_sql, workspace_id
+from .security import (
+    actor_id,
+    can_access_training_run,
+    current_user,
+    decrypt_secret,
+    encrypt_secret,
+    error_response,
+    has_permission,
+    require_permission,
+    training_scope_sql,
+    workspace_id,
+)
 from .timeutils import iso_now, utc_now
 
 cases_api = Blueprint("cases", __name__)
@@ -661,7 +673,8 @@ def add_evidence(case_id: int):
     title = data.get("title")
     content = data.get("content")
     if (
-        evidence_type not in {"ioc", "training_artifact", "raw_log"}
+        not isinstance(evidence_type, str)
+        or evidence_type not in {"ioc", "training_artifact", "raw_log"}
         or not isinstance(reference, str)
         or not 1 <= len(reference) <= 255
         or not isinstance(title, str)
@@ -679,6 +692,10 @@ def add_evidence(case_id: int):
                 (case_id, evidence_type, reference, title, digest, json.dumps({"source": "user", "content_length": len(content.encode())}), actor_id(), now),
             )
             evidence_id = inserted_id(cursor)
+            get_db().execute(
+                "INSERT INTO case_evidence_content (evidence_id, ciphertext) VALUES (?, ?)",
+                (evidence_id, encrypt_secret(content)),
+            )
             _history(get_db(), case_id, "evidence_added", None, {"evidence_id": evidence_id, "sha256": digest})
             record_audit(get_db(), "create", "case_evidence", evidence_id, details={"case_id": case_id, "sha256": digest})
     except sqlite3.IntegrityError:
@@ -702,7 +719,48 @@ def evidence_detail(case_id: int, evidence_id: int):
     result = dict(evidence)
     result["accessed_at"] = accessed_at
     result["provenance"] = json.loads(result["provenance"] or "{}")
+    result["content_available"] = get_db().execute("SELECT 1 FROM case_evidence_content WHERE evidence_id = ?", (evidence_id,)).fetchone() is not None
     return jsonify(result)
+
+
+@cases_api.get("/api/incidents/<int:case_id>/evidence/<int:evidence_id>/content")
+@require_permission("cases.read")
+def evidence_content(case_id: int, evidence_id: int):
+    if not _case_row(case_id):
+        return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
+    evidence = (
+        get_db()
+        .execute(
+            "SELECT e.sha256, c.ciphertext FROM case_evidence e LEFT JOIN case_evidence_content c ON c.evidence_id = e.id WHERE e.id = ? AND e.case_id = ?",
+            (evidence_id, case_id),
+        )
+        .fetchone()
+    )
+    if not evidence:
+        return error_response("EVIDENCE_NOT_FOUND", "الدليل غير موجود", 404)
+    if evidence["ciphertext"] is None:
+        return error_response("EVIDENCE_CONTENT_UNAVAILABLE", "المحتوى الأصلي غير محفوظ لهذا الدليل؛ راجع مرجع المصدر", 409)
+    try:
+        content = decrypt_secret(evidence["ciphertext"]).encode()
+        if not hmac.compare_digest(hashlib.sha256(content).hexdigest(), evidence["sha256"]):
+            raise ValueError("digest mismatch")
+    except ValueError:
+        record_audit(get_db(), "read", "case_evidence", evidence_id, result="denied", details={"case_id": case_id, "reason": "integrity_failure"})
+        return error_response("EVIDENCE_INTEGRITY_FAILURE", "تعذر التحقق من سلامة المحتوى", 409)
+    with transaction():
+        get_db().execute("UPDATE case_evidence SET accessed_at = ? WHERE id = ?", (iso_now(), evidence_id))
+        _history(get_db(), case_id, "evidence_downloaded", None, {"evidence_id": evidence_id, "sha256": evidence["sha256"]})
+        record_audit(get_db(), "download", "case_evidence", evidence_id, details={"case_id": case_id, "sha256": evidence["sha256"]})
+    return Response(
+        content,
+        mimetype="application/octet-stream",
+        headers={
+            "Content-Disposition": f"attachment; filename=evidence-{evidence_id}.txt",
+            "X-Evidence-SHA256": evidence["sha256"],
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @cases_api.post("/api/incidents/<int:case_id>/tasks")

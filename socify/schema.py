@@ -274,6 +274,20 @@ WHEN OLD.immutable = 1
 BEGIN
     SELECT RAISE(ABORT, 'immutable case evidence');
 END;
+CREATE TABLE IF NOT EXISTS case_evidence_content (
+    evidence_id INTEGER PRIMARY KEY REFERENCES case_evidence(id),
+    ciphertext TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS case_evidence_content_immutable_update
+BEFORE UPDATE ON case_evidence_content
+BEGIN
+    SELECT RAISE(ABORT, 'immutable evidence content');
+END;
+CREATE TRIGGER IF NOT EXISTS case_evidence_content_immutable_delete
+BEFORE DELETE ON case_evidence_content
+BEGIN
+    SELECT RAISE(ABORT, 'immutable evidence content');
+END;
 CREATE TABLE IF NOT EXISTS case_tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     case_id INTEGER NOT NULL REFERENCES incident_cases(id),
