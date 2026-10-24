@@ -489,9 +489,21 @@ def _transition(case_id: int, row: sqlite3.Row, target: str, reason: str, data: 
     user = current_user()
     if target == "closed" and not has_permission(user, "cases.close"):
         return error_response("PERMISSION_DENIED", "إغلاق التحقيق يتطلب صلاحية مدير", 403)
+    closure_fields = {
+        "disposition": 500,
+        "root_cause": 2000,
+        "impact": 2000,
+        "response_summary": 2000,
+        "evidence_summary": 5000,
+        "lessons_learned": 5000,
+        "validation": 2000,
+    }
+    override = False
     if target == "closed":
-        required = {"disposition", "root_cause", "impact", "response_summary", "lessons_learned"}
-        missing = [field for field in required if not isinstance(data.get(field), str) or len(str(data[field]).strip()) < 3]
+        missing = [field for field in closure_fields if not isinstance(data.get(field), str) or len(str(data[field]).strip()) < 3]
+        oversized = [field for field, maximum in closure_fields.items() if isinstance(data.get(field), str) and len(str(data[field])) > maximum]
+        if oversized:
+            return error_response("CASE_CLOSURE_FIELD_INVALID", "حقول تقرير الإغلاق تتجاوز الحد المسموح", 422, {"fields": oversized})
         evidence_count = int(get_db().execute("SELECT COUNT(*) FROM case_evidence WHERE case_id = ?", (case_id,)).fetchone()[0])
         tasks = int(get_db().execute("SELECT COUNT(*) FROM case_tasks WHERE case_id = ? AND required = 1 AND status != 'completed'", (case_id,)).fetchone()[0])
         override = (
@@ -509,7 +521,7 @@ def _transition(case_id: int, row: sqlite3.Row, target: str, reason: str, data: 
             )
     now = iso_now()
     extra: dict[str, Any] = {}
-    for field in ("disposition", "root_cause", "impact", "response_summary", "lessons_learned"):
+    for field in closure_fields:
         if isinstance(data.get(field), str):
             extra[field] = str(data[field]).strip()
     if target == "closed":
@@ -527,7 +539,10 @@ def _transition(case_id: int, row: sqlite3.Row, target: str, reason: str, data: 
         if changed.rowcount != 1:
             return error_response("CASE_VERSION_CONFLICT", "تم تعديل التحقيق في جلسة أخرى", 409)
         _history(get_db(), case_id, "status_changed", row["status"], target, reason)
-        record_audit(get_db(), "transition", "case", case_id, details={"from": row["status"], "to": target, "reason": reason})
+        audit_details = {"from": row["status"], "to": target, "reason": reason}
+        if override:
+            audit_details["override_reason"] = str(data["override_reason"]).strip()
+        record_audit(get_db(), "transition", "case", case_id, details=audit_details)
         record_training_action(
             get_db(),
             row["training_run_id"],
@@ -539,8 +554,8 @@ def _transition(case_id: int, row: sqlite3.Row, target: str, reason: str, data: 
             f"case-transition:{case_id}:{row['version']}:{target}",
         )
         insert_outbox(get_db(), workspace_id(), "incident.updated", {"id": case_id, "status": target})
-    if target == "closed":
-        _generate_reports(case_id)
+        if target == "closed":
+            _generate_reports(case_id)
     return jsonify(_case_view(_case_row(case_id)))
 
 
@@ -671,6 +686,25 @@ def add_evidence(case_id: int):
     return jsonify({"id": evidence_id, "sha256": digest}), 201
 
 
+@cases_api.get("/api/incidents/<int:case_id>/evidence/<int:evidence_id>")
+@require_permission("cases.read")
+def evidence_detail(case_id: int, evidence_id: int):
+    if not _case_row(case_id):
+        return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
+    evidence = get_db().execute("SELECT * FROM case_evidence WHERE id = ? AND case_id = ?", (evidence_id, case_id)).fetchone()
+    if not evidence:
+        return error_response("EVIDENCE_NOT_FOUND", "الدليل غير موجود", 404)
+    accessed_at = iso_now()
+    with transaction():
+        get_db().execute("UPDATE case_evidence SET accessed_at = ? WHERE id = ?", (accessed_at, evidence_id))
+        _history(get_db(), case_id, "evidence_accessed", None, {"evidence_id": evidence_id, "sha256": evidence["sha256"]})
+        record_audit(get_db(), "read", "case_evidence", evidence_id, details={"case_id": case_id, "sha256": evidence["sha256"]})
+    result = dict(evidence)
+    result["accessed_at"] = accessed_at
+    result["provenance"] = json.loads(result["provenance"] or "{}")
+    return jsonify(result)
+
+
 @cases_api.post("/api/incidents/<int:case_id>/tasks")
 @require_permission("cases.update")
 def add_task(case_id: int):
@@ -731,7 +765,17 @@ def _report_html(payload: dict[str, Any]) -> str:
         f'<tr><td>{html.escape(str(item["evidence_type"]))}</td><td>{html.escape(str(item["title"]))}</td><td dir="ltr">{html.escape(str(item["sha256"]))}</td></tr>'
         for item in payload["evidence"]
     )
-    return f'<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{html.escape(str(case["reference"]))}</title><style>body{{font-family:Arial,sans-serif;margin:2rem;line-height:1.7}}table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #bbb;padding:.5rem}}h1{{color:#123b66}}</style></head><body><h1>{html.escape(str(case["reference"]))}: {html.escape(str(case["title"]))}</h1><p><strong>الحالة:</strong> {html.escape(str(case["status"]))}</p><p><strong>السبب الجذري:</strong> {html.escape(str(case.get("root_cause") or "غير محدد"))}</p><p><strong>الأثر:</strong> {html.escape(str(case.get("impact") or "غير محدد"))}</p><p><strong>الاستجابة:</strong> {html.escape(str(case.get("response_summary") or "غير محدد"))}</p><h2>الأدلة</h2><table><thead><tr><th>النوع</th><th>العنوان</th><th>SHA-256</th></tr></thead><tbody>{evidence_rows}</tbody></table><p>وقت التوليد: {html.escape(str(payload["generated_at"]))}</p></body></html>'
+    fields = (
+        ("التصنيف النهائي", "disposition"),
+        ("السبب الجذري", "root_cause"),
+        ("الأثر", "impact"),
+        ("ملخص الاستجابة", "response_summary"),
+        ("ملخص الأدلة", "evidence_summary"),
+        ("الدروس المستفادة", "lessons_learned"),
+        ("التحقق", "validation"),
+    )
+    closure = "".join(f"<p><strong>{label}:</strong> {html.escape(str(case.get(field) or 'غير محدد'))}</p>" for label, field in fields)
+    return f'<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{html.escape(str(case["reference"]))}</title><style>body{{font-family:Arial,sans-serif;margin:2rem;line-height:1.7}}table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #bbb;padding:.5rem}}h1{{color:#123b66}}</style></head><body><h1>{html.escape(str(case["reference"]))}: {html.escape(str(case["title"]))}</h1><p><strong>الحالة:</strong> {html.escape(str(case["status"]))}</p>{closure}<h2>الأدلة</h2><table><thead><tr><th>النوع</th><th>العنوان</th><th>SHA-256</th></tr></thead><tbody>{evidence_rows}</tbody></table><p>وقت التوليد: {html.escape(str(payload["generated_at"]))}</p></body></html>'
 
 
 def _generate_reports(case_id: int) -> None:
@@ -757,11 +801,28 @@ def get_report(case_id: int):
     report_format = request.args.get("format", "json")
     if report_format not in {"json", "html"}:
         return error_response("REPORT_FORMAT_UNSUPPORTED", "الصيغ المتاحة هي JSON وHTML", 422)
-    row = get_db().execute("SELECT * FROM case_reports WHERE case_id = ? AND format = ? ORDER BY revision DESC LIMIT 1", (case_id, report_format)).fetchone()
+    revision_value = request.args.get("revision")
+    try:
+        revision = int(revision_value) if revision_value is not None else None
+        if revision is not None and revision < 1:
+            raise ValueError
+    except ValueError:
+        return error_response("REPORT_REVISION_INVALID", "إصدار التقرير غير صالح", 422)
+    row = (
+        get_db()
+        .execute(
+            "SELECT * FROM case_reports WHERE case_id = ? AND format = ? AND (? IS NULL OR revision = ?) ORDER BY revision DESC LIMIT 1",
+            (case_id, report_format, revision, revision),
+        )
+        .fetchone()
+    )
     if not row:
+        if revision is not None:
+            return error_response("REPORT_NOT_FOUND", "إصدار التقرير غير موجود", 404)
         if case["status"] != "closed":
             return error_response("REPORT_NOT_READY", "يتوفر التقرير النهائي بعد إغلاق التحقيق", 409)
-        _generate_reports(case_id)
+        with transaction():
+            _generate_reports(case_id)
         row = (
             get_db().execute("SELECT * FROM case_reports WHERE case_id = ? AND format = ? ORDER BY revision DESC LIMIT 1", (case_id, report_format)).fetchone()
         )

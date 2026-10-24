@@ -77,7 +77,8 @@ def test_browser_training_requires_explicit_assessment_submission(app) -> None:
             assert page.get_by_role("heading", name="Live Event Feed").is_visible()
             assert page.get_by_role("heading", name="Timeline").is_visible()
             assert page.get_by_role("progressbar", name="تقدم السيناريو").get_attribute("value") == "17"
-            assert "expected_detections" not in page.locator("body").inner_text()
+            assert "expected_detections" not in page.content()
+            assert "allowed_responses" not in page.content()
             page.get_by_role("button", name="طلب تلميح").click()
             page.get_by_text("التلميح:", exact=False).wait_for()
             page.get_by_role("button", name="إيقاف مؤقت").click()
@@ -177,6 +178,56 @@ def test_browser_import_preview_commit_and_evidence_controls(app) -> None:
             row.get_by_text("completed", exact=True).wait_for()
             assert row.get_by_role("link", name="الدليل الخام").is_visible()
             assert row.get_by_text("100%", exact=True).is_visible()
+            assert_accessible(page)
+            browser.close()
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+@pytest.mark.e2e
+def test_browser_case_closure_requires_complete_report(app, client, login_as):
+    login_as("soc_manager")
+    case_id = client.post("/api/incidents", json={"title": "Browser closure verification"}).json["id"]
+    url = f"/api/incidents/{case_id}"
+    assert (
+        client.post(
+            url + "/evidence", json={"type": "raw_log", "reference_id": "browser-proof", "title": "Closure proof", "content": "Synthetic proof"}
+        ).status_code
+        == 201
+    )
+    for task in client.get(url).json["tasks"]:
+        assert client.patch(f"{url}/tasks/{task['id']}", json={"status": "completed"}).status_code == 200
+    for status in ("investigating", "contained", "recovered"):
+        assert client.post(url + "/transitions", json={"status": status, "reason": "Verified exercise transition"}).status_code == 200
+    server = make_server("127.0.0.1", 0, app)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as playwright:
+            browser = launch_browser(playwright)
+            page = new_page(browser)
+            base = f"http://127.0.0.1:{server.server_port}"
+            page.goto(base + "/login")
+            page.locator("input[name=email]").fill("manager@socify.local")
+            page.locator("input[name=password]").fill("Training-Safe-Password-2026!")
+            page.locator("button[type=submit]").click()
+            page.wait_for_url("**/dashboard")
+            page.goto(base + f"/incidents?selected={case_id}")
+            form = page.locator("#case-transition-form")
+            form.locator("select[name=status]").select_option("closed")
+            form.locator("input[name=reason]").fill("Completed evidence review")
+            form.get_by_role("button", name="تسجيل الانتقال").click()
+            page.get_by_text("لا يمكن إغلاق التحقيق قبل إكمال الأدلة والمهام والتقرير").wait_for()
+            for name in ("disposition", "root_cause", "impact", "response_summary", "evidence_summary", "lessons_learned", "validation"):
+                form.locator(f"[name={name}]").fill(f"Reviewed {name} for the exercise")
+            form.get_by_role("button", name="تسجيل الانتقال").click()
+            page.get_by_role("link", name="تنزيل التقرير").wait_for()
+            with page.expect_download() as download:
+                page.get_by_role("link", name="تنزيل التقرير").click()
+            assert download.value.suggested_filename.endswith(".html")
+            page.get_by_role("button", name="عرض بيانات الدليل").click()
+            page.get_by_role("region", name="بيانات الدليل").wait_for()
             assert_accessible(page)
             browser.close()
     finally:

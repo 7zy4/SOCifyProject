@@ -363,7 +363,9 @@ function caseDetailView(item) {
     node("label", {}, ["السبب الجذري", node("input", { name: "root_cause", maxlength: "2000" })]),
     node("label", {}, ["الأثر", node("input", { name: "impact", maxlength: "2000" })]),
     node("label", {}, ["ملخص الاستجابة", node("input", { name: "response_summary", maxlength: "2000" })]),
+    node("label", { class: "span-2" }, ["ملخص الأدلة", node("textarea", { name: "evidence_summary", maxlength: "5000" })]),
     node("label", { class: "span-2" }, ["الدروس المستفادة", node("textarea", { name: "lessons_learned", maxlength: "5000" })]),
+    node("label", { class: "span-2" }, ["التحقق من صحة الإغلاق", node("textarea", { name: "validation", maxlength: "2000" })]),
     node("div", { class: "action-row span-2" }, button("تسجيل الانتقال", () => {}, "primary"))
   );
   workflow.querySelector("button").setAttribute("type", "submit");
@@ -371,7 +373,7 @@ function caseDetailView(item) {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(workflow).entries());
     const payload = { ...values, version: item.version };
-    if (payload.status !== "closed") ["disposition", "root_cause", "impact", "response_summary", "lessons_learned"].forEach((field) => delete payload[field]);
+    if (payload.status !== "closed") ["disposition", "root_cause", "impact", "response_summary", "evidence_summary", "lessons_learned", "validation"].forEach((field) => delete payload[field]);
     try {
       await api(`/api/incidents/${item.id}/transitions`, { method: "POST", body: payload });
       showMessage("تم تحديث دورة حياة التحقيق", "success");
@@ -405,7 +407,20 @@ function caseDetailView(item) {
     }, "compact") }
   ];
   const evidenceColumns = [
-    { label: "النوع", value: "evidence_type" }, { label: "العنوان", value: "title" }, { label: "SHA-256", value: (evidence) => node("span", { class: "mono", text: evidence.sha256 }) }, { label: "أضيف", value: (evidence) => formatTime(evidence.added_at) }
+    { label: "النوع", value: "evidence_type" }, { label: "العنوان", value: "title" }, { label: "SHA-256", value: (evidence) => node("span", { class: "mono", text: evidence.sha256 }) }, { label: "أضيف", value: (evidence) => formatTime(evidence.added_at) },
+    { label: "سلسلة الحيازة", value: (evidence) => button("عرض بيانات الدليل", async () => {
+      try {
+        const detail = await api(`/api/incidents/${item.id}/evidence/${evidence.id}`);
+        const existing = root.querySelector(".evidence-detail");
+        if (existing) existing.remove();
+        root.append(node("section", { class: "panel evidence-detail", "aria-label": "بيانات الدليل" }, [
+          node("h3", { text: detail.title }),
+          node("p", { text: `أضافه المستخدم ${detail.added_by} · ${formatTime(detail.added_at)}` }),
+          node("p", { text: `آخر وصول ${formatTime(detail.accessed_at)}` }),
+          node("pre", { class: "code-box", text: JSON.stringify(detail.provenance, null, 2) }),
+        ]));
+      } catch (error) { handleError(error); }
+    }, "compact") }
   ];
   const noteColumns = [
     { label: "الكاتب", value: "author_name" }, { label: "الملاحظة", value: "body" }, { label: "الرؤية", value: (note) => badge(note.visibility) }, { label: "الوقت", value: (note) => formatTime(note.created_at) }

@@ -237,7 +237,9 @@ def test_e2e_21_to_25_full_case_lifecycle_and_reports(client: FlaskClient, login
         root_cause="Simulated credential abuse",
         impact="Training identity exposure",
         response_summary="Contained the synthetic source",
+        evidence_summary="Linked alerts and raw events confirm the finding",
         lessons_learned="Tune identity detections",
+        validation="Verified containment and reviewed the evidence hashes",
     )
     assert closure.status_code == 200
     report_json = client.get(f"/api/incidents/{case_id}/report?format=json")

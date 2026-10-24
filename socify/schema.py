@@ -214,7 +214,9 @@ CREATE TABLE IF NOT EXISTS incident_cases (
     root_cause TEXT,
     impact TEXT,
     response_summary TEXT,
+    evidence_summary TEXT,
     lessons_learned TEXT,
+    validation TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     resolved_at TEXT,
@@ -260,6 +262,18 @@ CREATE TABLE IF NOT EXISTS case_evidence (
     immutable INTEGER NOT NULL DEFAULT 1,
     UNIQUE (case_id, evidence_type, reference_id)
 );
+CREATE TRIGGER IF NOT EXISTS case_evidence_immutable_update
+BEFORE UPDATE OF case_id, evidence_type, reference_id, title, sha256, provenance, added_by, added_at, immutable ON case_evidence
+WHEN OLD.immutable = 1
+BEGIN
+    SELECT RAISE(ABORT, 'immutable case evidence');
+END;
+CREATE TRIGGER IF NOT EXISTS case_evidence_immutable_delete
+BEFORE DELETE ON case_evidence
+WHEN OLD.immutable = 1
+BEGIN
+    SELECT RAISE(ABORT, 'immutable case evidence');
+END;
 CREATE TABLE IF NOT EXISTS case_tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     case_id INTEGER NOT NULL REFERENCES incident_cases(id),
@@ -699,6 +713,10 @@ COLUMN_MIGRATIONS: dict[str, dict[str, str]] = {
         "suppressions": "INTEGER NOT NULL DEFAULT 0",
     },
     "training_runs": {"submitted_at": "TEXT"},
+    "incident_cases": {
+        "evidence_summary": "TEXT",
+        "validation": "TEXT",
+    },
     "detection_matches": {
         "alert_id": "INTEGER",
         "dedup_key": "TEXT",
