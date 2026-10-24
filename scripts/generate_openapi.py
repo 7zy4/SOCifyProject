@@ -38,7 +38,11 @@ def generate() -> dict[str, object]:
             paths.setdefault(path, {})[method.lower()] = operation
     return {
         "openapi": "3.1.0",
-        "info": {"title": "SOCify Training Platform API", "version": "2.0.0"},
+        "info": {
+            "title": "SOCify Digital Autopsy API",
+            "version": "3.0.0",
+            "description": "Internal case-centered investigation. General training and unscoped legacy data endpoints return 410 in operational mode. V3 case creation requires title, reason and objective; structured record contracts are published by /api/autopsy/catalog. All writes require an authenticated session, permission and CSRF token.",
+        },
         "servers": [{"url": "/"}],
         "paths": paths,
         "components": {

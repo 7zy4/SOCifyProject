@@ -10,6 +10,7 @@ from flask import Blueprint, Response, jsonify, request
 
 from .audit import record_audit, record_training_action
 from .db import get_db, inserted_id, transaction
+from .operational import case_scope, case_visible, operational_mode
 from .report_brand import report_style
 from .schema import insert_outbox
 from .security import (
@@ -48,12 +49,13 @@ TRANSITIONS: dict[str, set[str]] = {
 
 def _case_row(case_id: int) -> sqlite3.Row | None:
     row = get_db().execute("SELECT * FROM incident_cases WHERE id = ? AND workspace_id = ? AND archived_at IS NULL", (case_id, workspace_id())).fetchone()
-    return row if row and can_access_training_run(row["training_run_id"]) else None
+    user = current_user()
+    return row if row and user and can_access_training_run(row["training_run_id"]) and case_visible(case_id, user) else None
 
 
 def _user_valid(user_id: object) -> bool:
     return (
-        isinstance(user_id, int)
+        type(user_id) is int
         and get_db().execute("SELECT 1 FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (user_id, workspace_id())).fetchone() is not None
     )
 
@@ -159,6 +161,8 @@ def _case_view(row: sqlite3.Row | None) -> dict[str, Any]:
     item["tags"] = json.loads(item["tags"] or "[]")
     item["mitre_ids"] = json.loads(item["mitre_ids"] or "[]")
     item["overdue"] = bool(item["sla_due_at"] and item["status"] not in {"closed", "cancelled"} and item["sla_due_at"] < iso_now())
+    context = get_db().execute("SELECT * FROM autopsy_case_context WHERE case_id = ?", (row["id"],)).fetchone()
+    item["context"] = dict(context) if context else None
     return item
 
 
@@ -172,6 +176,10 @@ def list_cases():
         return error_response("INVALID_PAGINATION", "قيم الترقيم غير صالحة", 400)
     clauses = ["c.workspace_id = ?", "c.archived_at IS NULL"]
     parameters: list[object] = [workspace_id()]
+    visibility, visibility_args = case_scope(current_user() or {})
+    if visibility:
+        clauses.append(visibility.removeprefix(" AND "))
+        parameters.extend(visibility_args)
     scope, scope_parameters = training_scope_sql("c.training_run_id")
     if scope:
         clauses.append(scope.removeprefix(" AND "))
@@ -221,6 +229,37 @@ def create_case():
 
 
 def _create_case(data: dict[str, Any]):
+    reason, objective, classification = data.get("reason"), data.get("objective"), data.get("classification", "confidential")
+    if operational_mode():
+        from .autopsy_domain import text_value
+
+        allowed = {
+            "title",
+            "reason",
+            "objective",
+            "classification",
+            "description",
+            "severity",
+            "priority",
+            "assignee",
+            "event_ids",
+            "alert_ids",
+            "tags",
+            "mitre_ids",
+        }
+        if set(data) - allowed:
+            return error_response("UNKNOWN_CASE_FIELDS", "حقول غير مسموحة في نموذج القضية", 422)
+        if not isinstance(reason, str) or not 3 <= len(reason.strip()) <= 500 or not isinstance(objective, str) or not 3 <= len(objective.strip()) <= 2000:
+            return error_response("CASE_PURPOSE_REQUIRED", "حدد سبب فتح القضية وهدف التحقيق", 422)
+        if not isinstance(classification, str) or classification not in {"internal", "confidential", "restricted"}:
+            return error_response("INVALID_CLASSIFICATION", "تصنيف السرية غير صالح", 422)
+        try:
+            text_value(data.get("title"), 255, True)
+            text_value(reason, 500, True)
+            text_value(objective, 2000, True)
+        except ValueError as exc:
+            return error_response("INVALID_CASE", str(exc), 422)
+        data.setdefault("assignee", actor_id())
     title = data.get("title")
     description = data.get("description", "")
     severity = str(data.get("severity", "medium")).lower()
@@ -294,6 +333,16 @@ def _create_case(data: dict[str, Any]):
             ),
         )
         case_id = inserted_id(cursor)
+        if operational_mode():
+            get_db().execute(
+                "INSERT INTO autopsy_case_context(case_id, reason, objective, classification, created_at) VALUES (?, ?, ?, ?, ?)",
+                (case_id, str(reason).strip(), str(objective).strip(), classification, now),
+            )
+            for member in {actor_id(), assignee} - {None}:
+                get_db().execute(
+                    "INSERT INTO autopsy_case_members(case_id, user_id, responsibility, assigned_by, assigned_at) VALUES (?, ?, 'analyst', ?, ?)",
+                    (case_id, member, actor_id(), now),
+                )
         for event_id in event_ids:
             if not _attach_event(get_db(), case_id, event_id):
                 raise ValueError(f"event {event_id} is unavailable")
@@ -346,6 +395,10 @@ def case_from_alert(alert_id: int):
 @cases_api.get("/api/incidents/<int:case_id>")
 @require_permission("cases.read")
 def case_detail(case_id: int):
+    if operational_mode():
+        from .autopsy_api import case_summary
+
+        return case_summary(case_id)
     row = _case_row(case_id)
     if not row:
         return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
@@ -443,7 +496,9 @@ def case_detail(case_id: int):
         )
         .fetchall()
     )
-    item["similar_cases"] = [dict(value) for value in candidates if can_access_training_run(value["training_run_id"])]
+    item["similar_cases"] = [
+        dict(value) for value in candidates if can_access_training_run(value["training_run_id"]) and case_visible(value["id"], current_user() or {})
+    ]
     return jsonify(item)
 
 
@@ -456,6 +511,10 @@ def update_case(case_id: int):
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return error_response("INVALID_JSON", "يلزم إرسال كائن JSON صالح", 400)
+    if operational_mode():
+        allowed = {"version", "title", "description", "team", "severity", "priority", "assignee", "assigned_to", "tags", "mitre_ids", "status", "reason"}
+        if set(data) - allowed or type(data.get("version")) is not int:
+            return error_response("INVALID_CASE_UPDATE", "أرسل الإصدار والحقول المعروفة", 422)
     supplied_version = data.get("version")
     if supplied_version is not None and supplied_version != row["version"]:
         return error_response("CASE_VERSION_CONFLICT", "تم تعديل التحقيق في جلسة أخرى. حدّث البيانات ثم أعد المحاولة", 409, {"current_version": row["version"]})

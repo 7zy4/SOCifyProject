@@ -5,15 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token }}">
   <meta name="section" content="{{ section }}">
+  <meta name="product-mode" content="{{ 'autopsy' if operational else 'training' }}">
+  {% if case_id %}<meta name="case-id" content="{{ case_id }}">{% endif %}
   <title>SOCify | مركز العمليات</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  {% if operational %}<link rel="stylesheet" href="{{ url_for('static', filename='autopsy.css') }}">{% endif %}
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  {% if operational %}<script src="{{ url_for('static', filename='autopsy.js') }}" defer></script>{% endif %}
 </head>
-<body class="app-shell">
+<body class="app-shell{{ ' autopsy-shell' if operational else '' }}">
   <a class="skip-link" href="#workspace">انتقل إلى مساحة العمل</a>
   <aside class="sidebar" aria-label="تنقل المنصة">
-    <a class="brand" href="{{ url_for('ui.dashboard') }}"><span class="brand-mark" aria-hidden="true">S</span><span>SOCify</span></a>
+    <a class="brand" href="{{ '/cases' if operational else '/dashboard' }}"><span class="brand-mark" aria-hidden="true">S</span><span dir="ltr">{{ product_name }}</span></a>
     <nav id="primary-nav">
+      {% if operational %}
+      <a data-section="cases" href="/cases">القضايا</a>
+      <a data-section="my-tasks" href="/my-tasks">مهامي</a>
+      <a data-section="team" href="/team">الفريق</a>
+      {% else %}
       <a data-section="dashboard" href="/dashboard"><span aria-hidden="true">⌂</span>نظرة عامة</a>
       <a data-section="events" href="/events"><span aria-hidden="true">≋</span>مستكشف السجلات</a>
       <a data-section="alerts" href="/alerts"><span aria-hidden="true">!</span>التنبيهات</a>
@@ -30,8 +39,9 @@
       <a data-section="audit" href="/audit"><span aria-hidden="true">✓</span>التدقيق</a>
       <a data-section="admin" href="/admin"><span aria-hidden="true">⚙</span>الإدارة</a>
       <a data-section="team" href="/team"><span aria-hidden="true">♧</span>الفريق والمهام</a>
+      {% endif %}
     </nav>
-    <div class="sidebar-foot"><span class="status-dot" aria-hidden="true"></span><span>بيئة تدريب معزولة</span></div>
+    <div class="sidebar-foot"><span class="status-dot" aria-hidden="true"></span><span>{{ 'تحليل داخلي · إثراء محلي' if operational else 'بيئة تدريب معزولة' }}</span></div>
   </aside>
   <div class="app-main">
     <header class="topbar">

@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - socify-version-2
+      - socify-version-3
 
 permissions:
   contents: read

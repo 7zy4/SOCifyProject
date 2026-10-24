@@ -2,6 +2,8 @@
 
 Scope: documentation, source provenance and retained REA evidence. This is not implementation acceptance for V3.
 
+Historical checkpoint: `8524a4c`, before application implementation began. For current code/test status read `docs/plans/v3-progress.md` and `docs/qa/v3-acceptance.csv`; the unchanged-application checks below describe that earlier planning snapshot.
+
 Verified in the workspace:
 
 - Active branch `socify-version-3`; V2 remains `ebef5078dd1a529ed55ac4109752b96df97d8d06`, and the inherited `origin/main` ref remains `11bc959`. V3 descends from the full V2 baseline.

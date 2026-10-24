@@ -34,6 +34,8 @@ def build_config() -> dict[str, object]:
         trusted_hosts.append(f"{codespace_name}-{codespace_port}.app.github.dev")
     return {
         "ENV_NAME": environment,
+        "PRODUCT_NAME": "SOCify Digital Autopsy",
+        "LEGACY_TRAINING_TESTS": False,
         "SECRET_KEY": effective_secret,
         "DATABASE": database,
         "TESTING": False,
@@ -47,7 +49,7 @@ def build_config() -> dict[str, object]:
         "SESSION_COOKIE_SAMESITE": "Lax",
         "SESSION_COOKIE_SECURE": _boolean("SOCIFY_HTTPS"),
         "PERMANENT_SESSION_LIFETIME": _integer("SOCIFY_SESSION_SECONDS", 28800),
-        "ALLOW_REGISTRATION": _boolean("SOCIFY_ALLOW_REGISTRATION", environment != "production"),
+        "ALLOW_REGISTRATION": _boolean("SOCIFY_ALLOW_REGISTRATION", False),
         "CREDENTIAL_KEY": os.environ.get("SOCIFY_CREDENTIAL_KEY") or effective_secret,
         "TRUSTED_HOSTS": trusted_hosts,
         "RATE_LIMIT_LOGIN_ATTEMPTS": _integer("SOCIFY_LOGIN_ATTEMPTS", 5),

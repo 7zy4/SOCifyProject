@@ -7,6 +7,7 @@ from flask_wtf.csrf import CSRFError, CSRFProtect, generate_csrf
 
 from .attack import attack_api
 from .auth import auth_api
+from .autopsy_api import autopsy_api
 from .cases import cases_api
 from .config import build_config
 from .db import close_db, connect_path
@@ -14,6 +15,7 @@ from .detection import detection_api
 from .events import events_api
 from .hunting import hunting_api
 from .ingestion import ingestion_api
+from .operational import operational_mode
 from .platform import platform_api
 from .playbooks import playbooks_api
 from .schema import ensure_schema
@@ -32,11 +34,17 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     app.config.update(build_config())
     if test_config:
         app.config.update(test_config)
+
+    @app.context_processor
+    def product_context():
+        return {"product_name": app.config["PRODUCT_NAME"] if operational_mode() else "SOCify", "operational": operational_mode()}
+
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     CSRFProtect(app)
     app.teardown_appcontext(close_db)
     for blueprint in (
         ui,
+        autopsy_api,
         auth_api,
         events_api,
         detection_api,
@@ -55,8 +63,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         app.register_blueprint(blueprint)
 
     @app.before_request
-    def prepare_request() -> None:
+    def prepare_request():
         request.environ["socify.correlation_id"] = correlation_id()
+        if operational_mode() and request.path.startswith("/api/") and request.blueprint not in {"auth", "cases", "autopsy", "teams"}:
+            return error_response("CASE_CONTEXT_REQUIRED", "استخدم الأداة من داخل قضية مصرح بها؛ مسارات التدريب العامة متقاعدة", 410)
 
     @app.after_request
     def secure_response(response):

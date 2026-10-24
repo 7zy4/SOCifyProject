@@ -1056,6 +1056,8 @@ def _execute_schema(connection: sqlite3.Connection, schema: str) -> None:
 
 
 def ensure_schema(connection: sqlite3.Connection) -> None:
+    from .autopsy_schema import migrate
+
     connection.execute("BEGIN IMMEDIATE")
     try:
         _execute_schema(connection, BASE_SCHEMA)
@@ -1064,6 +1066,7 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         _normalize_existing_rows(connection)
         _migrate_legacy_incidents(connection)
         _execute_schema(connection, INDEX_SCHEMA)
+        migrate(connection)
         connection.commit()
     except Exception:
         connection.rollback()

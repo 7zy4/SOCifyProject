@@ -97,6 +97,16 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
     "auditor": {"events.read", "alerts.read", "cases.read", "graph.read", "audit.read", "scores.read_team", "rules.read", "sources.read"},
 }
 
+ROLE_PERMISSIONS.update(
+    {
+        "l1_analyst": ROLE_PERMISSIONS["analyst"].copy(),
+        "l2_responder": ROLE_PERMISSIONS["analyst"].copy(),
+        "investigator": ROLE_PERMISSIONS["analyst"].copy(),
+        "reviewer": ROLE_PERMISSIONS["auditor"] | {"reports.approve", "notes.add"},
+    }
+)
+ROLE_PERMISSIONS["soc_manager"].update({"reports.approve", "cases.assign", "intel.manage", "samples.download"})
+
 SENSITIVE_KEYS = {"password", "current_password", "new_password", "api_key", "secret", "token", "credential", "authorization", "backup_codes"}
 
 
@@ -192,10 +202,19 @@ def login_required(function: F) -> F:
 def has_permission(user: dict[str, Any] | None, permission: str) -> bool:
     if user is None:
         return False
-    permissions = ROLE_PERMISSIONS.get(str(user.get("role")), set())
+    permissions = effective_permissions(user)
+    return "*" in permissions or permission in permissions
+
+
+def effective_permissions(user: dict[str, Any]) -> set[str]:
+    from .operational import operational_mode
+
+    permissions = ROLE_PERMISSIONS.get(str(user.get("role")), set()).copy()
+    if operational_mode():
+        permissions = {item for item in permissions if not item.startswith(("training.", "scores.", "ground_truth."))}
     if "role_permissions" in user and user.get("role") not in {"soc_manager", "admin"}:
         permissions = permissions.intersection(user["role_permissions"])
-    return "*" in permissions or permission in permissions
+    return permissions
 
 
 def require_permission(permission: str) -> Callable[[F], F]:

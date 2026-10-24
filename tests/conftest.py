@@ -35,6 +35,7 @@ def app(tmp_path: Path, template_database: Path) -> Iterator[Flask]:
         {
             "DATABASE": str(database),
             "TESTING": True,
+            "LEGACY_TRAINING_TESTS": True,
             "WTF_CSRF_ENABLED": False,
             "SECRET_KEY": "test-session-key",
             "CREDENTIAL_KEY": "test-credential-key",

@@ -839,6 +839,10 @@ async function initialize() {
   const me = await api("/api/auth/me");
   state.user = me.user;
   state.permissions = new Set(me.permissions);
+  if (document.querySelector('meta[name="product-mode"]')?.content === "autopsy") {
+    await window.SOCifyAutopsy.start();
+    return;
+  }
   const renderer = state.section === "team" ? renderTeam : renderers[state.section] || renderDashboard;
   try { await renderer(); } catch (error) {
     handleError(error);
@@ -853,4 +857,4 @@ menu.addEventListener("click", () => {
   menu.setAttribute("aria-expanded", String(open));
 });
 
-initialize().catch(handleError);
+document.addEventListener("DOMContentLoaded", () => initialize().catch(handleError), { once: true });

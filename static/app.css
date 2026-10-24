@@ -69,6 +69,8 @@ small, label, th, td, .eyebrow, .badge { font-size: 14pt; }
 .auth-shell { display: grid; place-items: center; padding: 42pt 44pt; background: #C9D1DE; }
 .auth-layout { width: min(100%, 1320px); display: grid; grid-template-columns: 1fr 1fr; border-radius: 26pt; background: var(--bg); overflow: clip; }
 .auth-panel { display: flex; flex-direction: column; justify-content: space-between; gap: 34pt; padding: 34pt; background: var(--blue); color: var(--panel); }
+.auth-panel .brand { max-width: 100%; min-width: 0; }
+.auth-panel .brand span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .auth-panel .brand, .auth-panel h1, .auth-panel .eyebrow { color: var(--panel); }
 .auth-panel h1 { font-size: 48pt; margin-block: 17pt; }
 .auth-assurance { color: var(--panel); font-size: 14pt; }

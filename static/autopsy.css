@@ -1,0 +1,33 @@
+.autopsy-shell { display: block; }
+.autopsy-shell .sidebar { position: static; inset: auto; width: auto; height: auto; visibility: visible; display: flex; flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; border-inline: 0; border-bottom: 3pt solid var(--blue); }
+.autopsy-shell .sidebar > .brand { font-size: 20pt; max-width: 100%; min-width: 0; }
+.autopsy-shell .brand span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.autopsy-shell .sidebar nav { flex-direction: row; flex-wrap: wrap; overflow: visible; }
+.autopsy-shell .sidebar-foot { margin: 0; }
+.autopsy-shell #menu-toggle { display: none; }
+.autopsy-shell #workspace { max-width: 1680px; margin-inline: auto; }
+.autopsy-shell .topbar > div { min-width: 0; overflow-wrap: anywhere; }
+.autopsy-shell .case-tabs { display: flex; flex-wrap: wrap; gap: 10pt; padding-block: 17pt; margin-block: 17pt; border-block: 1px solid var(--line-soft); }
+.autopsy-shell .case-tabs [aria-current="page"] { background: var(--blue); color: var(--panel); }
+.autopsy-shell .case-content { display: grid; gap: 17pt; min-width: 0; }
+.autopsy-shell .record-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 17pt; }
+.autopsy-shell dl { margin: 0; }
+.autopsy-shell dt { font-size: 14pt; font-weight: 700; color: var(--muted); }
+.autopsy-shell dd { margin: 0 0 12pt; overflow-wrap: anywhere; white-space: pre-wrap; unicode-bidi: plaintext; }
+.autopsy-shell .case-title { overflow-wrap: anywhere; }
+.autopsy-shell .case-reference { direction: ltr; unicode-bidi: isolate; display: inline-block; }
+.autopsy-modal { background: var(--bg); color: var(--text); border: 3pt solid var(--blue); border-radius: var(--radius); padding: 17pt; width: min(960px, calc(100% - 24pt)); max-height: calc(100dvh - 24pt); overflow: auto; }
+.autopsy-modal::backdrop { background: rgb(29 52 97 / .65); }
+.autopsy-modal h2 { margin-block-start: 0; font-size: 30pt; overflow-wrap: anywhere; }
+.autopsy-modal fieldset { border: 1px solid var(--line-soft); border-radius: 18pt; min-width: 0; }
+.autopsy-modal form > label, .autopsy-modal .why-step { min-width: 0; }
+.autopsy-shell .search-choice { min-width: 0; }
+.autopsy-shell .case-toolbar { display: flex; flex-wrap: wrap; gap: 12pt; align-items: end; }
+.autopsy-shell .case-toolbar > label { flex: 1; min-width: min(100%, 240px); }
+.autopsy-shell .record-card h3 { margin-block-start: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .autopsy-shell .sidebar { padding: 12pt; }
+  .autopsy-shell .sidebar nav { width: 100%; }
+  .autopsy-shell .sidebar nav a { flex: 1; justify-content: center; }
+  .autopsy-shell .case-tabs .button { flex: 1 1 140px; }
+}

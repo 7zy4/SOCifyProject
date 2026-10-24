@@ -196,14 +196,22 @@ def login_api():
 
 @auth_api.get("/register")
 def register_page():
-    if not current_app.config["ALLOW_REGISTRATION"]:
+    from .operational import operational_mode
+
+    if not current_app.config["ALLOW_REGISTRATION"] and not operational_mode():
         return error_response("REGISTRATION_DISABLED", "إنشاء الحسابات العامة غير متاح", 403)
     return render_template("register.html", csrf_token=generate_csrf())
 
 
 def _register(data: dict[str, Any]):
-    if not current_app.config["ALLOW_REGISTRATION"]:
-        return error_response("REGISTRATION_DISABLED", "إنشاء الحسابات العامة غير متاح", 403)
+    from .operational import operational_mode
+
+    if operational_mode() or not current_app.config["ALLOW_REGISTRATION"]:
+        token = data.get("invitation_token")
+        if not isinstance(token, str) or not 32 <= len(token) <= 200 or not token.strip():
+            return error_response("REGISTRATION_DISABLED", "إنشاء الحسابات يتطلب دعوة صالحة من مدير الفريق", 403)
+    if operational_mode() and set(data) - {"email", "name", "password", "invitation_token", "csrf_token"}:
+        return error_response("INVALID_REGISTRATION", "أرسل حقول الدعوة والحساب المعروفة فقط", 422)
     email = data.get("email")
     name = data.get("name")
     password = data.get("password")
@@ -320,10 +328,10 @@ def csrf_token_api():
 @auth_api.get("/api/auth/me")
 @login_required
 def me():
+    from .security import effective_permissions
+
     user = _active_user()
-    permissions = current_permissions(str(user["role"]))
-    if "role_permissions" in user and user["role"] not in {"soc_manager", "admin"}:
-        permissions = permissions.intersection(user["role_permissions"])
+    permissions = effective_permissions(user)
     return jsonify({"user": user, "permissions": sorted(permissions)})
 
 

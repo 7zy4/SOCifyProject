@@ -11,7 +11,7 @@ from .security import ROLE_PERMISSIONS, actor_id, current_user, error_response, 
 from .timeutils import iso_now, utc_now
 
 teams_api = Blueprint("teams", __name__)
-MEMBER_ROLES = {"analyst", "auditor", "instructor", "soc_manager"}
+MEMBER_ROLES = {"analyst", "auditor", "instructor", "soc_manager", "l1_analyst", "l2_responder", "investigator", "reviewer"}
 
 
 def manager():
@@ -21,15 +21,21 @@ def manager():
 @teams_api.get("/api/team")
 @login_required
 def team_detail():
+    from .operational import operational_mode
+    from .security import effective_permissions
+
     members = [
         dict(row)
         for row in get_db().execute("SELECT id, name, email, role, is_active FROM users WHERE workspace_id = ? ORDER BY id", (workspace_id(),)).fetchall()
     ]
     roles = []
     for role in sorted(MEMBER_ROLES):
+        if operational_mode() and role == "instructor":
+            continue
+        available = effective_permissions({"role": role})
         policy = get_db().execute("SELECT permissions FROM team_role_permissions WHERE workspace_id = ? AND role = ?", (workspace_id(), role)).fetchone()
         roles.append(
-            {"role": role, "permissions": json.loads(policy[0]) if policy else sorted(ROLE_PERMISSIONS[role]), "available": sorted(ROLE_PERMISSIONS[role])}
+            {"role": role, "permissions": sorted(set(json.loads(policy[0])) & available) if policy else sorted(available), "available": sorted(available)}
         )
     scope = "" if manager() else " AND a.assignee = ?"
     args = [workspace_id()] if manager() else [workspace_id(), actor_id()]
