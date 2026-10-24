@@ -77,15 +77,35 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         return response
 
     @app.errorhandler(CSRFError)
-    def csrf_failure(_: CSRFError):
+    def csrf_failure(error: CSRFError):
+        reasons = {
+            "The CSRF token is missing.": ("TOKEN_MISSING", "لم يصل رمز حماية النموذج. افتح صفحة تسجيل الدخول من جديد وأعد المحاولة."),
+            "The CSRF session token is missing.": (
+                "SESSION_MISSING",
+                "تعذّر استعادة جلسة النموذج. افتح الموقع من Ports في نافذة متصفح مستقلة واسمح بملفات الارتباط.",
+            ),
+            "The CSRF token has expired.": ("TOKEN_EXPIRED", "انتهت صلاحية النموذج. أعد إدخال بياناتك في النموذج الجديد."),
+            "The CSRF token is invalid.": ("TOKEN_INVALID", "تعذّر التحقق من رمز النموذج. افتح صفحة تسجيل الدخول من جديد وأعد المحاولة."),
+            "The CSRF tokens do not match.": ("TOKEN_MISMATCH", "تغيرت جلسة النموذج. أعد إدخال بياناتك في النموذج الجديد."),
+            "The referrer header is missing.": ("REFERRER_MISSING", "لم يرسل المتصفح عنوان صفحة النموذج. افتح الموقع من Ports في نافذة متصفح مستقلة."),
+            "The referrer does not match the host.": (
+                "REFERRER_MISMATCH",
+                "عنوان صفحة النموذج يختلف عن عنوان الخادم. افتح صفحة تسجيل الدخول من عنوان Ports نفسه.",
+            ),
+        }
+        reason, message = reasons.get(error.description, ("VALIDATION_FAILED", "تعذّر التحقق من حماية النموذج. افتح صفحة تسجيل الدخول من جديد."))
+        identifier = correlation_id()
+        app.logger.warning("csrf_rejected reason=%s correlation_id=%s", reason, identifier)
         if not request.is_json and request.path in {"/login", "/register"}:
             template = "login.html" if request.path == "/login" else "register.html"
             return render_template(
                 template,
                 csrf_token=generate_csrf(),
-                csrf_error="انتهت صلاحية النموذج أو تغيرت الجلسة. أعد إدخال بياناتك. الرمز يُنشأ تلقائيًا ولا تحتاج إلى إدخاله. إذا تكرر الخطأ افتح الموقع من Ports في نافذة متصفح مستقلة واسمح بملفات الارتباط.",
+                csrf_error=f"{message} الرمز يُنشأ تلقائيًا ولا تحتاج إلى إدخاله.",
+                csrf_reason=reason,
+                csrf_correlation_id=identifier,
             ), 400
-        return error_response("CSRF_VALIDATION_FAILED", "رمز الحماية مفقود أو منتهي. حدّث الصفحة وأعد المحاولة", 400)
+        return error_response("CSRF_VALIDATION_FAILED", "رمز الحماية مفقود أو منتهي. حدّث الصفحة وأعد المحاولة", 400, {"reason": reason})
 
     @app.errorhandler(404)
     def not_found(_: Exception):

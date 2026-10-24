@@ -18,7 +18,7 @@
       <form id="auth-form" method="post" action="{{ url_for('auth.login_form') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <header><p class="eyebrow">دخول آمن</p><h2>بيانات الحساب</h2></header>
-        {% if csrf_error %}<div class="notice" role="alert">{{ csrf_error }}</div>{% endif %}
+        {% if csrf_error %}<div class="notice" role="alert">{{ csrf_error }}<p dir="ltr">CSRF: {{ csrf_reason }} · {{ csrf_correlation_id }}</p></div>{% endif %}
         {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="notice {{ category }}" role="alert">{{ message }}</div>{% endfor %}{% endwith %}
         <label for="email">البريد الإلكتروني</label>
         <input id="email" name="email" type="email" autocomplete="username" required maxlength="254" autofocus>

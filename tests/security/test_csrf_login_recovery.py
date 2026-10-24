@@ -1,4 +1,7 @@
 import re
+import secrets
+
+import pytest
 
 from scripts.start_codespace import load_environment
 from socify import create_app
@@ -61,3 +64,53 @@ def test_persistent_codespace_keys_validate_csrf_across_app_instances(app, clien
     response = b.post("/login", data={"csrf_token": csrf, "email": "analyst@socify.local", "password": "Training-Safe-Password-2026!"})
     assert response.status_code == 302
     assert b.get("/api/auth/me").status_code == 200
+
+
+@pytest.mark.parametrize(
+    "reason", ["TOKEN_MISSING", "SESSION_MISSING", "TOKEN_EXPIRED", "TOKEN_INVALID", "TOKEN_MISMATCH", "REFERRER_MISSING", "REFERRER_MISMATCH"]
+)
+def test_csrf_rejection_identifies_cause_without_logging_credentials(app, client, caplog, reason):
+    app.config["WTF_CSRF_ENABLED"] = True
+    csrf = token(client.get("/login", base_url="https://localhost"))
+    fields = {"csrf_token": csrf, "email": "private-user@example.test", "password": secrets.token_urlsafe(24)}
+    headers = {"Referer": "https://localhost/login", "X-Correlation-ID": "csrf-diagnostic-fixture"}
+    if reason == "TOKEN_MISSING":
+        del fields["csrf_token"]
+    elif reason == "SESSION_MISSING":
+        client.delete_cookie("session")
+    elif reason == "TOKEN_EXPIRED":
+        app.config["WTF_CSRF_TIME_LIMIT"] = -1
+    elif reason == "TOKEN_INVALID":
+        fields.update({"csrf_token": "invalid"})
+    elif reason == "TOKEN_MISMATCH":
+        fields["csrf_token"] = token(app.test_client().get("/login", base_url="https://localhost"))
+    elif reason == "REFERRER_MISSING":
+        del headers["Referer"]
+    elif reason == "REFERRER_MISMATCH":
+        headers["Referer"] = "https://untrusted.example/login"
+    response = client.post("/login", base_url="https://localhost", data=fields, headers=headers)
+    assert response.status_code == 400
+    assert f"CSRF: {reason}" in response.text
+    assert "csrf-diagnostic-fixture" in response.text
+    assert response.headers["X-Correlation-ID"] == "csrf-diagnostic-fixture"
+    assert response.headers["Cache-Control"] == "no-store"
+    assert f"csrf_rejected reason={reason} correlation_id=csrf-diagnostic-fixture" in caplog.text
+    for value in (csrf, fields["email"], fields["password"]):
+        assert value not in caplog.text
+    assert fields["password"] not in response.text
+    assert token(response)
+
+
+def test_csrf_https_same_origin_login_succeeds(app, client, caplog):
+    app.config["WTF_CSRF_ENABLED"] = True
+    csrf = token(client.get("/login", base_url="https://localhost"))
+    response = client.post(
+        "/login",
+        base_url="https://localhost",
+        data={"csrf_token": csrf, "email": "analyst@socify.local", "password": "Training-Safe-Password-2026!"},
+        headers={"Referer": "https://localhost/login"},
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/dashboard"
+    assert client.get("/api/auth/me", base_url="https://localhost").status_code == 200
+    assert "csrf_rejected" not in caplog.text

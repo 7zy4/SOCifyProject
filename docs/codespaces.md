@@ -1,9 +1,17 @@
 # تشغيل GitHub Codespaces
 
-استخدم الفرع `socify-version-2`. للتشغيل اليدوي بعد إيقاف الخادم السابق بـCtrl+C:
+استخدم الفرع `socify-version-2`. للتجربة اليدوية بعد إيقاف الخادم السابق بـCtrl+C:
 
 ```bash
-git pull origin socify-version-2
+python run.py
+```
+
+أكد المستخدم نجاح تسجيل الدخول بهذا الأمر بعد فشل طريقة التشغيل السابقة. يشغّل `run.py` خادم تطوير بعملية واحدة؛ ليس أمر نشر إنتاجي. يستخدم إعدادات البيئة الموجودة، ولا يحمّل `instance/codespaces.env` بنفسه. إعادة تشغيله دون مفتاح جلسة ثابت تستلزم تسجيل الدخول من جديد. لا تشغّل خادمين على المنفذ نفسه.
+
+للتشغيل عبر Gunicorn مع تحميل المفاتيح المحفوظة تلقائيًا، بعد إيقاف الخادم السابق:
+
+```bash
+git pull --ff-only origin socify-version-2
 SOCIFY_HOST=0.0.0.0 python -m scripts.start_codespace
 ```
 

@@ -65,6 +65,8 @@ docker compose up --build
 
 ## Codespaces
 
+للتجربة اليدوية بعد إيقاف الخادم السابق: `python run.py`. أكد المستخدم نجاح تسجيل الدخول بهذا المسار. هذا خادم تطوير بعملية واحدة، ويستخدم مفاتيح البيئة الموجودة دون تحميل ملف مفاتيح Codespaces تلقائيًا.
+
 بعد إيقاف الخادم السابق، شغّل `SOCIFY_HOST=0.0.0.0 python -m scripts.start_codespace` من الفرع `socify-version-2`. يحمّل الأمر المفاتيح المحفوظة تلقائيًا قبل بدء Gunicorn. افتح المنفذ 5000 بوضع Private في نافذة متصفح مستقلة.
 
 افتح المستودع في Codespaces؛ يثبت Dev Container الاعتمادات، يرحّل القاعدة، ويشغل Gunicorn على المنفذ 5000 بظهور `Private`. التفاصيل في [دليل Codespaces](docs/codespaces.md).
