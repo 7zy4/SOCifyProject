@@ -12,6 +12,11 @@ services:
       SOCIFY_TRUSTED_HOSTS: localhost,127.0.0.1
     ports:
       - "127.0.0.1:5000:5000"
+    networks:
+      - socify-internal
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 128
     volumes:
       - socify-data:/data
     read_only: true
@@ -22,19 +27,25 @@ services:
     cap_drop:
       - ALL
     restart: unless-stopped
-  playbook-worker:
+  autopsy-worker:
     build:
       context: .
       target: runtime
-    command: ["python", "-m", "scripts.run_playbook_worker", "--database", "/data/socify.db"]
+    command: ["python", "-m", "scripts.run_autopsy_worker"]
     environment:
       SOCIFY_ENV: production
+      SOCIFY_SECRET_KEY: ${SOCIFY_SECRET_KEY:?Set SOCIFY_SECRET_KEY to a random value of at least 32 bytes}
+      SOCIFY_CREDENTIAL_KEY: ${SOCIFY_CREDENTIAL_KEY:?Set SOCIFY_CREDENTIAL_KEY to a separate random value}
       SOCIFY_DATABASE: /data/socify.db
+    network_mode: none
+    mem_limit: 2g
+    cpus: 2
+    pids_limit: 64
     volumes:
       - socify-data:/data
     read_only: true
     tmpfs:
-      - /tmp:size=32m,noexec,nosuid,nodev
+      - /tmp:size=128m,noexec,nosuid,nodev
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -45,6 +56,10 @@ services:
       context: .
       target: runtime
     command: ["python", "-m", "scripts.run_import_worker", "--lease-seconds", "120"]
+    network_mode: none
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 64
     environment:
       SOCIFY_ENV: production
       SOCIFY_SECRET_KEY: ${SOCIFY_SECRET_KEY:?Set SOCIFY_SECRET_KEY to a random value of at least 32 bytes}
@@ -63,3 +78,7 @@ services:
 
 volumes:
   socify-data:
+
+networks:
+  socify-internal:
+    internal: true

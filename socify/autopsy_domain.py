@@ -227,6 +227,14 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
     if kind == "corrective" and result["status"] == "validated" and not result.get("validation"):
         raise ValueError("توثيق التحقق من فاعلية الإجراء مطلوب")
     if (
+        kind == "foothold"
+        or kind == "hypothesis"
+        and result.get("assessment") in {"supported", "refuted"}
+        or kind == "root_cause"
+        and result.get("category") != "unknown"
+    ) and not result.get("evidence_id"):
+        raise ValueError("الاستنتاج المؤكد يتطلب دليلًا مرتبطًا")
+    if (
         kind == "response"
         and result["status"] == "succeeded"
         and (not result.get("performed_by") or not result.get("performed_at") or not result.get("evidence_id"))

@@ -96,6 +96,15 @@ CREATE TABLE IF NOT EXISTS autopsy_report_files (
     sha256 TEXT NOT NULL,
     PRIMARY KEY(report_id, format)
 );
+CREATE TRIGGER IF NOT EXISTS autopsy_report_snapshot_immutable
+BEFORE UPDATE OF case_id, revision, payload, sha256, source_version, created_by, created_at ON autopsy_reports
+BEGIN SELECT RAISE(ABORT, 'report snapshots are immutable'); END;
+CREATE TRIGGER IF NOT EXISTS autopsy_report_file_immutable_update
+BEFORE UPDATE ON autopsy_report_files
+BEGIN SELECT RAISE(ABORT, 'report files are immutable'); END;
+CREATE TRIGGER IF NOT EXISTS autopsy_report_file_immutable_delete
+BEFORE DELETE ON autopsy_report_files
+BEGIN SELECT RAISE(ABORT, 'report files are immutable'); END;
 CREATE TABLE IF NOT EXISTS autopsy_intel_bundles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
@@ -110,6 +119,24 @@ CREATE TABLE IF NOT EXISTS autopsy_intel_bundles (
     created_at TEXT NOT NULL,
     UNIQUE(workspace_id, name, version)
 );
+CREATE TABLE IF NOT EXISTS autopsy_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id INTEGER NOT NULL REFERENCES incident_cases(id),
+    kind TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT 'queued',
+    parameters TEXT NOT NULL CHECK(json_valid(parameters)),
+    result TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(result)),
+    error_code TEXT,
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    worker_id TEXT,
+    lease_expires_at TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    started_at TEXT,
+    completed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_autopsy_jobs_queue ON autopsy_jobs(state, id);
+CREATE INDEX IF NOT EXISTS idx_autopsy_jobs_case ON autopsy_jobs(case_id, id);
 CREATE VIRTUAL TABLE IF NOT EXISTS autopsy_log_search USING fts5(title, description, source_ip, destination_ip, hostname, username, raw_data, content='security_events', content_rowid='id');
 CREATE TRIGGER IF NOT EXISTS autopsy_search_insert AFTER INSERT ON security_events BEGIN
     INSERT INTO autopsy_log_search(rowid, title, description, source_ip, destination_ip, hostname, username, raw_data)
@@ -154,7 +181,21 @@ def migrate(connection: sqlite3.Connection) -> None:
         if "owner_case_id" not in columns:
             connection.execute(f"ALTER TABLE {table} ADD COLUMN owner_case_id INTEGER REFERENCES incident_cases(id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_events_case_time ON security_events(owner_case_id, event_time, id)")
+    for table in (
+        "case_notes",
+        "case_evidence",
+        "case_events",
+        "case_alerts",
+        "case_tasks",
+        "case_technique_annotations",
+        "autopsy_case_members",
+        "autopsy_case_imports",
+    ):
+        for operation, reference in (("INSERT", "new"), ("UPDATE", "new"), ("DELETE", "old")):
+            connection.execute(
+                f"CREATE TRIGGER IF NOT EXISTS autopsy_version_{table}_{operation.lower()} AFTER {operation} ON {table} WHEN EXISTS (SELECT 1 FROM autopsy_case_context WHERE case_id = {reference}.case_id) BEGIN UPDATE incident_cases SET version = version + 1 WHERE id = {reference}.case_id; END;"
+            )
     connection.execute(
-        "INSERT INTO schema_meta(key, value, updated_at) VALUES ('autopsy_schema_version', '2', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at WHERE schema_meta.value != excluded.value",
+        "INSERT INTO schema_meta(key, value, updated_at) VALUES ('autopsy_schema_version', '3', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at WHERE schema_meta.value != excluded.value",
         (iso_now(),),
     )

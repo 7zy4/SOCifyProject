@@ -6,6 +6,16 @@ __pycache__
 *.pyc
 *.db
 .env*
+**/*.env
+**/*.db*
+instance
+.coverage*
+.mypy_cache
+.venv
+node_modules
+artifacts
+docs/research
+*.log
 htmlcov
 dist
 docs/qa/evidence

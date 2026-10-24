@@ -74,7 +74,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - run: SOCIFY_SECRET_KEY=ci-only-secret-key-with-at-least-32-bytes SOCIFY_CREDENTIAL_KEY=ci-only-distinct-credential-key-with-at-least-32-bytes docker compose up --detach --build  # pragma: allowlist secret
       - run: curl --fail --retry 20 --retry-delay 2 --retry-all-errors http://127.0.0.1:5000/health/ready
-      - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp playbook-worker
+      - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp autopsy-worker
       - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp import-worker
       - if: always()
         run: docker compose logs

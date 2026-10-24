@@ -7,6 +7,9 @@ markers = ["e2e: browser end-to-end tests", "performance: deterministic local be
 [tool.coverage.run]
 branch = true
 source = ["socify"]
+concurrency = ["multiprocessing"]
+parallel = true
+sigterm = true
 
 [tool.coverage.report]
 show_missing = true

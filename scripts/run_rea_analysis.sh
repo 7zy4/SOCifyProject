@@ -7,9 +7,10 @@ output_path="${1:-$repository_root/artifacts/rea-analysis.json}"
 trap 'rm -rf "$analysis_target"' EXIT
 
 mkdir -p "$analysis_target/static" "$analysis_target/templates" "$(dirname "$output_path")"
-cp "$repository_root/static/app.js" "$analysis_target/static/app.js"
+cp "$repository_root"/static/*.js "$analysis_target/static/"
 cp "$repository_root/templates/app.html" "$analysis_target/templates/app.html"
 cp "$repository_root/templates/register.html" "$analysis_target/templates/register.html"
+cp "$repository_root/templates/login.html" "$analysis_target/templates/login.html"
 if [[ -n "${SOCIFY_REA_CLI:-}" ]]; then
   node "$SOCIFY_REA_CLI" analyze-javascript-application "$analysis_target" --json | tee "$output_path"
 else

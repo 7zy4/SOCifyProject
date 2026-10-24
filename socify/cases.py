@@ -598,6 +598,12 @@ def update_case(case_id: int):
 
 
 def _transition(case_id: int, row: sqlite3.Row, target: str, reason: str, data: dict[str, Any]):
+    from .operational import operational_mode
+
+    if operational_mode():
+        from .autopsy_reports import transition_operational
+
+        return transition_operational(case_id, row, target, reason, data)
     if target not in TRANSITIONS.get(str(row["status"]), set()):
         return error_response("ILLEGAL_CASE_TRANSITION", f"لا يمكن الانتقال من {row['status']} إلى {target}", 409)
     if len(reason.strip()) < 3:
@@ -696,6 +702,10 @@ def add_note(case_id: int):
     row = _case_row(case_id)
     if not row:
         return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
+    from .operational import operational_mode
+
+    if operational_mode() and row["status"] == "closed":
+        return error_response("CASE_CLOSED", "القضية مغلقة؛ تابع الإجراءات التصحيحية أو أعد فتحها بسبب موثق", 409)
     data = request.get_json(silent=True)
     body = data.get("body", data.get("note")) if isinstance(data, dict) else None
     visibility = data.get("visibility", "team") if isinstance(data, dict) else "team"

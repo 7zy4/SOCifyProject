@@ -9,6 +9,8 @@ from .attack import attack_api
 from .auth import auth_api
 from .autopsy_api import autopsy_api
 from .autopsy_ingestion import autopsy_ingestion_api
+from .autopsy_procedures import autopsy_procedures_api
+from .autopsy_reports import autopsy_reports_api
 from .cases import cases_api
 from .config import build_config
 from .db import close_db, connect_path
@@ -47,6 +49,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         ui,
         autopsy_api,
         autopsy_ingestion_api,
+        autopsy_procedures_api,
+        autopsy_reports_api,
         auth_api,
         events_api,
         detection_api,

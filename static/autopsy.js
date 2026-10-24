@@ -172,6 +172,8 @@ async function autopsyCase(caseId) {
   root.append(node("nav", { class: "case-tabs", "aria-label": "أقسام القضية" }, tabs.map(([id, label]) => node("a", { class: "button ghost", href: `/cases/${caseId}?tab=${id}`, "aria-current": selected === id ? "page" : null, text: label }))));
   const content = node("div", { class: "case-content" });
   if (selected === "summary") {
+    const transitions = autopsy.catalog.case_transitions[current.status] || [];
+    if (current.can_update && transitions.length) content.append(panel("حالة القضية", node("div", { class: "panel-body" }, autopsyForm({ status: { required: true, choices: transitions.filter((value) => value !== "closed" || permission("cases.close")) }, reason: { required: true, max: 2000 } }, async (body) => { await api(`/api/cases/${caseId}/transitions`, { method: "POST", body: { ...body, version: current.version } }); await autopsyCase(caseId); })), true));
     const schema = { reason: { required: true, max: 500 }, objective: { required: true, max: 2000 }, classification: { choices: autopsy.catalog.classifications, required: true }, attack_outcome: { choices: autopsy.catalog.outcomes, required: true }, alert_verdict: { choices: autopsy.catalog.verdicts, required: true } };
     if (current.can_update && current.status !== "closed") content.append(panel("سبب القضية وهدفها ونتيجتها", node("div", { class: "panel-body" }, autopsyForm(schema, async (body) => { await api(`/api/cases/${caseId}/context`, { method: "PATCH", body: { ...body, version: current.version } }); await autopsyCase(caseId); }, current.context || { classification: "confidential", attack_outcome: "unknown", alert_verdict: "undetermined" })), true));
     else content.append(panel("ملخص القضية", node("div", { class: "panel-body" }, [node("p", { text: current.context?.reason || "قضية موروثة؛ يتطلب ملخصها مراجعة" }), node("p", { text: current.context?.objective || "—" })]), true));
@@ -206,6 +208,7 @@ async function autopsyStart() {
   [autopsy.catalog, autopsy.team] = await Promise.all([api("/api/autopsy/catalog"), api("/api/team")]);
   const caseId = document.querySelector('meta[name="case-id"]')?.content;
   if (caseId) return autopsyCase(Number(caseId));
+  if (state.section === "playbooks" && window.SOCifyAutopsy.procedureLibrary) return window.SOCifyAutopsy.procedureLibrary();
   if (state.section === "team") return renderTeam();
   if (state.section === "my-tasks") {
     begin("my-tasks");

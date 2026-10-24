@@ -1,0 +1,41 @@
+{
+  "tool": "7zy4/rea",
+  "version": "6.7.0",
+  "tool_commit": "2250e67bc271c83f9e200ee298aa04a2457438a6",
+  "date": "2026-10-24",
+  "evidence_id": "ev_831326c87048d6b525aceeb9cce01be8702d5f91909c7386f8a7a19ae6535dea",
+  "evidence_file": "socify-implementation-rea.json.gz",
+  "compressed_sha256": "c5129e0d6269b5331e2121ce8fdafc8ace0ada5242ef321289578be155230dd7",
+  "statistics": {
+    "relevant_files": 8,
+    "nested_asar_containers": 0,
+    "text_bytes_read": 136729,
+    "invalid_utf8_files": 0,
+    "parsed_javascript_files": 5,
+    "skipped_javascript_files": 0,
+    "visited_ast_nodes": 19228,
+    "findings": 34,
+    "modules": 0,
+    "parse_failures": 0
+  },
+  "integrity_contradictions": [],
+  "inputs": {
+    "static/app.js": "939ef42c4e41559d82d26a8dcbe3fc383c353a9ecba4b1e8dd8e69c61c70be2d",
+    "static/autopsy.js": "82e67ee119c055981debf863da7fed993af2384b15e58047ebc6759078c0ab25",
+    "static/autopsy_data.js": "eda74f9f81bda44d418d7d6b7952eeb8510772a02316707d1a815d53766d2cfc",
+    "static/autopsy_procedures.js": "78ae8b7ccd4fadd1dc8328bb3eae0d3726301a926013c26d400ce1dced750208",
+    "static/autopsy_reports.js": "a1689df065b0f96bacb055fcb28016a070d8647dda57b36820f3b4e5e9e8c935",
+    "templates/app.html": "6af03e8a4d204a25947db9f123762f70dc9a577df1f662980f10f1dfa3ff62fc",
+    "templates/register.html": "3c4cd5f558695780b72a4e002ecaef3f2b0cbc07238da7440646293c3f20f536",
+    "templates/login.html": "23b5200086a8eb9ebe9f3bc74fc17d79924aacb5a1056291584f37b04ba11800"
+  },
+  "limitations": [
+    "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+    "Graph coverage is incomplete; unavailable facts remain explicit and must not be read as absence.",
+    "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+    "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+    "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+    "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
+  ],
+  "scope": "Implemented V3 checkpoint, not final acceptance or penetration testing"
+}

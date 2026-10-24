@@ -7,6 +7,8 @@ import pytest
 from playwright.sync_api import sync_playwright
 from werkzeug.serving import make_server
 
+from scripts.local_services import local_worker_services
+
 
 @pytest.mark.e2e
 def test_case_first_operational_browser_with_csrf_and_mobile_layout(app):
@@ -47,6 +49,55 @@ def test_case_first_operational_browser_with_csrf_and_mobile_layout(app):
             for width in (360, 390, 768, 1440):
                 page.set_viewport_size({"width": width, "height": 1000})
                 assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), width
+            browser.close()
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+@pytest.mark.e2e
+def test_manager_procedure_library_and_report_worker_browser(app):
+    app.config.update(LEGACY_TRAINING_TESTS=False, ALLOW_REGISTRATION=False, WTF_CSRF_ENABLED=True)
+    server = make_server("127.0.0.1", 0, app)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with local_worker_services(app.config), sync_playwright() as playwright:
+            browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
+            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.add_init_script(path=str(Path("node_modules/axe-core/axe.min.js").resolve()))
+            page.goto(f"http://127.0.0.1:{server.server_port}/login")
+            page.locator("input[name=email]").fill("manager@socify.local")
+            page.locator("input[name=password]").fill("Training-Safe-Password-2026!")
+            page.locator("button[type=submit]").click()
+            page.wait_for_url("**/cases")
+            page.get_by_role("link", name="كتيبات الاستجابة", exact=True).click()
+            page.get_by_role("button", name="إضافة القوالب الإرشادية للمراجعة").click()
+            page.get_by_role("button", name="اعتماد ونشر هذا الإصدار").first.wait_for()
+            page.get_by_role("button", name="اعتماد ونشر هذا الإصدار").first.click()
+            page.get_by_role("link", name="القضايا", exact=True).click()
+            page.get_by_role("button", name="إنشاء قضية", exact=True).click()
+            dialog = page.get_by_role("dialog")
+            dialog.locator("input[name=title]").fill("Browser report review")
+            dialog.locator("input[name=reason]").fill("مراجعة تنبيه")
+            dialog.locator("textarea[name=objective]").fill("Check locally generated report artifacts and review controls")
+            dialog.get_by_role("button", name="حفظ", exact=True).click()
+            page.wait_for_url("**/cases/*")
+            page.get_by_role("link", name="التقارير والمراجعة", exact=True).click()
+            page.get_by_role("button", name="إعداد تقرير جديد", exact=True).click()
+            page.get_by_role("link", name="تنزيل PDF", exact=True).wait_for(timeout=60000)
+            assert page.get_by_role("link", name="تنزيل DOCX", exact=True).count() == 1
+            with page.expect_download() as download:
+                page.get_by_role("link", name="تنزيل PDF", exact=True).click()
+            assert Path(download.value.path()).read_bytes().startswith(b"%PDF-")
+            violations = page.evaluate("async () => (await axe.run(document)).violations.filter(item => ['serious', 'critical'].includes(item.impact))")
+            assert not violations, [(item["id"], item["nodes"]) for item in violations]
+            for width in (360, 768, 1440, 1920):
+                page.set_viewport_size({"width": width, "height": 1000})
+                assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), width
+            assert errors == []
             browser.close()
     finally:
         server.shutdown()

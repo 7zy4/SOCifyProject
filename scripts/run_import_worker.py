@@ -1,8 +1,11 @@
 import argparse
+import os
 import socket
 import time
 import uuid
+from pathlib import Path
 
+from scripts.environment import load_environment
 from socify import create_app
 from socify.db import get_db
 from socify.import_worker import run_import_worker_once
@@ -16,6 +19,8 @@ def main() -> None:
     arguments = parser.parse_args()
     if not 0.05 <= arguments.poll_seconds <= 60 or not 5 <= arguments.lease_seconds <= 3600:
         parser.error("poll seconds or lease seconds are outside the safe range")
+    if os.environ.get("SOCIFY_ENV", "development") != "production":
+        load_environment(Path(__file__).resolve().parent.parent)
     worker_id = f"{socket.gethostname()}-{uuid.uuid4().hex[:12]}"
     application = create_app()
     with application.app_context():
