@@ -167,6 +167,11 @@ def current_user() -> dict[str, Any] | None:
     if not row:
         return None
     user = dict(row)
+    policy = (
+        get_db().execute("SELECT permissions FROM team_role_permissions WHERE workspace_id = ? AND role = ?", (user["workspace_id"], user["role"])).fetchone()
+    )
+    if policy:
+        user["role_permissions"] = json.loads(policy["permissions"])
     g.current_user = user
     return user
 
@@ -188,6 +193,8 @@ def has_permission(user: dict[str, Any] | None, permission: str) -> bool:
     if user is None:
         return False
     permissions = ROLE_PERMISSIONS.get(str(user.get("role")), set())
+    if "role_permissions" in user and user.get("role") not in {"soc_manager", "admin"}:
+        permissions = permissions.intersection(user["role_permissions"])
     return "*" in permissions or permission in permissions
 
 

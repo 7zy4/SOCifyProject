@@ -25,7 +25,8 @@ const titles = {
   scores: ["التقييم والنتائج", "ASSESSMENT ENGINE"],
   audit: ["سجل التدقيق", "IMMUTABLE ACTIVITY"],
   admin: ["إدارة المنصة", "ROLE GOVERNANCE"],
-  profile: ["الملف والأمان", "ACCOUNT SECURITY"]
+  profile: ["الملف والأمان", "ACCOUNT SECURITY"],
+  team: ["الفريق والمهام", "TEAM OPERATIONS"]
 };
 
 function node(tag, attributes = {}, children = []) {
@@ -345,6 +346,7 @@ function caseDetailView(item) {
     linkedButton("فتح الرسم الزمني", `/graph?case_id=${item.id}`)
   ];
   if (item.status === "closed") actions.push(linkedButton("تنزيل التقرير", `/api/incidents/${item.id}/report?format=html`));
+  if (["admin", "soc_manager"].includes(state.user.role)) actions.push(linkedButton("إسناد سجلات الفريق", `/team?case_id=${item.id}`));
   root.append(pageHead(`${item.reference} · ${item.title}`, `${item.description || "لا يوجد وصف"} · الإصدار ${item.version}`, actions));
   root.append(node("section", { class: "metric-grid", "aria-label": "ملخص التحقيق" }, [
     node("article", { class: "metric" }, [node("span", { text: "الحالة" }), badge(item.status), node("small", { text: `آخر تحديث ${formatTime(item.updated_at)}` })]),
@@ -779,6 +781,41 @@ async function renderAdmin() {
   finish(root);
 }
 
+async function renderTeam() {
+  begin("team");
+  const data = await api("/api/team");
+  const root = node("div", {}, pageHead("الفريق وتوزيع التحقيقات", "الإسناد مرتبط بالاستيراد والقضية والتقرير؛ السجلات المشتركة تعاونية داخل الفريق"));
+  const save = async (path, method, body) => { try { await api(path, { method, body }); await renderTeam(); } catch (error) { handleError(error); } };
+  const memberColumns = [{ label: "العضو", value: "name" }, { label: "البريد", value: "email" }, { label: "الدور", value: "role" }];
+  if (data.can_manage) memberColumns.push({ label: "تغيير الدور", value: (member) => {
+    if (member.role === "admin") return "مدير النظام";
+    const select = selectControl("role", data.roles.map((entry) => entry.role));
+    select.value = member.role; select.setAttribute("aria-label", `دور ${member.name}`);
+    return node("div", { class: "action-row" }, [select, button("حفظ الدور", () => save(`/api/team/members/${member.id}`, "PATCH", { role: select.value }), "compact")]);
+  }});
+  root.append(panel("أعضاء الفريق", table(memberColumns, data.members), true));
+  const columns = [{ label: "المسؤول", value: "assignee_name" }, { label: "الملف", value: "filename" }, { label: "القضية", value: (row) => linkedButton(row.reference, `/incidents?selected=${row.case_id}`, "compact") }, { label: "التعليمات", value: "instructions" }, { label: "الحالة", value: "task_status" }, { label: "الإجراء", value: (row) => node("div", { class: "action-row" }, [linkedButton("الخط الزمني", `/graph?case_id=${row.case_id}`, "compact"), button("بدء التحليل", () => save(`/api/team/assignments/${row.id}`, "PATCH", { status: "in_progress" }), "compact"), button("إكمال المهمة", () => save(`/api/team/assignments/${row.id}`, "PATCH", { status: "completed" }), "compact")]) }];
+  root.append(panel("مهام تحليل السجلات", data.assignments.length ? table(columns, data.assignments) : emptyState("لا مهام مسندة", "يسند المدير استيرادًا مكتملًا مرتبطًا بقضية إلى عضو الفريق."), true));
+  if (data.can_manage) {
+    const invite = node("form", { class: "form-grid", "aria-label": "دعوة عضو" }, [field("البريد الإلكتروني", node("input", { name: "email", type: "email", required: true })), field("دور العضو", selectControl("role", data.roles.map((entry) => entry.role))), node("button", { type: "submit", class: "button primary", text: "إنشاء دعوة" })]);
+    const resultView = node("div", { class: "panel-body", "aria-live": "polite" });
+    invite.addEventListener("submit", async (event) => { event.preventDefault(); try { const result = await api("/api/team/invitations", { method: "POST", body: Object.fromEntries(new FormData(invite)) }); resultView.replaceChildren(node("p", { text: "شارك الرمز مع صاحب البريد ليستخدمه عند التسجيل؛ صالح ليوم واحد ومرة واحدة." }), node("code", { text: result.invitation_token })); } catch (error) { handleError(error); } });
+    root.append(panel("دعوة عضو", node("div", { class: "panel-body" }, [invite, resultView])));
+    const assignment = node("form", { class: "form-grid", "aria-label": "إسناد سجلات" }, [field("رقم الاستيراد", node("input", { name: "job_id", type: "number", min: 1, required: true })), field("رقم القضية", node("input", { name: "case_id", type: "number", min: 1, required: true })), field("المسؤول", node("select", { name: "assignee" }, data.members.filter((member) => member.is_active && ["analyst", "soc_manager"].includes(member.role)).map((member) => node("option", { value: member.id, text: member.name })))), field("تعليمات التحليل", node("textarea", { name: "instructions", minlength: 3, maxlength: 2000, required: true })), node("button", { type: "submit", class: "button primary", text: "إسناد التحليل" }), linkedButton("الاستيراد", "/imports"), linkedButton("القضايا وربط السجلات", "/incidents")]);
+    assignment.elements.namedItem("case_id").value = new URLSearchParams(window.location.search).get("case_id") || "";
+    assignment.addEventListener("submit", (event) => { event.preventDefault(); const values = Object.fromEntries(new FormData(assignment)); return save("/api/team/assignments", "POST", { ...values, job_id: Number(values.job_id), case_id: Number(values.case_id), assignee: Number(values.assignee) }); });
+    root.append(panel("توزيع دفعة سجلات", node("div", { class: "panel-body" }, assignment)));
+    for (const role of data.roles.filter((entry) => entry.role !== "soc_manager")) {
+      const form = node("form", { class: "panel-body", "aria-label": `صلاحيات ${role.role}` });
+      for (const permission of role.available) form.append(node("label", {}, [node("input", { type: "checkbox", name: "permissions", value: permission, checked: role.permissions.includes(permission) }), permission]));
+      form.append(node("button", { type: "submit", class: "button primary", text: `حفظ صلاحيات ${role.role}` }));
+      form.addEventListener("submit", (event) => { event.preventDefault(); return save(`/api/team/roles/${role.role}`, "PUT", { permissions: new FormData(form).getAll("permissions") }); });
+      root.append(panel(`صلاحيات ${role.role}`, form));
+    }
+  }
+  finish(root);
+}
+
 async function renderProfile() {
   begin("profile");
   const [profile, sessions, settings] = await Promise.all([api("/api/profile"), api("/api/auth/sessions"), api("/api/settings")]);
@@ -801,7 +838,7 @@ async function initialize() {
   const me = await api("/api/auth/me");
   state.user = me.user;
   state.permissions = new Set(me.permissions);
-  const renderer = renderers[state.section] || renderDashboard;
+  const renderer = state.section === "team" ? renderTeam : renderers[state.section] || renderDashboard;
   try { await renderer(); } catch (error) {
     handleError(error);
     if (error.status === 403) finish(emptyState("هذا القسم غير متاح لدورك", "تطبق المنصة صلاحيات الخادم حتى عند فتح الرابط مباشرة.", [linkedButton("العودة إلى النظرة العامة", "/dashboard", "primary")]));

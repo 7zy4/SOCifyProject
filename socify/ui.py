@@ -32,6 +32,7 @@ def test_redirect():
 @ui.get("/audit")
 @ui.get("/admin")
 @ui.get("/profile")
+@ui.get("/team")
 @login_required
 def dashboard():
     section = request.path.strip("/") or "dashboard"

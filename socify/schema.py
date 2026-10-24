@@ -42,6 +42,36 @@ CREATE TABLE IF NOT EXISTS workspace_memberships (
     created_at TEXT NOT NULL,
     PRIMARY KEY (workspace_id, user_id)
 );
+CREATE TABLE IF NOT EXISTS team_invitations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+    email TEXT NOT NULL,
+    role TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    expires_at TEXT NOT NULL,
+    consumed_at TEXT
+);
+CREATE TABLE IF NOT EXISTS team_role_permissions (
+    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+    role TEXT NOT NULL,
+    permissions TEXT NOT NULL,
+    PRIMARY KEY(workspace_id, role)
+);
+CREATE TABLE IF NOT EXISTS team_log_assignments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+    job_id INTEGER NOT NULL REFERENCES ingestion_jobs(id),
+    case_id INTEGER NOT NULL REFERENCES incident_cases(id),
+    task_id INTEGER NOT NULL REFERENCES case_tasks(id),
+    assignee INTEGER NOT NULL REFERENCES users(id),
+    assigned_by INTEGER NOT NULL REFERENCES users(id),
+    instructions TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT 'assigned',
+    created_at TEXT NOT NULL,
+    completed_at TEXT,
+    UNIQUE(workspace_id, job_id, case_id, assignee)
+);
 CREATE TABLE IF NOT EXISTS auth_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_hash TEXT NOT NULL UNIQUE,

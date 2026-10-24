@@ -212,20 +212,49 @@ def _register(data: dict[str, Any]):
     problem = password_error(password)
     if problem:
         return error_response("WEAK_PASSWORD", problem, 422)
+    team_name = data.get("team_name")
+    invitation = data.get("invitation_token")
+    if team_name is not None and not isinstance(team_name, str) or team_name and not 2 <= len(team_name.strip()) <= 120:
+        return error_response("INVALID_TEAM", "اسم الفريق غير صالح", 422)
+    if invitation is not None and not isinstance(invitation, str) or invitation and (len(invitation) > 200 or team_name):
+        return error_response("INVALID_INVITATION", "بيانات الدعوة غير صالحة", 422)
     password_hash = bcrypt.hashpw(str(password).encode(), bcrypt.gensalt(rounds=12)).decode()
     try:
         with transaction():
+            target_workspace, target_role, target_team = 1, "analyst", str(data.get("team") or "المتدربون")[:120]
+            invite_row = None
+            if team_name:
+                created = get_db().execute(
+                    "INSERT INTO training_workspaces (public_id, name, created_at) VALUES (?, ?, ?)",
+                    ("team-" + secrets.token_hex(16), team_name.strip(), iso_now()),
+                )
+                target_workspace, target_role, target_team = inserted_id(created), "soc_manager", team_name.strip()
+            elif invitation:
+                invite_row = (
+                    get_db()
+                    .execute(
+                        "SELECT i.*, w.name AS team_name FROM team_invitations i JOIN training_workspaces w ON w.id = i.workspace_id WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ? AND w.is_active = 1",
+                        (hashlib.sha256(invitation.encode()).hexdigest(), iso_now()),
+                    )
+                    .fetchone()
+                )
+                if not invite_row or invite_row["email"] != email.strip().lower():
+                    return error_response("INVALID_INVITATION", "الدعوة غير صالحة أو منتهية أو لبريد آخر", 422)
+                target_workspace, target_role, target_team = invite_row["workspace_id"], invite_row["role"], invite_row["team_name"]
             cursor = get_db().execute(
                 """INSERT INTO users
                 (email, password_hash, name, role, team, workspace_id, created_at, password_changed_at, is_active)
-                VALUES (?, ?, ?, 'analyst', ?, 1, ?, ?, 1)""",
-                (email.strip().lower(), password_hash, name.strip(), str(data.get("team") or "المتدربون")[:120], iso_now(), iso_now()),
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)""",
+                (email.strip().lower(), password_hash, name.strip(), target_role, target_team, target_workspace, iso_now(), iso_now()),
             )
             user_id = inserted_id(cursor)
             get_db().execute(
-                "INSERT OR IGNORE INTO workspace_memberships (workspace_id, user_id, role, created_at) VALUES (1, ?, 'analyst', ?)", (user_id, iso_now())
+                "INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at) VALUES (?, ?, ?, ?)",
+                (target_workspace, user_id, target_role, iso_now()),
             )
-            record_audit(get_db(), "register", "user", user_id, actor=user_id, workspace=1)
+            if invite_row:
+                get_db().execute("UPDATE team_invitations SET consumed_at = ? WHERE id = ?", (iso_now(), invite_row["id"]))
+            record_audit(get_db(), "register", "user", user_id, actor=user_id, workspace=target_workspace)
     except Exception as exc:
         if "UNIQUE" in str(exc).upper():
             return error_response("ACCOUNT_EXISTS", "تعذر إنشاء الحساب بهذه البيانات", 409)
@@ -292,7 +321,10 @@ def csrf_token_api():
 @login_required
 def me():
     user = _active_user()
-    return jsonify({"user": user, "permissions": sorted(current_permissions(str(user["role"])))})
+    permissions = current_permissions(str(user["role"]))
+    if "role_permissions" in user and user["role"] not in {"soc_manager", "admin"}:
+        permissions = permissions.intersection(user["role_permissions"])
+    return jsonify({"user": user, "permissions": sorted(permissions)})
 
 
 def current_permissions(role: str) -> set[str]:

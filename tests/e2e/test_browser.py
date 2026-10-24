@@ -302,3 +302,77 @@ def test_browser_graph_filters_zoom_keyboard_details_and_export(app, client, log
     finally:
         server.shutdown()
         thread.join(timeout=5)
+
+
+@pytest.mark.e2e
+def test_browser_team_registration_invitation_and_assignment(app, client, database):
+    server = make_server("127.0.0.1", 0, app)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as playwright:
+            browser = launch_browser(playwright)
+            page = new_page(browser, viewport={"width": 1440, "height": 1000})
+            base = f"http://127.0.0.1:{server.server_port}"
+
+            def register(email, team="", token=""):
+                page.goto(base + "/register")
+                page.locator("#name").fill("Browser team member")
+                page.locator("#email").fill(email)
+                page.locator("#password").fill("Browser-Team-Safe-2026!")
+                page.locator("#team_name").fill(team)
+                page.locator("#invitation_token").fill(token)
+                page.locator("#register-form button[type=submit]").click()
+                page.wait_for_url("**/login")
+
+            def login(email):
+                page.goto(base + "/login")
+                page.locator("input[name=email]").fill(email)
+                page.locator("input[name=password]").fill("Browser-Team-Safe-2026!")
+                page.locator("button[type=submit]").click()
+                page.wait_for_url("**/dashboard")
+
+            register("owner@browser.test", team="Browser SOC Team")
+            login("owner@browser.test")
+            page.goto(base + "/team")
+            invite = page.get_by_role("form", name="دعوة عضو")
+            invite.locator("input[name=email]").fill("member@browser.test")
+            invite.locator("select[name=role]").select_option("analyst")
+            invite.get_by_role("button", name="إنشاء دعوة").click()
+            page.locator("#workspace code").wait_for()
+            token = page.locator("#workspace code").inner_text()
+            owner_page = page
+            page = new_page(browser, viewport={"width": 1440, "height": 1000})
+            register("member@browser.test", token=token)
+            member = database.execute("SELECT id FROM users WHERE email = 'member@browser.test'").fetchone()[0]
+            owner = database.execute("SELECT id, workspace_id FROM users WHERE email = 'owner@browser.test'").fetchone()
+            with client.session_transaction() as session:
+                session["user_id"] = owner["id"]
+                session["workspace_id"] = owner["workspace_id"]
+            job = client.post("/api/imports", json={"filename": "assigned.jsonl", "content": '{"source":"team-browser","title":"Team browser evidence"}'}).json
+            case = client.post("/api/incidents", json={"title": "Assigned browser investigation"}).json
+            assert client.post(f"/api/incidents/{case['id']}/imports", json={"job_id": job["id"]}).status_code == 200
+            member_page = page
+            page = owner_page
+            page.goto(base + "/team")
+            assignment = page.get_by_role("form", name="إسناد سجلات")
+            assignment.locator("input[name=job_id]").fill(str(job["id"]))
+            assignment.locator("input[name=case_id]").fill(str(case["id"]))
+            assignment.locator("select[name=assignee]").select_option(str(member))
+            assignment.locator("textarea[name=instructions]").fill("Review assigned logs and document the incident")
+            assignment.get_by_role("button", name="إسناد التحليل").click()
+            page.get_by_text("Review assigned logs and document the incident", exact=True).wait_for()
+            assert_accessible(page)
+            page = member_page
+            login("member@browser.test")
+            page.goto(base + "/team")
+            page.get_by_role("button", name="إكمال المهمة", exact=True).click()
+            page.get_by_role("cell", name="completed", exact=True).wait_for()
+            assert page.get_by_role("form", name="دعوة عضو").count() == 0
+            page = owner_page
+            page.goto(base + "/team")
+            page.get_by_role("cell", name="completed", exact=True).wait_for()
+            browser.close()
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)

@@ -88,9 +88,7 @@ def _history(connection: sqlite3.Connection, case_id: int, action: str, previous
 def _reference(connection: sqlite3.Connection) -> str:
     year = utc_now().year
     prefix = f"CASE-{year}-"
-    count = int(
-        connection.execute("SELECT COUNT(*) FROM incident_cases WHERE workspace_id = ? AND reference LIKE ?", (workspace_id(), prefix + "%")).fetchone()[0]
-    )
+    count = int(connection.execute("SELECT COUNT(*) FROM incident_cases WHERE reference LIKE ?", (prefix + "%",)).fetchone()[0])
     return f"{prefix}{count + 1:06d}"
 
 
@@ -858,8 +856,11 @@ def annotate_technique(case_id: int):
 @cases_api.post("/api/incidents/<int:case_id>/tasks")
 @require_permission("cases.update")
 def add_task(case_id: int):
-    if not _case_row(case_id):
+    case = _case_row(case_id)
+    if not case:
         return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
+    if case["status"] == "closed":
+        return error_response("CASE_CLOSED", "المهام مقفلة بعد إغلاق القضية", 409)
     data = request.get_json(silent=True)
     payload = data if isinstance(data, dict) else {}
     title = payload.get("title")
@@ -878,13 +879,19 @@ def add_task(case_id: int):
 @cases_api.patch("/api/incidents/<int:case_id>/tasks/<int:task_id>")
 @require_permission("cases.update")
 def update_task(case_id: int, task_id: int):
-    if not _case_row(case_id):
+    case = _case_row(case_id)
+    if not case:
         return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
+    if case["status"] == "closed":
+        return error_response("CASE_CLOSED", "المهام مقفلة بعد إغلاق القضية", 409)
     task = get_db().execute("SELECT * FROM case_tasks WHERE id = ? AND case_id = ?", (task_id, case_id)).fetchone()
     data = request.get_json(silent=True)
     status = data.get("status") if isinstance(data, dict) else None
     if not task or not isinstance(status, str) or status not in {"pending", "in_progress", "completed", "reviewed"}:
         return error_response("INVALID_TASK_UPDATE", "المهمة أو حالتها غير صالحة", 422)
+    assignment = get_db().execute("SELECT assignee FROM team_log_assignments WHERE task_id = ?", (task_id,)).fetchone()
+    if assignment and assignment["assignee"] != actor_id() and (current_user() or {}).get("role") not in {"admin", "soc_manager"}:
+        return error_response("PERMISSION_DENIED", "المهمة مخصصة لعضو آخر", 403)
     completed_at = iso_now() if status in {"completed", "reviewed"} else None
     completed_by = actor_id() if completed_at else None
     get_db().execute("UPDATE case_tasks SET status = ?, completed_by = ?, completed_at = ? WHERE id = ?", (status, completed_by, completed_at, task_id))
