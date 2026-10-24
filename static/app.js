@@ -395,6 +395,46 @@ function caseDetailView(item) {
     } catch (error) { handleError(error); }
   });
 
+  const logLinkForm = node("form", { class: "form-grid", "aria-label": "ربط سجلات الاستيراد" }, [
+    field("رقم مهمة الاستيراد المكتملة", node("input", { name: "job_id", type: "number", min: "1", required: true })),
+    node("button", { type: "submit", class: "button primary", text: "ربط سجلات الاستيراد بالقضية" }),
+    linkedButton("رفع سجلات جديدة", "/imports"),
+  ]);
+  logLinkForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = logLinkForm.querySelector("button");
+    submit.disabled = true;
+    try {
+      const jobId = Number(new FormData(logLinkForm).get("job_id"));
+      let afterId = 0;
+      let added = 0;
+      let result;
+      do {
+        result = await api(`/api/incidents/${item.id}/imports`, { method: "POST", body: { job_id: jobId, after_id: afterId } });
+        afterId = result.next_after_id;
+        added += result.added;
+      } while (result.has_more);
+      showMessage(`تم ربط ${added} سجلًا جديدًا بالقضية`, "success");
+      await renderIncidents(item.id);
+    } catch (error) { handleError(error); } finally { submit.disabled = false; }
+  });
+  const techniqueForm = node("form", { class: "form-grid", "aria-label": "تسجيل تحليل ATT&CK" }, [
+    field("MITRE Technique ID", node("input", { name: "technique_id", placeholder: "T1110", required: true, maxlength: "20" })),
+    field("تصنيف الربط", selectControl("assessment", ["suggested", "verified", "rejected"])),
+    field("رقم سجل الدليل المرتبط", node("input", { name: "event_id", type: "number", min: "1" })),
+    field("سبب الاستنتاج", node("textarea", { name: "reason", required: true, minlength: "3", maxlength: "2000" }), true),
+    node("button", { type: "submit", class: "button primary", text: "حفظ تحليل التقنية" }),
+  ]);
+  techniqueForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(techniqueForm));
+    try {
+      await api(`/api/incidents/${item.id}/techniques`, { method: "POST", body: { ...values, event_id: values.event_id ? Number(values.event_id) : null } });
+      showMessage("تم حفظ الاستنتاج ودليله في سجل التحقيق", "success");
+      await renderIncidents(item.id);
+    } catch (error) { handleError(error); }
+  });
+
   const taskColumns = [
     { label: "المهمة", value: "title" },
     { label: "الحالة", value: (task) => badge(task.status) },
@@ -439,6 +479,11 @@ function caseDetailView(item) {
     panel("التنبيهات المرتبطة", item.alerts.length ? table(alertColumns, item.alerts) : emptyState("لا توجد تنبيهات مرتبطة", "أنشئ التحقيق من قائمة التنبيهات لربط الأدلة تلقائيًا."), true),
     panel("السجلات المرتبطة", item.events.length ? table(eventColumns, item.events) : emptyState("لا توجد سجلات مرتبطة", "أضف سجلًا من مسار التحقيق المصرح."), true),
     node("div", { class: "panel-grid" }, [panel("Observables", item.observables.length ? table(observableColumns, item.observables) : emptyState("لا توجد مؤشرات مستخرجة", "استخرج IoCs من السجلات المرتبطة لتفعيل الارتباط بين القضايا.")), panel("تحقيقات مشابهة", item.similar_cases.length ? table(similarColumns, item.similar_cases) : emptyState("لا توجد قضايا مشابهة", "يظهر التشابه عند اشتراك التحقيقات في مؤشرات موثقة."))]),
+    panel("ربط سجلات القضية", logLinkForm, true),
+    panel("تحليل MITRE ATT&CK", node("div", {}, [techniqueForm, table([
+      { label: "التقنية", value: "technique_id" }, { label: "التقييم", value: "assessment" }, { label: "الدليل", value: "event_id" },
+      { label: "السبب", value: "reason" }, { label: "المحلل", value: "author_name" }, { label: "الوقت", value: (row) => formatTime(row.created_at) },
+    ], item.technique_annotations || [])]), true),
     panel("سجل النشاط", history, true)
   );
   return root;

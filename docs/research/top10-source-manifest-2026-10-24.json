@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Splunk",
+    "url": "https://raw.githubusercontent.com/splunk/security_content/develop/README.md",
+    "bytes": 11160,
+    "sha256": "2cc1bec78717157bd662519abf9536dbbc56b63fe88ca9b13061cef35ecad94d"
+  },
+  {
+    "name": "TheHive",
+    "url": "https://raw.githubusercontent.com/TheHive-Project/TheHive/main/README.md",
+    "bytes": 1055,
+    "sha256": "d9870d59cdbf446001dd27da22ea163ec968a1a0b6f5c1e8744213198727e45b"
+  },
+  {
+    "name": "Wazuh",
+    "url": "https://raw.githubusercontent.com/wazuh/wazuh/master/README.md",
+    "bytes": 11606,
+    "sha256": "1a8941c692e533c3b2be76b95970cc45cb00b2d7350b1a2fa29a4efaa8d6e4c5"
+  },
+  {
+    "name": "Elastic",
+    "url": "https://raw.githubusercontent.com/elastic/detection-rules/main/README.md",
+    "bytes": 11709,
+    "sha256": "d7a3468cfa4fb40e378242bc5723455c0253898eb3c8d486c02f71a67a45e054"
+  },
+  {
+    "name": "Security Onion",
+    "url": "https://raw.githubusercontent.com/Security-Onion-Solutions/securityonion/2.4/main/README.md",
+    "bytes": 1278,
+    "sha256": "4819d33a65ec3782e550de5dea8329c1bdfd3cb82adfc71cca18e098e8a0b6bf"
+  },
+  {
+    "name": "Shuffle",
+    "url": "https://raw.githubusercontent.com/Shuffle/Shuffle/main/README.md",
+    "bytes": 6530,
+    "sha256": "c46bf50ef56a50fec83458064adc3263134220c8fedc6cc4edb0fc59fe2b7b31"
+  },
+  {
+    "name": "Microsoft Sentinel",
+    "url": "https://raw.githubusercontent.com/Azure/Azure-Sentinel/master/README.md",
+    "bytes": 11837,
+    "sha256": "6c788523a5ca13c182c6f2171cd5de2a64bc18670c64eb85903893d8c88dec62"
+  },
+  {
+    "name": "Cortex XSOAR",
+    "url": "https://raw.githubusercontent.com/demisto/content/master/README.md",
+    "bytes": 4831,
+    "sha256": "6c43f7f63dd4464b6dc0ab9068ddb0903f78042e7100d80d65b9d3851ffa0522"
+  },
+  {
+    "name": "OpenSearch Security Analytics",
+    "url": "https://raw.githubusercontent.com/opensearch-project/security-analytics/main/README.md",
+    "bytes": 2659,
+    "sha256": "e43017299af2b3608ce68360436ac13bfbadf53174a4952723e1a7595c3f3a01"
+  },
+  {
+    "name": "DFIR-IRIS",
+    "url": "https://raw.githubusercontent.com/dfir-iris/iris-web/master/README.md",
+    "bytes": 6528,
+    "sha256": "a2d24e01454487749db050fe43d8037e12d78103f6219e5339c93fbd0c222433"
+  }
+]

@@ -321,6 +321,18 @@ CREATE TABLE IF NOT EXISTS case_reports (
     created_at TEXT NOT NULL,
     UNIQUE (case_id, revision, format)
 );
+CREATE TABLE IF NOT EXISTS case_technique_annotations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id INTEGER NOT NULL REFERENCES incident_cases(id),
+    technique_id TEXT NOT NULL,
+    attack_version TEXT NOT NULL,
+    event_id INTEGER REFERENCES security_events(id),
+    assessment TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_case_technique_annotations ON case_technique_annotations(case_id, id);
 CREATE TABLE IF NOT EXISTS event_sources (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     workspace_id INTEGER NOT NULL DEFAULT 1 REFERENCES training_workspaces(id),

@@ -111,7 +111,12 @@ def test_browser_training_requires_explicit_assessment_submission(app) -> None:
 
 
 @pytest.mark.e2e
-def test_browser_case_workspace_supports_investigation_actions(app) -> None:
+def test_browser_case_workspace_supports_investigation_actions(app, client, login_as) -> None:
+    login_as("analyst")
+    imported = client.post(
+        "/api/imports", json={"filename": "case-browser.jsonl", "content": '{"source":"browser-case","title":"Browser linked log","event_type":"failed_login"}'}
+    )
+    assert imported.status_code == 201
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -133,6 +138,20 @@ def test_browser_case_workspace_supports_investigation_actions(app) -> None:
             row = page.locator("tbody tr").filter(has_text="Browser investigation workspace")
             row.get_by_role("button").click()
             page.get_by_role("heading", name="دورة الحياة").wait_for()
+            link_form = page.get_by_role("form", name="ربط سجلات الاستيراد")
+            link_form.locator("input[name=job_id]").fill(str(imported.json["id"]))
+            link_form.get_by_role("button", name="ربط سجلات الاستيراد بالقضية").click()
+            page.locator(".panel").filter(has=page.get_by_role("heading", name="السجلات المرتبطة", exact=True)).get_by_text(
+                "Browser linked log", exact=True
+            ).wait_for()
+            event_id = client.get("/api/events?source=browser-case").json["items"][0]["id"]
+            technique = page.get_by_role("form", name="تسجيل تحليل ATT&CK")
+            technique.locator("input[name=technique_id]").fill("T1110")
+            technique.locator("select[name=assessment]").select_option("verified")
+            technique.locator("input[name=event_id]").fill(str(event_id))
+            technique.locator("textarea[name=reason]").fill("تم ربط الاستنتاج بسجل تسجيل الدخول المستورد")
+            technique.get_by_role("button", name="حفظ تحليل التقنية").click()
+            page.get_by_text("تم ربط الاستنتاج بسجل تسجيل الدخول المستورد", exact=True).wait_for()
             page.locator("form").filter(has_text="ملاحظة التحقيق").locator("textarea[name=body]").fill("تم التحقق من مصدر السجل وسلامة الأثر")
             page.get_by_role("button", name="إضافة الملاحظة").click()
             page.get_by_text("تم التحقق من مصدر السجل وسلامة الأثر").wait_for()

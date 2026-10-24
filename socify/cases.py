@@ -401,6 +401,15 @@ def case_detail(case_id: int):
         .execute("SELECT id, revision, format, sha256, created_by, created_at FROM case_reports WHERE case_id = ? ORDER BY revision DESC", (case_id,))
         .fetchall()
     ]
+    item["technique_annotations"] = [
+        dict(value)
+        for value in get_db()
+        .execute(
+            "SELECT a.*, u.name AS author_name FROM case_technique_annotations a JOIN users u ON u.id = a.created_by WHERE a.case_id = ? ORDER BY a.id",
+            (case_id,),
+        )
+        .fetchall()
+    ]
     item["observables"] = [
         {**dict(value), "tags": json.loads(value["tags"] or "[]")}
         for value in get_db()
@@ -462,7 +471,7 @@ def update_case(case_id: int):
             updates[field] = value.strip()
     for field, allowed in (("severity", SEVERITIES), ("priority", PRIORITIES)):
         if field in data:
-            if data[field] not in allowed:
+            if not isinstance(data[field], str) or data[field] not in allowed:
                 return error_response("INVALID_CASE_FIELD", f"الحقل {field} غير صالح", 422)
             updates[field] = data[field]
     if "assigned_to" in data or "assignee" in data:
@@ -595,7 +604,7 @@ def add_note(case_id: int):
     data = request.get_json(silent=True)
     body = data.get("body", data.get("note")) if isinstance(data, dict) else None
     visibility = data.get("visibility", "team") if isinstance(data, dict) else "team"
-    if not isinstance(body, str) or not 1 <= len(body.strip()) <= 5000 or visibility not in {"team", "private"}:
+    if not isinstance(body, str) or not 1 <= len(body.strip()) <= 5000 or not isinstance(visibility, str) or visibility not in {"team", "private"}:
         return error_response("INVALID_NOTE", "نص الملاحظة مطلوب وبحد أقصى 5000 محرف", 422)
     now = iso_now()
     with transaction():
@@ -763,6 +772,89 @@ def evidence_content(case_id: int, evidence_id: int):
     )
 
 
+@cases_api.post("/api/incidents/<int:case_id>/imports")
+@require_permission("evidence.add")
+def attach_import(case_id: int):
+    from .ingestion import _job_access
+
+    case = _case_row(case_id)
+    if not case:
+        return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or type(data.get("job_id")) is not int or type(data.get("after_id", 0)) is not int or data.get("after_id", 0) < 0:
+        return error_response("INVALID_IMPORT_LINK", "حدد رقم الاستيراد ومؤشر صفحة صحيحين", 422)
+    job = _job_access(data["job_id"])
+    if not job or job["training_run_id"] != case["training_run_id"]:
+        return error_response("IMPORT_NOT_FOUND", "الاستيراد غير موجود ضمن نطاق القضية", 404)
+    if job["status"] != "completed":
+        return error_response("IMPORT_NOT_READY", "انتظر اكتمال الاستيراد قبل ربطه", 409)
+    rows = (
+        get_db()
+        .execute(
+            "SELECT id FROM security_events WHERE workspace_id = ? AND training_run_id IS ? AND id > ? AND idempotency_key LIKE ? ORDER BY id LIMIT 201",
+            (workspace_id(), case["training_run_id"], data.get("after_id", 0), f"import:{job['content_hash']}:%"),
+        )
+        .fetchall()
+    )
+    with transaction():
+        current = _case_row(case_id)
+        if current is None or current["status"] == "closed":
+            return error_response("CASE_EVIDENCE_LOCKED", "الأدلة مقفلة بعد إغلاق التحقيق", 409)
+        added = 0
+        for event in rows[:200]:
+            existing = get_db().execute("SELECT 1 FROM case_events WHERE case_id = ? AND event_id = ?", (case_id, event["id"])).fetchone()
+            if not _attach_event(get_db(), case_id, event["id"]):
+                raise RuntimeError("import event scope changed")
+            added += not bool(existing)
+        if added:
+            _history(get_db(), case_id, "import_attached", None, {"job_id": job["id"], "added": added, "sha256": job["content_hash"]})
+            record_audit(get_db(), "attach", "case_import", job["id"], details={"case_id": case_id, "added": added})
+    return jsonify({"added": added, "has_more": len(rows) > 200, "next_after_id": rows[min(len(rows), 200) - 1]["id"] if rows else data.get("after_id", 0)})
+
+
+@cases_api.post("/api/incidents/<int:case_id>/techniques")
+@require_permission("cases.update")
+def annotate_technique(case_id: int):
+    if not _case_row(case_id):
+        return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return error_response("INVALID_JSON", "يلزم إرسال كائن JSON", 400)
+    technique, reason, assessment, event_id = data.get("technique_id"), data.get("reason"), data.get("assessment"), data.get("event_id")
+    if (
+        not isinstance(technique, str)
+        or not 1 <= len(technique) <= 20
+        or not isinstance(reason, str)
+        or not 3 <= len(reason.strip()) <= 2000
+        or not isinstance(assessment, str)
+        or assessment not in {"suggested", "verified", "rejected"}
+        or event_id is not None
+        and type(event_id) is not int
+    ):
+        return error_response("INVALID_TECHNIQUE_ANNOTATION", "حدد تقنية وتصنيفًا وسببًا ودليلًا صالحًا", 422)
+    technique_row = get_db().execute("SELECT technique_id, attack_version FROM attack_techniques WHERE technique_id = ?", (technique,)).fetchone()
+    if not technique_row:
+        return error_response("TECHNIQUE_NOT_FOUND", "التقنية غير موجودة في كتالوج ATT&CK", 422)
+    if event_id is not None and not get_db().execute("SELECT 1 FROM case_events WHERE case_id = ? AND event_id = ?", (case_id, event_id)).fetchone():
+        return error_response("CASE_EVENT_NOT_FOUND", "الدليل غير مرتبط بهذه القضية", 422)
+    if assessment == "verified" and event_id is None:
+        return error_response("TECHNIQUE_EVIDENCE_REQUIRED", "الربط المتحقق يتطلب سجلًا مرتبطًا بالقضية", 422)
+    with transaction():
+        case = _case_row(case_id)
+        if case is None or case["status"] == "closed":
+            return error_response("CASE_EVIDENCE_LOCKED", "أعد فتح القضية قبل إضافة استنتاج جديد", 409)
+        cursor = get_db().execute(
+            "INSERT INTO case_technique_annotations (case_id, technique_id, attack_version, event_id, assessment, reason, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (case_id, technique, technique_row["attack_version"], event_id, assessment, reason.strip(), actor_id(), iso_now()),
+        )
+        annotation_id = inserted_id(cursor)
+        _history(get_db(), case_id, "technique_annotated", None, {"id": annotation_id, "technique_id": technique, "assessment": assessment}, reason.strip())
+        record_audit(
+            get_db(), "create", "case_technique_annotation", annotation_id, details={"case_id": case_id, "technique_id": technique, "assessment": assessment}
+        )
+    return jsonify({"id": annotation_id}), 201
+
+
 @cases_api.post("/api/incidents/<int:case_id>/tasks")
 @require_permission("cases.update")
 def add_task(case_id: int):
@@ -791,7 +883,7 @@ def update_task(case_id: int, task_id: int):
     task = get_db().execute("SELECT * FROM case_tasks WHERE id = ? AND case_id = ?", (task_id, case_id)).fetchone()
     data = request.get_json(silent=True)
     status = data.get("status") if isinstance(data, dict) else None
-    if not task or status not in {"pending", "in_progress", "completed", "reviewed"}:
+    if not task or not isinstance(status, str) or status not in {"pending", "in_progress", "completed", "reviewed"}:
         return error_response("INVALID_TASK_UPDATE", "المهمة أو حالتها غير صالحة", 422)
     completed_at = iso_now() if status in {"completed", "reviewed"} else None
     completed_by = actor_id() if completed_at else None
@@ -814,7 +906,55 @@ def _report_payload(case_id: int) -> dict[str, Any]:
         .execute("SELECT action, previous_value, new_value, reason, created_at FROM case_history WHERE case_id = ? ORDER BY created_at", (case_id,))
         .fetchall()
     ]
-    return {"case": _case_view(case), "evidence": evidence, "timeline": history, "generated_at": iso_now()}
+    events = [
+        dict(row)
+        for row in get_db()
+        .execute(
+            "SELECT e.id, e.event_id, e.event_time, e.ingested_at, e.source, e.event_type, e.title, e.severity, e.raw_hash, e.mitre_ids FROM case_events ce JOIN security_events e ON e.id = ce.event_id WHERE ce.case_id = ? ORDER BY e.event_time, e.id",
+            (case_id,),
+        )
+        .fetchall()
+    ]
+    annotations = [dict(row) for row in get_db().execute("SELECT * FROM case_technique_annotations WHERE case_id = ? ORDER BY id", (case_id,)).fetchall()]
+    notes = [
+        dict(row)
+        for row in get_db()
+        .execute("SELECT author_id, body, created_at FROM case_notes WHERE case_id = ? AND visibility = 'team' ORDER BY id", (case_id,))
+        .fetchall()
+    ]
+    tasks = [
+        dict(row)
+        for row in get_db()
+        .execute("SELECT title, status, assignee, completed_by, completed_at FROM case_tasks WHERE case_id = ? ORDER BY id", (case_id,))
+        .fetchall()
+    ]
+    alerts = [
+        dict(row)
+        for row in get_db()
+        .execute(
+            "SELECT a.alert_id, a.rule_id, a.rule_version, a.reason, a.severity, a.confidence, a.status, a.detected_at FROM case_alerts ca JOIN alerts a ON a.id = ca.alert_id WHERE ca.case_id = ? ORDER BY a.detected_at, a.id",
+            (case_id,),
+        )
+        .fetchall()
+    ]
+    responses = [
+        dict(row)
+        for row in get_db()
+        .execute("SELECT run_id, state, requested_by, approved_by, started_at, completed_at FROM playbook_runs WHERE case_id = ? ORDER BY id", (case_id,))
+        .fetchall()
+    ]
+    return {
+        "case": _case_view(case),
+        "evidence": evidence,
+        "timeline": history,
+        "event_timeline": events,
+        "technique_annotations": annotations,
+        "notes": notes,
+        "tasks": tasks,
+        "alerts": alerts,
+        "responses": responses,
+        "generated_at": iso_now(),
+    }
 
 
 def _report_html(payload: dict[str, Any]) -> str:
@@ -833,6 +973,27 @@ def _report_html(payload: dict[str, Any]) -> str:
         ("التحقق", "validation"),
     )
     closure = "".join(f"<p><strong>{label}:</strong> {html.escape(str(case.get(field) or 'غير محدد'))}</p>" for label, field in fields)
+    for heading, key in (
+        ("الخط الزمني للسجلات", "event_timeline"),
+        ("تقييم تقنيات ATT&CK", "technique_annotations"),
+        ("ملاحظات التحقيق المشتركة", "notes"),
+        ("المهام", "tasks"),
+        ("التنبيهات", "alerts"),
+        ("الاستجابات", "responses"),
+        ("سجل النشاط", "timeline"),
+    ):
+        rows = payload[key]
+        closure += f"<h2>{heading}</h2>"
+        if rows:
+            columns = list(rows[0])
+            closure += "<table><thead><tr>" + "".join(f"<th>{html.escape(column)}</th>" for column in columns) + "</tr></thead><tbody>"
+            closure += "".join(
+                "<tr>" + "".join(f"<td>{html.escape(str(row.get(column) if row.get(column) is not None else '—'))}</td>" for column in columns) + "</tr>"
+                for row in rows
+            )
+            closure += "</tbody></table>"
+        else:
+            closure += "<p>لا توجد عناصر مسجلة</p>"
     return f'<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{html.escape(str(case["reference"]))}</title><style>body{{font-family:Arial,sans-serif;margin:2rem;line-height:1.7}}table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #bbb;padding:.5rem}}h1{{color:#123b66}}</style></head><body><h1>{html.escape(str(case["reference"]))}: {html.escape(str(case["title"]))}</h1><p><strong>الحالة:</strong> {html.escape(str(case["status"]))}</p>{closure}<h2>الأدلة</h2><table><thead><tr><th>النوع</th><th>العنوان</th><th>SHA-256</th></tr></thead><tbody>{evidence_rows}</tbody></table><p>وقت التوليد: {html.escape(str(payload["generated_at"]))}</p></body></html>'
 
 
