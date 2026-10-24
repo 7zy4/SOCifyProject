@@ -379,3 +379,37 @@ def test_browser_team_registration_invitation_and_assignment(app, client, databa
     finally:
         server.shutdown()
         thread.join(timeout=5)
+
+
+@pytest.mark.e2e
+def test_browser_login_recovers_from_invalid_csrf_with_protection_enabled(app):
+    app.config["WTF_CSRF_ENABLED"] = True
+    server = make_server("127.0.0.1", 0, app)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as playwright:
+            browser = launch_browser(playwright)
+            page = new_page(browser, viewport={"width": 1440, "height": 1000})
+            base = f"http://127.0.0.1:{server.server_port}"
+            response = page.goto(base + "/login")
+            assert response.headers["cache-control"] == "no-store"
+            page.locator("input[name=email]").fill("analyst@socify.local")
+            page.locator("input[name=password]").fill("Training-Safe-Password-2026!")
+            page.locator("input[name=csrf_token]").evaluate("element => { element.value = 'invalid'; }")
+            page.locator("button[type=submit]").click()
+            page.get_by_role("alert").filter(has_text="الرمز يُنشأ تلقائيًا").wait_for()
+            assert page.locator("input[name=csrf_token]").input_value() != "invalid"
+            page.locator("input[name=email]").fill("analyst@socify.local")
+            page.locator("input[name=password]").fill("Training-Safe-Password-2026!")
+            page.locator("button[type=submit]").click()
+            page.wait_for_url("**/dashboard")
+            page.goto(base + "/incidents")
+            page.get_by_role("button", name="تحقيق جديد", exact=True).click()
+            page.locator("#case-form input[name=title]").fill("Protected browser case")
+            page.locator("#case-form button[type=submit]").click()
+            page.get_by_role("cell", name="Protected browser case", exact=False).wait_for()
+            browser.close()
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)

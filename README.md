@@ -1,6 +1,6 @@
 # SOCify
 
-> **فرع التطوير الموحد:** [feature/socify-browser-review-2026-10-20](https://github.com/7zy4/SOCifyProject/tree/feature/socify-browser-review-2026-10-20) — يشمل أعمال المرحلة الأولى والمنصة المؤسسية وتحسين تشغيل Codespaces، دون تعديل `main`. [تقرير تدقيق الفروع والمتطلبات](docs/qa/branch-consolidation-2026-10-20.md). النسخة **NO-GO** حتى إغلاق متطلبات القبول.
+> **فرع التطوير الموحد:** [socify-version-2](https://github.com/7zy4/SOCifyProject/tree/socify-version-2) — يشمل أعمال المرحلة الأولى والمنصة المؤسسية وتحسين تشغيل Codespaces، دون تعديل `main`. [تقرير تدقيق الفروع والمتطلبات](docs/qa/branch-consolidation-2026-10-20.md). النسخة **NO-GO** حتى إغلاق متطلبات القبول.
 >
 > [تجربة Codespaces من المتصفح](docs/codespaces.md) · [مصفوفة 132 مطلبًا](docs/qa/requirements-traceability.csv) · [60 رحلة قبول](docs/qa/e2e-acceptance.csv)
 
@@ -64,6 +64,8 @@ docker compose up --build
 خدمة الويب مربوطة بـ`127.0.0.1` افتراضيًا، ويشغّل Compose عاملي Import وPlaybook منفصلين يستهلكان قوائم المهام المحفوظة. تعمل الخدمات كمستخدم غير root وتستخدم Volume مستمرًا وقاعدة ملفات للقراءة فقط عدا `/data` و`/tmp`. النشر العام يحتاج Reverse Proxy موثوقًا وTLS ونسخًا احتياطية ومراقبة.
 
 ## Codespaces
+
+بعد إيقاف الخادم السابق، شغّل `SOCIFY_HOST=0.0.0.0 python -m scripts.start_codespace` من الفرع `socify-version-2`. يحمّل الأمر المفاتيح المحفوظة تلقائيًا قبل بدء Gunicorn. افتح المنفذ 5000 بوضع Private في نافذة متصفح مستقلة.
 
 افتح المستودع في Codespaces؛ يثبت Dev Container الاعتمادات، يرحّل القاعدة، ويشغل Gunicorn على المنفذ 5000 بظهور `Private`. التفاصيل في [دليل Codespaces](docs/codespaces.md).
 

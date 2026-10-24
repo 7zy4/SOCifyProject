@@ -2,8 +2,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, jsonify, request
-from flask_wtf.csrf import CSRFError, CSRFProtect
+from flask import Flask, jsonify, render_template, request
+from flask_wtf.csrf import CSRFError, CSRFProtect, generate_csrf
 
 from .attack import attack_api
 from .auth import auth_api
@@ -72,12 +72,19 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         response.headers["X-Correlation-ID"] = correlation_id()
         if app.config.get("SESSION_COOKIE_SECURE"):
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        if request.path.startswith("/api/") or request.path.startswith("/health/"):
+        if request.path.startswith("/api/") or request.path.startswith("/health/") or response.mimetype == "text/html":
             response.headers.setdefault("Cache-Control", "no-store")
         return response
 
     @app.errorhandler(CSRFError)
     def csrf_failure(_: CSRFError):
+        if not request.is_json and request.path in {"/login", "/register"}:
+            template = "login.html" if request.path == "/login" else "register.html"
+            return render_template(
+                template,
+                csrf_token=generate_csrf(),
+                csrf_error="انتهت صلاحية النموذج أو تغيرت الجلسة. أعد إدخال بياناتك. الرمز يُنشأ تلقائيًا ولا تحتاج إلى إدخاله. إذا تكرر الخطأ افتح الموقع من Ports في نافذة متصفح مستقلة واسمح بملفات الارتباط.",
+            ), 400
         return error_response("CSRF_VALIDATION_FAILED", "رمز الحماية مفقود أو منتهي. حدّث الصفحة وأعد المحاولة", 400)
 
     @app.errorhandler(404)

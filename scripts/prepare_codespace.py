@@ -2,8 +2,7 @@ import secrets
 from pathlib import Path
 
 
-def prepare() -> Path:
-    destination = Path("instance/codespaces.env")
+def prepare(destination: Path = Path("instance/codespaces.env")) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     if not destination.exists():
         values = {
