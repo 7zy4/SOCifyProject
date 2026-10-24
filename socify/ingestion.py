@@ -11,6 +11,7 @@ from collections.abc import Iterable, Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from defusedxml import ElementTree
 from flask import Blueprint, Response, current_app, jsonify, request
@@ -19,6 +20,7 @@ from werkzeug.utils import secure_filename
 from .audit import record_audit
 from .db import get_db, inserted_id, transaction
 from .events import ingest_event
+from .operational import case_visible, operational_mode
 from .schema import public_id
 from .security import (
     actor_id,
@@ -62,6 +64,8 @@ def _depth(value: object, level: int = 0) -> int:
 
 
 def _detect_format(filename: str, content: bytes) -> str:
+    if content[:4] in {b"\xd4\xc3\xb2\xa1", b"\xa1\xb2\xc3\xd4", b"\x4d\x3c\xb2\xa1", b"\xa1\xb2\x3c\x4d", b"\x0a\x0d\x0d\x0a"}:
+        return "pcapng" if content[:4] == b"\x0a\x0d\x0d\x0a" else "pcap"
     suffix = Path(filename).suffix.lower()
     sample = content[:4096].lstrip()
     if sample.startswith(b"ElfFile\x00"):
@@ -77,7 +81,7 @@ def _detect_format(filename: str, content: bytes) -> str:
         return "web"
     if AUTH_LOG.match(text.splitlines()[0] if text.splitlines() else "") and "sshd" in text:
         return "linux_auth"
-    if suffix == ".csv" and "," in (text.splitlines()[0] if text.splitlines() else ""):
+    if suffix == ".csv" and any(value in (text.splitlines()[0] if text.splitlines() else "") for value in (",", ";", "\t", "|")):
         return "csv"
     return "syslog"
 
@@ -118,27 +122,40 @@ def _record_from_mapping(record: dict[str, Any], row_number: int, source_name: s
     }
 
 
-def _csv_records(text: str, source_name: str, content_hash: str) -> Iterator[dict[str, Any]]:
-    reader = csv.DictReader(io.StringIO(text))
-    if not reader.fieldnames or len(reader.fieldnames) > 200:
+def _csv_records(text: str, source_name: str, content_hash: str, delimiter: str = ",") -> Iterator[dict[str, Any]]:
+    reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+    if (
+        not reader.fieldnames
+        or len(reader.fieldnames) > 200
+        or len(set(reader.fieldnames)) != len(reader.fieldnames)
+        or any(not field.strip() for field in reader.fieldnames)
+    ):
         raise ValueError("CSV requires a header with at most 200 columns")
     for row_number, record in enumerate(reader, 2):
         yield _record_from_mapping(dict(record), row_number, source_name, content_hash)
 
 
-def _json_records(text: str, source_name: str, content_hash: str, json_lines: bool) -> Iterator[dict[str, Any]]:
+def _json_records(text: str, source_name: str, content_hash: str, json_lines: bool, tolerant: bool = False) -> Iterator[dict[str, Any]]:
     if json_lines:
         for row_number, line in enumerate(text.splitlines(), 1):
             if not line.strip():
                 continue
             if len(line.encode()) > 1048576:
                 raise ValueError(f"line {row_number} exceeds 1 MiB")
-            value = json.loads(line)
-            if not isinstance(value, dict):
-                raise ValueError(f"line {row_number} must contain an object")
-            yield _record_from_mapping(value, row_number, source_name, content_hash)
+            try:
+                value = json.loads(line)
+                if not isinstance(value, dict):
+                    raise ValueError(f"line {row_number} must contain an object")
+                yield _record_from_mapping(value, row_number, source_name, content_hash)
+            except (ValueError, RecursionError) as exc:
+                if not tolerant:
+                    raise ValueError(f"invalid JSON record at line {row_number}") from exc
+                yield {"__parse_error": f"invalid JSON record at line {row_number}", "provenance": {"file_sha256": content_hash, "row": row_number}}
         return
-    value = json.loads(text)
+    try:
+        value = json.loads(text)
+    except (ValueError, RecursionError) as exc:
+        raise ValueError("invalid JSON document") from exc
     records = value if isinstance(value, list) else [value]
     if not all(isinstance(item, dict) for item in records):
         raise ValueError("JSON must contain an object or an array of objects")
@@ -346,43 +363,104 @@ def _evtx_records(content: bytes, source_name: str, content_hash: str) -> Iterat
                     yield item
 
 
-def parse_records(filename: str, content: bytes, selected_format: str | None, source_name: str) -> tuple[str, Iterable[dict[str, Any]]]:
+def parse_records(
+    filename: str, content: bytes, selected_format: str | None, source_name: str, options: dict[str, Any] | None = None
+) -> tuple[str, Iterable[dict[str, Any]]]:
     if len(content) > int(current_app.config["MAX_CONTENT_LENGTH"]):
         raise ValueError("file exceeds the configured upload limit")
     content_hash = hashlib.sha256(content).hexdigest()
+    options = options or {}
     format_name = selected_format or "auto"
     if format_name == "auto":
         format_name = _detect_format(filename, content)
-    if format_name == "csv":
-        return format_name, _csv_records(_decode(content), source_name, content_hash)
-    if format_name in {"jsonl", "ndjson"}:
-        return "jsonl", _json_records(_decode(content), source_name, content_hash, True)
-    if format_name == "json":
-        return format_name, _json_records(_decode(content), source_name, content_hash, False)
-    if format_name == "syslog":
-        return format_name, _syslog_records(_decode(content), source_name, content_hash)
-    if format_name == "web":
-        return format_name, _web_records(_decode(content), source_name, content_hash)
-    if format_name == "linux_auth":
-        return format_name, _auth_records(_decode(content), source_name, content_hash)
-    if format_name in {"sysmon_xml", "xml"}:
-        return "sysmon_xml", _sysmon_xml_records(content, source_name, content_hash)
+    if format_name in {"pcap", "pcapng"}:
+        from .packet_ingestion import packet_records
+
+        return format_name, _mapped_records(packet_records(content, source_name, int(current_app.config["MAX_IMPORT_ROWS"]) + 1), options, source_name)
     if format_name == "evtx":
-        return format_name, _evtx_records(content, source_name, content_hash)
+        return format_name, _mapped_records(_evtx_records(content, source_name, content_hash), options, source_name)
+    if format_name in {"sysmon_xml", "xml"}:
+        return "sysmon_xml", _mapped_records(_sysmon_xml_records(content, source_name, content_hash), options, source_name)
+    encoding = options.get("encoding", "utf-8-sig")
+    if encoding != "utf-8-sig":
+        try:
+            text = content.decode(encoding)
+        except UnicodeError as exc:
+            raise ValueError("file encoding does not match the selected encoding") from exc
+        if "\x00" in text or any(len(line.encode()) > 1048576 for line in text.splitlines()):
+            raise ValueError("invalid binary text or oversized line")
+    else:
+        text = _decode(content)
+    if format_name == "csv":
+        records = _csv_records(text, source_name, content_hash, options.get("delimiter", ","))
+        return format_name, _mapped_records(records, options, source_name)
+    if format_name in {"jsonl", "ndjson"}:
+        return "jsonl", _mapped_records(_json_records(text, source_name, content_hash, True, bool(options)), options, source_name)
+    if format_name == "json":
+        return format_name, _mapped_records(_json_records(text, source_name, content_hash, False), options, source_name)
+    if format_name == "syslog":
+        return format_name, _mapped_records(_syslog_records(text, source_name, content_hash), options, source_name)
+    if format_name == "web":
+        return format_name, _mapped_records(_web_records(text, source_name, content_hash), options, source_name)
+    if format_name == "linux_auth":
+        return format_name, _mapped_records(_auth_records(text, source_name, content_hash), options, source_name)
     raise ValueError("selected format is not supported")
 
 
-def _estimated_rows(format_name: str, content: bytes) -> int:
+def _mapped_records(records: Iterable[dict[str, Any]], options: dict[str, Any], source: str) -> Iterator[dict[str, Any]]:
+    for record in records:
+        if not options or record.get("__parse_error"):
+            yield record
+            continue
+        raw_value = record.get("raw_payload")
+        raw: dict[str, Any] = raw_value if isinstance(raw_value, dict) else {}
+        known_time = (
+            any(key in raw and raw[key] not in (None, "") for key in ("event_time", "timestamp", "time")) or record.get("source_type") == "packet_capture"
+        )
+        for source_field, destination in options.get("mapping", {}).items():
+            if source_field in raw:
+                record[destination] = raw[source_field]
+                if destination == "event_time":
+                    known_time = True
+        try:
+            value = record.get("event_time")
+            if isinstance(value, bool):
+                raise ValueError("boolean timestamps are invalid")
+            if isinstance(value, str):
+                moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                if moment.tzinfo is None:
+                    zone = ZoneInfo(options.get("source_timezone", "UTC"))
+                    if moment.replace(tzinfo=zone, fold=0).utcoffset() != moment.replace(tzinfo=zone, fold=1).utcoffset():
+                        raise ValueError("ambiguous or nonexistent local time; supply an explicit UTC offset")
+                    moment = moment.replace(tzinfo=zone)
+                record["event_time"] = moment.astimezone(UTC).isoformat().replace("+00:00", "Z")
+            record["source"] = source
+            normalized_value = record.get("normalized_fields")
+            normalized: dict[str, Any] = normalized_value if isinstance(normalized_value, dict) else {}
+            record["normalized_fields"] = {**normalized, "event_time_known": known_time}
+            record["provenance"] = {
+                **record.get("provenance", {}),
+                "pipeline_options": options,
+                "event_time_basis": "source" if known_time else "ingestion_fallback_not_observed_time",
+            }
+        except (ValueError, TypeError, ZoneInfoNotFoundError):
+            record = {"__parse_error": "invalid, ambiguous or nonexistent source timestamp"}
+        yield record
+
+
+def _estimated_rows(format_name: str, content: bytes, options: dict[str, Any] | None = None) -> int:
+    if options and options.get("encoding", "utf-8-sig") != "utf-8-sig":
+        return 0
     if format_name == "json":
         try:
             value = json.loads(_decode(content))
-        except ValueError:
+        except (ValueError, RecursionError):
             return 1
         return len(value) if isinstance(value, list) else 1
     if format_name == "sysmon_xml":
         root = ElementTree.fromstring(content)
         return 1 if root.tag.rsplit("}", 1)[-1] == "Event" else sum(1 for item in root.iter() if item.tag.rsplit("}", 1)[-1] == "Event")
-    if format_name == "evtx":
+    if format_name in {"evtx", "pcap", "pcapng"}:
         return 0
     lines = sum(1 for line in _decode(content).splitlines() if line.strip())
     return max(lines - 1, 0) if format_name == "csv" else lines
@@ -390,6 +468,8 @@ def _estimated_rows(format_name: str, content: bytes) -> int:
 
 def _job_view(row: sqlite3.Row) -> dict[str, Any]:
     item = dict(row)
+    if "autopsy_options" in item:
+        item["autopsy_options"] = json.loads(item["autopsy_options"])
     available = bool(item.pop("evidence_ciphertext", None))
     item["raw_evidence"] = {
         "available": available,
@@ -402,6 +482,8 @@ def _job_view(row: sqlite3.Row) -> dict[str, Any]:
 def _job_access(job_id: int, write: bool = False) -> sqlite3.Row | None:
     row = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ? AND workspace_id = ?", (job_id, workspace_id())).fetchone()
     if not row or not can_access_training_run(row["training_run_id"]):
+        return None
+    if operational_mode() and row["case_id"] is not None and not case_visible(row["case_id"], current_user() or {}):
         return None
     if write and row["created_by"] != actor_id() and not has_permission(current_user(), "sources.manage"):
         return None
@@ -441,7 +523,7 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
         raise RuntimeError("import job is not leased by this worker")
     try:
         content = _job_content(job)
-        _, records = parse_records(job["filename"], content, job["format"], job["source_name"])
+        _, records = parse_records(job["filename"], content, job["format"], job["source_name"], json.loads(job["autopsy_options"]))
     except (ValueError, json.JSONDecodeError, csv.Error, ElementTree.ParseError) as exc:
         _mark_job_failed(job_id, str(exc))
         failed = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
@@ -482,6 +564,12 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
         if not batch:
             break
         with transaction():
+            if job["case_id"] is not None and not _import_case_authorized(job):
+                _mark_job_failed(job_id, "case closed, archived or import creator no longer authorized")
+                failed = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
+                if failed is None:
+                    raise RuntimeError("import job disappeared after authorization failure")
+                return failed
             if worker_id is not None:
                 lease = (utc_now() + timedelta(seconds=lease_seconds)).isoformat().replace("+00:00", "Z")
                 owned = get_db().execute(
@@ -502,19 +590,29 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
                     raise RuntimeError("import batch contains no record")
                 get_db().execute("SAVEPOINT import_row")
                 try:
-                    _, _, was_duplicate = ingest_event(get_db(), record, int(job["created_by"]), int(job["workspace_id"]), job["training_run_id"])
+                    if record.get("__parse_error"):
+                        raise ValueError(str(record["__parse_error"]))
+                    if job["case_id"] is not None:
+                        record["idempotency_key"] = (
+                            f"pipeline:{hashlib.sha256(job['autopsy_options'].encode()).hexdigest()}:{record.get('idempotency_key', row_number)}"
+                        )
+                    event_id, alerts, was_duplicate = ingest_event(
+                        get_db(), record, int(job["created_by"]), int(job["workspace_id"]), job["training_run_id"], job["case_id"]
+                    )
+                    if job["case_id"] is not None:
+                        _attach_import_result(job, event_id, alerts)
                     get_db().execute("RELEASE SAVEPOINT import_row")
                     if was_duplicate:
                         skipped += 1
                     else:
                         accepted += 1
-                except (ValueError, sqlite3.Error) as exc:
+                except (ValueError, OverflowError, sqlite3.Error) as exc:
                     get_db().execute("ROLLBACK TO SAVEPOINT import_row")
                     get_db().execute("RELEASE SAVEPOINT import_row")
                     rejected += 1
                     get_db().execute(
                         "INSERT INTO ingestion_errors (job_id, row_number, error_code, message, sample, created_at) VALUES (?, ?, 'VALIDATION_ERROR', ?, ?, ?)",
-                        (job_id, row_number, str(exc)[:500], json.dumps(record, ensure_ascii=False)[:1000], iso_now()),
+                        (job_id, row_number, str(exc)[:500], json.dumps(record, ensure_ascii=True)[:1000], iso_now()),
                     )
             checkpoint += len(batch)
             estimated = max(min(int(job["estimated_total"]), maximum_rows), 1)
@@ -523,6 +621,10 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
                 "UPDATE ingestion_jobs SET accepted = ?, rejected = ?, skipped = ?, total = ?, checkpoint = ?, progress = ?, updated_at = ? WHERE id = ?",
                 (accepted, rejected, skipped, checkpoint, checkpoint, progress, iso_now(), job_id),
             )
+            if job["case_id"] is not None:
+                from .autopsy_domain import touch_case
+
+                touch_case(job["case_id"])
         state = get_db().execute("SELECT status FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
         if state and state["status"] == "cancel_requested":
             get_db().execute(
@@ -564,10 +666,63 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
         actor=int(job["created_by"]),
         workspace=int(job["workspace_id"]),
     )
+    if job["case_id"] is not None:
+        from .autopsy_domain import custody
+
+        with transaction():
+            custody(
+                job["case_id"],
+                "import_completed",
+                {"job_id": job_id, "accepted": accepted, "rejected": rejected, "sha256": job["content_hash"]},
+                actor=job["created_by"],
+            )
     result = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
     if result is None:
         raise RuntimeError("import job disappeared after completion")
     return result
+
+
+def _import_case_authorized(job: sqlite3.Row) -> bool:
+    case = (
+        get_db().execute("SELECT status, archived_at FROM incident_cases WHERE id = ? AND workspace_id = ?", (job["case_id"], job["workspace_id"])).fetchone()
+    )
+    user = get_db().execute("SELECT id, workspace_id, role FROM users WHERE id = ? AND is_active = 1", (job["created_by"],)).fetchone()
+    if not case or case["status"] == "closed" or case["archived_at"] or not user:
+        return False
+    principal = dict(user)
+    policy = (
+        get_db().execute("SELECT permissions FROM team_role_permissions WHERE workspace_id = ? AND role = ?", (user["workspace_id"], user["role"])).fetchone()
+    )
+    if policy:
+        principal["role_permissions"] = json.loads(policy["permissions"])
+    return has_permission(principal, "events.create") and case_visible(job["case_id"], principal)
+
+
+def _attach_import_result(job: sqlite3.Row, event_id: int, alert_ids: list[int]) -> None:
+    now = iso_now()
+    get_db().execute(
+        "INSERT OR IGNORE INTO case_events(case_id, event_id, attached_by, attached_at) VALUES (?, ?, ?, ?)", (job["case_id"], event_id, job["created_by"], now)
+    )
+    for alert_id in alert_ids:
+        alert = get_db().execute("SELECT reason, dedup_key, evidence FROM alerts WHERE id = ? AND owner_case_id = ?", (alert_id, job["case_id"])).fetchone()
+        if not alert:
+            continue
+        get_db().execute(
+            "INSERT OR IGNORE INTO case_alerts(case_id, alert_id, attached_by, attached_at) VALUES (?, ?, ?, ?)",
+            (job["case_id"], alert_id, job["created_by"], now),
+        )
+        get_db().execute(
+            "INSERT OR IGNORE INTO case_evidence(case_id, evidence_type, reference_id, title, sha256, provenance, added_by, added_at) VALUES (?, 'alert', ?, ?, ?, ?, ?, ?)",
+            (job["case_id"], str(alert_id), alert["reason"][:255], alert["dedup_key"], alert["evidence"], job["created_by"], now),
+        )
+
+
+def _safe_import_filename(value: str) -> str:
+    name = secure_filename(value) or "import.log"
+    suffix = Path(value).suffix.lower()
+    if suffix in {".csv", ".json", ".jsonl", ".ndjson", ".log", ".txt", ".xml", ".evtx", ".pcap", ".pcapng"} and not name.lower().endswith(suffix):
+        return "import" + suffix
+    return name
 
 
 def _upload_payload() -> tuple[str, bytes, str | None, int | None, int | None]:
@@ -575,7 +730,7 @@ def _upload_payload() -> tuple[str, bytes, str | None, int | None, int | None]:
         uploaded = request.files.get("file")
         if not uploaded or not uploaded.filename:
             raise ValueError("file is required")
-        filename = secure_filename(uploaded.filename) or "import.log"
+        filename = _safe_import_filename(uploaded.filename)
         content = uploaded.stream.read(int(current_app.config["MAX_CONTENT_LENGTH"]) + 1)
         selected_format = request.form.get("format", "auto")
         source_id = int(request.form["source_id"]) if request.form.get("source_id") else None
@@ -584,7 +739,7 @@ def _upload_payload() -> tuple[str, bytes, str | None, int | None, int | None]:
     data = request.get_json(silent=True)
     if not isinstance(data, dict) or not isinstance(data.get("content"), str):
         raise ValueError("multipart file or textual content is required")
-    filename = secure_filename(str(data.get("filename") or "import.log")) or "import.log"
+    filename = _safe_import_filename(str(data.get("filename") or "import.log"))
     return (
         filename,
         data["content"].encode(),
@@ -594,17 +749,87 @@ def _upload_payload() -> tuple[str, bytes, str | None, int | None, int | None]:
     )
 
 
+def _upload_options() -> tuple[int | None, dict[str, Any]]:
+    if not operational_mode():
+        return None, {}
+    from .autopsy_domain import text_value
+    from .cases import _case_row
+
+    case_id = (request.view_args or {}).get("case_id")
+    case = _case_row(case_id) if type(case_id) is int else None
+    if not case or case["status"] == "closed":
+        raise ValueError("an open, authorized case is required")
+    data = request.form.to_dict() if request.files else request.get_json(silent=True)
+    allowed = {"filename", "content", "format", "source_id", "source_label", "mapping", "source_timezone", "encoding", "delimiter"}
+    if not isinstance(data, dict) or set(data) - allowed:
+        raise ValueError("unknown import parameters")
+    if not request.files and not isinstance(data.get("filename", "import.log"), str):
+        raise ValueError("filename must be a string")
+    mapping: Any = data.get("mapping", {})
+    if isinstance(mapping, str) and len(mapping) <= 10000:
+        mapping = json.loads(mapping)
+    fields = {
+        "event_time",
+        "title",
+        "event_type",
+        "category",
+        "severity",
+        "description",
+        "source_ip",
+        "destination_ip",
+        "hostname",
+        "username",
+        "process_name",
+        "parent_process",
+        "file_hash",
+        "http_status",
+        "action",
+        "outcome",
+    }
+    if (
+        not isinstance(mapping, dict)
+        or len(mapping) > 50
+        or any(not isinstance(key, str) or not 1 <= len(key) <= 100 or not isinstance(value, str) or value not in fields for key, value in mapping.items())
+    ):
+        raise ValueError("field mapping contains invalid source/destination fields")
+    if len(set(mapping.values())) != len(mapping):
+        raise ValueError("map each destination field only once")
+    encoding, delimiter = data.get("encoding", "utf-8-sig"), data.get("delimiter", ",")
+    if encoding not in ("utf-8-sig", "utf-8", "utf-16", "latin-1") or delimiter not in (",", ";", "\t", "|"):
+        raise ValueError("unsupported encoding or delimiter")
+    zone = text_value(data.get("source_timezone", "UTC"), 100, True)
+    if not re.fullmatch(r"[A-Za-z0-9_+-]+(?:/[A-Za-z0-9_+-]+)*", zone):
+        raise ValueError("invalid source timezone")
+    try:
+        ZoneInfo(zone)
+    except ZoneInfoNotFoundError as exc:
+        raise ValueError("source timezone is not available locally") from exc
+    options = {"mapping": mapping, "source_timezone": zone, "encoding": encoding, "delimiter": delimiter}
+    if data.get("source_label"):
+        options["source_label"] = text_value(data["source_label"], 100, True)
+    if "source_id" in data and data["source_id"] not in (None, ""):
+        if request.files:
+            if not str(data["source_id"]).isdecimal() or not 1 <= int(data["source_id"]) <= 9223372036854775807:
+                raise ValueError("source id must be an integer")
+        elif type(data["source_id"]) is not int or not 1 <= data["source_id"] <= 9223372036854775807:
+            raise ValueError("source id must be an integer")
+    return case_id, options
+
+
 @ingestion_api.post("/api/imports/preview")
 @require_permission("events.create")
 def preview_import():
     try:
+        _, options = _upload_options()
         filename, content, selected_format, source_id, training_run_id = _upload_payload()
         if not can_access_training_run(training_run_id):
             return error_response("TRAINING_RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
         source = (
             get_db().execute("SELECT name FROM event_sources WHERE id = ? AND workspace_id = ?", (source_id, workspace_id())).fetchone() if source_id else None
         )
-        format_name, records = parse_records(filename, content, selected_format, source["name"] if source else "file-import")
+        format_name, records = parse_records(
+            filename, content, selected_format, options.get("source_label") or (source["name"] if source else "file-import"), options
+        )
         preview = []
         for index, record in enumerate(records):
             if index >= 20:
@@ -621,6 +846,7 @@ def preview_import():
 @require_permission("events.create")
 def create_import():
     try:
+        case_id, options = _upload_options()
         filename, content, selected_format, source_id, training_run_id = _upload_payload()
     except (ValueError, OverflowError) as exc:
         return error_response("INVALID_IMPORT", str(exc), 422)
@@ -635,12 +861,14 @@ def create_import():
     )
     if source_id and not source:
         return error_response("SOURCE_NOT_FOUND", "المصدر غير موجود أو معطل", 404)
-    source_name = source["name"] if source else "file-import"
+    source_name = options.get("source_label") or (source["name"] if source else "file-import")
+    serialized_options = json.dumps(options, sort_keys=True, separators=(",", ":"))
     content_hash = hashlib.sha256(content).hexdigest()
     duplicate = (
         get_db()
         .execute(
-            "SELECT * FROM ingestion_jobs WHERE workspace_id = ? AND content_hash = ? AND training_run_id IS ?", (workspace_id(), content_hash, training_run_id)
+            "SELECT * FROM ingestion_jobs WHERE workspace_id = ? AND content_hash = ? AND training_run_id IS ? AND case_id IS ? AND autopsy_options = ?",
+            (workspace_id(), content_hash, training_run_id, case_id, serialized_options),
         )
         .fetchone()
     )
@@ -657,11 +885,19 @@ def create_import():
     if queued >= int(current_app.config["MAX_PENDING_IMPORT_JOBS"]):
         return error_response("IMPORT_QUEUE_FULL", "قائمة مهام الاستيراد ممتلئة؛ أعد المحاولة لاحقًا", 429)
     try:
-        format_name, _ = parse_records(filename, content, selected_format, source_name)
-        estimated_total = _estimated_rows(format_name, content)
+        format_name, _ = parse_records(filename, content, selected_format, source_name, options)
+        estimated_total = _estimated_rows(format_name, content, options)
     except (ValueError, json.JSONDecodeError, csv.Error, ElementTree.ParseError) as exc:
         return error_response("IMPORT_FORMAT_ERROR", str(exc), 422)
     now = iso_now()
+    original_filename = request.files["file"].filename if request.files else (request.get_json(silent=True) or {}).get("filename", filename)
+    if operational_mode():
+        from .autopsy_domain import text_value
+
+        try:
+            original_filename = text_value(original_filename, 255, True)
+        except ValueError as exc:
+            return error_response("INVALID_FILENAME", str(exc), 422)
     ciphertext = encrypt_secret(base64.b64encode(content).decode())
     with transaction():
         cursor = get_db().execute(
@@ -688,8 +924,32 @@ def create_import():
             ),
         )
         job_database_id = inserted_id(cursor)
+        get_db().execute(
+            "UPDATE ingestion_jobs SET case_id = ?, autopsy_options = ?, original_filename = ? WHERE id = ?",
+            (case_id, serialized_options, original_filename, job_database_id),
+        )
+        if case_id is not None:
+            from .autopsy_domain import custody, touch_case
+
+            get_db().execute(
+                "INSERT INTO autopsy_case_imports(case_id, job_id, attached_by, attached_at) VALUES (?, ?, ?, ?)", (case_id, job_database_id, actor_id(), now)
+            )
+            get_db().execute(
+                "INSERT INTO case_evidence(case_id, evidence_type, reference_id, title, sha256, provenance, added_by, added_at) VALUES (?, 'import', ?, ?, ?, ?, ?, ?)",
+                (
+                    case_id,
+                    str(job_database_id),
+                    filename,
+                    content_hash,
+                    json.dumps({"source": source_name, "options": options, "format": format_name}),
+                    actor_id(),
+                    now,
+                ),
+            )
+            custody(case_id, "original_import_received", {"job_id": job_database_id, "sha256": content_hash, "bytes": len(content)})
+            touch_case(case_id)
         record_audit(get_db(), "create", "import", job_database_id, details={"format": format_name, "sha256": content_hash, "size": len(content)})
-    if request.args.get("defer") == "1" or not current_app.config["IMPORT_INLINE_EXECUTION"]:
+    if request.args.get("defer") == "1" or not current_app.config["IMPORT_INLINE_EXECUTION"] or case_id is not None and format_name in {"pcap", "pcapng"}:
         queued = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_database_id,)).fetchone()
         if queued is None:
             raise RuntimeError("import job disappeared after creation")

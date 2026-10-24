@@ -294,9 +294,15 @@ def _candidate_events(connection: sqlite3.Connection, event: dict[str, Any], sec
     start = end - timedelta(seconds=seconds)
     rows = connection.execute(
         """SELECT * FROM security_events
-        WHERE workspace_id = ? AND training_run_id IS ? AND source != 'rules_engine' AND event_time >= ? AND event_time <= ?
+        WHERE workspace_id = ? AND training_run_id IS ? AND owner_case_id IS ? AND source != 'rules_engine' AND event_time >= ? AND event_time <= ?
         ORDER BY event_time, id LIMIT 20000""",
-        (event["workspace_id"], event.get("training_run_id"), start.isoformat().replace("+00:00", "Z"), end.isoformat().replace("+00:00", "Z")),
+        (
+            event["workspace_id"],
+            event.get("training_run_id"),
+            event.get("owner_case_id"),
+            start.isoformat().replace("+00:00", "Z"),
+            end.isoformat().replace("+00:00", "Z"),
+        ),
     ).fetchall()
     return [_event_dict(row) for row in rows]
 
@@ -323,8 +329,8 @@ def evaluate_dsl(connection: sqlite3.Connection, dsl: dict[str, Any], event: dic
     group_fields = [str(item) for item in window.get("group_by", [])]
     target_group = _group_key(event, group_fields)
     max_time_row = connection.execute(
-        "SELECT MAX(event_time) FROM security_events WHERE workspace_id = ? AND training_run_id IS ? AND source != 'rules_engine'",
-        (event["workspace_id"], event.get("training_run_id")),
+        "SELECT MAX(event_time) FROM security_events WHERE workspace_id = ? AND training_run_id IS ? AND owner_case_id IS ? AND source != 'rules_engine'",
+        (event["workspace_id"], event.get("training_run_id"), event.get("owner_case_id")),
     ).fetchone()
     max_time = parse_timestamp(max_time_row[0]) if max_time_row and max_time_row[0] else parse_timestamp(event["event_time"])
     lateness = int((max_time - parse_timestamp(event["event_time"])).total_seconds())
@@ -463,6 +469,8 @@ def evaluate_rules(connection: sqlite3.Connection, event_id: int) -> list[int]:
                 ),
             )
             alert_id = inserted_id(alert_cursor)
+            if event.get("owner_case_id") is not None:
+                connection.execute("UPDATE alerts SET owner_case_id = ? WHERE id = ?", (event["owner_case_id"], alert_id))
             for matched_event_id in evaluation.event_ids:
                 connection.execute("INSERT OR IGNORE INTO alert_events (alert_id, event_id) VALUES (?, ?)", (alert_id, matched_event_id))
             compatibility_event_id = public_id("DET")
@@ -491,6 +499,8 @@ def evaluate_rules(connection: sqlite3.Connection, event_id: int) -> list[int]:
                     json.dumps({"kind": "derived_alert", "origin_event_ids": list(evaluation.event_ids)}, separators=(",", ":")),
                 ),
             )
+            if event.get("owner_case_id") is not None:
+                connection.execute("UPDATE security_events SET owner_case_id = ? WHERE id = ?", (event["owner_case_id"], inserted_id(compatibility_cursor)))
             connection.execute(
                 """INSERT OR IGNORE INTO detection_matches
                 (rule_id, event_id, alert_event_id, alert_id, dedup_key, trace, created_at)

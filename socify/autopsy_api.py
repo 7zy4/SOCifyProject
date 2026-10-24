@@ -122,11 +122,31 @@ def case_get(case_id: int):
 @autopsy_api.get("/api/autopsy/catalog")
 @require_permission("cases.read")
 def catalog():
+    from zoneinfo import available_timezones
+
     from .security import ROLE_PERMISSIONS
 
     return jsonify(
         {
             "product": "SOCify Digital Autopsy",
+            "import_formats": ["auto", "csv", "json", "jsonl", "syslog", "linux_auth", "web", "sysmon_xml", "evtx", "pcap", "pcapng"],
+            "source_timezones": sorted(available_timezones()),
+            "mapping_fields": [
+                "event_time",
+                "title",
+                "event_type",
+                "severity",
+                "source_ip",
+                "destination_ip",
+                "hostname",
+                "username",
+                "process_name",
+                "parent_process",
+                "file_hash",
+                "http_status",
+                "action",
+                "outcome",
+            ],
             "network_policy": "offline-only",
             "record_schemas": KINDS,
             "roles": [role for role in ROLE_PERMISSIONS if role not in {"instructor", "analyst", "auditor"}],

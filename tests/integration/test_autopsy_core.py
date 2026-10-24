@@ -3,18 +3,6 @@ import sqlite3
 import pytest
 
 
-@pytest.fixture
-def autopsy_case(app, client, login_as):
-    app.config["LEGACY_TRAINING_TESTS"] = False
-    app.config["ALLOW_REGISTRATION"] = False
-    login_as("analyst")
-    response = client.post(
-        "/api/cases", json={"title": "Internal incident review", "reason": "alert_review", "objective": "Establish impact from retained evidence"}
-    )
-    assert response.status_code == 201, response.json
-    return response.json["id"]
-
-
 def test_case_first_context_membership_and_retired_routes(autopsy_case, app, client, database, login_as):
     case = client.get(f"/api/cases/{autopsy_case}").json
     assert case["context"]["objective"] == "Establish impact from retained evidence"

@@ -8,6 +8,7 @@ from flask_wtf.csrf import CSRFError, CSRFProtect, generate_csrf
 from .attack import attack_api
 from .auth import auth_api
 from .autopsy_api import autopsy_api
+from .autopsy_ingestion import autopsy_ingestion_api
 from .cases import cases_api
 from .config import build_config
 from .db import close_db, connect_path
@@ -45,6 +46,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     for blueprint in (
         ui,
         autopsy_api,
+        autopsy_ingestion_api,
         auth_api,
         events_api,
         detection_api,
@@ -65,7 +67,14 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.before_request
     def prepare_request():
         request.environ["socify.correlation_id"] = correlation_id()
-        if operational_mode() and request.path.startswith("/api/") and request.blueprint not in {"auth", "cases", "autopsy", "teams"}:
+        if any(type(value) is int and not 1 <= value <= 9223372036854775807 for value in (request.view_args or {}).values()):
+            return error_response("INVALID_IDENTIFIER", "معرف المورد خارج النطاق المسموح", 404)
+        if (
+            operational_mode()
+            and request.path.startswith("/api/")
+            and request.blueprint not in {"auth", "cases", "teams"}
+            and not str(request.blueprint or "").startswith("autopsy")
+        ):
             return error_response("CASE_CONTEXT_REQUIRED", "استخدم الأداة من داخل قضية مصرح بها؛ مسارات التدريب العامة متقاعدة", 410)
 
     @app.after_request
@@ -130,6 +139,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.errorhandler(413)
     def too_large(_: Exception):
         return error_response("UPLOAD_TOO_LARGE", "حجم الطلب يتجاوز الحد المسموح", 413)
+
+    @app.errorhandler(OverflowError)
+    def number_out_of_range(_: OverflowError):
+        return error_response("NUMBER_OUT_OF_RANGE", "قيمة رقمية تتجاوز النطاق المسموح", 422)
 
     @app.errorhandler(500)
     def internal_error(error: Exception):

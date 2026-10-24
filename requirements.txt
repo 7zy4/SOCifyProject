@@ -6,3 +6,9 @@ cryptography==50.0.2
 defusedxml==0.7.1
 python-evtx==0.8.1
 gunicorn==26.2.0
+weasyprint==70.0
+python-docx==1.2.0
+dpkt==1.9.8
+PyYAML==6.0.3
+yara-python==4.5.4
+maxminddb==3.2.0

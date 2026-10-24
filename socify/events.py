@@ -110,7 +110,7 @@ def normalize_event(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(mitre_ids, list) or len(mitre_ids) > 20 or any(not isinstance(item, str) for item in mitre_ids):
         raise ValueError("mitre_ids must be a list of identifiers")
     merged_normalized = {**normalized, **{key: value for key, value in extracted.items() if value is not None}}
-    raw_serialized = json.dumps(raw, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    raw_serialized = json.dumps(raw, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
     external_id = _string(data.get("external_id"), 255)
     idempotency_key = _string(data.get("idempotency_key"), 255)
     return {
@@ -150,8 +150,17 @@ def ingest_event(
     actor: int | None,
     workspace: int,
     training_run_id: int | None = None,
+    case_id: int | None = None,
 ) -> tuple[int, list[int], bool]:
     normalized = normalize_event(data)
+    if case_id is not None:
+        if (
+            type(case_id) is not int
+            or not connection.execute("SELECT 1 FROM incident_cases WHERE id = ? AND workspace_id = ? AND archived_at IS NULL", (case_id, workspace)).fetchone()
+        ):
+            raise ValueError("invalid case context")
+        if normalized["idempotency_key"]:
+            normalized["idempotency_key"] = f"case:{case_id}:{normalized['idempotency_key']}"
     mitre_ids = json.loads(str(normalized["mitre_ids"]))
     if mitre_ids:
         placeholders = ",".join("?" for _ in mitre_ids)
@@ -170,7 +179,7 @@ def ingest_event(
         ).fetchone()
         if existing:
             return int(existing["id"]), [], True
-    event_public_id = _string(data.get("event_id"), 80) or public_id("EVT")
+    event_public_id = public_id("EVT") if case_id is not None else _string(data.get("event_id"), 80) or public_id("EVT")
     now = iso_now()
     cursor = connection.execute(
         """INSERT INTO security_events
@@ -216,6 +225,8 @@ def ingest_event(
         ),
     )
     event_id = inserted_id(cursor)
+    if case_id is not None:
+        connection.execute("UPDATE security_events SET owner_case_id = ? WHERE id = ?", (case_id, event_id))
     alerts = evaluate_rules(connection, event_id)
     insert_outbox(
         connection, workspace, "event.created", {"id": event_id, "event_id": event_public_id, "severity": normalized["severity"], "alert_ids": alerts}

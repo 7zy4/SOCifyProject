@@ -110,6 +110,21 @@ CREATE TABLE IF NOT EXISTS autopsy_intel_bundles (
     created_at TEXT NOT NULL,
     UNIQUE(workspace_id, name, version)
 );
+CREATE VIRTUAL TABLE IF NOT EXISTS autopsy_log_search USING fts5(title, description, source_ip, destination_ip, hostname, username, raw_data, content='security_events', content_rowid='id');
+CREATE TRIGGER IF NOT EXISTS autopsy_search_insert AFTER INSERT ON security_events BEGIN
+    INSERT INTO autopsy_log_search(rowid, title, description, source_ip, destination_ip, hostname, username, raw_data)
+    VALUES (new.id, new.title, new.description, new.source_ip, new.destination_ip, new.hostname, new.username, new.raw_data);
+END;
+CREATE TRIGGER IF NOT EXISTS autopsy_search_delete AFTER DELETE ON security_events BEGIN
+    INSERT INTO autopsy_log_search(autopsy_log_search, rowid, title, description, source_ip, destination_ip, hostname, username, raw_data)
+    VALUES ('delete', old.id, old.title, old.description, old.source_ip, old.destination_ip, old.hostname, old.username, old.raw_data);
+END;
+CREATE TRIGGER IF NOT EXISTS autopsy_search_update AFTER UPDATE OF title, description, source_ip, destination_ip, hostname, username, raw_data ON security_events BEGIN
+    INSERT INTO autopsy_log_search(autopsy_log_search, rowid, title, description, source_ip, destination_ip, hostname, username, raw_data)
+    VALUES ('delete', old.id, old.title, old.description, old.source_ip, old.destination_ip, old.hostname, old.username, old.raw_data);
+    INSERT INTO autopsy_log_search(rowid, title, description, source_ip, destination_ip, hostname, username, raw_data)
+    VALUES (new.id, new.title, new.description, new.source_ip, new.destination_ip, new.hostname, new.username, new.raw_data);
+END;
 """
 
 
@@ -123,4 +138,23 @@ def migrate(connection: sqlite3.Connection) -> None:
     columns = {row["name"] for row in connection.execute("PRAGMA table_info(users)")}
     if "operations_role" not in columns:
         connection.execute("ALTER TABLE users ADD COLUMN operations_role TEXT")
-    connection.execute("INSERT INTO schema_meta(key, value, updated_at) VALUES ('autopsy_schema_version', '1', ?) ON CONFLICT(key) DO NOTHING", (iso_now(),))
+    if not connection.execute("SELECT 1 FROM schema_meta WHERE key = 'autopsy_search_version'").fetchone():
+        connection.execute("INSERT INTO autopsy_log_search(autopsy_log_search) VALUES ('rebuild')")
+        connection.execute("INSERT INTO schema_meta(key, value, updated_at) VALUES ('autopsy_search_version', '1', ?)", (iso_now(),))
+    job_columns = {row["name"] for row in connection.execute("PRAGMA table_info(ingestion_jobs)")}
+    if "case_id" not in job_columns:
+        connection.execute("ALTER TABLE ingestion_jobs ADD COLUMN case_id INTEGER REFERENCES incident_cases(id)")
+    if "autopsy_options" not in job_columns:
+        connection.execute("ALTER TABLE ingestion_jobs ADD COLUMN autopsy_options TEXT NOT NULL DEFAULT '{}'")
+    if "original_filename" not in job_columns:
+        connection.execute("ALTER TABLE ingestion_jobs ADD COLUMN original_filename TEXT")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_autopsy_import_case ON ingestion_jobs(case_id, id)")
+    for table in ("security_events", "alerts"):
+        columns = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
+        if "owner_case_id" not in columns:
+            connection.execute(f"ALTER TABLE {table} ADD COLUMN owner_case_id INTEGER REFERENCES incident_cases(id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_events_case_time ON security_events(owner_case_id, event_time, id)")
+    connection.execute(
+        "INSERT INTO schema_meta(key, value, updated_at) VALUES ('autopsy_schema_version', '2', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at WHERE schema_meta.value != excluded.value",
+        (iso_now(),),
+    )

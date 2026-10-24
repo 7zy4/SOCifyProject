@@ -1,6 +1,6 @@
 # SOCify
 
-> **تأسيس النسخة الثالثة:** [socify-version-3](https://github.com/7zy4/SOCifyProject/tree/socify-version-3) — التوجه الجديد **SOCify Digital Autopsy** للتحليل والتحقيق والتوثيق داخل الشركة بعزل كامل. ابدأ من [البرومت التنفيذي](docs/plans/v3-digital-autopsy-implementation-prompt-ar.md)، [جرد V2](docs/plans/v3-feature-inventory.md)، [البحث وأدلة REA](docs/research/v3/competitive-workflow-review-ar.md)، و[سجل الاستكمال](docs/plans/v3-progress.md). هذه مرحلة مواصفة وبحث؛ متطلبات V3 ليست منفذة بعد.
+> **النسخة الثالثة قيد التنفيذ:** [socify-version-3](https://github.com/7zy4/SOCifyProject/tree/socify-version-3) — التوجه الجديد **SOCify Digital Autopsy** للتحليل والتحقيق والتوثيق داخل الشركة. نُفذ أساس القضية وصلاحياتها والاستيراد والتصدير المقيدان بها؛ بقية متطلبات V3 قيد العمل والقبول. [التشغيل والحساب الداخلي](docs/operations-v3.md) · [البرومت التنفيذي](docs/plans/v3-digital-autopsy-implementation-prompt-ar.md) · [سجل الاستكمال](docs/plans/v3-progress.md) · [مصفوفة V3](docs/qa/v3-acceptance.csv). لا تُستخدم بيانات شركة حقيقية في Codespaces أو بيئة سحابية غير معتمدة داخل الشركة.
 >
 > **مرجع النسخة الثانية:** [socify-version-2](https://github.com/7zy4/SOCifyProject/tree/socify-version-2) — يشمل أعمال المرحلة الأولى والمنصة المؤسسية وتحسين تشغيل Codespaces، دون تعديل `main`. [تقرير تدقيق الفروع والمتطلبات](docs/qa/branch-consolidation-2026-10-20.md). النسخة **NO-GO** حتى إغلاق متطلبات القبول.
 >

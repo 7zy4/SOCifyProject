@@ -20,7 +20,7 @@ function autopsySelect(name, values, current = "") {
 function autopsyChoice(name, values, current = "", required = false) {
   const id = `choice-${name}-${crypto.randomUUID()}`;
   const input = node("input", { name, list: id, required, autocomplete: "off", class: "search-choice" });
-  const choices = values.map((entry) => typeof entry === "object" ? entry : { value: entry, label: autopsyLabel(entry) });
+  const choices = values.map((entry) => typeof entry === "object" ? { ...entry, label: displayText(entry.label) } : { value: entry, label: displayText(autopsyLabel(entry)) });
   const selected = choices.find((entry) => String(entry.value) === String(current));
   input.value = selected?.label || "";
   const list = node("datalist", { id }, choices.map((entry) => node("option", { value: entry.label })));
@@ -162,7 +162,7 @@ async function autopsyCase(caseId) {
   const selected = new URLSearchParams(window.location.search).get("tab") || "summary";
   autopsy.current = await api(`/api/cases/${caseId}`);
   const current = autopsy.current;
-  document.getElementById("section-title").textContent = current.title;
+  document.getElementById("section-title").textContent = displayText(current.title);
   document.getElementById("section-kicker").textContent = current.reference;
   document.title = `${current.reference} | SOCify Digital Autopsy`;
   const assetData = await api(`/api/cases/${caseId}/records?kind=asset&limit=100`);

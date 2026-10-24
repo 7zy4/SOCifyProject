@@ -56,6 +56,7 @@ def _case_row(case_id: int) -> sqlite3.Row | None:
 def _user_valid(user_id: object) -> bool:
     return (
         type(user_id) is int
+        and 1 <= user_id <= 9223372036854775807
         and get_db().execute("SELECT 1 FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (user_id, workspace_id())).fetchone() is not None
     )
 
@@ -95,12 +96,25 @@ def _reference(connection: sqlite3.Connection) -> str:
     return f"{prefix}{count + 1:06d}"
 
 
+def _source_visible(owner_case_id: int | None, created_by: int | None = None) -> bool:
+    if not operational_mode():
+        return True
+    user = current_user() or {}
+    if owner_case_id is None:
+        return user.get("role") in {"admin", "soc_manager"} or created_by == actor_id()
+    return case_visible(owner_case_id, user)
+
+
 def _attach_event(connection: sqlite3.Connection, case_id: int, event_id: int) -> bool:
     event = connection.execute(
-        "SELECT id, event_id, title, raw_hash, provenance, training_run_id FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, workspace_id())
+        "SELECT id, event_id, title, raw_hash, provenance, training_run_id, owner_case_id, created_by FROM security_events WHERE id = ? AND workspace_id = ?",
+        (event_id, workspace_id()),
     ).fetchone()
     case = connection.execute("SELECT training_run_id FROM incident_cases WHERE id = ? AND workspace_id = ?", (case_id, workspace_id())).fetchone()
     if not event or not case or event["training_run_id"] != case["training_run_id"] or not can_access_training_run(event["training_run_id"]):
+        return False
+    already_linked = connection.execute("SELECT 1 FROM case_events WHERE case_id = ? AND event_id = ?", (case_id, event_id)).fetchone()
+    if not already_linked and not _source_visible(event["owner_case_id"], event["created_by"]):
         return False
     now = iso_now()
     connection.execute(
@@ -125,10 +139,13 @@ def _attach_event(connection: sqlite3.Connection, case_id: int, event_id: int) -
 
 def _attach_alert(connection: sqlite3.Connection, case_id: int, alert_id: int) -> bool:
     alert = connection.execute(
-        "SELECT id, alert_id, reason, dedup_key, evidence, training_run_id FROM alerts WHERE id = ? AND workspace_id = ?", (alert_id, workspace_id())
+        "SELECT id, alert_id, reason, dedup_key, evidence, training_run_id, owner_case_id FROM alerts WHERE id = ? AND workspace_id = ?",
+        (alert_id, workspace_id()),
     ).fetchone()
     case = connection.execute("SELECT training_run_id FROM incident_cases WHERE id = ? AND workspace_id = ?", (case_id, workspace_id())).fetchone()
     if not alert or not case or alert["training_run_id"] != case["training_run_id"] or not can_access_training_run(alert["training_run_id"]):
+        return False
+    if not _source_visible(alert["owner_case_id"]):
         return False
     now = iso_now()
     connection.execute(
@@ -171,6 +188,8 @@ def _case_view(row: sqlite3.Row | None) -> dict[str, Any]:
 def list_cases():
     try:
         page = max(int(request.args.get("page", 1)), 1)
+        if page > 1000000:
+            raise ValueError
         page_size = min(max(int(request.args.get("page_size", 50)), 1), 100)
     except ValueError:
         return error_response("INVALID_PAGINATION", "قيم الترقيم غير صالحة", 400)
@@ -300,12 +319,28 @@ def _create_case(data: dict[str, Any]):
     team = str(data.get("team") or (user.get("team") if user else "") or "")[:120]
     with transaction():
         for event_id in event_ids:
-            event = get_db().execute("SELECT training_run_id FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, workspace_id())).fetchone()
-            if not event or event["training_run_id"] != training_run_id or not can_access_training_run(event["training_run_id"]):
+            event = (
+                get_db()
+                .execute("SELECT training_run_id, owner_case_id, created_by FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, workspace_id()))
+                .fetchone()
+            )
+            if (
+                not event
+                or event["training_run_id"] != training_run_id
+                or not can_access_training_run(event["training_run_id"])
+                or not _source_visible(event["owner_case_id"], event["created_by"])
+            ):
                 return error_response("EVENT_NOT_FOUND", "السجل غير موجود", 404)
         for alert_id in alert_ids:
-            alert = get_db().execute("SELECT training_run_id FROM alerts WHERE id = ? AND workspace_id = ?", (alert_id, workspace_id())).fetchone()
-            if not alert or alert["training_run_id"] != training_run_id or not can_access_training_run(alert["training_run_id"]):
+            alert = (
+                get_db().execute("SELECT training_run_id, owner_case_id FROM alerts WHERE id = ? AND workspace_id = ?", (alert_id, workspace_id())).fetchone()
+            )
+            if (
+                not alert
+                or alert["training_run_id"] != training_run_id
+                or not can_access_training_run(alert["training_run_id"])
+                or not _source_visible(alert["owner_case_id"])
+            ):
                 return error_response("ALERT_NOT_FOUND", "التنبيه غير موجود", 404)
         cursor = get_db().execute(
             """INSERT INTO incident_cases
@@ -388,6 +423,8 @@ def case_from_alert(alert_id: int):
     body.setdefault("priority", alert["severity"] if alert["severity"] in PRIORITIES else "medium")
     body["alert_ids"] = [alert_id]
     body["training_run_id"] = alert["training_run_id"]
+    if operational_mode():
+        body.pop("training_run_id", None)
     body.setdefault("mitre_ids", json.loads(alert["mitre_technique_ids"] or "[]"))
     return _create_case(body)
 
@@ -793,6 +830,8 @@ def evidence_detail(case_id: int, evidence_id: int):
 @cases_api.get("/api/incidents/<int:case_id>/evidence/<int:evidence_id>/content")
 @require_permission("cases.read")
 def evidence_content(case_id: int, evidence_id: int):
+    if operational_mode() and not has_permission(current_user(), "evidence.download"):
+        return error_response("PERMISSION_DENIED", "تنزيل الأصل يتطلب صلاحية مستقلة", 403)
     if not _case_row(case_id):
         return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
     evidence = (

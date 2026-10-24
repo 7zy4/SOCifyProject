@@ -106,6 +106,8 @@ ROLE_PERMISSIONS.update(
     }
 )
 ROLE_PERMISSIONS["soc_manager"].update({"reports.approve", "cases.assign", "intel.manage", "samples.download"})
+for _role in ("analyst", "l1_analyst", "l2_responder", "investigator", "soc_manager"):
+    ROLE_PERMISSIONS[_role].update({"cases.export", "evidence.download"})
 
 SENSITIVE_KEYS = {"password", "current_password", "new_password", "api_key", "secret", "token", "credential", "authorization", "backup_codes"}
 

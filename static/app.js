@@ -29,16 +29,22 @@ const titles = {
   team: ["الفريق والمهام", "TEAM OPERATIONS"]
 };
 
+function displayText(value) {
+  const text = value == null ? "—" : String(value);
+  if (document.querySelector('meta[name="product-mode"]')?.content !== "autopsy") return text;
+  return text.replace(/[\u202a-\u202e\u2066-\u2069]/gu, (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`);
+}
+
 function node(tag, attributes = {}, children = []) {
   const element = document.createElement(tag);
   Object.entries(attributes).forEach(([key, value]) => {
     if (key === "class") element.className = value;
-    else if (key === "text") element.textContent = value == null ? "—" : String(value);
+    else if (key === "text") element.textContent = displayText(value);
     else if (key.startsWith("on") && typeof value === "function") element.addEventListener(key.slice(2), value);
     else if (value !== false && value != null) element.setAttribute(key, String(value));
   });
   const values = Array.isArray(children) ? children : [children];
-  values.filter((value) => value != null).forEach((value) => element.append(value instanceof Node ? value : document.createTextNode(String(value))));
+  values.filter((value) => value != null).forEach((value) => element.append(value instanceof Node ? value : document.createTextNode(displayText(value))));
   return element;
 }
 

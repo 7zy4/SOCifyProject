@@ -136,17 +136,19 @@ def canonical(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-def custody(case_id: int, action: str, details: dict[str, Any]) -> None:
+def custody(case_id: int, action: str, details: dict[str, Any], actor: int | None = None) -> None:
     previous = get_db().execute("SELECT entry_hash FROM autopsy_custody WHERE case_id = ? ORDER BY id DESC LIMIT 1", (case_id,)).fetchone()
     previous_hash = previous[0] if previous else "0" * 64
     now = iso_now()
+    principal = actor if actor is not None else actor_id()
     clean = canonical(details)
-    digest = hashlib.sha256(canonical([case_id, actor_id(), action, clean, previous_hash, now]).encode()).hexdigest()
+    digest = hashlib.sha256(canonical([case_id, principal, action, clean, previous_hash, now]).encode()).hexdigest()
     get_db().execute(
         "INSERT INTO autopsy_custody(case_id, actor_id, action, details, previous_hash, entry_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (case_id, actor_id(), action, clean, previous_hash, digest, now),
+        (case_id, principal, action, clean, previous_hash, digest, now),
     )
-    record_audit(get_db(), action, "autopsy_case", case_id, details=details)
+    owner = get_db().execute("SELECT workspace_id FROM incident_cases WHERE id = ?", (case_id,)).fetchone()
+    record_audit(get_db(), action, "autopsy_case", case_id, details=details, actor=principal, workspace=owner["workspace_id"])
 
 
 def touch_case(case_id: int) -> None:

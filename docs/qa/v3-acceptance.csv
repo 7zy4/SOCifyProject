@@ -5,20 +5,20 @@ V3-E03,إنشاء قضية بالاسم والسبب والهدف فقط وفت�
 V3-E04,رفض اسم/سبب/هدف غير صالح من الخادم، مع بقاء المسودة قابلة للتصحيح,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
 V3-E05,فتح قضية من قائمة الفريق واستعادة السياق والفلاتر,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
 V3-E06,منع تجاوز سياق القضية بتغيير URL أو hidden ID,VERIFIED,tests/integration/test_autopsy_core.py::test_case_first_context_membership_and_retired_routes,
-V3-E07,استيراد CSV مع ربط حقول ومنطقة زمنية ومعاينة,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E08,استيراد JSON وJSONL مع حقول ناقصة وتراكيب غير صالحة,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E09,استيراد Syslog وLinux auth والتحقق من أوقات المصادر,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E10,استيراد Sysmon XML وEVTX بدليل دعم كل parser,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E11,إعادة رفع الملف ومنع التكرار مع إظهار تفسير,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E12,مهمة استيراد متوقفة/فاشلة وإعادة محاولة واستئناف آمن,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E13,رفض ملف كبير/أرشيف قنبلة/XXE ومسار خبيث دون انهيار العامل,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E14,حفظ الأصل وإثبات البصمة والفرق بين الخام والمطبع,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E15,بحث وفلاتر وترقيم سجلات دون تحميل المجموعة كاملة,NOT_STARTED,,Complete remaining implementation and acceptance evidence
+V3-E07,استيراد CSV مع ربط حقول ومنطقة زمنية ومعاينة,VERIFIED,tests/integration/test_autopsy_ingestion.py; tests/e2e/test_autopsy_browser.py,
+V3-E08,استيراد JSON وJSONL مع حقول ناقصة وتراكيب غير صالحة,PARTIAL,docs/qa/v3-ingestion-2026-10-24.md,Complete remaining acceptance boundaries; component coverage is not full journey acceptance
+V3-E09,استيراد Syslog وLinux auth والتحقق من أوقات المصادر,PARTIAL,docs/qa/v3-ingestion-2026-10-24.md,Complete remaining acceptance boundaries; component coverage is not full journey acceptance
+V3-E10,استيراد Sysmon XML وEVTX بدليل دعم كل parser,PARTIAL,docs/qa/v3-ingestion-2026-10-24.md,Complete remaining acceptance boundaries; component coverage is not full journey acceptance
+V3-E11,إعادة رفع الملف ومنع التكرار مع إظهار تفسير,VERIFIED,tests/integration/test_autopsy_ingestion.py; tests/e2e/test_autopsy_browser.py,
+V3-E12,مهمة استيراد متوقفة/فاشلة وإعادة محاولة واستئناف آمن,PARTIAL,docs/qa/v3-ingestion-2026-10-24.md,Complete remaining acceptance boundaries; component coverage is not full journey acceptance
+V3-E13,رفض ملف كبير/أرشيف قنبلة/XXE ومسار خبيث دون انهيار العامل,PARTIAL,docs/qa/v3-ingestion-2026-10-24.md,Complete remaining acceptance boundaries; component coverage is not full journey acceptance
+V3-E14,حفظ الأصل وإثبات البصمة والفرق بين الخام والمطبع,VERIFIED,tests/integration/test_autopsy_ingestion.py; tests/e2e/test_autopsy_browser.py,
+V3-E15,بحث وفلاتر وترقيم سجلات دون تحميل المجموعة كاملة,PARTIAL,docs/qa/v3-ingestion-2026-10-24.md,Complete remaining acceptance boundaries; component coverage is not full journey acceptance
 V3-E16,إسناد مجموعة سجلات لعضو وربطها بمهمة القضية,NOT_STARTED,,Complete remaining implementation and acceptance evidence
 V3-E17,منع العضو من قراءة مجموعات أو قضايا خارج الإسناد المصرح,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
-V3-E18,تصدير CSV آمن من formulas وJSON/JSONL مطابق للفلاتر,NOT_STARTED,,Complete remaining implementation and acceptance evidence
+V3-E18,تصدير CSV آمن من formulas وJSON/JSONL مطابق للفلاتر,VERIFIED,tests/integration/test_autopsy_ingestion.py; tests/e2e/test_autopsy_browser.py,
 V3-E19,حزمة قضية مع manifest واستيراد صحيح ورفض عبث بالبصمات,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E20,تصدير منقح مع حفظ الأصل وتدقيق التنزيل,NOT_STARTED,,Complete remaining implementation and acceptance evidence
+V3-E20,تصدير منقح مع حفظ الأصل وتدقيق التنزيل,VERIFIED,tests/integration/test_autopsy_ingestion.py; tests/e2e/test_autopsy_browser.py,
 V3-E21,إضافة Observable وتحويله إلى IOC بدليل وثقة ومصدر,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
 V3-E22,قبول IPv6 وhash صحيح ورفض قيم ومراجع كيان غير صالحة,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
 V3-E23,كشف مؤشرات مكررة وربطها دون تسرب بين الفرق,NOT_STARTED,,Complete remaining implementation and acceptance evidence
@@ -56,12 +56,12 @@ V3-E54,تجاوز حصص الطلبات وحدود البحث/الرفع وال�
 V3-E55,هجرة نسخة V2 مع الأعداد والبصمات والعلاقات واسترجاع النسخة الاحتياطية,NOT_STARTED,,Complete remaining implementation and acceptance evidence
 V3-E56,اختفاء وظائف التدريب وتعطيل APIs التشغيلية الخاصة بها دون فقد التاريخ,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
 V3-E57,واجهة 360–1920 وتكبير 200% ولوحة مفاتيح وcombobox وRTL/LTR,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
-V3-E58,عزل شبكة مثبت للتطبيق والعمال والتقارير وعدم إرسال أي بيانات للخارج,NOT_STARTED,,Complete remaining implementation and acceptance evidence
+V3-E58,عزل شبكة مثبت للتطبيق والعمال والتقارير وعدم إرسال أي بيانات للخارج,PARTIAL,docs/qa/v3-ingestion-2026-10-24.md,Complete remaining acceptance boundaries; component coverage is not full journey acceptance
 V3-E59,حمل ممثل وقياسات p95/p99 وموارد، مع حدود وسعة مثبتة لا مفترضة,NOT_STARTED,,Complete remaining implementation and acceptance evidence
 V3-E60,انقطاع خدمة/عامل، ثم إعادة تشغيل واستعادة القضية والمهام والأدلة والتدقيق,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E61,استيراد PCAP وPCAPNG واستخلاص تدفقات ومؤشرات دون التقاط حي أو زيارة عناوين,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E62,ملف شبكة تالف/مبتور/ضخم وحدود المحلل وعرض نقص التغطية والتشفير بصدق,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E63,Pipeline بإصدارات ومعاينة وحجر وإعادة معالجة دون تعديل الأصل,NOT_STARTED,,Complete remaining implementation and acceptance evidence
+V3-E61,استيراد PCAP وPCAPNG واستخلاص تدفقات ومؤشرات دون التقاط حي أو زيارة عناوين,VERIFIED,tests/integration/test_autopsy_ingestion.py; tests/e2e/test_autopsy_browser.py,
+V3-E62,ملف شبكة تالف/مبتور/ضخم وحدود المحلل وعرض نقص التغطية والتشفير بصدق,PARTIAL,docs/qa/v3-ingestion-2026-10-24.md,Complete remaining acceptance boundaries; component coverage is not full journey acceptance
+V3-E63,Pipeline بإصدارات ومعاينة وحجر وإعادة معالجة دون تعديل الأصل,PARTIAL,docs/qa/v3-ingestion-2026-10-24.md,Complete remaining acceptance boundaries; component coverage is not full journey acceptance
 V3-E64,استيراد TI وGeoIP محليًا مع مصدر وإصدار وصلاحية، ومنع التحديث الخارجي,NOT_STARTED,,Complete remaining implementation and acceptance evidence
 V3-E65,Sigma مدعومة تُطابق fixtures، ورفض operator غير مدعوم وYAML عدائي,NOT_STARTED,,Complete remaining implementation and acceptance evidence
 V3-E66,تجميع تنبيهات وفك التجميع مع حفظ الأدلة وsuppression منتهية الصلاحية,NOT_STARTED,,Complete remaining implementation and acceptance evidence

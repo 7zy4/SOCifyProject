@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
   {% if operational %}<link rel="stylesheet" href="{{ url_for('static', filename='autopsy.css') }}">{% endif %}
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
-  {% if operational %}<script src="{{ url_for('static', filename='autopsy.js') }}" defer></script>{% endif %}
+  {% if operational %}<script src="{{ url_for('static', filename='autopsy.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_data.js') }}" defer></script>{% endif %}
 </head>
 <body class="app-shell{{ ' autopsy-shell' if operational else '' }}">
   <a class="skip-link" href="#workspace">انتقل إلى مساحة العمل</a>

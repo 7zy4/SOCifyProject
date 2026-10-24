@@ -18,6 +18,14 @@ def connect_path(path: str, testing: bool = False) -> sqlite3.Connection:
     return connection
 
 
+def connect_readonly(path: str) -> sqlite3.Connection:
+    connection = sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True, timeout=10)
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA query_only = ON")
+    connection.execute("PRAGMA busy_timeout = 10000")
+    return connection
+
+
 def get_db() -> sqlite3.Connection:
     if "db" not in g:
         g.db = connect_path(str(current_app.config["DATABASE"]), bool(current_app.config.get("TESTING")))

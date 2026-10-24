@@ -15,6 +15,18 @@ from socify.seeding import seed_demo_data
 DEMO_LOGIN_VALUE = "Training-Safe-Password-2026!"
 
 
+@pytest.fixture
+def autopsy_case(app, client, login_as):
+    app.config["LEGACY_TRAINING_TESTS"] = False
+    app.config["ALLOW_REGISTRATION"] = False
+    login_as("analyst")
+    response = client.post(
+        "/api/cases", json={"title": "Internal incident review", "reason": "alert_review", "objective": "Establish impact from retained evidence"}
+    )
+    assert response.status_code == 201, response.json
+    return response.json["id"]
+
+
 @pytest.fixture(scope="session")
 def template_database(tmp_path_factory: pytest.TempPathFactory) -> Path:
     path = tmp_path_factory.mktemp("socify-template") / "template.db"
