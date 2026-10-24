@@ -10,6 +10,7 @@ from flask import Blueprint, Response, jsonify, request
 
 from .audit import record_audit, record_training_action
 from .db import get_db, inserted_id, transaction
+from .report_brand import report_style
 from .schema import insert_outbox
 from .security import (
     actor_id,
@@ -992,16 +993,17 @@ def _report_html(payload: dict[str, Any]) -> str:
         rows = payload[key]
         closure += f"<h2>{heading}</h2>"
         if rows:
-            columns = list(rows[0])
-            closure += "<table><thead><tr>" + "".join(f"<th>{html.escape(column)}</th>" for column in columns) + "</tr></thead><tbody>"
             closure += "".join(
-                "<tr>" + "".join(f"<td>{html.escape(str(row.get(column) if row.get(column) is not None else '—'))}</td>" for column in columns) + "</tr>"
+                '<article class="report-record"><dl>'
+                + "".join(
+                    f"<dt>{html.escape(str(column))}</dt><dd>{html.escape(str(value) if value is not None else '—')}</dd>" for column, value in row.items()
+                )
+                + "</dl></article>"
                 for row in rows
             )
-            closure += "</tbody></table>"
         else:
             closure += "<p>لا توجد عناصر مسجلة</p>"
-    return f'<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{html.escape(str(case["reference"]))}</title><style>body{{font-family:Arial,sans-serif;margin:2rem;line-height:1.7}}table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #bbb;padding:.5rem}}h1{{color:#123b66}}</style></head><body><h1>{html.escape(str(case["reference"]))}: {html.escape(str(case["title"]))}</h1><p><strong>الحالة:</strong> {html.escape(str(case["status"]))}</p>{closure}<h2>الأدلة</h2><table><thead><tr><th>النوع</th><th>العنوان</th><th>SHA-256</th></tr></thead><tbody>{evidence_rows}</tbody></table><p>وقت التوليد: {html.escape(str(payload["generated_at"]))}</p></body></html>'
+    return f'<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{html.escape(str(case["reference"]))}</title><style>{report_style()}</style></head><body><h1>{html.escape(str(case["reference"]))}: {html.escape(str(case["title"]))}</h1><p><strong>الحالة:</strong> {html.escape(str(case["status"]))}</p>{closure}<h2>الأدلة</h2><table><thead><tr><th>النوع</th><th>العنوان</th><th>SHA-256</th></tr></thead><tbody>{evidence_rows}</tbody></table><p>وقت التوليد: {html.escape(str(payload["generated_at"]))}</p></body></html>'
 
 
 def _generate_reports(case_id: int) -> None:

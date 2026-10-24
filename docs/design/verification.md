@@ -1,0 +1,19 @@
+# Visual identity verification — 2026-10-24
+
+The user's printed-booklet brief was adapted, with their explicit authorization, for a responsive website plus A4 incident and assessment reports. The revised reusable prompt is [visual-identity-prompt.md](visual-identity-prompt.md). The standalone guide is [visual-identity-v2.pdf](visual-identity-v2.pdf), with an offline [HTML edition](visual-identity-v2.html).
+
+The identity now uses self-hosted Baloo Bhaijaan 2 and IBM Plex Sans Arabic, the agreed blue/ivory palette, thick rounded outlines, and no animation, gradients or shadows. Fonts are served as WOFF2: 250,052 bytes total compared with 768,424 bytes for the original TTF files. Both source fonts and their OFL licenses remain available. Downloaded reports embed the WOFF2 fonts, increasing their base HTML size to approximately 340KB to support offline rendering.
+
+`python -m scripts.audit_brand` creates an isolated synthetic database, opens public pages and all 17 application sections at 1440px and 390px, captures screenshots, checks outer document widths, exercises an LTR rendering, and exports incident/assessment examples and the guide using Chromium's print engine. Data tables retain readable text with local scrolling; all records remain accessible. The guide uses eight explicit A4 pages with bounded content and no page number on the first/last page. The PDF engine rounds the requested 595×842pt dimensions to 594.96×841.92pt.
+
+Final visual review includes the screenshot contact sheets, the eight guide pages, and printed incident/assessment examples. Browser measurements found no outer-page horizontal overflow. Guide content stays within its page boxes. Font embedding was checked with `pdffonts`.
+
+Regression checks: 384 unit/integration/security tests passed in 73.68 seconds; combined branch coverage 92.73%. All seven Chromium journeys passed in 34.22 seconds with axe-core serious/critical checks, including mobile-menu open/close, graph keyboard controls, imports, investigations, reports and team assignments. The mobile navigation assertion now actually opens and closes the menu. Ruff format/lint, mypy and Bandit pass without suppressing new findings.
+
+Secret scanning remains enabled. The visual-audit fixture now generates random session/encryption keys. Eighteen reviewed findings are public SHA-256 metadata in the pre-existing research manifest and the new font manifest, with matching finding digests; font hashes were recomputed from the bundled files. Only those exact findings were marked non-secret in the existing baseline, without changing scanner rules or excluding additional files.
+
+Report snapshots already stored in the database are unchanged; newly generated reports receive the new design. Wide incident tables are represented as escaped field cards to preserve their contents on portrait paper. Pagination may continue a record that is taller than the printable area; text is never deliberately clipped or reduced below the report scale.
+
+The user-selected REA fork was executed on the final JavaScript and templates. Evidence ID: `ev_698655aa27f1daf9eeb762d5640bf34f0ad95df726dc92304d8bb3356a149da8`; target digest: `9b113883791d394b9a4fea3167be1843bc3c650de8d61204b4eaebb2390ea2fe`. It reported zero parse failures and 2,005 explicit unknown relationships. REA does not verify CSS rendering; the browser and PDF review supply that evidence. Full output is retained as `rea-brand-evidence-2026-10-24.json.gz` beside this report.
+
+Reproduce the deliverables with `python -m scripts.audit_brand`. The output directory `artifacts/brand/` contains the standalone guide HTML/PDF, screenshots, machine-readable visual measurements and report samples. These visual checks do not replace the original project's remaining functional acceptance gates.

@@ -46,7 +46,10 @@ def test_browser_login_rtl_navigation_and_mobile_layout(app) -> None:
             page.locator("button[type=submit]").click()
             page.wait_for_url("**/dashboard")
             assert page.locator("main").is_visible()
+            page.get_by_role("button", name="فتح القائمة").click()
             assert page.locator("nav").is_visible()
+            page.get_by_role("button", name="فتح القائمة").click()
+            assert not page.locator("nav").is_visible()
             assert_accessible(page)
             browser.close()
     finally:

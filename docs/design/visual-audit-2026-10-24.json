@@ -1,0 +1,360 @@
+[
+  {
+    "route": "/",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\""
+  },
+  {
+    "route": "/login",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\""
+  },
+  {
+    "route": "/register",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\""
+  },
+  {
+    "route": "/",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\""
+  },
+  {
+    "route": "/login",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\""
+  },
+  {
+    "route": "/register",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\""
+  },
+  {
+    "route": "dashboard",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "events",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "alerts",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "rules",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "sources",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "imports",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "incidents?selected=1",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "lab",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "attack",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "hunt",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "graph",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "playbooks",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "scores",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "audit",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "admin",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "profile",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "team",
+    "viewport": 1440,
+    "width": 1440,
+    "scroll": 1440,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "dashboard",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "events",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "alerts",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "rules",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "sources",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "imports",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "incidents?selected=1",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "lab",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "attack",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "hunt",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "graph",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "playbooks",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "scores",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "audit",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "admin",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "profile",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "route": "team",
+    "viewport": 390,
+    "width": 390,
+    "scroll": 390,
+    "font": "\"IBM Plex Sans Arabic\"",
+    "errors": []
+  },
+  {
+    "guide_pages": [
+      {
+        "height": 1123,
+        "scroll": 1123,
+        "contentBottom": 676.203125
+      },
+      {
+        "height": 1123,
+        "scroll": 1123,
+        "contentBottom": 819.15625
+      },
+      {
+        "height": 1123,
+        "scroll": 1123,
+        "contentBottom": 833.828125
+      },
+      {
+        "height": 1123,
+        "scroll": 1123,
+        "contentBottom": 835.359375
+      },
+      {
+        "height": 1123,
+        "scroll": 1123,
+        "contentBottom": 945.234375
+      },
+      {
+        "height": 1123,
+        "scroll": 1123,
+        "contentBottom": 875.921875
+      },
+      {
+        "height": 1123,
+        "scroll": 1123,
+        "contentBottom": 792.140625
+      },
+      {
+        "height": 1123,
+        "scroll": 1123,
+        "contentBottom": 809.265625
+      }
+    ]
+  }
+]

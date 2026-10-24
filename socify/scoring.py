@@ -9,6 +9,7 @@ from flask import Blueprint, Response, jsonify, request
 
 from .audit import record_audit
 from .db import get_db, inserted_id
+from .report_brand import report_style
 from .schema import public_id
 from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
 from .timeutils import iso_now, parse_timestamp
@@ -457,7 +458,7 @@ def assessment_report(assessment_id: int):
         missed = html.escape(json.dumps({key: value for key, value in report.items() if key.startswith("missed_")}, ensure_ascii=False))
         content = (
             '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير تقييم SOCify</title>'
-            "<style>body{font-family:Arial,sans-serif;margin:2rem;line-height:1.7}table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #bbb;padding:.5rem;text-align:right}h1{color:#123b66}@media print{body{margin:0}}</style>"
+            f"<style>{report_style()}</style>"
             f"</head><body><h1>تقرير تقييم SOCify</h1><p>المحاولة: {html.escape(str(assessment['run_id']))}</p>"
             f"<p>السياسة: {html.escape(str(assessment['policy_version']))} · الدرجة: {html.escape(str(assessment['total_score']))}</p>"
             f"<h2>المكونات</h2><table>{component_rows}</table><h2>المقاييس</h2><table>{metric_rows}</table>"

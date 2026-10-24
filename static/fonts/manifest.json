@@ -1,0 +1,46 @@
+{
+  "source": "https://github.com/google/fonts",
+  "conversion": "fonttools 4.60.1; Brotli 1.2.1; WOFF2 lossless",
+  "files": [
+    {
+      "file": "BalooBhaijaan2-OFL.txt",
+      "bytes": 4383,
+      "sha256": "a15158d76445b1892b82387a50d92e9c6adbe1eff04a46c8fc414a6308cd6e38"
+    },
+    {
+      "file": "BalooBhaijaan2.ttf",
+      "bytes": 285508,
+      "sha256": "3e9f07fbc796c0ddcb3e6e0aa26f9c86741d9f5b7f5cb72f4ed3c06e55a19336"
+    },
+    {
+      "file": "BalooBhaijaan2.woff2",
+      "bytes": 105096,
+      "sha256": "1f57fdea281af43e856308677e6014d6d56c7404b8ed94538ae74b67d6de5a6e"
+    },
+    {
+      "file": "IBMPlexSansArabic-Bold.ttf",
+      "bytes": 246992,
+      "sha256": "691e0c891a38637ae6bbdb69700f8042cb0724a137bee615068ffdb92244f61f"
+    },
+    {
+      "file": "IBMPlexSansArabic-Bold.woff2",
+      "bytes": 73372,
+      "sha256": "e81cebc1f33cc7a758a9bbec5d15b7ff1b8c2e7c65063d671731d95ac23a8303"
+    },
+    {
+      "file": "IBMPlexSansArabic-OFL.txt",
+      "bytes": 4362,
+      "sha256": "d741e57d5f865e294df801f96b7b5161a88b211df65887e4358d271c9fc5fb4f"
+    },
+    {
+      "file": "IBMPlexSansArabic-Regular.ttf",
+      "bytes": 235924,
+      "sha256": "6f611412270a132bbac838da9259d4c68569b4175f3b3b8fa3fa36a30b56dab9"
+    },
+    {
+      "file": "IBMPlexSansArabic-Regular.woff2",
+      "bytes": 71584,
+      "sha256": "508a0e83392dcfec7f0c6ace5918ed1dd0aa997b5e29f7e69b26c7cac7aadb82"
+    }
+  ]
+}

@@ -661,7 +661,9 @@ async function renderGraph() {
   const canvas = node("div", { class: "graph-canvas", tabindex: "0", "aria-label": "رسم الأدلة، استخدم الجدول البديل للتنقل الكامل" });
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   const width = 900;
-  const height = 430;
+  const height = Math.max(430, Math.ceil(graph.nodes.length / 3) * 110 + 60);
+  svg.setAttribute("width", String(width));
+  svg.setAttribute("height", String(height));
   svg.setAttribute("role", "group");
   svg.setAttribute("aria-label", "عقد الأدلة التفاعلية");
   let zoom = 1;
@@ -709,9 +711,7 @@ async function renderGraph() {
   });
   const positions = new Map();
   graph.nodes.forEach((item, index) => {
-    const angle = index * 2.399963;
-    const radius = 45 + 17 * Math.sqrt(index);
-    positions.set(item.id, { x: width / 2 + Math.cos(angle) * radius, y: height / 2 + Math.sin(angle) * radius });
+    positions.set(item.id, { x: 45 + (index % 3) * 300, y: 55 + Math.floor(index / 3) * 110 });
   });
   graph.edges.forEach((item) => {
     const source = positions.get(item.source);
@@ -724,11 +724,12 @@ async function renderGraph() {
     const position = positions.get(item.id);
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
     group.setAttribute("class", "graph-node"); group.setAttribute("tabindex", "0"); group.setAttribute("transform", `translate(${position.x} ${position.y})`);
-    group.setAttribute("role", "button"); group.setAttribute("aria-label", `${item.type}: ${item.label}`); group.dataset.nodeId = item.id;
+    const shortLabel = String(item.label).length > 24 ? String(item.label).slice(0, 24) + "…" : String(item.label);
+    group.setAttribute("role", "button"); group.setAttribute("aria-label", `${item.type}: ${shortLabel}`); group.dataset.nodeId = item.id;
     group.addEventListener("click", () => selectNode(item));
     group.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectNode(item); } });
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle"); circle.setAttribute("r", "18");
-    const label = document.createElementNS("http://www.w3.org/2000/svg", "text"); label.setAttribute("x", "24"); label.setAttribute("y", "4"); label.textContent = String(item.label).slice(0, 34);
+    const label = document.createElementNS("http://www.w3.org/2000/svg", "text"); label.setAttribute("x", "24"); label.setAttribute("y", "4"); label.textContent = shortLabel;
     const title = document.createElementNS("http://www.w3.org/2000/svg", "title"); title.textContent = `${item.type}: ${item.label}`;
     group.append(title, circle, label); svg.append(group);
   });
