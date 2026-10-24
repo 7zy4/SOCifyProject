@@ -136,4 +136,4 @@ def test_training_hints_and_score_read_models(client, login_as, database):
     assert client.get(f"/api/assessments/{score['id']}").status_code == 200
     version_id = database.execute("SELECT scenario_version_id FROM training_runs WHERE id = ?", (run["id"],)).fetchone()[0]
     database.execute("UPDATE scenario_steps SET visible_hint = NULL WHERE scenario_version_id = ?", (version_id,))
-    assert client.post(url + "/hints", json={}).status_code == 404
+    assert client.post(url + "/hints", json={}).status_code == 409

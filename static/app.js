@@ -607,12 +607,59 @@ async function renderHunt() {
 
 async function renderGraph() {
   begin("graph");
-  const [graph, timeline] = await Promise.all([api("/api/visualizations/graph?limit=150"), api("/api/visualizations/timeline?limit=200")]);
+  const filters = new URLSearchParams(window.location.search);
+  filters.set("limit", "150");
+  const [graph, timeline] = await Promise.all([api(`/api/visualizations/graph?${filters}`), api(`/api/visualizations/timeline?${filters}`)]);
   const root = node("div");
   const canvas = node("div", { class: "graph-canvas", tabindex: "0", "aria-label": "رسم الأدلة، استخدم الجدول البديل للتنقل الكامل" });
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   const width = 900;
   const height = 430;
+  svg.setAttribute("role", "group");
+  svg.setAttribute("aria-label", "عقد الأدلة التفاعلية");
+  let zoom = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+  const updateViewport = () => svg.setAttribute("viewBox", `${offsetX} ${offsetY} ${width / zoom} ${height / zoom}`);
+  updateViewport();
+  const controls = node("div", { class: "action-row" }, [
+    button("تكبير الرسم", () => { zoom = Math.min(zoom * 1.25, 5); updateViewport(); }),
+    button("تصغير الرسم", () => { zoom = Math.max(zoom / 1.25, 0.5); updateViewport(); }),
+    button("ملاءمة الرسم", () => { zoom = 1; offsetX = 0; offsetY = 0; updateViewport(); }),
+  ]);
+  canvas.addEventListener("keydown", (event) => {
+    const directions = { ArrowLeft: [-30, 0], ArrowRight: [30, 0], ArrowUp: [0, -30], ArrowDown: [0, 30] };
+    if (!directions[event.key]) return;
+    event.preventDefault();
+    offsetX += directions[event.key][0] / zoom;
+    offsetY += directions[event.key][1] / zoom;
+    updateViewport();
+  });
+  const details = node("div", { class: "panel-body", "aria-live": "polite" }, "اختر عقدة أو واقعة من الخط الزمني لعرض مصدرها وعلاقاتها.");
+  const selectNode = (item) => {
+    svg.querySelectorAll(".graph-node").forEach((entry) => entry.classList.toggle("selected", entry.dataset.nodeId === item.id));
+    const neighbors = graph.edges.filter((edge) => edge.source === item.id || edge.target === item.id);
+    details.replaceChildren(node("h4", { text: item.label }), node("p", { text: `${item.type} · ${item.provenance} · ${formatTime(item.timestamp)}` }), node("p", { text: `الثقة ${Math.round(Number(item.confidence) * 100)}% · المرجع ${item.reference_id}` }));
+    if (item.type === "Event") details.append(linkedButton("عرض الواقعة", `/api/events/${item.reference_id}`));
+    if (item.type === "Incident") details.append(linkedButton("فتح التحقيق", `/incidents?selected=${item.reference_id}`));
+    const adjacent = new Set(neighbors.map((edge) => edge.source === item.id ? edge.target : edge.source));
+    details.append(node("div", { class: "action-row" }, graph.nodes.filter((entry) => adjacent.has(entry.id)).map((entry) => button(`${entry.type}: ${entry.label}`, () => selectNode(entry), "compact"))));
+  };
+  const form = node("form", { class: "filter-row", "aria-label": "تصفية الرسم" });
+  for (const [name, label] of [["start", "من الوقت UTC"], ["end", "إلى الوقت UTC"], ["case_id", "رقم التحقيق"], ["training_run_id", "رقم المحاولة"]]) {
+    form.append(field(label, node("input", { name, value: filters.get(name) || "", placeholder: name === "start" || name === "end" ? "2026-10-24T00:00:00Z" : "" })));
+  }
+  const severity = selectControl("severity", ["low", "medium", "high", "critical"], "كل درجات الخطورة");
+  severity.setAttribute("aria-label", "الخطورة");
+  severity.value = filters.get("severity") || "auto";
+  form.append(field("الخطورة", severity), node("button", { type: "submit", class: "button primary", text: "تطبيق التصفية" }));
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const query = new URLSearchParams();
+    for (const [key, value] of new FormData(form)) if (value && value !== "auto") query.set(key, value);
+    window.history.replaceState({}, "", `/graph?${query}`);
+    try { await renderGraph(); } catch (error) { handleError(error); }
+  });
   const positions = new Map();
   graph.nodes.forEach((item, index) => {
     const angle = index * 2.399963;
@@ -630,15 +677,20 @@ async function renderGraph() {
     const position = positions.get(item.id);
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
     group.setAttribute("class", "graph-node"); group.setAttribute("tabindex", "0"); group.setAttribute("transform", `translate(${position.x} ${position.y})`);
+    group.setAttribute("role", "button"); group.setAttribute("aria-label", `${item.type}: ${item.label}`); group.dataset.nodeId = item.id;
+    group.addEventListener("click", () => selectNode(item));
+    group.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectNode(item); } });
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle"); circle.setAttribute("r", "18");
     const label = document.createElementNS("http://www.w3.org/2000/svg", "text"); label.setAttribute("x", "24"); label.setAttribute("y", "4"); label.textContent = String(item.label).slice(0, 34);
     const title = document.createElementNS("http://www.w3.org/2000/svg", "title"); title.textContent = `${item.type}: ${item.label}`;
     group.append(title, circle, label); svg.append(group);
   });
   canvas.append(svg);
-  const nodeColumns = [{ label: "النوع", value: "type" }, { label: "التسمية", value: "label" }, { label: "المرجع", value: "reference_id" }, { label: "الثقة", value: (row) => `${Math.round(Number(row.confidence) * 100)}%` }, { label: "المصدر", value: "provenance" }];
-  const timeList = node("ol", { class: "timeline" }, timeline.items.slice(0, 100).map((item) => node("li", {}, [node("time", { text: formatTime(item.timestamp) }), node("i"), node("p", { text: `${item.type}: ${item.title || item.label || item.reference_id}` })])));
-  root.append(pageHead("رسم الأدلة والأثر الزمني", `${graph.nodes.length} عقد · ${graph.edges.length} علاقات موثقة`, [linkedButton("تصدير JSON", "/api/visualizations/graph/export", "primary")]), panel("Graph", canvas, true), node("div", { class: "panel-grid" }, [panel("بديل جدولي قابل للوصول", table(nodeColumns, graph.nodes)), panel("Timeline", timeList)]));
+  const nodeColumns = [{ label: "النوع", value: "type" }, { label: "التسمية", value: (row) => button(row.label, () => selectNode(row), "compact") }, { label: "المرجع", value: "reference_id" }, { label: "الثقة", value: (row) => `${Math.round(Number(row.confidence) * 100)}%` }, { label: "المصدر", value: "provenance" }];
+  const timeList = node("ol", { class: "timeline" }, timeline.items.map((item) => node("li", {}, [node("time", { datetime: item.event_time, text: formatTime(item.event_time) }), node("i", { "aria-hidden": "true" }), button(`${item.event_type}: ${item.title}`, () => { const target = graph.nodes.find((entry) => entry.id === `event:${item.id}`); if (target) selectNode(target); }, "compact")])));
+  root.append(pageHead("رسم الأدلة والأثر الزمني", `${graph.nodes.length} عقد · ${graph.edges.length} علاقات موثقة`, [linkedButton("تصدير JSON", `/api/visualizations/graph/export?${filters}`, "primary")]), form, controls);
+  if (graph.truncated || timeline.truncated) root.append(node("p", { class: "notice", text: "النتائج محدودة؛ ضيّق الفترة أو التحقيق لعرض بقية الأدلة." }));
+  root.append(panel("Graph", canvas, true), panel("تفاصيل العقدة", details), node("div", { class: "panel-grid" }, [panel("بديل جدولي قابل للوصول", table(nodeColumns, graph.nodes)), panel("Timeline", timeList)]));
   finish(root);
 }
 

@@ -170,6 +170,7 @@ tbody tr:hover { background: rgba(95, 242, 178, .025); }
 .graph-canvas svg { min-width: 900px; min-height: 430px; }
 .graph-node { cursor: pointer; }
 .graph-node circle { fill: #133b30; stroke: #65e5ad; stroke-width: 2; }
+.graph-node.selected circle, .graph-node:focus circle { fill: #544117; stroke: var(--amber); stroke-width: 4; }
 .graph-node text { fill: #eaf5f1; font-size: 12px; }
 .graph-edge { stroke: #54736b; stroke-width: 1.5; }
 .timeline { margin: 0; padding: 0; list-style: none; }

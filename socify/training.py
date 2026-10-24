@@ -108,7 +108,11 @@ def scenario_detail(scenario_id: int):
         .fetchall()
     )
     item["steps"] = [
-        {**dict(step), "mitre_ids": json.loads(step["mitre_ids"]), "visible_hint": step["visible_hint"] if version["difficulty"] == "beginner" else None}
+        {
+            **dict(step),
+            "mitre_ids": json.loads(step["mitre_ids"]),
+            "visible_hint": step["visible_hint"] if has_permission(current_user(), "training.manage") else None,
+        }
         for step in steps
     ]
     return jsonify(item)
@@ -444,7 +448,7 @@ def start_run():
     return _start_run(data)
 
 
-def _start_run(data: dict[str, Any]):
+def _start_run(data: dict[str, Any], replaces_run: int | None = None):
     scenario = (
         get_db()
         .execute("SELECT * FROM attack_scenarios WHERE id = ? AND workspace_id = ? AND state IN ('published', 'ready')", (data["scenario_id"], workspace_id()))
@@ -481,6 +485,9 @@ def _start_run(data: dict[str, Any]):
             ),
         )
         run_id = inserted_id(cursor)
+        if replaces_run is not None:
+            get_db().execute("UPDATE training_runs SET state = 'cancelled' WHERE id = ? AND state IN ('running', 'paused', 'ready')", (replaces_run,))
+            record_audit(get_db(), "restart", "training_run", replaces_run, details={"replacement_run_id": run_id})
         record_audit(get_db(), "start", "training_run", run_id, details={"scenario": scenario["scenario_id"], "seed": seed, "difficulty": difficulty})
         record_training_action(get_db(), run_id, actor_id(), "run_started", "training_run", run_id, {}, f"run-start:{run_id}")
         insert_outbox(get_db(), workspace_id(), "training_run.started", {"id": run_id})
@@ -671,16 +678,16 @@ def restart_run(run_id: int):
     run = _run_access(run_id)
     if not run:
         return error_response("RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
-    get_db().execute("UPDATE training_runs SET state = 'cancelled' WHERE id = ? AND state IN ('running', 'paused', 'ready')", (run_id,))
-    scenario = get_db().execute("SELECT scenario_id FROM scenario_versions WHERE id = ?", (run["scenario_version_id"],)).fetchone()
+    scenario = get_db().execute("SELECT scenario_id, version FROM scenario_versions WHERE id = ?", (run["scenario_version_id"],)).fetchone()
     data = {
         "scenario_id": scenario["scenario_id"],
+        "version": scenario["version"],
         "difficulty": run["difficulty"],
         "seed": run["seed"],
         "playback_rate": run["playback_rate"],
         "auto_play": False,
     }
-    return _start_run(data)
+    return _start_run(data, replaces_run=run_id)
 
 
 @training_api.post("/api/training/runs/<int:run_id>/hints")
@@ -689,6 +696,8 @@ def consume_hint(run_id: int):
     run = _run_access(run_id)
     if not run:
         return error_response("RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
+    if run["state"] not in {"running", "paused", "awaiting_submission"}:
+        return error_response("RUN_HINTS_CLOSED", "لا يمكن استهلاك تلميحات بعد اعتماد المحاولة", 409)
     step = (
         get_db()
         .execute(
@@ -699,9 +708,20 @@ def consume_hint(run_id: int):
     )
     if not step or not step["visible_hint"]:
         return error_response("HINT_NOT_AVAILABLE", "لا يتوفر تلميح لهذه الخطوة", 404)
-    get_db().execute("UPDATE training_runs SET hints_used = hints_used + 1 WHERE id = ?", (run_id,))
-    record_training_action(get_db(), run_id, actor_id(), "hint_used", "training_run", run_id, {}, f"hint:{run_id}:{int(run['hints_used']) + 1}")
-    return jsonify({"hint": step["visible_hint"], "hints_used": int(run["hints_used"]) + 1})
+    with transaction():
+        changed = (
+            get_db()
+            .execute(
+                "UPDATE training_runs SET hints_used = hints_used + 1 WHERE id = ? AND state IN ('running', 'paused', 'awaiting_submission') RETURNING hints_used",
+                (run_id,),
+            )
+            .fetchone()
+        )
+        if changed is None:
+            return error_response("RUN_HINTS_CLOSED", "لا يمكن استهلاك تلميحات بعد اعتماد المحاولة", 409)
+        hints_used = int(changed["hints_used"])
+        record_training_action(get_db(), run_id, actor_id(), "hint_used", "training_run", run_id, {}, f"hint:{run_id}:{hints_used}")
+    return jsonify({"hint": step["visible_hint"], "hints_used": hints_used})
 
 
 @training_api.get("/api/training/runs/<int:run_id>")

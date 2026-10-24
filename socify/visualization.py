@@ -59,6 +59,25 @@ def _filters(alias: str = "e") -> tuple[str, list[object]]:
     parameters: list[object] = [workspace_id()]
     if request.args.get("include_derived") != "1":
         clauses.append(f"{alias}.source != 'rules_engine'")
+    case_id = request.args.get("case_id")
+    if case_id:
+        from .cases import _case_row
+
+        try:
+            case_value = int(case_id)
+        except ValueError as exc:
+            raise ValueError("case_id must be an integer") from exc
+        if _case_row(case_value) is None:
+            clauses.append("1 = 0")
+        else:
+            clauses.append(f"{alias}.id IN (SELECT event_id FROM case_events WHERE case_id = ?)")
+            parameters.append(case_value)
+    severity = request.args.get("severity")
+    if severity:
+        if severity not in {"low", "medium", "high", "critical"}:
+            raise ValueError("invalid severity")
+        clauses.append(f"{alias}.severity = ?")
+        parameters.append(severity)
     training_run_id = request.args.get("training_run_id")
     if training_run_id:
         try:

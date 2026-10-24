@@ -236,3 +236,50 @@ def test_browser_case_closure_requires_complete_report(app, client, login_as):
     finally:
         server.shutdown()
         thread.join(timeout=5)
+
+
+@pytest.mark.e2e
+def test_browser_graph_filters_zoom_keyboard_details_and_export(app, client, login_as):
+    login_as("analyst")
+    event_id = client.post(
+        "/api/events", json={"source": "graph-browser", "title": "Graph browser evidence", "severity": "high", "event_time": "2026-10-24T01:00:00Z"}
+    ).json["id"]
+    case_id = client.post("/api/incidents", json={"title": "Graph browser case", "event_ids": [event_id]}).json["id"]
+    server = make_server("127.0.0.1", 0, app)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as playwright:
+            browser = launch_browser(playwright)
+            page = new_page(browser, viewport={"width": 390, "height": 844})
+            base = f"http://127.0.0.1:{server.server_port}"
+            page.goto(base + "/login")
+            page.locator("input[name=email]").fill("analyst@socify.local")
+            page.locator("input[name=password]").fill("Training-Safe-Password-2026!")
+            page.locator("button[type=submit]").click()
+            page.wait_for_url("**/dashboard")
+            page.goto(base + f"/graph?case_id={case_id}")
+            svg = page.locator(".graph-canvas svg")
+            svg.wait_for()
+            original = svg.get_attribute("viewBox")
+            page.get_by_role("button", name="تكبير الرسم", exact=True).click()
+            assert svg.get_attribute("viewBox") != original
+            page.get_by_role("button", name="ملاءمة الرسم", exact=True).click()
+            assert svg.get_attribute("viewBox") == original
+            target = page.get_by_role("button", name="Event: Graph browser evidence", exact=True)
+            target.focus()
+            target.press("Enter")
+            page.get_by_role("link", name="عرض الواقعة").wait_for()
+            assert page.locator(".graph-node.selected").count() == 1
+            assert "UTC" in page.locator(".timeline time").first.inner_text()
+            page.get_by_label("الخطورة", exact=True).select_option("high")
+            page.get_by_role("button", name="تطبيق التصفية").click()
+            page.locator(".graph-node").first.wait_for()
+            with page.expect_download() as download:
+                page.get_by_role("link", name="تصدير JSON").click()
+            assert b"Graph browser evidence" in Path(download.value.path()).read_bytes()
+            assert_accessible(page)
+            browser.close()
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
