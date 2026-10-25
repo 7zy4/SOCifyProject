@@ -1,0 +1,71 @@
+{
+  "schema": "socify-v3-capacity/1",
+  "revision": "f0a6f30618f7a8eb495eeddd8d5488a6560d68d1",
+  "environment": {
+    "python": "3.12.14",
+    "kernel": "6.18.55",
+    "cpu_count": 5,
+    "host_memory_bytes": 35743760384,
+    "database_bytes": 1049350144
+  },
+  "scope": {
+    "case_events": 1000000,
+    "actual_parsed_events": 10000,
+    "storage_seed_events": 990000,
+    "concurrent_clients": 20,
+    "requests": 100,
+    "authentication": "synthetic test sessions; CSRF measured separately by real browser tests",
+    "transport": "Flask test client including application validation, SQL and JSON serialization; excludes ingress/TLS latency",
+    "fts_hit_count": "Exact below 10000; declared lower bound above 10000 with exact has_next for each returned page"
+  },
+  "import": {
+    "seconds": 9.468861848989036,
+    "rows_per_second": 1056.093135530082
+  },
+  "storage_seed_seconds": 36.16753525097738,
+  "reads": {
+    "case_open": {
+      "p50_ms": 522.413,
+      "p95_ms": 828.861,
+      "p99_ms": 839.391
+    },
+    "log_page": {
+      "p50_ms": 367.02,
+      "p95_ms": 487.313,
+      "p99_ms": 522.953
+    },
+    "fts_search": {
+      "p50_ms": 138.55,
+      "p95_ms": 434.414,
+      "p99_ms": 440.59
+    },
+    "timeline": {
+      "p50_ms": 372.295,
+      "p95_ms": 490.143,
+      "p99_ms": 505.945
+    }
+  },
+  "report": {
+    "seconds": 3.999878427013755,
+    "pdf_bytes": 105419,
+    "formats": [
+      "docx",
+      "html",
+      "json",
+      "md",
+      "pdf"
+    ]
+  },
+  "resources": {
+    "coordinator_peak_rss_kib": 118716,
+    "coordinator_user_cpu_seconds": 43.035071,
+    "coordinator_system_cpu_seconds": 12.43133,
+    "elapsed_seconds": 53.86251300299773
+  },
+  "limitations": [
+    "Synthetic storage expansion does not measure million-row parsing or enrichment throughput",
+    "Memory/CPU values cover coordinator only, not Docker analysis service",
+    "Single bounded report timing is not a report latency distribution",
+    "No company SLO agreed; measurements are evidence for sizing, not a production capacity promise"
+  ]
+}

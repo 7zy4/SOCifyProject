@@ -1,0 +1,68 @@
+{
+  "verified_source_revision": "f0a6f30618f7a8eb495eeddd8d5488a6560d68d1",
+  "synthetic_only": true,
+  "pytest": {
+    "passed": 708,
+    "e2e_deselected_then_run_separately": 15,
+    "warnings": 1,
+    "warning_scope": "Intentional duplicate ZIP member rejection fixture"
+  },
+  "coverage": {
+    "covered_lines": 8671,
+    "num_statements": 9351,
+    "percent_covered": 90.42955193953883,
+    "percent_covered_display": "90",
+    "missing_lines": 680,
+    "excluded_lines": 0,
+    "percent_statements_covered": 92.72805047588493,
+    "percent_statements_covered_display": "93",
+    "num_branches": 3616,
+    "num_partial_branches": 509,
+    "covered_branches": 3055,
+    "missing_branches": 561,
+    "percent_branches_covered": 84.48561946902655,
+    "percent_branches_covered_display": "84"
+  },
+  "chromium": {
+    "passed": 15,
+    "csrf_enabled": true,
+    "css_content_zoom_percent": 200,
+    "native_desktop_zoom_proven": false
+  },
+  "static_checks": {
+    "ruff_lint": "passed",
+    "ruff_format": "passed",
+    "mypy": "passed: 75 source files",
+    "bandit": "passed with existing narrowly reviewed markers",
+    "detect_secrets": "passed with reviewed public fingerprints"
+  },
+  "production": {
+    "case_archive_restore": true,
+    "custom_yara_validation_and_versioned_scan": true,
+    "fixed_internal_ingress": true,
+    "formats": [
+      "docx",
+      "html",
+      "json",
+      "md",
+      "pdf"
+    ],
+    "import_state": "completed",
+    "pdf_sha256_verified": true,
+    "production_http_login_csrf": true,
+    "report_state": "completed",
+    "sample_executed": false,
+    "static_analysis": "completed"
+  },
+  "acceptance": {
+    "total": 75,
+    "verified": 64,
+    "partial": 11,
+    "not_started": 0
+  },
+  "limitations": [
+    "Coverage is not acceptance completion",
+    "No claim of zero vulnerabilities or commercial product equivalence",
+    "Full ingestion/TLS/analysis resource capacity and remaining composite acceptance are explicitly tracked in CSV"
+  ]
+}

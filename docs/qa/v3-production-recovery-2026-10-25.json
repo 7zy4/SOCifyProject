@@ -1,0 +1,63 @@
+{
+  "schema": "socify-v3-production-recovery/1",
+  "synthetic_only": true,
+  "existing_authenticated_session_retained": true,
+  "all_five_services_restarted": true,
+  "queued_import_and_report_completed": true,
+  "original_evidence_hashes_retained": true,
+  "custody_chain_valid": true,
+  "pdf_sha256_verified": true,
+  "analysis_outage_backoff_and_automatic_recovery": true,
+  "seconds": 17.447,
+  "isolation": {
+    "socify": {
+      "image": "sha256:389a56c76545ffa99c7ac7e8eb9416a38844c3c11f9e095849a96cab3adc588b",
+      "network_mode": "socify-v3-verification_socify-internal",
+      "nonroot": true,
+      "read_only_root": true,
+      "capabilities_dropped": true,
+      "egress": {
+        "blocked": true,
+        "errno": 101
+      }
+    },
+    "import-worker": {
+      "image": "sha256:389a56c76545ffa99c7ac7e8eb9416a38844c3c11f9e095849a96cab3adc588b",
+      "network_mode": "none",
+      "nonroot": true,
+      "read_only_root": true,
+      "capabilities_dropped": true,
+      "egress": {
+        "blocked": true,
+        "errno": 101
+      }
+    },
+    "autopsy-worker": {
+      "image": "sha256:389a56c76545ffa99c7ac7e8eb9416a38844c3c11f9e095849a96cab3adc588b",
+      "network_mode": "none",
+      "nonroot": true,
+      "read_only_root": true,
+      "capabilities_dropped": true,
+      "egress": {
+        "blocked": true,
+        "errno": 101
+      }
+    },
+    "analysis": {
+      "image": "sha256:dfae2935800dc8817d462a89adebec12b7e63fc73876f4256b71666a07547cd6",
+      "network_mode": "none",
+      "nonroot": true,
+      "read_only_root": true,
+      "capabilities_dropped": true,
+      "egress": {
+        "blocked": true,
+        "errno": 101
+      }
+    }
+  },
+  "limitations": [
+    "Queued work and authenticated continuity tested; in-flight lease expiration has separate integration tests",
+    "Ingress proxies fixed internal upstream and intentionally receives browser traffic; network probes here cover data-processing services",
+    "Host administrators remain trusted"
+  ]
+}

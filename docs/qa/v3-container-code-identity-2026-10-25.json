@@ -1,0 +1,14 @@
+{
+  "revision": "f0a6f30618f7a8eb495eeddd8d5488a6560d68d1",
+  "source_digest": "7c56d44e258ee1a11b50239629d1811ccf88c876141f2ae27ea957338057e1af",
+  "containers": {
+    "socify": {
+      "checked_files": 81,
+      "all_match": true
+    },
+    "analysis": {
+      "checked_files": 81,
+      "all_match": true
+    }
+  }
+}
