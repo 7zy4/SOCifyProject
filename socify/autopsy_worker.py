@@ -10,6 +10,7 @@ from pathlib import Path
 
 from flask import current_app
 
+from .analysis_transport import AnalysisUnavailableError
 from .autopsy_domain import canonical, custody
 from .db import get_db, transaction
 from .operational import case_visible
@@ -104,7 +105,11 @@ def claim_job(identity):
             "UPDATE autopsy_jobs SET state = CASE WHEN attempts >= 3 THEN 'failed' ELSE 'queued' END, worker_id = NULL, lease_expires_at = NULL, error_code = 'LEASE_EXPIRED' WHERE state = 'processing' AND lease_expires_at <= ?",
             (now,),
         )
-        job = get_db().execute("SELECT * FROM autopsy_jobs WHERE state = 'queued' ORDER BY id LIMIT 1").fetchone()
+        job = (
+            get_db()
+            .execute("SELECT * FROM autopsy_jobs WHERE state = 'queued' AND COALESCE(available_at,created_at)<=? ORDER BY id LIMIT 1", (now,))
+            .fetchone()
+        )
         if not job:
             return None
         lease = (utc_now() + timedelta(seconds=120)).isoformat().replace("+00:00", "Z")
@@ -198,13 +203,28 @@ def run_autopsy_worker_once(identity="local-autopsy-worker"):
             raise ValueError("Unknown local analysis job")
     except Exception as exc:
         current_app.logger.error("autopsy_job_failed id=%s error_type=%s", job["id"], type(exc).__name__)
-        error = "ACCESS_REVOKED" if isinstance(exc, PermissionError) else "RESOURCE_LIMIT" if isinstance(exc, TimeoutError) else "LOCAL_RENDER_FAILED"
+        error = (
+            "ANALYSIS_UNAVAILABLE"
+            if isinstance(exc, AnalysisUnavailableError)
+            else "ACCESS_REVOKED"
+            if isinstance(exc, PermissionError)
+            else "RESOURCE_LIMIT"
+            if isinstance(exc, TimeoutError)
+            else "LOCAL_RENDER_FAILED"
+        )
     with transaction():
         current = get_db().execute("SELECT * FROM autopsy_jobs WHERE id = ? AND worker_id = ? AND state = 'processing'", (job["id"], identity)).fetchone()
         if not current:
             return job["id"]
         if not job_authorized(job):
             error = "ACCESS_REVOKED"
+        if error == "ANALYSIS_UNAVAILABLE" and current["attempts"] < 3:
+            available = (utc_now() + timedelta(seconds=5 * 2 ** (current["attempts"] - 1))).isoformat().replace("+00:00", "Z")
+            get_db().execute(
+                "UPDATE autopsy_jobs SET state='queued',error_code=?,available_at=?,worker_id=NULL,lease_expires_at=NULL WHERE id=?",
+                (error, available, job["id"]),
+            )
+            return job["id"]
         if error is None and files is not None:
             for kind, content in files.items():
                 get_db().execute(

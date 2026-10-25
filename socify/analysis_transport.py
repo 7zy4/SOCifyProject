@@ -7,13 +7,21 @@ MAX_REQUEST = 24 * 1024 * 1024
 MAX_RESPONSE = 48 * 1024 * 1024
 
 
+class AnalysisUnavailableError(ConnectionError):
+    pass
+
+
+class IncompleteMessageError(ValueError):
+    pass
+
+
 def receive(stream, maximum):
     def exact(size):
         parts = bytearray()
         while len(parts) < size:
             chunk = stream.recv(min(65536, size - len(parts)))
             if not chunk:
-                raise ValueError("Incomplete analysis message")
+                raise IncompleteMessageError("Incomplete analysis message")
             parts.extend(chunk)
         return bytes(parts)
 
@@ -31,11 +39,14 @@ def send(stream, payload, maximum):
 
 
 def remote_artifacts(path, payload, operation, formats, timeout):
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as stream:
-        stream.settimeout(timeout + 5)
-        stream.connect(path)
-        send(stream, {"operation": operation, "payload": payload}, MAX_REQUEST)
-        result = receive(stream, MAX_RESPONSE)
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as stream:
+            stream.settimeout(timeout + 5)
+            stream.connect(path)
+            send(stream, {"operation": operation, "payload": payload}, MAX_REQUEST)
+            result = receive(stream, MAX_RESPONSE)
+    except (OSError, IncompleteMessageError) as exc:
+        raise AnalysisUnavailableError("Isolated analysis transport is temporarily unavailable") from exc
     if not isinstance(result, dict) or set(result) != {"files"} or not isinstance(result["files"], dict) or set(result["files"]) != set(formats):
         raise ValueError("Isolated analysis service failed")
     files = {kind: base64.b64decode(value, validate=True) for kind, value in result["files"].items()}

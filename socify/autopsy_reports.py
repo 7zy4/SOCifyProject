@@ -428,7 +428,7 @@ def get_job(case_id: int, job_id: int):
     row = (
         get_db()
         .execute(
-            "SELECT id, kind, state, error_code, attempts, created_by, created_at, started_at, completed_at FROM autopsy_jobs WHERE id = ? AND case_id = ?",
+            "SELECT id, kind, state, error_code, attempts, created_by, created_at, started_at, completed_at, available_at FROM autopsy_jobs WHERE id = ? AND case_id = ?",
             (job_id, case_id),
         )
         .fetchone()
@@ -460,6 +460,6 @@ def job_action(case_id: int, job_id: int, action: str):
         else:
             if job["state"] not in {"failed", "cancelled"} or job["attempts"] >= 3:
                 return error_response("JOB_STATE_CONFLICT", "أعد إعداد تقرير جديد بعد مراجعة سبب الفشل", 409)
-            get_db().execute("UPDATE autopsy_jobs SET state = 'queued', error_code = NULL, completed_at = NULL WHERE id = ?", (job_id,))
+            get_db().execute("UPDATE autopsy_jobs SET state = 'queued', error_code = NULL, completed_at = NULL, available_at = NULL WHERE id = ?", (job_id,))
         custody(case_id, "job_" + action, {"job_id": job_id, "kind": job["kind"]})
     return jsonify({"id": job_id, "state": "cancelled" if action == "cancel" else "queued"})

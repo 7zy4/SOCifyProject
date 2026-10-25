@@ -28,6 +28,7 @@ def guard_batch_scope():
 
 def migrate(connection: sqlite3.Connection) -> None:
     definitions = {
+        "autopsy_jobs": {"available_at": "TEXT"},
         "ingestion_jobs": {"executor_id": "INTEGER REFERENCES users(id)", "active_version": "INTEGER NOT NULL DEFAULT 1 CHECK(active_version IN (0,1))"},
         "security_events": {
             "import_job_id": "INTEGER REFERENCES ingestion_jobs(id)",
