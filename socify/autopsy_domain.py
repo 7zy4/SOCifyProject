@@ -94,6 +94,8 @@ KINDS: dict[str, dict[str, dict[str, Any]]] = {
         "due_at": {"required": True, "timestamp": True},
         "status": {"required": True, "choices": ["open", "in_progress", "completed", "validated"]},
         "validation": {"max": 4000},
+        "root_cause_id": {"record_kind": "root_cause"},
+        "why_id": {"max": 64},
     },
     "foothold": {
         "title": {"required": True, "max": 255},
@@ -205,6 +207,14 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
         elif spec.get("event"):
             if type(value) is not int or not get_db().execute("SELECT 1 FROM case_events WHERE case_id = ? AND event_id = ?", (case_id, value)).fetchone():
                 raise ValueError("السجل لا ينتمي إلى القضية")
+        elif spec.get("record_kind"):
+            if (
+                type(value) is not int
+                or not get_db()
+                .execute("SELECT 1 FROM autopsy_records WHERE id = ? AND case_id = ? AND kind = ?", (value, case_id, spec["record_kind"]))
+                .fetchone()
+            ):
+                raise ValueError("مرجع نتيجة التحقيق لا ينتمي إلى القضية")
         elif spec.get("integer"):
             if type(value) is not int or not spec.get("min", 0) <= value <= spec["max"]:
                 raise ValueError(f"قيمة {key} غير صالحة")
@@ -216,10 +226,21 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
             if not isinstance(value, list) or len(value) > 10:
                 raise ValueError("سلسلة الأسباب تتجاوز الحدود")
             chain = []
-            for step in value:
-                if not isinstance(step, dict) or set(step) - {"question", "answer", "evidence_id"}:
+            for index, step in enumerate(value, 1):
+                if not isinstance(step, dict) or set(step) - {"question", "answer", "evidence_id", "id", "parent_id", "assessment"}:
                     raise ValueError("خطوة تحليل السبب غير صالحة")
                 item: dict[str, Any] = {"question": text_value(step.get("question"), 500, True), "answer": text_value(step.get("answer"), 2000, True)}
+                identifier = text_value(step.get("id", f"why-{index}"), 64, True)
+                if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", identifier):
+                    raise ValueError("معرف فرع السبب غير صالح")
+                item["id"] = identifier
+                parent = step.get("parent_id")
+                if parent is not None:
+                    item["parent_id"] = text_value(parent, 64, True)
+                assessment = step.get("assessment", "supported" if step.get("evidence_id") else "unverified")
+                if not isinstance(assessment, str) or assessment not in {"unverified", "hypothesis", "supported", "refuted"}:
+                    raise ValueError("حدد ما إذا كان السبب فرضية أو نتيجة مدعومة أو غير متحققة")
+                item["assessment"] = assessment
                 if step.get("evidence_id") is not None:
                     evidence = step["evidence_id"]
                     if (
@@ -228,7 +249,21 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
                     ):
                         raise ValueError("دليل السبب غير متاح")
                     item["evidence_id"] = evidence
+                if assessment in {"supported", "refuted"} and not item.get("evidence_id"):
+                    raise ValueError("تأييد سبب أو نفيه يتطلب دليلًا من القضية")
                 chain.append(item)
+            identifiers = {step["id"] for step in chain}
+            if len(identifiers) != len(chain):
+                raise ValueError("معرف فرع السبب مكرر")
+            parents = {step["id"]: step.get("parent_id") for step in chain}
+            for starting_id in identifiers:
+                cursor_id: str | None = starting_id
+                seen = set()
+                while cursor_id is not None:
+                    if cursor_id not in identifiers or cursor_id in seen:
+                        raise ValueError("شجرة الأسباب تحتوي مرجعًا مفقودًا أو حلقة")
+                    seen.add(cursor_id)
+                    cursor_id = parents[cursor_id]
             value = chain
         elif spec.get("timestamp"):
             if not isinstance(value, str) or not re.search(r"(?:Z|[+-]\d{2}:\d{2})$", value):
@@ -247,6 +282,16 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
         raise ValueError("بداية الفترة تتجاوز نهايتها")
     if kind == "corrective" and result["status"] == "validated" and not result.get("validation"):
         raise ValueError("توثيق التحقق من فاعلية الإجراء مطلوب")
+    if kind == "corrective" and result.get("why_id"):
+        cause = (
+            get_db()
+            .execute("SELECT payload FROM autopsy_records WHERE id = ? AND case_id = ? AND kind = 'root_cause'", (result.get("root_cause_id"), case_id))
+            .fetchone()
+        )
+        if cause is None or not any(
+            step.get("id", f"why-{index}") == result["why_id"] for index, step in enumerate(json.loads(cause["payload"]).get("whys", []), 1)
+        ):
+            raise ValueError("فرع السبب المرتبط بالإجراء التصحيحي غير متاح")
     if (
         kind == "foothold"
         or kind == "hypothesis"

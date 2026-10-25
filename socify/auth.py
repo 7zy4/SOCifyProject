@@ -1,4 +1,5 @@
 import hashlib
+import re
 import secrets
 import sqlite3
 from datetime import timedelta
@@ -88,8 +89,9 @@ def _mfa_valid(user_id: int, candidate: object) -> bool:
     enrollment = get_db().execute("SELECT secret_ciphertext, enabled FROM mfa_enrollments WHERE user_id = ?", (user_id,)).fetchone()
     if not enrollment or not enrollment["enabled"]:
         return True
-    if not isinstance(candidate, str):
+    if not isinstance(candidate, str) or not re.fullmatch(r"(?:[0-9]{6}|[0-9A-Fa-f]{10})", candidate.strip()):
         return False
+    candidate = candidate.strip()
     try:
         secret = decrypt_secret(enrollment["secret_ciphertext"])
     except ValueError:
@@ -344,16 +346,25 @@ def current_permissions(role: str) -> set[str]:
 @auth_api.get("/api/auth/sessions")
 @login_required
 def sessions_list():
+    raw = session.get("session_id")
+    digest = hashlib.sha256(raw.encode()).hexdigest() if isinstance(raw, str) else ""
     rows = (
         get_db()
         .execute(
-            """SELECT id, created_at, last_seen_at, expires_at, revoked_at, ip_address, user_agent
+            """SELECT id, session_hash, created_at, last_seen_at, expires_at, revoked_at, ip_address, user_agent
         FROM auth_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 50""",
             (actor_id(),),
         )
         .fetchall()
     )
-    return jsonify({"items": [dict(row) for row in rows]})
+    return jsonify(
+        {
+            "items": [
+                {**{key: value for key, value in dict(row).items() if key != "session_hash"}, "is_current": secrets.compare_digest(row["session_hash"], digest)}
+                for row in rows
+            ]
+        }
+    )
 
 
 @auth_api.delete("/api/auth/sessions/<int:session_id>")
@@ -395,6 +406,22 @@ def change_password():
 @auth_api.post("/api/auth/mfa/enroll")
 @login_required
 def mfa_enroll():
+    from .operational import operational_mode
+
+    if operational_mode():
+        supplied = _payload().get("current_password")
+        user = get_db().execute("SELECT password_hash FROM users WHERE id = ?", (actor_id(),)).fetchone()
+        try:
+            valid = (
+                isinstance(supplied, str)
+                and len(supplied.encode()) <= 72
+                and user is not None
+                and bcrypt.checkpw(supplied.encode(), user["password_hash"].encode())
+            )
+        except (ValueError, UnicodeError):
+            valid = False
+        if not valid:
+            return error_response("REAUTHENTICATION_FAILED", "أدخل كلمة المرور الحالية لبدء إعداد المصادقة", 403)
     enrollment = get_db().execute("SELECT enabled FROM mfa_enrollments WHERE user_id = ?", (actor_id(),)).fetchone()
     if enrollment and enrollment["enabled"]:
         return error_response("MFA_ALREADY_ENABLED", "ألغِ التفعيل الحالي بعد التحقق قبل إعادة التسجيل", 409)
@@ -414,9 +441,27 @@ def mfa_enroll():
     return jsonify({"secret": secret, "otpauth_uri": uri})
 
 
+@auth_api.get("/api/auth/mfa/status")
+@login_required
+def mfa_status():
+    row = get_db().execute("SELECT enabled, verified_at FROM mfa_enrollments WHERE user_id = ?", (actor_id(),)).fetchone()
+    remaining = get_db().execute("SELECT COUNT(*) FROM mfa_backup_codes WHERE user_id = ? AND consumed_at IS NULL", (actor_id(),)).fetchone()[0]
+    return jsonify(
+        {
+            "enabled": bool(row and row["enabled"]),
+            "pending": bool(row and not row["enabled"]),
+            "verified_at": row["verified_at"] if row else None,
+            "recovery_codes_remaining": remaining,
+        }
+    )
+
+
 @auth_api.post("/api/auth/mfa/verify")
 @login_required
 def mfa_verify():
+    identity, address = f"mfa-verification:{actor_id()}", request.remote_addr or "unknown"
+    if _rate_limited(identity, address):
+        return error_response("RATE_LIMITED", "محاولات تحقق كثيرة؛ انتظر ثم أعد المحاولة", 429)
     code = _payload().get("code")
     enrollment = get_db().execute("SELECT secret_ciphertext FROM mfa_enrollments WHERE user_id = ?", (actor_id(),)).fetchone()
     if not enrollment or not isinstance(code, str):
@@ -426,9 +471,11 @@ def mfa_verify():
     except ValueError:
         return error_response("MFA_KEY_MISMATCH", "تعذر فك إعداد المصادقة. أعد التسجيل", 409)
     if not verify_totp(secret, code):
+        _record_attempt(identity, address, False)
         record_audit(get_db(), "verify", "mfa", actor_id(), "denied")
         return error_response("INVALID_MFA_CODE", "رمز المصادقة غير صحيح", 422)
     codes = [secrets.token_hex(5).upper() for _ in range(10)]
+    _record_attempt(identity, address, True)
     with transaction():
         get_db().execute("UPDATE mfa_enrollments SET enabled = 1, verified_at = ?, updated_at = ? WHERE user_id = ?", (iso_now(), iso_now(), actor_id()))
         get_db().execute("DELETE FROM mfa_backup_codes WHERE user_id = ?", (actor_id(),))

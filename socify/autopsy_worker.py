@@ -1,9 +1,9 @@
 import hashlib
 import json
-import multiprocessing
 import os
-import resource
-import socket
+import stat
+import subprocess
+import sysconfig
 import tempfile
 from datetime import timedelta
 from pathlib import Path
@@ -21,52 +21,60 @@ def deny_network(*args, **kwargs):
     raise PermissionError("Network access is disabled for SOCify local analysis")
 
 
-def restricted_render(payload, directory, operation="report"):
-    try:
-        resource.setrlimit(resource.RLIMIT_CPU, (40, 45))
-        resource.setrlimit(resource.RLIMIT_AS, (1536 * 1024 * 1024, 1536 * 1024 * 1024))
-        resource.setrlimit(resource.RLIMIT_NOFILE, (128, 128))
-        resource.setrlimit(resource.RLIMIT_FSIZE, (24 * 1024 * 1024, 24 * 1024 * 1024))
-        for method in ("connect", "connect_ex", "sendto", "sendmsg"):
-            if hasattr(socket.socket, method):
-                setattr(socket.socket, method, deny_network)
-        socket.create_connection = deny_network
-        socket.getaddrinfo = deny_network
-        os.environ["XDG_CACHE_HOME"] = str(Path(directory) / "cache")
-        if operation == "report":
-            from .autopsy_report_render import render_files
-
-            files = render_files(payload)
-        elif operation == "sample":
-            from .autopsy_static_analysis import analyze_sample
-
-            files = {"analysis": canonical(analyze_sample(payload)).encode()}
-        else:
-            raise ValueError("Unknown local worker operation")
-        for kind, content in files.items():
-            if len(content) > 20 * 1024 * 1024:
-                raise ValueError("Report artifact exceeds size limit")
-            (Path(directory) / kind).write_bytes(content)
-        (Path(directory) / "done").write_text("ok")
-    except Exception as exc:
-        (Path(directory) / "error").write_text(type(exc).__name__)
+def read_artifact(path, maximum=20 * 1024 * 1024):
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    with os.fdopen(descriptor, "rb") as content:
+        metadata = os.fstat(content.fileno())
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1 or metadata.st_size > maximum:
+            raise ValueError("Analysis output must be a bounded regular file")
+        result = content.read(maximum + 1)
+        if len(result) > maximum:
+            raise ValueError("Analysis output exceeds the configured limit")
+        return result
 
 
-def compute_artifacts(payload, operation, formats, timeout):
+def compute_artifacts(payload, operation, formats, timeout, isolated_container=False):
+    if operation not in {"report", "sample", "probe"} or set(formats) - {"json", "html", "md", "docx", "pdf", "analysis", "probe"}:
+        raise ValueError("Unknown local analysis operation")
+    if not isolated_container and os.environ.get("SOCIFY_ANALYSIS_SOCKET"):
+        from .analysis_transport import remote_artifacts
+
+        return remote_artifacts(os.environ["SOCIFY_ANALYSIS_SOCKET"], payload, operation, formats, timeout)
+    encoded = canonical(payload).encode()
+    if len(encoded) > 24 * 1024 * 1024:
+        raise ValueError("Analysis request exceeds the configured limit")
     with tempfile.TemporaryDirectory(prefix="socify-local-report-") as directory:
-        worker = multiprocessing.get_context("spawn").Process(target=restricted_render, args=(payload, directory, operation))
-        worker.start()
-        worker.join(timeout)
-        if worker.is_alive():
-            worker.terminate()
-            worker.join(2)
-            if worker.is_alive():
-                worker.kill()
-                worker.join(2)
-            raise TimeoutError("Local report renderer exceeded its time limit")
-        if worker.exitcode != 0 or not (Path(directory) / "done").exists():
-            raise ValueError("Local report renderer failed within its isolation boundary")
-        return {kind: (Path(directory) / kind).read_bytes() for kind in formats}
+        root = str(Path(__file__).resolve().parent.parent)
+        environment = {
+            "PATH": "/usr/bin:/bin",
+            "LANG": "C.UTF-8",
+            "LC_ALL": "C.UTF-8",
+            "PYTHONPATH": os.pathsep.join([root, sysconfig.get_path("purelib")]),
+            "PYTHONNOUSERSITE": "1",
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "TMPDIR": directory,
+            "XDG_CACHE_HOME": str(Path(directory) / "cache"),
+            "SOCIFY_ANALYSIS_OPERATION": operation,
+            "SOCIFY_ANALYSIS_OUTPUT": directory,
+        }
+        if isolated_container:
+            environment["SOCIFY_ISOLATED_ANALYSIS_CONTAINER"] = "1"
+        try:
+            process = subprocess.run(
+                ["/proc/self/exe", "-m", "socify.analysis_sandbox"],
+                input=encoded,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                timeout=timeout,
+                env=environment,
+                cwd=root,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise TimeoutError("Local analysis exceeded its time limit") from exc
+        if process.returncode != 0 or not (Path(directory) / "done").exists():
+            raise ValueError("Local analysis failed to enforce its operating-system boundary or compute the result")
+        return {kind: read_artifact(Path(directory) / kind) for kind in formats}
 
 
 def compute_report(payload, timeout=50):
@@ -107,7 +115,13 @@ def job_authorized(job):
     )
     if policy:
         principal["role_permissions"] = json.loads(policy[0])
+    from .autopsy_pipeline import case_full_access
+
+    if not case_full_access(job["case_id"], principal):
+        return False
     if job["kind"] == "sample":
+        return has_permission(principal, "cases.update")
+    if job["kind"] == "detection":
         return has_permission(principal, "cases.update")
     report = (
         get_db()
@@ -146,6 +160,10 @@ def run_autopsy_worker_once(identity="local-autopsy-worker"):
             analysis = compute_sample(
                 {"sample_id": sample["id"], "evidence_id": sample["evidence_id"], "sha256": sample["sha256"], "content": base64.b64encode(content).decode()}
             )
+        elif job["kind"] == "detection":
+            from .autopsy_detection import run_detection_job
+
+            analysis = run_detection_job(job)
         else:
             raise ValueError("Unknown local analysis job")
     except Exception as exc:

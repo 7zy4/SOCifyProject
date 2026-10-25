@@ -151,8 +151,18 @@ def ingest_event(
     workspace: int,
     training_run_id: int | None = None,
     case_id: int | None = None,
+    import_job_id: int | None = None,
+    is_active: bool = True,
 ) -> tuple[int, list[int], bool]:
     normalized = normalize_event(data)
+    if import_job_id is not None and (
+        type(import_job_id) is not int
+        or type(is_active) is not bool
+        or not connection.execute(
+            "SELECT 1 FROM ingestion_jobs WHERE id = ? AND case_id = ? AND workspace_id = ?", (import_job_id, case_id, workspace)
+        ).fetchone()
+    ):
+        raise ValueError("invalid trusted import context")
     if case_id is not None:
         if (
             type(case_id) is not int
@@ -227,6 +237,8 @@ def ingest_event(
     event_id = inserted_id(cursor)
     if case_id is not None:
         connection.execute("UPDATE security_events SET owner_case_id = ? WHERE id = ?", (case_id, event_id))
+    if import_job_id is not None:
+        connection.execute("UPDATE security_events SET import_job_id = ?, autopsy_active = ? WHERE id = ?", (import_job_id, int(is_active), event_id))
     alerts = evaluate_rules(connection, event_id)
     insert_outbox(
         connection, workspace, "event.created", {"id": event_id, "event_id": event_public_id, "severity": normalized["severity"], "alert_ids": alerts}

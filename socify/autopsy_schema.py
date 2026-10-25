@@ -214,6 +214,17 @@ def migrate(connection: sqlite3.Connection) -> None:
                 f"CREATE TRIGGER IF NOT EXISTS autopsy_version_{table}_{operation.lower()} AFTER {operation} ON {table} WHEN EXISTS (SELECT 1 FROM autopsy_case_context WHERE case_id = {reference}.case_id) BEGIN UPDATE incident_cases SET version = version + 1 WHERE id = {reference}.case_id; END;"
             )
     connection.execute("DROP TRIGGER IF EXISTS autopsy_version_case_evidence_update")
+    from .autopsy_intel import migrate as migrate_intel
+    from .autopsy_pipeline import migrate as migrate_pipeline
+
+    migrate_pipeline(connection)
+    migrate_intel(connection)
+    from .autopsy_capsules import migrate as migrate_capsules
+
+    migrate_capsules(connection)
+    from .autopsy_detection import migrate as migrate_detection
+
+    migrate_detection(connection)
     connection.execute(
         "INSERT INTO schema_meta(key, value, updated_at) VALUES ('autopsy_schema_version', '3', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at WHERE schema_meta.value != excluded.value",
         (iso_now(),),

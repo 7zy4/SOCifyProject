@@ -162,16 +162,22 @@ async function autopsyRecordPanel(kind) {
 
 async function autopsyCase(caseId) {
   begin("case");
-  const selected = new URLSearchParams(window.location.search).get("tab") || "summary";
+  let selected = new URLSearchParams(window.location.search).get("tab") || "summary";
   autopsy.current = await api(`/api/cases/${caseId}`);
   const current = autopsy.current;
   document.getElementById("section-title").textContent = displayText(current.title);
   document.getElementById("section-kicker").textContent = current.reference;
   document.title = `${current.reference} | SOCify Digital Autopsy`;
-  const assetData = await api(`/api/cases/${caseId}/records?kind=asset&limit=100`);
+  const restricted = current.full_case_access === false;
+  if (restricted && !["summary", "logs"].includes(selected)) selected = "logs";
+  const assetData = restricted ? { items: [] } : await api(`/api/cases/${caseId}/records?kind=asset&limit=100`);
   autopsy.assets = assetData.items;
   const root = node("div", {}, [pageHead(current.title, `${current.reference} · ${autopsyLabel(current.status)} · ${autopsyLabel(current.severity)}`, [linkedButton("جميع القضايا", "/cases")])]);
-  const tabs = [["summary", "الملخص والمسؤوليات"], ["logs", "السجلات والأدلة"], ["analysis", "الأصول والمؤشرات"], ["investigation", "التحقيق والخط الزمني"], ["response", "الاستجابة والتصعيد"], ["activity", "الحيازة والنشاط"]];
+  let tabs = [["summary", "الملخص والمسؤوليات"], ["logs", "السجلات والأدلة"], ["analysis", "الأصول والمؤشرات"], ["investigation", "التحقيق والخط الزمني"], ["response", "الاستجابة والتصعيد"], ["activity", "الحيازة والنشاط"]];
+  if (restricted) {
+    tabs = tabs.slice(0, 2);
+    root.append(node("p", { class: "notice", text: "نطاق دفعات محدد: تظهر السجلات المصرح بها فقط. يتطلب سياق التحقيق والتقارير الوصول إلى جميع دفعات القضية." }));
+  }
   root.append(node("nav", { class: "case-tabs", "aria-label": "أقسام القضية" }, tabs.map(([id, label]) => node("a", { class: "button ghost", href: `/cases/${caseId}?tab=${id}`, "aria-current": selected === id ? "page" : null, text: label }))));
   const content = node("div", { class: "case-content" });
   if (selected === "summary") {
@@ -203,7 +209,7 @@ async function autopsyCase(caseId) {
     content.append(panel("سلسلة حيازة الأدلة", node("div", { class: "panel-body" }, [node("p", { text: `${data.integrity_valid ? "سلسلة البصمات متسقة" : "تحذير: عدم اتساق في السلسلة"} · ${data.total} حركة` }), table([{ label: "الإجراء", value: "action" }, { label: "الوقت", value: (row) => formatTime(row.created_at) }, { label: "بصمة الحركة", value: (row) => node("bdi", { text: row.entry_hash }) }], data.items)]), true));
     content.append(panel("نشاط القضية", table([{ label: "الحدث", value: "action" }, { label: "الفاعل", value: "actor_name" }, { label: "الوقت", value: (row) => formatTime(row.created_at) }], current.history), true));
   }
-  if (window.SOCifyAutopsy.reports && !tabs.some(([id]) => id === "reports")) root.querySelector(".case-tabs").append(linkedButton("التقارير والمراجعة", `/cases/${caseId}?tab=reports`));
+  if (!restricted && window.SOCifyAutopsy.reports && !tabs.some(([id]) => id === "reports")) root.querySelector(".case-tabs").append(linkedButton("التقارير والمراجعة", `/cases/${caseId}?tab=reports`));
   root.append(content);
   finish(root);
 }
@@ -212,6 +218,7 @@ async function autopsyStart() {
   [autopsy.catalog, autopsy.team] = await Promise.all([api("/api/autopsy/catalog"), api("/api/team")]);
   const caseId = document.querySelector('meta[name="case-id"]')?.content;
   if (caseId) return autopsyCase(Number(caseId));
+  if (state.section === "profile" && window.SOCifyAutopsy.profile) return window.SOCifyAutopsy.profile();
   if (state.section === "playbooks" && window.SOCifyAutopsy.procedureLibrary) return window.SOCifyAutopsy.procedureLibrary();
   if (state.section === "team") return window.SOCifyAutopsy.team();
   if (state.section === "my-tasks") {

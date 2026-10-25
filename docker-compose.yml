@@ -62,12 +62,38 @@ services:
       SOCIFY_SECRET_KEY: ${SOCIFY_SECRET_KEY:?Set SOCIFY_SECRET_KEY to a random value of at least 32 bytes}
       SOCIFY_CREDENTIAL_KEY: ${SOCIFY_CREDENTIAL_KEY:?Set SOCIFY_CREDENTIAL_KEY to a separate random value}
       SOCIFY_DATABASE: /data/socify.db
+      SOCIFY_ANALYSIS_SOCKET: /analysis-ipc/analysis.sock
     network_mode: none
     mem_limit: 2g
     cpus: 2
     pids_limit: 64
     volumes:
       - socify-data:/data
+      - analysis-ipc:/analysis-ipc:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+  analysis:
+    init: true
+    healthcheck:
+      disable: true
+    build:
+      context: .
+      target: analysis
+    command: ["python", "-m", "scripts.run_analysis_service"]
+    environment:
+      SOCIFY_ISOLATED_ANALYSIS_CONTAINER: "1"
+    network_mode: none
+    mem_limit: 2g
+    cpus: 2
+    pids_limit: 32
+    volumes:
+      - analysis-ipc:/analysis-ipc
     read_only: true
     tmpfs:
       - /tmp:size=128m,noexec,nosuid,nodev
@@ -106,6 +132,7 @@ services:
 
 volumes:
   socify-data:
+  analysis-ipc:
 
 networks:
   ingress:

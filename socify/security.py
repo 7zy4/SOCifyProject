@@ -320,7 +320,11 @@ def verify_totp(secret: str, candidate: str, moment: int | None = None) -> bool:
 def password_error(password: object) -> str | None:
     if not isinstance(password, str) or not 12 <= len(password) <= 128:
         return "يجب أن تتكون كلمة المرور من 12 إلى 128 محرفًا"
-    if len(password.encode()) > 72:
+    try:
+        size = len(password.encode())
+    except UnicodeError:
+        return "كلمة المرور تحتوي ترميزًا غير صالح"
+    if size > 72:
         return "يجب ألا تتجاوز كلمة المرور 72 بايت بترميز UTF-8"
     normalized = password.casefold().strip()
     if normalized in {"password1234", "administrator", "socifypassword", "qwertyuiop12"} or len(set(normalized)) < 5:

@@ -57,6 +57,14 @@ def _scope() -> tuple[str, list[object]]:
 def _filters(alias: str = "e", fixed_case_id: int | None = None) -> tuple[str, list[object]]:
     clauses = [f"{alias}.workspace_id = ?"]
     parameters: list[object] = [workspace_id()]
+    from .operational import operational_mode
+
+    if operational_mode():
+        from .autopsy_pipeline import active_event_sql, visibility_sql
+
+        scope, arguments = visibility_sql(alias)
+        clauses.extend([active_event_sql(alias), scope])
+        parameters.extend(arguments)
     if request.args.get("include_derived") != "1":
         clauses.append(f"{alias}.source != 'rules_engine'")
     case_id = fixed_case_id if fixed_case_id is not None else request.args.get("case_id")

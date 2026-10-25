@@ -198,6 +198,8 @@ def sections(payload):
         if records:
             yield LABELS[kind], records
     for title, key in (
+        ("الإثراء المحلي ومصادر السمعة وإصداراتها", "observables"),
+        ("SLA وجمع الأدلة ومراجعة ما بعد الحادثة", "workflow"),
         ("توثيق MITRE ATT&CK وإصداره وأدلته", "techniques"),
         ("خط زمني للسجلات المختارة كأدلة وتوقيت مصادرها", "evidenced_timeline"),
         ("الملاحظات المشتركة الموروثة", "shared_notes"),

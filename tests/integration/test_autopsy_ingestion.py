@@ -52,7 +52,13 @@ def test_case_bound_csv_mapping_timezone_original_and_versioned_reprocessing(aut
     changed = upload(client, autopsy_case, raw, **{**options, "source_timezone": "UTC"})
     assert changed.status_code == 201
     assert changed.json["id"] != job_id
-    assert client.get(f"/api/cases/{autopsy_case}/logs").json["total"] == 2
+    active = client.get(f"/api/cases/{autopsy_case}/logs").json
+    assert active["total"] == 1
+    assert active["items"][0]["id"] != event_id
+    historical = client.get(f"/api/cases/{autopsy_case}/logs?job_id={job_id}").json
+    assert historical["total"] == 1
+    assert historical["items"][0]["id"] == event_id
+    assert client.get(f"/api/cases/{autopsy_case}/imports/{job_id}/original").data == raw.encode()
     assert client.get(f"/api/cases/{autopsy_case}/custody").json["integrity_valid"] is True
 
 

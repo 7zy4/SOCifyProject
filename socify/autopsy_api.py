@@ -86,6 +86,28 @@ def case_summary(case_id: int):
     if not case:
         return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
     result = _case_view(case)
+    if not result.get("full_case_access", True):
+        from .autopsy_pipeline import visibility_sql
+
+        scope, args = visibility_sql()
+        count = (
+            get_db()
+            .execute(f"SELECT COUNT(*) FROM security_events e WHERE e.owner_case_id = ? AND e.autopsy_active = 1 AND {scope}", (case_id, *args))
+            .fetchone()[0]
+        )
+        result.update(
+            counts={"events": count, "evidence": 0, "tasks": 0, "records": 0},
+            members=[],
+            tasks=[],
+            history=[],
+            evidence=[],
+            reports=[],
+            archived_reports=[],
+            can_manage=False,
+            can_update=False,
+            can_approve=False,
+        )
+        return jsonify(result)
     result["counts"] = {
         name: get_db().execute(f"SELECT COUNT(*) FROM {table} WHERE case_id = ?", (case_id,)).fetchone()[0]
         for name, table in [("events", "case_events"), ("evidence", "case_evidence"), ("tasks", "case_tasks"), ("records", "autopsy_records")]
@@ -99,6 +121,7 @@ def case_summary(case_id: int):
             )
             .fetchone()[0]
         )
+    result["counts"]["events"] = get_db().execute("SELECT COUNT(*) FROM case_events WHERE case_id = ? AND active_event = 1", (case_id,)).fetchone()[0]
     result["members"] = [
         dict(row)
         for row in get_db()

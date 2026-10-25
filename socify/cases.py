@@ -180,6 +180,15 @@ def _case_view(row: sqlite3.Row | None) -> dict[str, Any]:
     item["overdue"] = bool(item["sla_due_at"] and item["status"] not in {"closed", "cancelled"} and item["sla_due_at"] < iso_now())
     context = get_db().execute("SELECT * FROM autopsy_case_context WHERE case_id = ?", (row["id"],)).fetchone()
     item["context"] = dict(context) if context else None
+    if operational_mode():
+        from .autopsy_pipeline import case_full_access
+
+        item["full_case_access"] = case_full_access(row["id"])
+        if not item["full_case_access"]:
+            allowed = {"id", "reference", "title", "status", "severity", "priority", "created_at", "updated_at", "version", "context", "full_case_access"}
+            item = {key: value for key, value in item.items() if key in allowed}
+            if item["context"]:
+                item["context"] = {key: value for key, value in item["context"].items() if key in {"case_id", "reason", "objective", "confidentiality"}}
     return item
 
 
@@ -218,9 +227,13 @@ def list_cases():
     if query:
         if len(query) > 200:
             return error_response("QUERY_TOO_LONG", "نص البحث طويل جدًا", 422)
-        clauses.append("(c.reference LIKE ? OR c.title LIKE ? OR c.description LIKE ?)")
         like = f"%{query}%"
-        parameters.extend([like, like, like])
+        if operational_mode():
+            clauses.append("(c.reference LIKE ? OR c.title LIKE ?)")
+            parameters.extend([like, like])
+        else:
+            clauses.append("(c.reference LIKE ? OR c.title LIKE ? OR c.description LIKE ?)")
+            parameters.extend([like, like, like])
     where = " AND ".join(clauses)
     total = int(get_db().execute(f"SELECT COUNT(*) FROM incident_cases c WHERE {where}", parameters).fetchone()[0])
     rows = (

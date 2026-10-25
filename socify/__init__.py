@@ -8,11 +8,15 @@ from flask_wtf.csrf import CSRFError, CSRFProtect, generate_csrf
 from .attack import attack_api
 from .auth import auth_api
 from .autopsy_api import autopsy_api
+from .autopsy_capsules import autopsy_capsules_api
+from .autopsy_detection import autopsy_detection_api
 from .autopsy_ingestion import autopsy_ingestion_api
+from .autopsy_intel import autopsy_intel_api
 from .autopsy_investigation import autopsy_investigation_api
 from .autopsy_procedures import autopsy_procedures_api
 from .autopsy_reports import autopsy_reports_api
 from .autopsy_samples import autopsy_samples_api
+from .autopsy_workflow import autopsy_workflow_api
 from .cases import cases_api
 from .config import build_config
 from .db import close_db, connect_path
@@ -54,6 +58,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         autopsy_procedures_api,
         autopsy_reports_api,
         autopsy_samples_api,
+        autopsy_intel_api,
+        autopsy_capsules_api,
+        autopsy_detection_api,
+        autopsy_workflow_api,
         autopsy_investigation_api,
         auth_api,
         events_api,
@@ -85,6 +93,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             and not str(request.blueprint or "").startswith("autopsy")
         ):
             return error_response("CASE_CONTEXT_REQUIRED", "استخدم الأداة من داخل قضية مصرح بها؛ مسارات التدريب العامة متقاعدة", 410)
+        if operational_mode():
+            from .autopsy_pipeline import guard_batch_scope
+
+            return guard_batch_scope()
 
     @app.after_request
     def secure_response(response):

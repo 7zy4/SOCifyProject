@@ -103,6 +103,8 @@ def build_snapshot(case, revision: int, profile: str):
         name: get_db().execute(f"SELECT COUNT(*) FROM {table} WHERE case_id = ?", (case_id,)).fetchone()[0]
         for name, table in (("normalized_logs", "case_events"), ("evidence", "case_evidence"), ("alerts", "case_alerts"))
     }
+    counts["historical_normalized_logs"] = counts["normalized_logs"]
+    counts["normalized_logs"] = get_db().execute("SELECT COUNT(*) FROM case_events WHERE case_id=? AND active_event=1", (case_id,)).fetchone()[0]
     payload["summary"] = {
         "counts": counts,
         "classification": payload["context"].get("classification"),
@@ -128,7 +130,14 @@ def build_snapshot(case, revision: int, profile: str):
     )
     for row in records:
         payload["records"].setdefault(row["kind"], []).append({key: value for key, value in record_view(row).items() if key != "case_id"})
-    payload["metrics"] = case_metrics(payload["records"])
+    from .autopsy_workflow import factual_metrics, sla_status
+
+    payload["metrics"] = factual_metrics(case, {kind: [row["payload"] for row in records] for kind, records in payload["records"].items()})
+    payload["workflow"] = {
+        "sla": sla_status(case),
+        "collections": payload["records"].get("collection_request", []),
+        "postmortems": payload["records"].get("postmortem", []),
+    }
     payload["members"] = bounded_rows(
         "SELECT m.user_id, u.name, u.role, m.responsibility FROM autopsy_case_members m JOIN users u ON u.id = m.user_id WHERE m.case_id = ? ORDER BY m.user_id",
         (case_id,),
@@ -138,15 +147,22 @@ def build_snapshot(case, revision: int, profile: str):
         "SELECT id, evidence_type, title, sha256, added_by, added_at FROM case_evidence WHERE case_id = ? ORDER BY id", (case_id,), 2000
     )
     payload["imports"] = bounded_rows(
-        "SELECT j.id, j.original_filename, j.filename, j.content_hash AS sha256, j.format, j.parser_version, j.status, j.accepted, j.rejected, j.autopsy_options, j.created_at FROM ingestion_jobs j JOIN autopsy_case_imports a ON a.job_id = j.id WHERE a.case_id = ? ORDER BY j.id",
+        "SELECT j.id, j.original_filename, j.filename, j.content_hash AS sha256, j.format, j.parser_version, j.status, j.accepted, j.rejected, j.autopsy_options, j.active_version, j.created_at FROM ingestion_jobs j JOIN autopsy_case_imports a ON a.job_id = j.id WHERE a.case_id = ? ORDER BY j.id",
         (case_id,),
         1000,
     )
     payload["alerts"] = bounded_rows(
-        "SELECT a.id, r.name AS title, a.severity, a.status, a.reason, a.evidence, a.detected_at FROM alerts a JOIN rules r ON r.id = a.rule_id JOIN case_alerts c ON c.alert_id = a.id WHERE c.case_id = ? ORDER BY a.id",
+        "SELECT a.id, r.name AS title, a.severity, a.status, a.reason, a.evidence, a.detected_at, review.payload AS review FROM alerts a JOIN rules r ON r.id = a.rule_id JOIN case_alerts c ON c.alert_id = a.id LEFT JOIN autopsy_alert_reviews review ON review.alert_id=a.id WHERE c.case_id = ? ORDER BY a.id",
         (case_id,),
         2000,
     )
+    payload["observables"] = bounded_rows(
+        "SELECT o.type,o.value,o.enrichment,(SELECT COUNT(*) FROM autopsy_observable_links l JOIN security_events e ON e.id=l.event_id WHERE l.observable_id=o.id AND e.autopsy_active=1) AS active_occurrences FROM autopsy_observables o WHERE o.case_id=? ORDER BY o.id",
+        (case_id,),
+        2000,
+    )
+    for observable in payload["observables"]:
+        observable["enrichment"] = json.loads(observable["enrichment"])
     payload["tasks"] = bounded_rows(
         "SELECT id, title, assignee, status, required, completed_at FROM case_tasks WHERE case_id = ? ORDER BY id", (case_id,), 1000
     )

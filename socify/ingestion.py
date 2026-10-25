@@ -18,6 +18,7 @@ from flask import Blueprint, Response, current_app, jsonify, request
 from werkzeug.utils import secure_filename
 
 from .audit import record_audit
+from .autopsy_pipeline import activate_import, job_visible
 from .db import get_db, inserted_id, transaction
 from .events import ingest_event
 from .operational import case_visible, operational_mode
@@ -283,7 +284,7 @@ def _auth_records(text: str, source_name: str, content_hash: str) -> Iterator[di
         )
         message = values["message"]
         failed = "failed password" in message.casefold() or "authentication failure" in message.casefold()
-        ip_match = re.search(r"\b(?:from|rhost=)([0-9a-fA-F:.]+)", message)
+        ip_match = re.search(r"\b(?:from\s+|rhost=)([0-9a-fA-F:.]+)", message)
         user_match = re.search(r"(?:for invalid user|for|user=)(?:\s*)?([\w.@-]+)", message)
         yield _record_from_mapping(
             {
@@ -328,7 +329,7 @@ def _sysmon_xml_records(content: bytes, source_name: str, content_hash: str) -> 
         record = {
             "source": source_name,
             "source_type": "sysmon",
-            "event_time": system.get("TimeCreated", iso_now()),
+            "event_time": system.get("TimeCreated") or None,
             "hostname": system.get("Computer"),
             "event_type": f"sysmon_{event_id}",
             "category": "windows",
@@ -417,6 +418,13 @@ def _mapped_records(records: Iterable[dict[str, Any]], options: dict[str, Any], 
         known_time = (
             any(key in raw and raw[key] not in (None, "") for key in ("event_time", "timestamp", "time")) or record.get("source_type") == "packet_capture"
         )
+        assumed_year = raw.get("timestamp_assumption") == "current_year_utc"
+        if assumed_year:
+            local = datetime.fromisoformat(str(record["event_time"]).replace("Z", "+00:00")).replace(
+                tzinfo=None, year=int(options.get("source_year", utc_now_year()))
+            )
+            record["event_time"] = local.isoformat()
+            known_time = "source_year" in options
         for source_field, destination in options.get("mapping", {}).items():
             if source_field in raw:
                 record[destination] = raw[source_field]
@@ -441,7 +449,13 @@ def _mapped_records(records: Iterable[dict[str, Any]], options: dict[str, Any], 
             record["provenance"] = {
                 **record.get("provenance", {}),
                 "pipeline_options": options,
-                "event_time_basis": "source" if known_time else "ingestion_fallback_not_observed_time",
+                "event_time_basis": "source_year_and_zone_declared"
+                if assumed_year and known_time
+                else "source_year_assumed_not_verified"
+                if assumed_year
+                else "source"
+                if known_time
+                else "ingestion_fallback_not_observed_time",
             }
         except (ValueError, TypeError, ZoneInfoNotFoundError):
             record = {"__parse_error": "invalid, ambiguous or nonexistent source timestamp"}
@@ -484,6 +498,8 @@ def _job_access(job_id: int, write: bool = False) -> sqlite3.Row | None:
     if not row or not can_access_training_run(row["training_run_id"]):
         return None
     if operational_mode() and row["case_id"] is not None and not case_visible(row["case_id"], current_user() or {}):
+        return None
+    if operational_mode() and row["case_id"] is not None and not job_visible(job_id):
         return None
     if write and row["created_by"] != actor_id() and not has_permission(current_user(), "sources.manage"):
         return None
@@ -597,7 +613,14 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
                             f"pipeline:{hashlib.sha256(job['autopsy_options'].encode()).hexdigest()}:{record.get('idempotency_key', row_number)}"
                         )
                     event_id, alerts, was_duplicate = ingest_event(
-                        get_db(), record, int(job["created_by"]), int(job["workspace_id"]), job["training_run_id"], job["case_id"]
+                        get_db(),
+                        record,
+                        int(job["created_by"]),
+                        int(job["workspace_id"]),
+                        job["training_run_id"],
+                        job["case_id"],
+                        job_id if job["case_id"] is not None else None,
+                        bool(job["active_version"]),
                     )
                     if job["case_id"] is not None:
                         _attach_import_result(job, event_id, alerts)
@@ -670,6 +693,17 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
         from .autopsy_domain import custody
 
         with transaction():
+            finished = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
+            latest = (
+                get_db()
+                .execute(
+                    "SELECT MAX(id) FROM ingestion_jobs WHERE case_id = ? AND content_hash = ? AND status IN ('completed','completed_with_errors') AND accepted > 0",
+                    (job["case_id"], job["content_hash"]),
+                )
+                .fetchone()[0]
+            )
+            if latest == job_id and accepted > 0:
+                activate_import(finished, actor=job["executor_id"] or job["created_by"])
             custody(
                 job["case_id"],
                 "import_completed",
@@ -686,7 +720,7 @@ def _import_case_authorized(job: sqlite3.Row) -> bool:
     case = (
         get_db().execute("SELECT status, archived_at FROM incident_cases WHERE id = ? AND workspace_id = ?", (job["case_id"], job["workspace_id"])).fetchone()
     )
-    user = get_db().execute("SELECT id, workspace_id, role FROM users WHERE id = ? AND is_active = 1", (job["created_by"],)).fetchone()
+    user = get_db().execute("SELECT id, workspace_id, role FROM users WHERE id = ? AND is_active = 1", (job["executor_id"] or job["created_by"],)).fetchone()
     if not case or case["status"] == "closed" or case["archived_at"] or not user:
         return False
     principal = dict(user)
@@ -699,6 +733,8 @@ def _import_case_authorized(job: sqlite3.Row) -> bool:
 
 
 def _attach_import_result(job: sqlite3.Row, event_id: int, alert_ids: list[int]) -> None:
+    from .autopsy_intel import enrich_imported_event
+
     now = iso_now()
     get_db().execute(
         "INSERT OR IGNORE INTO case_events(case_id, event_id, attached_by, attached_at) VALUES (?, ?, ?, ?)", (job["case_id"], event_id, job["created_by"], now)
@@ -715,6 +751,7 @@ def _attach_import_result(job: sqlite3.Row, event_id: int, alert_ids: list[int])
             "INSERT OR IGNORE INTO case_evidence(case_id, evidence_type, reference_id, title, sha256, provenance, added_by, added_at) VALUES (?, 'alert', ?, ?, ?, ?, ?, ?)",
             (job["case_id"], str(alert_id), alert["reason"][:255], alert["dedup_key"], alert["evidence"], job["created_by"], now),
         )
+    enrich_imported_event(job, event_id)
 
 
 def _safe_import_filename(value: str) -> str:
@@ -760,7 +797,7 @@ def _upload_options() -> tuple[int | None, dict[str, Any]]:
     if not case or case["status"] == "closed":
         raise ValueError("an open, authorized case is required")
     data = request.form.to_dict() if request.files else request.get_json(silent=True)
-    allowed = {"filename", "content", "format", "source_id", "source_label", "mapping", "source_timezone", "encoding", "delimiter"}
+    allowed = {"filename", "content", "format", "source_id", "source_label", "mapping", "source_timezone", "source_year", "encoding", "delimiter"}
     if not isinstance(data, dict) or set(data) - allowed:
         raise ValueError("unknown import parameters")
     if not request.files and not isinstance(data.get("filename", "import.log"), str):
@@ -805,6 +842,13 @@ def _upload_options() -> tuple[int | None, dict[str, Any]]:
     except ZoneInfoNotFoundError as exc:
         raise ValueError("source timezone is not available locally") from exc
     options = {"mapping": mapping, "source_timezone": zone, "encoding": encoding, "delimiter": delimiter}
+    if data.get("source_year") not in (None, ""):
+        year = data["source_year"]
+        if isinstance(year, str) and year.isascii() and year.isdecimal():
+            year = int(year)
+        if type(year) is not int or not 1970 <= year <= 2100:
+            raise ValueError("source year must be between 1970 and 2100")
+        options["source_year"] = year
     if data.get("source_label"):
         options["source_label"] = text_value(data["source_label"], 100, True)
     if "source_id" in data and data["source_id"] not in (None, ""):
@@ -931,6 +975,16 @@ def create_import():
         if case_id is not None:
             from .autopsy_domain import custody, touch_case
 
+            previous = (
+                get_db()
+                .execute(
+                    "SELECT 1 FROM ingestion_jobs WHERE case_id = ? AND content_hash = ? AND id != ? AND active_version = 1 AND status IN ('completed','completed_with_errors') AND accepted > 0 LIMIT 1",
+                    (case_id, content_hash, job_database_id),
+                )
+                .fetchone()
+            )
+            get_db().execute("UPDATE ingestion_jobs SET executor_id = ?, active_version = ? WHERE id = ?", (actor_id(), 0 if previous else 1, job_database_id))
+
             get_db().execute(
                 "INSERT INTO autopsy_case_imports(case_id, job_id, attached_by, attached_at) VALUES (?, ?, ?, ?)", (case_id, job_database_id, actor_id(), now)
             )
@@ -993,6 +1047,12 @@ def resume_import(job_id: int):
         return error_response("IMPORT_NOT_FOUND", "مهمة الاستيراد غير موجودة", 404)
     if row["status"] not in {"queued", "interrupted", "failed"}:
         return error_response("IMPORT_NOT_RESUMABLE", "مهمة الاستيراد ليست في حالة قابلة للاستئناف", 409)
+    if operational_mode() and row["case_id"] is not None:
+        with transaction():
+            get_db().execute("UPDATE ingestion_jobs SET executor_id = ? WHERE id = ?", (actor_id(), job_id))
+            from .autopsy_domain import custody
+
+            custody(row["case_id"], "import_execution_reauthorized", {"job_id": job_id, "original_uploader": row["created_by"], "executor": actor_id()})
     get_db().execute(
         """UPDATE ingestion_jobs SET status = 'queued', retry_count = retry_count + 1, completed_at = NULL,
         available_at = ?, worker_id = NULL, lease_expires_at = NULL, updated_at = ? WHERE id = ?""",

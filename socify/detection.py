@@ -19,6 +19,7 @@ from .timeutils import iso_now, parse_timestamp
 detection_api = Blueprint("detection", __name__)
 
 FIELDS = {
+    "source_type",
     "event_type",
     "category",
     "severity",
@@ -294,7 +295,7 @@ def _candidate_events(connection: sqlite3.Connection, event: dict[str, Any], sec
     start = end - timedelta(seconds=seconds)
     rows = connection.execute(
         """SELECT * FROM security_events
-        WHERE workspace_id = ? AND training_run_id IS ? AND owner_case_id IS ? AND source != 'rules_engine' AND event_time >= ? AND event_time <= ?
+        WHERE workspace_id = ? AND training_run_id IS ? AND owner_case_id IS ? AND autopsy_active = 1 AND source != 'rules_engine' AND event_time >= ? AND event_time <= ?
         ORDER BY event_time, id LIMIT 20000""",
         (
             event["workspace_id"],
@@ -329,7 +330,7 @@ def evaluate_dsl(connection: sqlite3.Connection, dsl: dict[str, Any], event: dic
     group_fields = [str(item) for item in window.get("group_by", [])]
     target_group = _group_key(event, group_fields)
     max_time_row = connection.execute(
-        "SELECT MAX(event_time) FROM security_events WHERE workspace_id = ? AND training_run_id IS ? AND owner_case_id IS ? AND source != 'rules_engine'",
+        "SELECT MAX(event_time) FROM security_events WHERE workspace_id = ? AND training_run_id IS ? AND owner_case_id IS ? AND autopsy_active = 1 AND source != 'rules_engine'",
         (event["workspace_id"], event.get("training_run_id"), event.get("owner_case_id")),
     ).fetchone()
     max_time = parse_timestamp(max_time_row[0]) if max_time_row and max_time_row[0] else parse_timestamp(event["event_time"])
@@ -408,7 +409,7 @@ def _alert_reason(rule_name: str, evaluation: Evaluation) -> str:
 
 def evaluate_rules(connection: sqlite3.Connection, event_id: int) -> list[int]:
     row = connection.execute("SELECT * FROM security_events WHERE id = ?", (event_id,)).fetchone()
-    if not row or row["source"] == "rules_engine":
+    if not row or row["source"] == "rules_engine" or not row["autopsy_active"]:
         return []
     event = _event_dict(row)
     rules = connection.execute(

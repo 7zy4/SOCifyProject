@@ -9,18 +9,32 @@ from flask import Blueprint, Response, current_app, jsonify, request, stream_wit
 from werkzeug.utils import secure_filename
 
 from .autopsy_domain import custody, touch_case
+from .autopsy_pipeline import activate_import, event_visible, job_visible, visibility_sql
 from .cases import _attach_event, _case_row
 from .db import connect_readonly, get_db, transaction
 from .events import _event_view
 from .ingestion import _job_content, _job_view, cancel_import, create_import, preview_import, resume_import
 from .security import actor_id, current_user, error_response, has_permission, require_permission
-from .timeutils import iso_timestamp
+from .timeutils import iso_now, iso_timestamp
 
 autopsy_ingestion_api = Blueprint("autopsy_ingestion", __name__)
 
 
+def import_view(row):
+    item = _job_view(row)
+    access = get_db().execute("SELECT restricted FROM autopsy_batch_access WHERE job_id = ?", (row["id"],)).fetchone()
+    item["restricted"] = bool(access and access[0])
+    if (current_user() or {}).get("role") in {"admin", "soc_manager"}:
+        item["batch_members"] = [
+            entry[0] for entry in get_db().execute("SELECT user_id FROM autopsy_batch_members WHERE job_id = ? ORDER BY user_id", (row["id"],))
+        ]
+    return item
+
+
 def _job_for_case(case_id: int, job_id: int):
     if not _case_row(case_id):
+        return None
+    if not job_visible(job_id):
         return None
     return get_db().execute("SELECT * FROM ingestion_jobs WHERE case_id = ? AND id = ?", (case_id, job_id)).fetchone()
 
@@ -47,7 +61,7 @@ def case_import_list(case_id: int):
     if not _case_row(case_id):
         return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
     rows = get_db().execute("SELECT * FROM ingestion_jobs WHERE case_id = ? ORDER BY id DESC LIMIT 100", (case_id,)).fetchall()
-    return jsonify({"items": [_job_view(row) for row in rows]})
+    return jsonify({"items": [import_view(row) for row in rows if job_visible(row["id"])]})
 
 
 @autopsy_ingestion_api.get("/api/cases/<int:case_id>/imports/<int:job_id>")
@@ -62,7 +76,7 @@ def case_import_detail(case_id: int, job_id: int):
     ]
     return jsonify(
         {
-            **_job_view(job),
+            **import_view(job),
             "errors": errors,
             "errors_total": get_db().execute("SELECT COUNT(*) FROM ingestion_errors WHERE job_id = ?", (job_id,)).fetchone()[0],
         }
@@ -83,6 +97,75 @@ def case_import_cancel(case_id: int, job_id: int):
     if not _job_for_case(case_id, job_id):
         return error_response("IMPORT_NOT_FOUND", "الاستيراد غير متاح في القضية", 404)
     return cancel_import(job_id)
+
+
+@autopsy_ingestion_api.post("/api/cases/<int:case_id>/imports/<int:job_id>/activate")
+@require_permission("cases.assign")
+def case_import_activate(case_id: int, job_id: int):
+    data = request.get_json(silent=True)
+    if (
+        not isinstance(data, dict)
+        or set(data) != {"version", "reason"}
+        or type(data.get("version")) is not int
+        or not isinstance(data.get("reason"), str)
+        or not 3 <= len(data["reason"].strip()) <= 1000
+    ):
+        return error_response("INVALID_ACTIVATION", "حدد إصدار القضية وسبب اختيار نسخة المعالجة", 422)
+    with transaction():
+        case = _case_row(case_id)
+        job = _job_for_case(case_id, job_id)
+        if not case or not job:
+            return error_response("IMPORT_NOT_FOUND", "النسخة غير متاحة في القضية", 404)
+        if case["status"] == "closed" or case["version"] != data["version"]:
+            return error_response("CASE_VERSION_CONFLICT", "القضية مغلقة أو تغيرت؛ حدّث البيانات", 409)
+        try:
+            activate_import(job)
+        except ValueError as exc:
+            return error_response("IMPORT_NOT_ACTIVATABLE", str(exc), 409)
+        custody(case_id, "derived_import_activation_reason", {"job_id": job_id, "reason": data["reason"].strip()})
+    return jsonify({"id": job_id, "active_version": True, "detection_rescan_required": True})
+
+
+@autopsy_ingestion_api.put("/api/cases/<int:case_id>/imports/<int:job_id>/access")
+@require_permission("cases.assign")
+def case_import_access(case_id: int, job_id: int):
+    data = request.get_json(silent=True)
+    if (
+        not isinstance(data, dict)
+        or set(data) != {"restricted", "members", "reason"}
+        or type(data.get("restricted")) is not bool
+        or not isinstance(data.get("members"), list)
+        or len(data["members"]) > 100
+        or any(type(value) is not int for value in data["members"])
+        or not isinstance(data.get("reason"), str)
+        or not 3 <= len(data["reason"].strip()) <= 1000
+    ):
+        return error_response("INVALID_BATCH_ACCESS", "حدد نطاق الدفعة وأعضاءها وسبب التغيير", 422)
+    with transaction():
+        case, job = _case_row(case_id), _job_for_case(case_id, job_id)
+        if not case or not job:
+            return error_response("IMPORT_NOT_FOUND", "الدفعة غير متاحة في القضية", 404)
+        for user_id in set(data["members"]):
+            if not get_db().execute("SELECT 1 FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (user_id, case["workspace_id"])).fetchone():
+                return error_response("MEMBER_NOT_FOUND", "أحد الأعضاء غير متاح في الفريق", 422)
+        get_db().execute(
+            "INSERT INTO autopsy_batch_access(job_id,restricted,changed_by,changed_at) VALUES (?,?,?,?) ON CONFLICT(job_id) DO UPDATE SET restricted = excluded.restricted, changed_by = excluded.changed_by, changed_at = excluded.changed_at",
+            (job_id, int(data["restricted"]), actor_id(), iso_now()),
+        )
+        get_db().execute("DELETE FROM autopsy_batch_members WHERE job_id = ?", (job_id,))
+        for user_id in set(data["members"]):
+            get_db().execute("INSERT INTO autopsy_batch_members(job_id,user_id) VALUES (?,?)", (job_id, user_id))
+            get_db().execute(
+                "INSERT INTO autopsy_case_members(case_id,user_id,responsibility,assigned_by,assigned_at) VALUES (?,?,'investigator',?,?) ON CONFLICT(case_id,user_id) DO NOTHING",
+                (case_id, user_id, actor_id(), iso_now()),
+            )
+        custody(
+            case_id,
+            "import_batch_access_changed",
+            {"job_id": job_id, "restricted": data["restricted"], "members": sorted(set(data["members"])), "reason": data["reason"].strip()},
+        )
+        touch_case(case_id)
+    return jsonify({"id": job_id, "restricted": data["restricted"], "members": sorted(set(data["members"]))})
 
 
 @autopsy_ingestion_api.get("/api/cases/<int:case_id>/imports/<int:job_id>/original")
@@ -107,6 +190,19 @@ def original_import(case_id: int, job_id: int):
 def log_query(case_id: int) -> tuple[str, list[Any]]:
     clauses = ["ce.case_id = ?"]
     args: list[Any] = [case_id]
+    scope, parameters = visibility_sql()
+    clauses.append(scope)
+    args.extend(parameters)
+    selected_job = request.args.get("job_id")
+    if selected_job:
+        if not selected_job.isascii() or not selected_job.isdecimal() or not 1 <= int(selected_job) <= 2**63 - 1:
+            raise ValueError("معرف نسخة الاستيراد غير صالح")
+        if not _job_for_case(case_id, int(selected_job)):
+            raise ValueError("نسخة الاستيراد غير متاحة في القضية")
+        clauses.append("ce.import_job_id = ?")
+        args.append(int(selected_job))
+    else:
+        clauses.append("ce.active_event = 1")
     query = request.args.get("q", "").strip()
     if len(query) > 200:
         raise ValueError("نص البحث يتجاوز الحد المسموح")
@@ -119,13 +215,13 @@ def log_query(case_id: int) -> tuple[str, list[Any]]:
             clauses.append("0 = 1")
     for key, operator in (("start", ">="), ("end", "<=")):
         if request.args.get(key):
-            clauses.append(f"e.event_time {operator} ?")
+            clauses.append(f"ce.event_time {operator} ?")
             args.append(iso_timestamp(request.args[key]))
     if request.args.get("severity"):
         severity = request.args["severity"]
         if severity not in {"critical", "high", "medium", "low"}:
             raise ValueError("الخطورة غير صالحة")
-        clauses.append("e.severity = ?")
+        clauses.append("ce.event_severity = ?")
         args.append(severity)
     return " AND ".join(clauses), args
 
@@ -146,7 +242,7 @@ def case_logs(case_id: int):
     rows = (
         get_db()
         .execute(
-            f"SELECT e.* FROM case_events ce JOIN security_events e ON e.id = ce.event_id WHERE {where} ORDER BY e.event_time, e.id LIMIT ? OFFSET ?",
+            f"SELECT e.* FROM case_events ce JOIN security_events e ON e.id = ce.event_id WHERE {where} ORDER BY ce.event_time, ce.event_id LIMIT ? OFFSET ?",
             (*args, limit, (page - 1) * limit),
         )
         .fetchall()
@@ -159,6 +255,8 @@ def case_logs(case_id: int):
 def case_log_detail(case_id: int, event_id: int):
     if not _case_row(case_id):
         return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+    if not event_visible(case_id, event_id, active_only=False):
+        return error_response("EVENT_NOT_FOUND", "السجل غير متاح في القضية", 404)
     row = (
         get_db()
         .execute("SELECT e.* FROM case_events ce JOIN security_events e ON e.id = ce.event_id WHERE ce.case_id = ? AND ce.event_id = ?", (case_id, event_id))
@@ -176,7 +274,7 @@ def select_log_exhibit(case_id: int, event_id: int):
             return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
         if case["status"] == "closed":
             return error_response("CASE_CLOSED", "أعد فتح القضية قبل تغيير أدلتها", 409)
-        if not get_db().execute("SELECT 1 FROM case_events WHERE case_id = ? AND event_id = ?", (case_id, event_id)).fetchone():
+        if not event_visible(case_id, event_id):
             return error_response("EVENT_NOT_FOUND", "السجل غير متاح في القضية", 404)
         prior = (
             get_db()

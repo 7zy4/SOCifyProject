@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-25",
+  "tool_repository": "https://github.com/7zy4/rea",
+  "tool_commit": "2250e67bc271c83f9e200ee298aa04a2457438a6",
+  "source_application_evidence": "ev_a157ac9fc8f595234a45a4b357c334c6cdd88dd27c5149460634a4342a0c0457",
+  "source_manifest": "rea-evidence-manifest.json",
+  "results": [
+    {
+      "file": "thehive-observable-module-trace-2026-10-25.json.gz",
+      "raw_sha256": "b78920a1c5bc2a1e949c4a7f2a2f7ad128f103de732f06fcfcc45a6845b6f72e",
+      "gzip_sha256": "82ed1641a624dae6289fd5b3c1507bdb6c076b5c8fdedd69f67a57dc960b29f9",
+      "evidence_id": "ev_7c39a9c4d41883bb8bff12ae842f3d2bb06f525ed98a7672a3c183642e32ecff",
+      "operation": "trace_application_feature"
+    },
+    {
+      "file": "thehive-analy-no-match-2026-10-25.json.gz",
+      "raw_sha256": "b0c0d7904be98a5ba02c9586cc577896fccdd3b8d36a07b8e4e3ffd28e1c6348",
+      "gzip_sha256": "881cb8e303686665c24f954d15be287f929a70214c685733161ccc38b66e5a46",
+      "evidence_id": "ev_f7e0aec47155fb6e217b9ca209e24200093d3de8c4aa311d5702a5991d9a4b91",
+      "operation": "trace_application_feature"
+    }
+  ],
+  "limitations": [
+    "Static source-derived trace, not live commercial behavior or runtime proof",
+    "Module seed: two nodes, one edge; analy string seed had no match",
+    "SOCify adapts enrichment offline; no external analyzer or reputation queries"
+  ]
+}

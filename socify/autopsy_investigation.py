@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, request
 from .attack import _metadata
 from .autopsy_api import records_for_case
 from .autopsy_ingestion import log_query
+from .autopsy_pipeline import case_full_access
 from .cases import _case_row, annotate_technique
 from .db import get_db
 from .security import error_response, require_permission
@@ -19,7 +20,7 @@ def case_timeline(case_id: int):
     if not _case_row(case_id):
         return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
     try:
-        if set(request.args) - {"q", "severity", "start", "end", "page", "limit"}:
+        if set(request.args) - {"q", "severity", "start", "end", "page", "limit", "job_id"}:
             raise ValueError("مرشح غير معروف")
         page, limit = int(request.args.get("page", 1)), int(request.args.get("limit", 50))
         if not 1 <= page <= 1000000 or not 1 <= limit <= 100:
@@ -31,7 +32,7 @@ def case_timeline(case_id: int):
     rows = (
         get_db()
         .execute(
-            f"SELECT e.id, e.title, e.event_time, e.ingested_at, e.source, e.event_type, e.severity, e.provenance, e.normalized_fields FROM case_events ce JOIN security_events e ON e.id = ce.event_id WHERE {where} ORDER BY COALESCE(json_extract(e.normalized_fields, '$.event_time_known'), 0) DESC, e.event_time, e.id LIMIT ? OFFSET ?",
+            f"SELECT e.id, e.title, e.event_time, e.ingested_at, e.source, e.event_type, e.severity, e.provenance, e.normalized_fields FROM case_events ce JOIN security_events e ON e.id = ce.event_id WHERE {where} ORDER BY ce.time_known DESC, ce.event_time, ce.event_id LIMIT ? OFFSET ?",
             (*args, limit, (page - 1) * limit),
         )
         .fetchall()
@@ -54,9 +55,9 @@ def case_timeline(case_id: int):
             "total": total,
             "page": page,
             "limit": limit,
-            "annotations": records_for_case(case_id, "timeline", 100),
-            "bookmarks": records_for_case(case_id, "bookmark", 500),
-            "views": records_for_case(case_id, "timeline_view", 100),
+            "annotations": records_for_case(case_id, "timeline", 100) if case_full_access(case_id) else [],
+            "bookmarks": records_for_case(case_id, "bookmark", 500) if case_full_access(case_id) else [],
+            "views": records_for_case(case_id, "timeline_view", 100) if case_full_access(case_id) else [],
             "limits": "القائمة المطبعّة مرقمة؛ التعليقات والمناظر محدودة مع ترقيم مستقل في API السجلات",
         }
     )
@@ -67,6 +68,8 @@ def case_timeline(case_id: int):
 def case_graph(case_id: int):
     if not _case_row(case_id):
         return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+    if not case_full_access(case_id):
+        return error_response("BATCH_ACCESS_REQUIRED", "الرسم الكامل يحتاج نطاق القضية الكامل؛ السجلات المصرح بها متاحة في الخط الزمني", 403)
     try:
         if set(request.args) - {"limit", "severity", "start", "end"}:
             raise ValueError("مرشح الرسم غير معروف")
@@ -89,6 +92,8 @@ def case_graph(case_id: int):
 def case_attack(case_id: int):
     if not _case_row(case_id):
         return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+    if not case_full_access(case_id):
+        return error_response("BATCH_ACCESS_REQUIRED", "توثيق MITRE الكامل يحتاج نطاق القضية الكامل", 403)
     query = request.args.get("q", "").strip()
     if len(query) > 100 or set(request.args) - {"q"}:
         return error_response("INVALID_ATTACK_SEARCH", "البحث يتجاوز الحدود أو يحتوي مرشحًا غير معروف", 422)
