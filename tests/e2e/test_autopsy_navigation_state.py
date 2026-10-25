@@ -4,7 +4,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 from conftest import DEMO_LOGIN_VALUE
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 from werkzeug.serving import make_server
 
 
@@ -108,4 +108,47 @@ def test_team_list_batch_search_pagination_and_saved_timeline_filters_survive_na
     assert page.locator("select[name=timeline_severity]").input_value() == "high"
     page.get_by_role("link", name="جميع القضايا", exact=True).click()
     assert page.get_by_role("form", name="بحث القضايا").locator("input[name=q]").input_value() == "saved case context"
+    assert not errors
+
+
+@pytest.mark.e2e
+def test_combined_timeline_renders_source_observation_action_notes_and_unknown_clock(operational_browser):
+    page, root, errors = operational_browser
+    case_id = page.evaluate(
+        """async () => {
+          const c=await api('/api/cases',{method:'POST',body:{title:'Mixed chronology browser proof',reason:'forensic_review',objective:'Preserve provenance across logs investigation response and notes'}});
+          const base=`/api/cases/${c.id}`;
+          await api(base+'/imports',{method:'POST',body:{filename:'mixed.json',content:JSON.stringify([{title:'Source clock first',event_time:'2026-10-20T10:00:00Z'},{title:'Unknown source clock last'}])}});
+          const logs=await api(base+'/logs');
+          const log=logs.items.find(item=>item.title==='Source clock first');
+          const exhibit=await api(base+`/logs/${log.id}/exhibit`,{method:'POST',body:{}});
+          const me=await api('/api/auth/me');
+          await api(base+'/records/timeline',{method:'POST',body:{title:'Investigator observation second',event_time:'2026-10-20T10:00:00.000001Z',category:'observed',source:'Synthetic exhibited log',evidence_id:exhibit.id}});
+          await api(base+'/records/response',{method:'POST',body:{title:'Containment action third',phase:'containment',status:'succeeded',performed_at:'2026-10-20T10:00:00.000002Z',performed_by:me.user.id,evidence_id:exhibit.id,details:'Document a synthetic local containment action with its retained evidence'}});
+          await api(base+'/records/war_room',{method:'POST',body:{title:'Team decision fourth',body:'Retain uncertainty and source references',visibility:'team'}});
+          await api(`/api/incidents/${c.id}/notes`,{method:'POST',body:{body:'Shared retained note fifth',visibility:'team'}});
+          return c.id;
+        }"""
+    )
+    page.goto(root + f"/cases/{case_id}?tab=investigation")
+    page.locator(".autopsy-timeline > li").nth(5).wait_for()
+    entries = page.locator(".autopsy-timeline > li")
+    assert entries.count() == 6
+    titles = entries.locator("h3").all_text_contents()
+    for index, title in enumerate(("Source clock first", "Investigator observation second", "Containment action third", "Team decision fourth")):
+        assert title in titles[index]
+    assert "Shared retained note fifth" in entries.nth(4).inner_text()
+    assert "Unknown source clock last" in titles[-1]
+    assert "وقت ملاحظة أدخله المحقق" in entries.nth(1).inner_text()
+    assert "وقت إجراء مسجل بواسطة المنفذ" in entries.nth(2).inner_text()
+    assert "وقت التوثيق؛ ليس وقت وقوع الهجوم" in entries.nth(3).inner_text()
+    assert "وقت الحدث غير معروف" in entries.nth(5).inner_text()
+    page.locator("select[name=timeline_scope]").select_option("logs")
+    page.get_by_role("button", name="تطبيق الفلاتر", exact=True).click()
+    expect(page.locator(".autopsy-timeline > li")).to_have_count(2)
+    page.reload()
+    assert page.locator("select[name=timeline_scope]").input_value() == "logs"
+    page.locator("select[name=timeline_scope]").select_option("all")
+    page.get_by_role("button", name="تطبيق الفلاتر", exact=True).click()
+    expect(page.locator(".autopsy-timeline > li")).to_have_count(6)
     assert not errors

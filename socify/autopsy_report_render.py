@@ -169,7 +169,7 @@ def lines(value, depth=0):
     if isinstance(value, dict):
         for key, item in value.items():
             if isinstance(item, (dict, list)):
-                yield depth, LABELS.get(key, key)
+                yield depth, "عناصر الخط الزمني" if key == "entries" and isinstance(item, list) else LABELS.get(key, key)
                 yield from lines(item, depth + 1)
             else:
                 value = "غير قابل للحساب" if item is None and key.endswith("_seconds") else display(item)
@@ -236,17 +236,25 @@ def sections(payload):
             yield LABELS[key], payload[key]
 
 
+def line_html(text):
+    label, separator, value = text.partition(": ")
+    if separator:
+        return f'{html.escape(label)}: <bdi dir="auto">{html.escape(value)}</bdi>'
+    return f'<bdi dir="auto">{html.escape(text)}</bdi>'
+
+
 def render_html(payload) -> str:
     case = payload["case"]
     content = []
     for title, value in sections(payload):
-        rows = "".join(f'<p class="report-line depth-{min(depth, 3)}">{html.escape(text)}</p>' for depth, text in lines(value))
+        rows = "".join(f'<p class="report-line depth-{min(depth, 3)}">{line_html(text)}</p>' for depth, text in lines(value))
         content.append(f'<section class="report-section"><h2>{html.escape(title)}</h2>{rows}</section>')
     digest = hashlib.sha256(canonical(payload).encode()).hexdigest()
-    cover = f'<header class="report-cover"><p dir="ltr">SOCify Digital Autopsy</p><h1>{html.escape(display(case["title"]))}</h1><p>{html.escape(case["reference"])} · الإصدار {payload["revision"]}</p></header><p class="report-note">نسخة ثابتة من بيانات القضية عند إعدادها. اعتماد هذه النسخة محفوظ منفصلًا في سجل المنصة. البصمة أدناه تخص JSON المعياري، لا بايتات PDF.</p><p>SHA-256: <bdi>{digest}</bdi></p>'
+    title_class = ' class="report-title-long"' if len(case["title"]) > 100 else ""
+    cover = f'<header class="report-cover"><p dir="ltr">SOCify Digital Autopsy</p><h1{title_class}><bdi dir="auto">{html.escape(display(case["title"]))}</bdi></h1><p><bdi dir="ltr">{html.escape(case["reference"])}</bdi> · الإصدار {payload["revision"]}</p></header><p class="report-note">نسخة ثابتة من بيانات القضية عند إعدادها. اعتماد هذه النسخة محفوظ منفصلًا في سجل المنصة. البصمة أدناه تخص JSON المعياري، لا بايتات PDF.</p><p dir="ltr">SHA-256: <bdi>{digest}</bdi></p>'
     style = (
         report_style()
-        + ".report-section{break-before:auto}.report-section:first-of-type{break-before:page}.report-line{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 10pt;font-size:14pt}.depth-1{padding-inline-start:10pt}.depth-2,.depth-3{padding-inline-start:18pt}"
+        + ".report-cover{break-inside:avoid}.report-cover h1.report-title-long{font-size:24pt;line-height:1.1}.report-section{break-before:auto}.report-section:first-of-type{break-before:page}.report-line{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 10pt;font-size:14pt}.depth-1{padding-inline-start:10pt}.depth-2,.depth-3{padding-inline-start:18pt}"
     )
     return f'<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{html.escape(case["reference"])}</title><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; font-src data:"><style>{style}</style></head><body>{cover}{"".join(content)}</body></html>'
 

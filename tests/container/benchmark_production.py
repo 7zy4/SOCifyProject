@@ -28,6 +28,7 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.x509.oid import NameOID
 
 from scripts.benchmark_reference import distribution, git_revision
+from socify.timeutils import parse_timestamp
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT = "socify-v3-performance"
@@ -76,6 +77,7 @@ class DockerProject:
             if item["Config"]["Labels"].get("io.socify.synthetic-capacity") != "true":
                 raise RuntimeError("Synthetic capacity marker is required before creating any accounts or fixtures")
             result[service] = {
+                "container_id": identifier,
                 "image": item["Image"],
                 "memory_limit_bytes": item["HostConfig"]["Memory"],
                 "cpu_limit": item["HostConfig"]["NanoCpus"] / 1e9,
@@ -290,6 +292,7 @@ def main():
     parser.add_argument("--port", type=int, default=15006)
     parser.add_argument("--events", type=int, default=1000000)
     parser.add_argument("--requests", type=int, default=200)
+    parser.add_argument("--report-samples", type=int, default=10)
     parser.add_argument("--measure-only", action="store_true")
     options = parser.parse_args()
     if (
@@ -297,6 +300,7 @@ def main():
         or options.events % 10000
         or not 100 <= options.requests <= 1000
         or options.requests % 20
+        or not 5 <= options.report_samples <= 20
         or not 1 <= options.port <= 65535
     ):
         parser.error("Use 10000..1000000 events in 10000-row batches and 100..1000 requests in multiples of 20")
@@ -334,7 +338,7 @@ def main():
             case = owner.call(
                 "/api/cases",
                 {
-                    "title": "Production synthetic million-event capacity",
+                    "title": f"Production synthetic {options.events}-event capacity",
                     "reason": "forensic_review",
                     "objective": "Measure real ingestion TLS authenticated team reads and isolated report resources",
                 },
@@ -371,7 +375,14 @@ def main():
                 status = wait_job(owner, base + "/imports/" + str(prior["id"]), "status", {"queued", "processing", "interrupted"})
                 if status["status"] != "completed" or status["accepted"] != 10000 or status["rejected"] or status["content_hash"] != digest:
                     raise RuntimeError("Real ingestion count, parser status or original digest failed")
-                prior.update(completed=True, accepted=status["accepted"], parser_version=status["parser_version"])
+                prior.update(
+                    completed=True,
+                    accepted=status["accepted"],
+                    parser_version=status["parser_version"],
+                    created_at=status["created_at"],
+                    started_at=status["started_at"],
+                    completed_at=status["completed_at"],
+                )
                 save_state(state_path, state)
                 print(
                     json.dumps(
@@ -391,6 +402,16 @@ def main():
             raise RuntimeError("All real ingestion batches must finish before capacity measurement")
         if owner.call(base + "/logs?limit=1")["total"] != options.events:
             raise RuntimeError("Actual case population differs from the requested real workload")
+        for batch in state["batches"].values():
+            if not batch.get("completed_at"):
+                status = owner.call(base + "/imports/" + str(batch["id"]))
+                for key in ("created_at", "started_at", "completed_at"):
+                    batch[key] = status[key]
+        save_state(state_path, state)
+        ingestion_times = [
+            (parse_timestamp(batch["completed_at"]) - parse_timestamp(batch["started_at"])).total_seconds() for batch in state["batches"].values()
+        ]
+        queue_times = [(parse_timestamp(batch["started_at"]) - parse_timestamp(batch["created_at"])).total_seconds() for batch in state["batches"].values()]
         paths = {
             "case_open": base,
             "log_page": base + "/logs?limit=50",
@@ -426,15 +447,21 @@ def main():
             original, headers = owner.call(base + "/imports/" + str(batch["id"]) + "/original", raw=True)
             if hashlib.sha256(original).hexdigest() != batch["sha256"] or headers["X-Evidence-SHA256"] != batch["sha256"]:
                 raise RuntimeError("Stored original export digest failed")
-        report_start = time.monotonic()
-        report = owner.call(base + "/reports", {"version": owner.call(base)["version"]})
-        ready = wait_job(owner, base + "/jobs/" + str(report["job_id"]), "state", {"queued", "processing"})
-        if ready["state"] != "completed":
-            raise RuntimeError("Isolated capacity report failed")
-        pdf, headers = owner.call(base + "/reports/" + str(report["id"]) + "/files/pdf", raw=True)
-        if not pdf.startswith(b"%PDF-") or hashlib.sha256(pdf).hexdigest() != headers["X-Content-SHA256"]:
-            raise RuntimeError("Capacity PDF digest failed")
-        report_seconds = time.monotonic() - report_start
+        report_times, report_bytes = [], []
+        for _ in range(options.report_samples):
+            report_start = time.monotonic()
+            report = owner.call(base + "/reports", {"version": owner.call(base)["version"]})
+            ready = wait_job(owner, base + "/jobs/" + str(report["job_id"]), "state", {"queued", "processing"})
+            if ready["state"] != "completed":
+                raise RuntimeError("Isolated capacity report failed")
+            metadata = owner.call(base + "/reports/" + str(report["id"]))
+            if set(metadata["formats"]) != {"json", "html", "md", "docx", "pdf"}:
+                raise RuntimeError("All five native report formats must be present")
+            pdf, headers = owner.call(base + "/reports/" + str(report["id"]) + "/files/pdf", raw=True)
+            if not pdf.startswith(b"%PDF-") or hashlib.sha256(pdf).hexdigest() != headers["X-Content-SHA256"]:
+                raise RuntimeError("Capacity PDF digest failed")
+            report_times.append(time.monotonic() - report_start)
+            report_bytes.append(len(pdf))
         resources = docker.resources()
         for service, value in resources.items():
             value["measurement_cpu_used_usec"] = value["cpu_usage_usec"] - measurement_cpu[service]["cpu_usage_usec"]
@@ -460,12 +487,24 @@ def main():
             "ingestion": {
                 "seconds": round(state["ingestion_completed_epoch"] - state["ingestion_started_epoch"], 3),
                 "rows_per_second": options.events / (state["ingestion_completed_epoch"] - state["ingestion_started_epoch"]),
+                "batches": len(ingestion_times),
+                "rows_per_batch": 10000,
+                "processing": distribution(ingestion_times),
+                "queue_wait": distribution(queue_times),
+                "processing_seconds_total": sum(ingestion_times),
                 "images": state["ingestion_images"],
                 "resources": state.get("ingestion_resources", {}),
             },
             "first_reads_ms": cold,
             "reads": {name: distribution(values) for name, values in observations.items()},
-            "report": {"seconds": round(report_seconds, 3), "pdf_bytes": len(pdf), "sha256_verified": True},
+            "report": {
+                "samples": len(report_times),
+                "latencies": distribution(report_times),
+                "pdf_bytes_min": min(report_bytes),
+                "pdf_bytes_max": max(report_bytes),
+                "sha256_verified": True,
+                "formats_per_report": 5,
+            },
             "resources": resources,
             "tls_fixture_and_driver": {
                 "peak_rss_kib": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
