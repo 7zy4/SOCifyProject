@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify, request
 
 from .attack import _metadata
 from .autopsy_api import records_for_case
-from .autopsy_ingestion import log_query
+from .autopsy_ingestion import log_query, metadata_scope
 from .autopsy_pipeline import case_full_access
 from .cases import _case_row, annotate_technique
 from .db import get_db
@@ -28,17 +28,17 @@ def case_timeline(case_id: int):
         where, args = log_query(case_id)
     except ValueError as exc:
         return error_response("INVALID_TIMELINE_FILTER", str(exc), 422)
-    total = get_db().execute(f"SELECT COUNT(*) FROM case_events ce JOIN security_events e ON e.id = ce.event_id WHERE {where}", args).fetchone()[0]
+    source, where, total, relation = metadata_scope(where, args)
     rows = (
         get_db()
         .execute(
-            f"SELECT e.id, e.title, e.event_time, e.ingested_at, e.source, e.event_type, e.severity, e.provenance, e.normalized_fields FROM case_events ce JOIN security_events e ON e.id = ce.event_id WHERE {where} ORDER BY ce.time_known DESC, ce.event_time, ce.event_id LIMIT ? OFFSET ?",
-            (*args, limit, (page - 1) * limit),
+            f"WITH page AS MATERIALIZED (SELECT ce.event_id,ce.time_known,ce.event_time FROM {source} WHERE {where} ORDER BY ce.time_known DESC,ce.event_time,ce.event_id LIMIT ? OFFSET ?) SELECT e.id,e.title,e.event_time,e.ingested_at,e.source,e.event_type,e.severity,e.provenance,e.normalized_fields FROM page JOIN security_events e ON e.id=page.event_id ORDER BY page.time_known DESC,page.event_time,page.event_id",
+            (*args, limit + 1, (page - 1) * limit),
         )
         .fetchall()
     )
     items = []
-    for row in rows:
+    for row in rows[:limit]:
         normalized, provenance = json.loads(row["normalized_fields"] or "{}"), json.loads(row["provenance"] or "{}")
         known = normalized.get("event_time_known") is True
         items.append(
@@ -53,6 +53,8 @@ def case_timeline(case_id: int):
         {
             "items": items,
             "total": total,
+            "total_relation": relation,
+            "has_next": len(rows) > limit,
             "page": page,
             "limit": limit,
             "annotations": records_for_case(case_id, "timeline", 100) if case_full_access(case_id) else [],

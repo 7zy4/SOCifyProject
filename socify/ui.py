@@ -38,6 +38,7 @@ def test_redirect():
 @ui.get("/team")
 @ui.get("/cases")
 @ui.get("/my-tasks")
+@ui.get("/analysis-library")
 @ui.get("/cases/<int:case_id>")
 @login_required
 def dashboard(case_id: int | None = None):
@@ -49,7 +50,7 @@ def dashboard(case_id: int | None = None):
             return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
         if request.path in {"/lab", "/scores"}:
             return error_response("FEATURE_RETIRED", "وظائف التدريب متقاعدة في النسخة التشغيلية", 410)
-        if request.path not in {"/cases", "/my-tasks", "/team", "/profile", "/playbooks", "/audit", "/admin"} and case_id is None:
+        if request.path not in {"/cases", "/my-tasks", "/team", "/profile", "/playbooks", "/analysis-library", "/audit", "/admin"} and case_id is None:
             return redirect("/cases")
         return render_template(
             "app.html",

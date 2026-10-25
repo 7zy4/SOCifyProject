@@ -5,6 +5,7 @@ import json
 import re
 import sqlite3
 import stat
+import struct
 import uuid
 import zipfile
 from typing import Any
@@ -17,6 +18,7 @@ from .autopsy_domain import canonical, custody, text_value
 from .cases import _case_row, _reference
 from .db import get_db, inserted_id, transaction
 from .ingestion import _job_content
+from .request_limits import StructureLimitError, validate_json_structure
 from .security import actor_id, cipher, current_user, decrypt_secret, encrypt_secret, error_response, has_permission, require_permission, workspace_id
 from .timeutils import iso_now
 
@@ -210,15 +212,17 @@ def decode_json(content):
         value = json.loads(
             content, object_pairs_hook=object_pairs, parse_constant=lambda value: (_ for _ in ()).throw(ValueError("JSON numeric constant is invalid"))
         )
+        validate_json_structure(value, max_nodes=MAX_ROWS * 100)
         canonical(value).encode()
         return value
-    except (UnicodeError, RecursionError, json.JSONDecodeError) as exc:
+    except (UnicodeError, RecursionError, json.JSONDecodeError, StructureLimitError) as exc:
         raise ValueError("JSON الحزمة غير صالح") from exc
 
 
 def inspect_capsule(content):
     if not content or len(content) > MAX_ARCHIVE:
         raise ValueError("حجم الحزمة خارج النطاق")
+    preflight_directory(content)
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as archive:
             entries = archive.infolist()
@@ -318,6 +322,12 @@ def inspect_capsule(content):
     for row in data["tables"]["autopsy_records"]:
         if not isinstance(row.get("kind"), str) or not isinstance(decode_json(row.get("payload")), dict):
             raise ValueError("مخطط إفادة الحزمة غير صالح")
+    for row in data["revisions"]:
+        if not isinstance(decode_json(row.get("payload")), dict):
+            raise ValueError("مخطط إصدار الإفادة غير صالح")
+    for row in data["tables"]["case_evidence"]:
+        if not isinstance(row.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", row["sha256"]):
+            raise ValueError("بصمة الدليل غير صالحة")
     for row in data["events"]:
         for key, expected in (("normalized_fields", dict), ("tags", list), ("mitre_ids", list)):
             if not isinstance(decode_json(row.get(key, "{}" if expected is dict else "[]")), expected):
@@ -330,7 +340,9 @@ def inspect_capsule(content):
     if manifest["profile"] == "team" and (
         any(row.get("visibility") == "private" for row in data["tables"]["case_notes"])
         or any(decode_json(row["payload"]).get("visibility") == "private" for row in data["tables"]["autopsy_records"])
-        or any(path.startswith("samples/") for path in files)
+        or any(decode_json(row.get("payload")).get("visibility") == "private" for row in data["revisions"])
+        or any("payload" in row for row in data["tables"]["autopsy_reports"])
+        or any(path.startswith(("samples/", "reports/", "legacy_reports/")) for path in files)
     ):
         raise ValueError("سياسة مشاركة الحزمة لا تطابق محتواها")
     event_ids = {row["id"] for row in data["events"]}
@@ -340,6 +352,33 @@ def inspect_capsule(content):
         if f"originals/{row['id']}.bin" not in files and row.get("raw_size", 0):
             raise ValueError("أصل استيراد مفقود")
     return manifest, data, files
+
+
+def preflight_directory(content):
+    if len(content) < 22:
+        raise ValueError("فهرس ZIP مفقود")
+    signature, disk, directory_disk, disk_count, total, size, offset, comment = struct.unpack_from("<4s4H2IH", content, len(content) - 22)
+    if (
+        signature != b"PK\x05\x06"
+        or disk
+        or directory_disk
+        or disk_count != total
+        or not 2 <= total <= MAX_FILES
+        or comment
+        or offset + size != len(content) - 22
+    ):
+        raise ValueError("تتطلب الحزمة فهرس ZIP32 واحدًا محدودًا بلا تعليق ختامي")
+    cursor, count = offset, 0
+    while cursor < offset + size:
+        count += 1
+        if count > MAX_FILES or cursor + 46 > offset + size or content[cursor : cursor + 4] != b"PK\x01\x02":
+            raise ValueError("فهرس ZIP يتجاوز حدود الملفات أو يحتوي بيانات تالفة")
+        name_size, extra_size, comment_size = struct.unpack_from("<3H", content, cursor + 28)
+        cursor += 46 + name_size + extra_size + comment_size
+        if not 1 <= name_size <= 200 or cursor > offset + size:
+            raise ValueError("سجل فهرس ZIP خارج الحدود")
+    if cursor != offset + size or count != total:
+        raise ValueError("عدد ملفات فهرس ZIP غير متطابق")
 
 
 def insert_values(table, values):

@@ -27,6 +27,7 @@ from .ingestion import ingestion_api
 from .operational import operational_mode
 from .platform import platform_api
 from .playbooks import playbooks_api
+from .request_limits import BoundedRequest, StructureLimitError
 from .schema import ensure_schema
 from .scoring import scoring_api
 from .security import correlation_id, error_response
@@ -40,6 +41,7 @@ from .visualization import visualization_api
 def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     root = Path(__file__).parent.parent
     app = Flask(__name__, template_folder=str(root / "templates"), static_folder=str(root / "static"))
+    app.request_class = BoundedRequest
     app.config.update(build_config())
     if test_config:
         app.config.update(test_config)
@@ -165,6 +167,11 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.errorhandler(OverflowError)
     def number_out_of_range(_: OverflowError):
         return error_response("NUMBER_OUT_OF_RANGE", "قيمة رقمية تتجاوز النطاق المسموح", 422)
+
+    @app.errorhandler(RecursionError)
+    @app.errorhandler(StructureLimitError)
+    def structure_too_deep(_: Exception):
+        return error_response("STRUCTURE_LIMIT_EXCEEDED", "عمق البيانات أو عدد عناصرها يتجاوز الحد المسموح", 422)
 
     @app.errorhandler(500)
     def internal_error(error: Exception):

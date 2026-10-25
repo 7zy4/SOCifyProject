@@ -26,6 +26,7 @@ const titles = {
   audit: ["سجل التدقيق", "IMMUTABLE ACTIVITY"],
   admin: ["إدارة المنصة", "ROLE GOVERNANCE"],
   profile: ["الملف والأمان", "ACCOUNT SECURITY"],
+  "analysis-library": ["مكتبة التحليل المحلي", "OFFLINE ANALYSIS"],
   team: ["الفريق والمهام", "TEAM OPERATIONS"]
 };
 

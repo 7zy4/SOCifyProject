@@ -15,7 +15,7 @@
 </head>
 <body class="app-shell{{ ' autopsy-shell' if operational else '' }}">
   <a class="skip-link" href="#workspace">انتقل إلى مساحة العمل</a>
-  {% if operational %}<script src="{{ url_for('static', filename='autopsy_team.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_investigation.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_profile.js') }}" defer></script>{% endif %}
+  {% if operational %}<script src="{{ url_for('static', filename='autopsy_team.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_investigation.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_profile.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_operations.js') }}" defer></script>{% endif %}
   <aside class="sidebar" aria-label="تنقل المنصة">
     <a class="brand" href="{{ '/cases' if operational else '/dashboard' }}"><span class="brand-mark" aria-hidden="true">S</span><span dir="ltr">{{ product_name }}</span></a>
     <nav id="primary-nav">
@@ -24,6 +24,7 @@
       <a data-section="my-tasks" href="/my-tasks">مهامي</a>
       <a data-section="team" href="/team">الفريق</a>
       <a data-section="playbooks" href="/playbooks">كتيبات الاستجابة</a>
+      <a data-section="analysis-library" href="/analysis-library">مكتبة التحليل المحلي</a>
       {% else %}
       <a data-section="dashboard" href="/dashboard"><span aria-hidden="true">⌂</span>نظرة عامة</a>
       <a data-section="events" href="/events"><span aria-hidden="true">≋</span>مستكشف السجلات</a>

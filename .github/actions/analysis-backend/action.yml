@@ -1,0 +1,22 @@
+name: Isolated synthetic analysis backend
+description: Build and start a credential-free analysis container for automated acceptance tests
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: docker build --target analysis --tag socify-ci-analysis .
+    - shell: bash
+      run: |
+        analysis_ipc_dir="${RUNNER_TEMP}/socify-analysis-ipc"
+        install -d -m 2770 "$analysis_ipc_dir"
+        docker run --detach --init --name socify-ci-analysis --network none --read-only --cap-drop ALL --security-opt no-new-privileges --group-add "$(id -g)" --memory 2g --pids-limit 32 --tmpfs /tmp:size=128m,noexec,nosuid,nodev --mount "type=bind,source=${analysis_ipc_dir},target=/analysis-ipc" socify-ci-analysis
+        for attempt in $(seq 1 30); do
+          if test -S "${analysis_ipc_dir}/analysis.sock" && test -f "${analysis_ipc_dir}/analysis.lock"; then
+            chmod 555 "$analysis_ipc_dir"
+            echo "SOCIFY_ANALYSIS_SOCKET=${analysis_ipc_dir}/analysis.sock" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          sleep 1
+        done
+        docker logs socify-ci-analysis
+        exit 1

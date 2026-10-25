@@ -53,12 +53,25 @@ function autopsyForm(schema, submit, initial = {}) {
     if (spec.whys) {
       const rows = node("div");
       const add = (value = {}) => {
+        const identifier = value.id || `why-${crypto.randomUUID()}`;
         const question = node("input", { value: value.question || "لماذا حدث ذلك؟", required: true, maxlength: 500 });
         const answer = node("textarea", { required: true, maxlength: 2000 }, value.answer || "");
-        const row = node("fieldset", { class: "why-step" }, [node("legend", { text: "سبب مرتبط بدليل أو فرضية معلنة" }), field("السؤال", question), field("الإجابة", answer)]);
-        row.autopsyValue = () => ({ question: question.value, answer: answer.value });
-        row.append(button("حذف الخطوة", () => row.remove()));
+        const assessment = autopsySelect("why_assessment", ["unverified", "hypothesis", "supported", "refuted"], value.assessment || (value.evidence_id ? "supported" : "unverified"));
+        const evidence = autopsyChoice("evidence_id", (autopsy.current?.evidence || []).map((item) => ({ value: item.id, label: `${item.title} · ${item.id}` })), value.evidence_id);
+        const parent = node("select", { name: "why_parent" });
+        const row = node("fieldset", { class: "why-step" }, [node("legend", { text: "سبب مرتبط بدليل أو فرضية معلنة" }), field("السؤال", question), field("الإجابة", answer), field("التقييم", assessment), field("الدليل", evidence.control), field("السبب السابق في الشجرة", parent)]);
+        row.whyId = identifier;
+        row.whyParent = parent;
+        const refresh = () => [...rows.children].forEach((item) => {
+          const selected = item.whyParent.value || item.whyInitialParent || "";
+          item.whyParent.replaceChildren(node("option", { value: "", text: "جذر مستقل" }), ...[...rows.children].filter((other) => other !== item).map((other, index) => node("option", { value: other.whyId, text: `السبب ${index + 1} · ${other.whyId}`, selected: other.whyId === selected })));
+        });
+        row.whyInitialParent = value.parent_id;
+        parent.addEventListener("change", () => { row.whyInitialParent = parent.value; });
+        row.autopsyValue = () => ({ id: identifier, question: question.value, answer: answer.value, assessment: assessment.value, ...(parent.value ? { parent_id: parent.value } : {}), ...(evidence.input.autopsyValue() ? { evidence_id: evidence.input.autopsyValue() } : {}) });
+        row.append(button("حذف الخطوة", () => { row.remove(); refresh(); }));
         rows.append(row);
+        refresh();
       };
       (initial[key] || []).forEach(add);
       control = node("fieldset", { class: "span-2" }, [node("legend", { text: autopsyLabel(key) }), rows, button("إضافة سؤال لماذا", () => { if (rows.children.length < 10) add(); })]);
@@ -67,7 +80,7 @@ function autopsyForm(schema, submit, initial = {}) {
       continue;
     }
     let choices = spec.choices;
-    if (spec.user) choices = autopsy.team.members.filter((member) => member.is_active).map((member) => ({ value: member.id, label: `${member.name} · ${autopsyLabel(member.role)}` }));
+    if (spec.user) choices = autopsy.team.members.filter((member) => member.is_active && (!(spec.case_member || key === "owner_id") || ["admin", "soc_manager"].includes(member.role) || autopsy.current?.members.some((item) => item.user_id === member.id))).map((member) => ({ value: member.id, label: `${member.name} · ${autopsyLabel(member.role)}` }));
     if (spec.evidence) choices = (autopsy.current?.evidence || []).map((evidence) => ({ value: evidence.id, label: `${evidence.title} · ${evidence.id}` }));
     if (spec.asset) choices = (autopsy.assets || []).map((record) => ({ value: record.id, label: `${record.payload.name} · ${record.id}` }));
     if (choices) {
@@ -134,17 +147,27 @@ function autopsyRecordCard(record) {
   const values = node("dl");
   Object.entries(record.payload).forEach(([key, value]) => {
     if (value === null || value === "") return;
-    let display = Array.isArray(value) ? value.map((item) => typeof item === "object" ? `${item.question || ""}: ${item.answer || ""}` : item).join("\n") : typeof value === "object" ? JSON.stringify(value) : autopsyLabel(value);
+    let display = Array.isArray(value) ? value.map((item) => typeof item === "object" && item !== null ? (item.question ? `${item.question}: ${item.answer || ""} · ${item.assessment || ""}${item.evidence_id ? ` · دليل ${item.evidence_id}` : ""}${item.parent_id ? ` · فرع ${item.parent_id}` : ""}` : JSON.stringify(item)) : item).join("\n") : typeof value === "object" ? JSON.stringify(value) : autopsyLabel(value);
     if (key.endsWith("_at") || key === "event_time") display = formatTime(value);
     values.append(node("dt", { text: autopsyLabel(key) }), node("dd", { text: display }));
   });
   const card = node("article", { class: "card record-card" }, [node("h3", { text: record.payload.title || record.payload.name || autopsyLabel(record.kind) }), values, node("small", { text: `الإصدار ${record.version} · ${formatTime(record.updated_at)}` })]);
   if (autopsy.current.can_update && autopsy.catalog.record_schemas[record.kind]) card.append(button("تعديل", () => autopsyEditRecord(record.kind, record)));
+  if (record.kind === "analysis" && record.payload.analysis_type === "local_detection" && record.payload.next_after_id && autopsy.current.can_update && autopsy.current.status !== "closed") card.append(autopsyAction("استكمال فحص الدفعة التالية", async () => { await api(`/api/cases/${autopsy.current.id}/detection`, { method: "POST", body: { version: autopsy.current.version, mode: record.payload.mode, after_id: record.payload.next_after_id } }); await autopsyCase(autopsy.current.id); }));
   return card;
 }
 
 async function autopsyEditRecord(kind, record = null) {
   const schema = { ...autopsy.catalog.record_schemas[kind], evidence_id: { evidence: true } };
+  if (kind === "corrective") {
+    let causes = (await api(`/api/cases/${autopsy.current.id}/records?kind=root_cause&limit=100`)).items;
+    if (record?.payload.root_cause_id && !causes.some((item) => item.id === record.payload.root_cause_id)) {
+      const selected = (await api(`/api/cases/${autopsy.current.id}/records?kind=root_cause&limit=1&before=${record.payload.root_cause_id + 1}`)).items;
+      if (selected[0]?.id === record.payload.root_cause_id) causes = [...causes, selected[0]];
+    }
+    schema.root_cause_id = { choices: causes.map((item) => ({ value: item.id, label: `${item.id} · ${item.payload.conclusion.slice(0, 80)}` })) };
+    schema.why_id = { choices: causes.flatMap((item) => (item.payload.whys || []).map((why) => ({ value: why.id, label: `${item.id} · ${why.question.slice(0, 80)} · ${why.id}` }))) };
+  }
   let dialog;
   const form = autopsyForm(schema, async (payload) => {
     await api(`/api/cases/${autopsy.current.id}/records/${record ? record.id : kind}`, { method: record ? "PATCH" : "POST", body: record ? { version: record.version, payload } : payload });
@@ -157,7 +180,7 @@ async function autopsyEditRecord(kind, record = null) {
 async function autopsyRecordPanel(kind) {
   const data = await api(`/api/cases/${autopsy.current.id}/records?kind=${kind}&limit=100`);
   const content = data.items.length ? node("div", { class: "record-grid" }, data.items.map(autopsyRecordCard)) : emptyState("لا سجلات بعد", "أضف نتيجة موثقة من أدلة القضية، وميّز الحقائق عن الفرضيات.");
-  return panel(autopsyLabel(kind), node("div", { class: "panel-body" }, [autopsy.current.can_update ? button(`إضافة ${autopsyLabel(kind)}`, () => autopsyEditRecord(kind), "primary") : null, content]), true);
+  return panel(autopsyLabel(kind), node("div", { class: "panel-body" }, [autopsy.current.can_update ? button(`إضافة ${autopsyLabel(kind)}`, () => autopsyEditRecord(kind).catch(handleError), "primary") : null, content]), true);
 }
 
 async function autopsyCase(caseId) {
@@ -197,18 +220,21 @@ async function autopsyCase(caseId) {
   } else if (selected === "analysis") {
     for (const kind of ["asset", "indicator", "hypothesis", "foothold"]) content.append(await autopsyRecordPanel(kind));
     if (window.SOCifyAutopsy.analysis) content.append(await window.SOCifyAutopsy.analysis(caseId));
+    if (window.SOCifyAutopsy.localDetection) content.append(await window.SOCifyAutopsy.localDetection(caseId));
   } else if (selected === "investigation") {
     if (window.SOCifyAutopsy.investigation) content.append(await window.SOCifyAutopsy.investigation(caseId));
     for (const kind of ["timeline", "root_cause", "war_room"]) content.append(await autopsyRecordPanel(kind));
   } else if (selected === "response") {
     for (const kind of ["escalation", "response", "corrective"]) content.append(await autopsyRecordPanel(kind));
     if (window.SOCifyAutopsy.procedures) content.append(await window.SOCifyAutopsy.procedures(caseId));
+    if (window.SOCifyAutopsy.workflow) content.append(await window.SOCifyAutopsy.workflow(caseId));
   } else if (selected === "reports" && window.SOCifyAutopsy.reports) content.append(await window.SOCifyAutopsy.reports(caseId));
   else {
     const data = await api(`/api/cases/${caseId}/custody`);
     content.append(panel("سلسلة حيازة الأدلة", node("div", { class: "panel-body" }, [node("p", { text: `${data.integrity_valid ? "سلسلة البصمات متسقة" : "تحذير: عدم اتساق في السلسلة"} · ${data.total} حركة` }), table([{ label: "الإجراء", value: "action" }, { label: "الوقت", value: (row) => formatTime(row.created_at) }, { label: "بصمة الحركة", value: (row) => node("bdi", { text: row.entry_hash }) }], data.items)]), true));
     content.append(panel("نشاط القضية", table([{ label: "الحدث", value: "action" }, { label: "الفاعل", value: "actor_name" }, { label: "الوقت", value: (row) => formatTime(row.created_at) }], current.history), true));
   }
+  if (!restricted && selected === "reports" && window.SOCifyAutopsy.capsules) content.append(await window.SOCifyAutopsy.capsules(caseId));
   if (!restricted && window.SOCifyAutopsy.reports && !tabs.some(([id]) => id === "reports")) root.querySelector(".case-tabs").append(linkedButton("التقارير والمراجعة", `/cases/${caseId}?tab=reports`));
   root.append(content);
   finish(root);
@@ -219,6 +245,7 @@ async function autopsyStart() {
   const caseId = document.querySelector('meta[name="case-id"]')?.content;
   if (caseId) return autopsyCase(Number(caseId));
   if (state.section === "profile" && window.SOCifyAutopsy.profile) return window.SOCifyAutopsy.profile();
+  if (state.section === "analysis-library" && window.SOCifyAutopsy.library) return window.SOCifyAutopsy.library();
   if (state.section === "playbooks" && window.SOCifyAutopsy.procedureLibrary) return window.SOCifyAutopsy.procedureLibrary();
   if (state.section === "team") return window.SOCifyAutopsy.team();
   if (state.section === "my-tasks") {

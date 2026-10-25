@@ -3,7 +3,7 @@ import re
 import secrets
 import sqlite3
 from datetime import timedelta
-from typing import Any
+from typing import Any, TypeGuard
 
 import bcrypt
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, session, url_for
@@ -33,6 +33,13 @@ def _active_user() -> dict[str, Any]:
     if user is None:
         raise PermissionError("authentication required")
     return user
+
+
+def _bounded_utf8(value: object, maximum: int) -> TypeGuard[str]:
+    try:
+        return isinstance(value, str) and len(value.encode()) <= maximum
+    except UnicodeError:
+        return False
 
 
 def _payload() -> dict[str, Any]:
@@ -135,7 +142,7 @@ def _login_response(data: dict[str, Any]):
     email = data.get("email")
     password = data.get("password")
     ip_address = request.remote_addr or "unknown"
-    if not isinstance(email, str) or not isinstance(password, str) or not email.strip() or not password or len(password.encode()) > 72:
+    if not _bounded_utf8(email, 320) or not isinstance(email, str) or not _bounded_utf8(password, 72) or not email.strip() or not password:
         return error_response("INVALID_CREDENTIALS", "بيانات الدخول غير صحيحة", 401)
     normalized_email = email.strip().lower()
     if _rate_limited(normalized_email, ip_address):
@@ -385,7 +392,7 @@ def change_password():
     current = data.get("current_password")
     new = data.get("new_password")
     problem = password_error(new)
-    if not isinstance(current, str) or len(current.encode()) > 72 or problem:
+    if not _bounded_utf8(current, 72) or problem:
         return error_response("INVALID_PASSWORD_CHANGE", problem or "كلمة المرور الحالية مطلوبة", 422)
     user = get_db().execute("SELECT password_hash FROM users WHERE id = ? AND is_active = 1", (actor_id(),)).fetchone()
     if not user or not bcrypt.checkpw(current.encode(), user["password_hash"].encode()):
@@ -494,13 +501,7 @@ def mfa_disable():
     password = data.get("current_password")
     code = data.get("code")
     user = get_db().execute("SELECT password_hash FROM users WHERE id = ?", (actor_id(),)).fetchone()
-    if (
-        not isinstance(password, str)
-        or len(password.encode()) > 72
-        or not user
-        or not bcrypt.checkpw(password.encode(), user["password_hash"].encode())
-        or not _mfa_valid(actor_id(), code)
-    ):
+    if not _bounded_utf8(password, 72) or not user or not bcrypt.checkpw(password.encode(), user["password_hash"].encode()) or not _mfa_valid(actor_id(), code):
         return error_response("REAUTHENTICATION_FAILED", "يلزم التحقق من كلمة المرور ورمز المصادقة", 403)
     with transaction():
         get_db().execute("DELETE FROM mfa_backup_codes WHERE user_id = ?", (actor_id(),))

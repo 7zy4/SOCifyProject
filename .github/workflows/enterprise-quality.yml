@@ -25,11 +25,14 @@ jobs:
       - run: python -m mypy socify scripts app.py create_db.py init_db.py run.py
       - run: python -m scripts.generate_openapi
       - run: git diff --exit-code docs/api/openapi.yaml
+      - uses: ./.github/actions/analysis-backend
       - run: python -m pytest -q --cov=socify --cov-branch --cov-report=xml --cov-fail-under=90
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: coverage
           path: coverage.xml
+      - if: always()
+        run: docker rm --force socify-ci-analysis
   security:
     runs-on: ubuntu-latest
     steps:
@@ -67,7 +70,10 @@ jobs:
       - run: python -m pip install -r requirements.txt -r requirements-dev.txt
       - run: python -m playwright install --with-deps chromium
       - run: npm install --no-save --ignore-scripts axe-core@4.14.0
+      - uses: ./.github/actions/analysis-backend
       - run: python -m pytest -m e2e tests/e2e
+      - if: always()
+        run: docker rm --force socify-ci-analysis
   container:
     runs-on: ubuntu-latest
     steps:
@@ -77,6 +83,7 @@ jobs:
       - run: docker compose exec -T -e SOCIFY_CONTAINER_ACCEPTANCE=synthetic socify python - < tests/container/verify_autopsy.py
       - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp autopsy-worker
       - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp import-worker
+      - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp analysis
       - if: always()
         run: docker compose logs
       - if: always()
@@ -91,7 +98,15 @@ jobs:
           cache: pip
       - run: python -m pip install -r requirements.txt
       - run: python -m scripts.benchmark_reference
+      - uses: ./.github/actions/analysis-backend
+      - run: python -m scripts.benchmark_autopsy --events 1000000 --concurrency 20 --requests 100 --output artifacts/performance-autopsy.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: performance-reference
           path: artifacts/performance-reference.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: performance-autopsy
+          path: artifacts/performance-autopsy.json
+      - if: always()
+        run: docker rm --force socify-ci-analysis

@@ -167,6 +167,7 @@ def test_sigma_publication_fixture_proof_backfill_and_alert_review(autopsy_case,
     assert len(alerts) == 1
     assert alerts[0]["evidence"]["event_ids"]
     assert alerts[0]["historical_derivation"] is False
+    assert alerts[0]["review"]["group"].startswith("auto-")
     patch = {
         "version": 0,
         "verdict": "false_positive",
@@ -181,6 +182,8 @@ def test_sigma_publication_fixture_proof_backfill_and_alert_review(autopsy_case,
     visible = client.get(base + "/alerts").json["items"][0]
     assert visible["suppressed"] and visible["review"]["attack_outcome"] == "blocked"
     assert visible["review"]["verdict"] == "false_positive"
+    assert client.patch(path, json={**patch, "version": 1, "group": "", "suppressed_until": None}).status_code == 200
+    assert client.get(base + "/alerts").json["items"][0]["review"]["group"] == ""
     assert client.get(base + "/custody").json["integrity_valid"] is True
     with pytest.raises(sqlite3.IntegrityError, match="immutable"):
         database.execute("DELETE FROM autopsy_sigma_sources")
@@ -244,5 +247,6 @@ def test_anomaly_reports_cold_start_and_evidenced_baseline(autopsy_case, app, cl
         record = database.execute("SELECT payload FROM autopsy_records WHERE id=?", (json.loads(job["result"])["record_id"],)).fetchone()
         payload = json.loads(record[0])
         assert payload["status"] == expected
+        assert len(payload["baseline_version"]) == 64
         if after:
             assert payload["baseline_events"] == 20 and len(payload["findings"]) == 1

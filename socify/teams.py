@@ -59,6 +59,10 @@ def team_detail():
     ]
     if not has_permission(current_user(), "cases.read"):
         assignments = []
+    if operational_mode():
+        from .autopsy_pipeline import job_visible
+
+        assignments = [assignment for assignment in assignments if job_visible(assignment["job_id"])]
     return jsonify({"members": members, "roles": roles, "assignments": assignments, "can_manage": manager()})
 
 
@@ -248,6 +252,11 @@ def update_assignment(assignment_id):
             return error_response("ASSIGNMENT_NOT_FOUND", "المهمة غير موجودة", 404)
         if operational_mode() and not case_visible(row["case_id"], current_user() or {}):
             return error_response("ASSIGNMENT_NOT_FOUND", "المهمة غير متاحة بعد سحب عضوية القضية", 404)
+        if operational_mode():
+            from .autopsy_pipeline import job_visible
+
+            if not job_visible(row["job_id"]):
+                return error_response("ASSIGNMENT_NOT_FOUND", "دفعة المهمة غير متاحة", 404)
         if row["case_status"] == "closed":
             return error_response("CASE_CLOSED", "المهمة مقفلة مع القضية", 409)
         get_db().execute(
@@ -344,6 +353,10 @@ def deactivate_member(user_id: int):
                     (target, case["id"], user_id),
                 )
                 custody(case["id"], "member_responsibilities_handed_off", {"from": user_id, "to": target, "reason": reason})
+                get_db().execute(
+                    "INSERT OR IGNORE INTO autopsy_batch_members(job_id,user_id) SELECT j.id,? FROM ingestion_jobs j JOIN autopsy_batch_access a ON a.job_id=j.id AND a.restricted=1 WHERE j.case_id=? AND (j.created_by=? OR EXISTS (SELECT 1 FROM autopsy_batch_members m WHERE m.job_id=j.id AND m.user_id=?))",
+                    (target, case["id"], user_id, user_id),
+                )
                 handoff_records(case["id"], user_id, target, reason)
             get_db().execute(
                 "UPDATE team_log_assignments SET assignee = ? WHERE workspace_id = ? AND assignee = ? AND state != 'completed'",

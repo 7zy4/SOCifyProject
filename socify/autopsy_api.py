@@ -89,11 +89,9 @@ def case_summary(case_id: int):
     if not result.get("full_case_access", True):
         from .autopsy_pipeline import visibility_sql
 
-        scope, args = visibility_sql()
+        scope, args = visibility_sql("ce")
         count = (
-            get_db()
-            .execute(f"SELECT COUNT(*) FROM security_events e WHERE e.owner_case_id = ? AND e.autopsy_active = 1 AND {scope}", (case_id, *args))
-            .fetchone()[0]
+            get_db().execute(f"SELECT COUNT(*) FROM case_events ce WHERE ce.case_id = ? AND ce.active_event = 1 AND {scope}", (case_id, *args)).fetchone()[0]
         )
         result.update(
             counts={"events": count, "evidence": 0, "tasks": 0, "records": 0},

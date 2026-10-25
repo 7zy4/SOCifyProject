@@ -7,6 +7,7 @@ instance/
 .ruff_cache/
 .mypy_cache/
 .coverage
+.coverage.*
 .coverage.json
 coverage.xml
 htmlcov/

@@ -15,10 +15,10 @@ def guard_batch_scope():
     if not case_id or not current_user():
         return None
     if not _case_row(case_id):
-        return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+        return None
     if case_full_access(case_id):
         return None
-    allowed = request.endpoint in {"autopsy.case_get", "cases.case_detail"} and request.method == "GET"
+    allowed = request.endpoint in {"autopsy.case_get", "cases.case_detail", "ui.dashboard"} and request.method == "GET"
     allowed = allowed or request.blueprint == "autopsy_ingestion"
     allowed = allowed or request.endpoint == "autopsy_investigation.case_timeline" and request.method == "GET"
     if not allowed:
@@ -114,7 +114,7 @@ def job_visible(job_id: int, user: dict | None = None) -> bool:
 
 
 def visibility_sql(alias: str = "e", user: dict | None = None) -> tuple[str, list[object]]:
-    if alias not in {"e", "security_events", "candidate", "event"}:
+    if alias not in {"e", "security_events", "candidate", "event", "ce"}:
         raise ValueError("Unknown event SQL alias")
     principal = user if user is not None else current_user()
     if not principal:

@@ -29,6 +29,10 @@ class PathRule(ctypes.Structure):
     _fields_ = [("allowed_access", ctypes.c_uint64), ("parent_fd", ctypes.c_int32)]
 
 
+class ArgumentComparison(ctypes.Structure):
+    _fields_ = [("argument", ctypes.c_uint), ("operation", ctypes.c_int), ("mask", ctypes.c_uint64), ("value", ctypes.c_uint64)]
+
+
 def _checked(value):
     if value < 0:
         number = ctypes.get_errno()
@@ -95,6 +99,8 @@ def restrict_syscalls() -> None:
     library.seccomp_syscall_resolve_name.restype = ctypes.c_int
     library.seccomp_rule_add.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_int, ctypes.c_uint]
     library.seccomp_rule_add.restype = ctypes.c_int
+    library.seccomp_rule_add_array.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_int, ctypes.c_uint, ctypes.POINTER(ArgumentComparison)]
+    library.seccomp_rule_add_array.restype = ctypes.c_int
     library.seccomp_load.argtypes = [ctypes.c_void_p]
     library.seccomp_load.restype = ctypes.c_int
     library.seccomp_release.argtypes = [ctypes.c_void_p]
@@ -122,8 +128,6 @@ def restrict_syscalls() -> None:
         "tgkill",
         "execve",
         "execveat",
-        "clone",
-        "clone3",
         "fork",
         "vfork",
         "unshare",
@@ -141,12 +145,51 @@ def restrict_syscalls() -> None:
         "keyctl",
         "add_key",
         "request_key",
+        "chmod",
+        "fchmod",
+        "fchmodat",
+        "fchmodat2",
+        "chown",
+        "fchown",
+        "fchownat",
+        "lchown",
+        "utime",
+        "utimes",
+        "futimesat",
+        "utimensat",
+        "mq_open",
+        "mq_unlink",
+        "mq_timedsend",
+        "mq_timedreceive",
+        "mq_notify",
+        "mq_getsetattr",
+        "shmget",
+        "shmat",
+        "shmdt",
+        "shmctl",
+        "semget",
+        "semop",
+        "semtimedop",
+        "semctl",
+        "msgget",
+        "msgsnd",
+        "msgrcv",
+        "msgctl",
     )
     try:
         for name in denied:
             identifier = library.seccomp_syscall_resolve_name(name.encode())
+            if identifier < 0 and name in {"fchmodat2", "io_uring_setup", "pidfd_getfd", "process_vm_readv", "process_vm_writev"}:
+                raise RuntimeError("libseccomp cannot resolve a required security boundary syscall")
             if identifier >= 0 and library.seccomp_rule_add(context, 0x00050000 | errno.EPERM, identifier, 0) != 0:
                 raise RuntimeError("Unable to install a required syscall rule")
+        clone = library.seccomp_syscall_resolve_name(b"clone")
+        comparison = ArgumentComparison(0, 7, 0x10000, 0)
+        if clone < 0 or library.seccomp_rule_add_array(context, 0x00050000 | errno.EPERM, clone, 1, ctypes.byref(comparison)) != 0:
+            raise RuntimeError("Unable to restrict process creation while allowing native font threads")
+        clone3 = library.seccomp_syscall_resolve_name(b"clone3")
+        if clone3 < 0 or library.seccomp_rule_add(context, 0x00050000 | errno.ENOSYS, clone3, 0) != 0:
+            raise RuntimeError("Unable to enforce legacy clone flag validation")
         if library.seccomp_load(context) != 0:
             raise RuntimeError("Unable to enforce seccomp filter")
     finally:
@@ -223,10 +266,25 @@ def main() -> int:
         return 1
 
 
-def probe(payload, boundary):
+def probe(payload, boundary, scratch_roots=None):
     import socket
 
     result = {"isolation": boundary, "environment_keys": sorted(os.environ), "denied": {}}
+    if payload.get("scratch_persistence_test") is True:
+        roots = scratch_roots or (Path(os.environ["SOCIFY_ANALYSIS_OUTPUT"]).parent, Path("/dev") / "shm", Path("/analysis-ipc"))
+        result["scratch_writes"] = {}
+        for root in roots:
+            path = Path(root) / "socify-isolation-marker"
+            try:
+                path.write_text("Synthetic isolation acceptance marker")
+                result["scratch_writes"][str(path)] = True
+            except PermissionError:
+                result["scratch_writes"][str(path)] = False
+        try:
+            os.chmod(roots[-1], 0o700)
+            result["denied"]["ipc_permission_change"] = False
+        except PermissionError:
+            result["denied"]["ipc_permission_change"] = True
     for name, path in payload["paths"].items():
         try:
             Path(path).read_bytes()
@@ -237,9 +295,14 @@ def probe(payload, boundary):
         ("network", lambda: socket.socket(socket.AF_INET, socket.SOCK_STREAM)),
         ("unix_socket", lambda: socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)),
         ("process_memory", lambda: os.open(f"/proc/{os.getppid()}/mem", os.O_RDONLY)),
+        ("parent_environment", lambda: os.open(f"/proc/{os.getppid()}/environ", os.O_RDONLY)),
     ):
         try:
-            action()
+            opened = action()
+            if isinstance(opened, int):
+                os.close(opened)
+            else:
+                opened.close()
             result["denied"][name] = False
         except PermissionError:
             result["denied"][name] = True

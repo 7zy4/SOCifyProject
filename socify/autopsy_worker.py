@@ -2,7 +2,7 @@ import hashlib
 import json
 import os
 import stat
-import subprocess
+import subprocess  # nosec B404
 import sysconfig
 import tempfile
 from datetime import timedelta
@@ -60,15 +60,16 @@ def compute_artifacts(payload, operation, formats, timeout, isolated_container=F
         if isolated_container:
             environment["SOCIFY_ISOLATED_ANALYSIS_CONTAINER"] = "1"
         try:
-            process = subprocess.run(
+            process = subprocess.run(  # nosec B603
                 ["/proc/self/exe", "-m", "socify.analysis_sandbox"],
                 input=encoded,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
                 timeout=timeout,
                 env=environment,
                 cwd=root,
                 check=False,
+                shell=False,
             )
         except subprocess.TimeoutExpired as exc:
             raise TimeoutError("Local analysis exceeded its time limit") from exc

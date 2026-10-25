@@ -198,7 +198,7 @@ def run_detection_job(job):
             baseline = (
                 get_db()
                 .execute(
-                    "SELECT source_ip,hostname FROM security_events WHERE owner_case_id=? AND autopsy_active=1 AND source!='rules_engine' AND id<? AND source_ip IS NOT NULL AND hostname IS NOT NULL ORDER BY id DESC LIMIT 10000",
+                    "SELECT id,source_ip,hostname FROM security_events WHERE owner_case_id=? AND autopsy_active=1 AND source!='rules_engine' AND id<? AND source_ip IS NOT NULL AND hostname IS NOT NULL ORDER BY id DESC LIMIT 10000",
                     (job["case_id"], batch[0]["id"]),
                 )
                 .fetchall()
@@ -227,6 +227,15 @@ def run_detection_job(job):
         "alert_ids": alerts,
         "findings": findings,
         "baseline_events": len(baseline),
+        "baseline_version": hashlib.sha256(canonical([dict(row) for row in baseline]).encode()).hexdigest(),
+        "baseline_scope": {
+            "case_version": parameters["case_version"],
+            "before_event_id": batch[0]["id"] if batch else None,
+            "limit": 10000,
+            "order": "id_desc",
+            "first_id": baseline[-1]["id"] if baseline else None,
+            "last_id": baseline[0]["id"] if baseline else None,
+        },
         "status": "insufficient_baseline" if parameters["mode"] == "anomaly" and len(baseline) < 20 else "evaluated",
         "limitations": "النطاق هو النسخ المشتقة الفعالة فقط. الشذوذ مقارنة بترتيب السجلات المستوردة وليس إثباتًا زمنيًا للهجوم أو حكمًا خبيثًا. نتائج الشذوذ محدودة بأول 100 finding؛ القواعد ضمن Sigma subset المعلن فقط.",
     }
@@ -254,8 +263,22 @@ def case_alerts(case_id):
     items = []
     for row in found:
         item = dict(row)
+        entity = (
+            get_db()
+            .execute(
+                "SELECT e.source_ip,e.hostname FROM alert_events ae JOIN security_events e ON e.id=ae.event_id WHERE ae.alert_id=? AND e.owner_case_id=? ORDER BY e.id LIMIT 1",
+                (row["id"], case_id),
+            )
+            .fetchone()
+        )
+        basis = {"rule_id": row["rule_id"], "rule_version": row["rule_version"], "first_evidence_entity": dict(entity) if entity else None}
+        automatic_group = "auto-" + hashlib.sha256(canonical(basis).encode()).hexdigest()[:20]
+        item["group_basis"] = basis
+        item["group_source"] = "manual_review" if row["review"] else "automatic_first_evidence_entity"
         item["review"] = (
-            json.loads(row["review"]) if row["review"] else {"verdict": "undetermined", "attack_outcome": "unknown", "group": "", "suppressed_until": None}
+            json.loads(row["review"])
+            if row["review"]
+            else {"verdict": "undetermined", "attack_outcome": "unknown", "group": automatic_group, "suppressed_until": None}
         )
         item["review_version"] = row["review_version"] or 0
         item["evidence"] = json.loads(row["evidence"] or "{}")

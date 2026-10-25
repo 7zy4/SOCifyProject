@@ -11,7 +11,7 @@ from .autopsy_domain import canonical, custody, normalize_indicator, text_value
 from .cases import _case_row
 from .db import get_db, inserted_id, transaction
 from .security import actor_id, error_response, require_permission, workspace_id
-from .timeutils import iso_now, iso_timestamp, parse_timestamp
+from .timeutils import iso_now, iso_timestamp, parse_timestamp, utc_now
 
 autopsy_intel_api = Blueprint("autopsy_intel", __name__)
 VERDICTS = {"unknown": 0, "benign": 1, "suspicious": 2, "malicious": 3}
@@ -253,7 +253,7 @@ def activate_bundle(bundle_id):
         row = get_db().execute("SELECT * FROM autopsy_intel_bundles WHERE id=? AND workspace_id=?", (bundle_id, workspace_id())).fetchone()
         if not row:
             return error_response("INTELLIGENCE_NOT_FOUND", "الحزمة غير متاحة", 404)
-        if row["expires_at"] <= iso_now() or hashlib.sha256(row["payload"].encode()).hexdigest() != row["sha256"]:
+        if parse_timestamp(row["expires_at"]) <= utc_now() or hashlib.sha256(row["payload"].encode()).hexdigest() != row["sha256"]:
             return error_response("INTELLIGENCE_INTEGRITY_OR_EXPIRY", "الحزمة منتهية أو بصمتها غير مطابقة", 409)
         get_db().execute(
             "INSERT INTO autopsy_intel_activation(workspace_id,name,bundle_id,activated_by,activated_at) VALUES (?,?,?,?,?) ON CONFLICT(workspace_id,name) DO UPDATE SET bundle_id=excluded.bundle_id,activated_by=excluded.activated_by,activated_at=excluded.activated_at",
@@ -263,7 +263,19 @@ def activate_bundle(bundle_id):
     return jsonify({"id": bundle_id, "active": True})
 
 
-def lookup_local(workspace, kind, raw):
+def intelligence_configuration(workspace):
+    rows = (
+        get_db()
+        .execute(
+            "SELECT b.id,b.sha256,b.expires_at FROM autopsy_intel_activation a JOIN autopsy_intel_bundles b ON b.id=a.bundle_id WHERE a.workspace_id=? AND julianday(b.expires_at)>julianday(?) ORDER BY b.id",
+            (workspace, iso_now()),
+        )
+        .fetchall()
+    )
+    return hashlib.sha256(canonical([dict(row) for row in rows]).encode()).hexdigest()
+
+
+def lookup_local(workspace, kind, raw, configuration=None):
     value = normalize_indicator(kind, raw)
     candidates = [(kind, value)]
     if kind == "ip":
@@ -274,7 +286,7 @@ def lookup_local(workspace, kind, raw):
     rows = (
         get_db()
         .execute(
-            f"SELECT e.*,b.name,b.version,b.source,b.license,b.expires_at,b.sha256 FROM autopsy_intel_entries e JOIN autopsy_intel_bundles b ON b.id=e.bundle_id JOIN autopsy_intel_activation a ON a.bundle_id=b.id WHERE b.workspace_id=? AND b.expires_at>? AND (e.valid_from IS NULL OR e.valid_from<=?) AND (e.valid_until IS NULL OR e.valid_until>?) AND (e.type,e.value) IN ({placeholders}) ORDER BY e.bundle_id DESC,e.id LIMIT 100",
+            f"SELECT e.*,b.name,b.version,b.source,b.license,b.expires_at,b.sha256 FROM autopsy_intel_entries e JOIN autopsy_intel_bundles b ON b.id=e.bundle_id JOIN autopsy_intel_activation a ON a.bundle_id=b.id WHERE b.workspace_id=? AND julianday(b.expires_at)>julianday(?) AND (e.valid_from IS NULL OR julianday(e.valid_from)<=julianday(?)) AND (e.valid_until IS NULL OR julianday(e.valid_until)>julianday(?)) AND (e.type,e.value) IN ({placeholders}) ORDER BY CASE e.verdict WHEN 'malicious' THEN 3 WHEN 'suspicious' THEN 2 WHEN 'benign' THEN 1 ELSE 0 END DESC,e.confidence DESC,e.id DESC LIMIT 101",
             (workspace, iso_now(), iso_now(), iso_now(), *args),
         )
         .fetchall()
@@ -282,12 +294,19 @@ def lookup_local(workspace, kind, raw):
     active = (
         get_db()
         .execute(
-            "SELECT COUNT(*) FROM autopsy_intel_activation a JOIN autopsy_intel_bundles b ON b.id=a.bundle_id WHERE a.workspace_id=? AND b.expires_at>?",
+            "SELECT COUNT(*) FROM autopsy_intel_activation a JOIN autopsy_intel_bundles b ON b.id=a.bundle_id WHERE a.workspace_id=? AND julianday(b.expires_at)>julianday(?)",
             (workspace, iso_now()),
         )
         .fetchone()[0]
     )
-    matches = [dict(row) for row in rows]
+    now = utc_now()
+    validity = get_db().execute(
+        f"SELECT e.valid_from,e.valid_until,b.expires_at FROM autopsy_intel_entries e JOIN autopsy_intel_bundles b ON b.id=e.bundle_id JOIN autopsy_intel_activation a ON a.bundle_id=b.id WHERE b.workspace_id=? AND julianday(b.expires_at)>julianday(?) AND (e.type,e.value) IN ({placeholders})",
+        (workspace, iso_now(), *args),
+    )
+    changes = [parse_timestamp(value) for row in validity for value in row if value is not None and parse_timestamp(value) > now]
+    refresh = min(changes).isoformat().replace("+00:00", "Z") if changes else None
+    matches = [dict(row) for row in rows[:100]]
     best = max(matches, key=lambda item: (VERDICTS[item["verdict"]], item["confidence"]), default=None)
     return {
         "type": kind,
@@ -296,8 +315,11 @@ def lookup_local(workspace, kind, raw):
         "verdict": best["verdict"] if best else "unknown",
         "confidence": best["confidence"] if best else None,
         "matches": matches,
+        "matches_truncated": len(rows) > 100,
+        "refresh_after": refresh,
         "checked_at": iso_now(),
         "network": "offline-only",
+        "configuration_sha256": configuration or intelligence_configuration(workspace),
         "limitations": "غياب نتيجة أو انتهاء الحزمة لا يثبت سلامة المؤشر؛ الثقة والموقع من المصدر المحلي المعلن",
     }
 
@@ -306,6 +328,7 @@ def enrich_imported_event(job, event_id):
     row = get_db().execute("SELECT source_ip,destination_ip,hostname,file_hash FROM security_events WHERE id=?", (event_id,)).fetchone()
     if not row:
         return
+    configuration = intelligence_configuration(job["workspace_id"])
     values = [("ip", row["source_ip"]), ("ip", row["destination_ip"]), ("domain", row["hostname"])]
     if row["file_hash"] and re.fullmatch(r"[0-9a-fA-F]{64}", row["file_hash"]):
         values.append(("sha256", row["file_hash"]))
@@ -316,11 +339,17 @@ def enrich_imported_event(job, event_id):
             value = normalize_indicator(kind, raw)
         except (ValueError, UnicodeError):
             continue
-        existing = get_db().execute("SELECT id FROM autopsy_observables WHERE case_id=? AND type=? AND value=?", (job["case_id"], kind, value)).fetchone()
+        existing = (
+            get_db().execute("SELECT id,enrichment FROM autopsy_observables WHERE case_id=? AND type=? AND value=?", (job["case_id"], kind, value)).fetchone()
+        )
         if existing:
             identifier = existing["id"]
+            cached = json.loads(existing["enrichment"])
+            if cached.get("configuration_sha256") != configuration or cached.get("refresh_after") and parse_timestamp(cached["refresh_after"]) <= utc_now():
+                result = lookup_local(job["workspace_id"], kind, value, configuration)
+                get_db().execute("UPDATE autopsy_observables SET enrichment=? WHERE id=?", (canonical(result), identifier))
         else:
-            result = lookup_local(job["workspace_id"], kind, value)
+            result = lookup_local(job["workspace_id"], kind, value, configuration)
             identifier = inserted_id(
                 get_db().execute(
                     "INSERT INTO autopsy_observables(case_id,type,value,first_event_id,enrichment) VALUES (?,?,?,?,?)",

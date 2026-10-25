@@ -33,9 +33,9 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
       }));
       timeline.append(content);
     }
-    const pages = node("div", { class: "action-row" }, node("p", { text: `${data.total} سجل · الصفحة ${page}` }));
+    const pages = node("div", { class: "action-row" }, node("p", { text: `${data.total_relation === "gte" ? "على الأقل " : ""}${data.total} سجل · الصفحة ${page}` }));
     if (page > 1) pages.append(button("السابق", () => load(page - 1).catch(handleError)));
-    if (page * 50 < data.total) pages.append(button("التالي", () => load(page + 1).catch(handleError)));
+    if (data.has_next ?? (page * 50 < data.total)) pages.append(button("التالي", () => load(page + 1).catch(handleError)));
     const views = node("div", { class: "action-row" });
     for (const view of data.views) views.append(button(view.payload.title, () => { query.value = view.payload.query || ""; severity.value = view.payload.severity || ""; start.value = localTime(view.payload.start); end.value = localTime(view.payload.end); load().catch(handleError); }));
     viewport.replaceChildren(views, timeline, pages);

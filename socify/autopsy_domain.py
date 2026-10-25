@@ -8,7 +8,8 @@ from urllib.parse import urlsplit
 from .audit import record_audit
 from .cases import _case_row
 from .db import get_db
-from .security import actor_id
+from .operational import case_visible
+from .security import actor_id, has_permission
 from .timeutils import iso_now, iso_timestamp, parse_timestamp
 
 ASSET_TYPES = [
@@ -292,6 +293,17 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
             step.get("id", f"why-{index}") == result["why_id"] for index, step in enumerate(json.loads(cause["payload"]).get("whys", []), 1)
         ):
             raise ValueError("فرع السبب المرتبط بالإجراء التصحيحي غير متاح")
+    if kind == "corrective":
+        principal = dict(get_db().execute("SELECT id,role,workspace_id FROM users WHERE id=?", (result["owner_id"],)).fetchone())
+        policy = (
+            get_db()
+            .execute("SELECT permissions FROM team_role_permissions WHERE workspace_id=? AND role=?", (case["workspace_id"], principal["role"]))
+            .fetchone()
+        )
+        if policy:
+            principal["role_permissions"] = json.loads(policy[0])
+        if not case_visible(case_id, principal) or not has_permission(principal, "cases.read") or not has_permission(principal, "cases.update"):
+            raise ValueError("مسؤول الإجراء يحتاج عضوية القضية وصلاحية قراءتها وتحديثها؛ أضفه عبر المدير قبل إسناد الإجراء")
     if (
         kind == "foothold"
         or kind == "hypothesis"

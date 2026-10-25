@@ -18,6 +18,8 @@ from .security import actor_id, current_user, error_response, has_permission, re
 from .timeutils import iso_now, iso_timestamp
 
 autopsy_ingestion_api = Blueprint("autopsy_ingestion", __name__)
+SEARCH_COUNT_LIMIT = 10000
+FTS_PREDICATE = "autopsy_log_search MATCH ?"
 
 
 def import_view(row):
@@ -190,7 +192,7 @@ def original_import(case_id: int, job_id: int):
 def log_query(case_id: int) -> tuple[str, list[Any]]:
     clauses = ["ce.case_id = ?"]
     args: list[Any] = [case_id]
-    scope, parameters = visibility_sql()
+    scope, parameters = visibility_sql("ce")
     clauses.append(scope)
     args.extend(parameters)
     selected_job = request.args.get("job_id")
@@ -209,7 +211,7 @@ def log_query(case_id: int) -> tuple[str, list[Any]]:
     if query:
         words = [word for word in re.findall(r"[\w.-]+", query) if any(char.isalnum() for char in word)][:20]
         if words:
-            clauses.append("e.id IN (SELECT rowid FROM autopsy_log_search WHERE autopsy_log_search MATCH ?)")
+            clauses.append(FTS_PREDICATE)
             args.append(" AND ".join('"' + word + '"' for word in words))
         else:
             clauses.append("0 = 1")
@@ -226,6 +228,21 @@ def log_query(case_id: int) -> tuple[str, list[Any]]:
     return " AND ".join(clauses), args
 
 
+def metadata_source(where):
+    return "case_events ce JOIN autopsy_log_search ON autopsy_log_search.rowid=ce.event_id" if FTS_PREDICATE in where else "case_events ce"
+
+
+def metadata_scope(where, args):
+    source = metadata_source(where)
+    if FTS_PREDICATE in where:
+        count = get_db().execute(f"SELECT COUNT(*) FROM (SELECT 1 FROM {source} WHERE {where} LIMIT ?)", (*args, SEARCH_COUNT_LIMIT + 1)).fetchone()[0]
+        if count > SEARCH_COUNT_LIMIT:
+            predicate = "EXISTS (SELECT 1 FROM autopsy_log_search WHERE autopsy_log_search.rowid=ce.event_id AND autopsy_log_search MATCH ?)"
+            return "case_events ce", where.replace(FTS_PREDICATE, predicate), SEARCH_COUNT_LIMIT, "gte"
+        return source, where, count, "eq"
+    return source, where, get_db().execute(f"SELECT COUNT(*) FROM {source} WHERE {where}", args).fetchone()[0], "eq"
+
+
 @autopsy_ingestion_api.get("/api/cases/<int:case_id>/logs")
 @require_permission("cases.read")
 def case_logs(case_id: int):
@@ -238,16 +255,25 @@ def case_logs(case_id: int):
         where, args = log_query(case_id)
     except ValueError as exc:
         return error_response("INVALID_LOG_FILTER", str(exc), 422)
-    total = get_db().execute(f"SELECT COUNT(*) FROM case_events ce JOIN security_events e ON e.id = ce.event_id WHERE {where}", args).fetchone()[0]
+    source, where, total, relation = metadata_scope(where, args)
     rows = (
         get_db()
         .execute(
-            f"SELECT e.* FROM case_events ce JOIN security_events e ON e.id = ce.event_id WHERE {where} ORDER BY ce.event_time, ce.event_id LIMIT ? OFFSET ?",
-            (*args, limit, (page - 1) * limit),
+            f"WITH page AS MATERIALIZED (SELECT ce.event_id,ce.event_time FROM {source} WHERE {where} ORDER BY ce.event_time,ce.event_id LIMIT ? OFFSET ?) SELECT e.* FROM page JOIN security_events e ON e.id=page.event_id ORDER BY page.event_time,page.event_id",
+            (*args, limit + 1, (page - 1) * limit),
         )
         .fetchall()
     )
-    return jsonify({"items": [_event_view(row) for row in rows], "total": total, "page": page, "limit": limit})
+    return jsonify(
+        {
+            "items": [_event_view(row) for row in rows[:limit]],
+            "total": total,
+            "total_relation": relation,
+            "has_next": len(rows) > limit,
+            "page": page,
+            "limit": limit,
+        }
+    )
 
 
 @autopsy_ingestion_api.get("/api/cases/<int:case_id>/logs/<int:event_id>")
@@ -334,7 +360,7 @@ def export_case_logs(case_id: int):
     identifiers = [
         row[0]
         for row in get_db()
-        .execute(f"SELECT e.id FROM case_events ce JOIN security_events e ON e.id = ce.event_id WHERE {where} ORDER BY e.event_time, e.id LIMIT 100001", args)
+        .execute(f"SELECT ce.event_id FROM {metadata_source(where)} WHERE {where} ORDER BY ce.event_time,ce.event_id LIMIT 100001", args)
         .fetchall()
     ]
     count = len(identifiers)
