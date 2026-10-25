@@ -228,6 +228,9 @@ def migrate(connection: sqlite3.Connection) -> None:
     from .autopsy_yara import migrate as migrate_yara
 
     migrate_yara(connection)
+    from .autopsy_chronology import migrate as migrate_chronology
+
+    migrate_chronology(connection)
     connection.execute(
         "INSERT INTO schema_meta(key, value, updated_at) VALUES ('autopsy_schema_version', '3', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at WHERE schema_meta.value != excluded.value",
         (iso_now(),),

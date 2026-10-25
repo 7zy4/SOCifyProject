@@ -9,6 +9,7 @@ from .attack import attack_api
 from .auth import auth_api
 from .autopsy_api import autopsy_api
 from .autopsy_capsules import autopsy_capsules_api
+from .autopsy_chronology import autopsy_chronology_api
 from .autopsy_detection import autopsy_detection_api
 from .autopsy_ingestion import autopsy_ingestion_api
 from .autopsy_intel import autopsy_intel_api
@@ -63,6 +64,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         autopsy_samples_api,
         autopsy_intel_api,
         autopsy_capsules_api,
+        autopsy_chronology_api,
         autopsy_detection_api,
         autopsy_workflow_api,
         autopsy_yara_api,

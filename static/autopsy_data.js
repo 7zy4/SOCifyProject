@@ -84,7 +84,7 @@ async function autopsyLogsPanel(caseId) {
       autopsyModal("حالة الأصل ومهمة المعالجة", content);
     } catch (error) { handleError(error); }
   }) }];
-  jobColumns.push({ label: "الإصدار المشتق", value: (job) => `${job.active_version ? "فعال" : "تاريخي"}${job.restricted ? " · وصول مقيد" : ""}` }, { label: "النطاق", value: (job) => linkedButton("سجلات هذه النسخة", `/cases/${caseId}?tab=logs&job_id=${job.id}`) });
+  jobColumns.push({ label: "الإصدار المشتق", value: (job) => `${job.active_version ? "فعال" : "تاريخي"}${job.restricted ? " · وصول مقيد" : ""}` }, { label: "النطاق", value: (job) => linkedButton("سجلات هذه النسخة", autopsyCaseURL(caseId, { tab: "logs", job_id: job.id, page: null })) });
   if (autopsy.current.can_manage) jobColumns.push({ label: "إدارة النسخة والدفعة", value: (job) => autopsyAction("إدارة الدفعة", async () => {
     const members = node("select", { multiple: true, "aria-label": "أعضاء الدفعة" }, autopsy.team.members.filter((member) => member.is_active).map((member) => node("option", { value: member.id, selected: job.batch_members?.includes(member.id), text: `${member.name} · ${autopsyLabel(member.role)}` })));
     const content = node("div");
@@ -93,11 +93,11 @@ async function autopsyLogsPanel(caseId) {
     if (!job.active_version && ["completed", "completed_with_errors"].includes(job.status) && job.accepted > 0) content.append(autopsyForm({ reason: { required: true, max: 1000 } }, async (body) => { await api(`/api/cases/${caseId}/imports/${job.id}/activate`, { method: "POST", body: { ...body, version: autopsy.current.version } }); await autopsyCase(caseId); }));
     autopsyModal("نطاق الدفعة وتفعيل النسخة؛ أعد فحص القواعد بعد التفعيل", content);
   }) });
-  if (selectedJob) root.append(node("p", { text: "تعرض سجلات نسخة محددة، وقد تكون تاريخية." }), linkedButton("عرض النسخ الفعالة", `/cases/${caseId}?tab=logs`));
+  if (selectedJob) root.append(node("p", { text: "تعرض سجلات نسخة محددة، وقد تكون تاريخية." }), linkedButton("عرض النسخ الفعالة", autopsyCaseURL(caseId, { tab: "logs", job_id: null, page: null })));
   root.append(panel("أصول الاستيراد والمعالجة", imports.items.length ? table(jobColumns, imports.items) : emptyState("لا استيرادات بعد", "الأصل وبصمته ومصدره محفوظة منفصلة عن السجلات المطبّعة."), true));
   const search = node("input", { type: "search", name: "q", value: query, maxlength: 200 });
   const form = node("form", { class: "filter-row", "aria-label": "بحث سجلات القضية" }, [field("عنوان أو عنوان شبكة أو مستخدم أو مضيف", search), node("button", { type: "submit", class: "button ghost", text: "بحث السجلات" })]);
-  form.addEventListener("submit", (event) => { event.preventDefault(); window.location.assign(`/cases/${caseId}?tab=logs&q=${encodeURIComponent(search.value)}`); });
+  form.addEventListener("submit", (event) => { event.preventDefault(); window.location.assign(autopsyCaseURL(caseId, { tab: "logs", q: search.value, page: null })); });
   const exports = node("div", { class: "action-row" });
   if (permission("cases.export")) for (const format of ["csv", "json", "jsonl"]) {
     exports.append(linkedButton(`${format.toUpperCase()} · بيانات وصفية محجوبة`, `/api/cases/${caseId}/logs/export?format=${format}&redacted=1&q=${encodeURIComponent(query)}${jobFilter}`));
@@ -105,8 +105,8 @@ async function autopsyLogsPanel(caseId) {
   }
   const columns = [{ label: "وقت الحدث", value: (row) => row.normalized_fields.event_time_known === false ? "غير متوفر؛ محفوظ وقت الإدخال" : formatTime(row.event_time) }, { label: "العنوان", value: "title" }, { label: "المصدر", value: "source" }, { label: "الخطورة", value: (row) => autopsyLabel(row.severity) }, { label: "فحص", value: (row) => button("تفاصيل السجل", async () => { try { const detail = await api(`/api/cases/${caseId}/logs/${row.id}`); autopsyModal("السجل الخام والمطبع", node("pre", { text: JSON.stringify(detail, null, 2) })); } catch (error) { handleError(error); } }) }];
   const tableContent = node("div", { class: "panel-body" }, [form, exports, node("p", { text: `${data.total_relation === "gte" ? "على الأقل " : ""}${data.total} سجل في نطاق البحث${data.total_relation === "gte" ? " · الحد الأدنى للعدد يحافظ على سرعة البحث؛ تستمر الصفحات التالية" : ""}` }), data.items.length ? table(columns, data.items) : emptyState("لا سجلات في النطاق", "أضف ملفًا أو غيّر مرشح البحث داخل القضية.")]);
-  if (page > 1) tableContent.append(linkedButton("السجلات السابقة", `/cases/${caseId}?tab=logs&q=${encodeURIComponent(query)}&page=${page - 1}${jobFilter}`));
-  if (data.has_next ?? (page * data.limit < data.total)) tableContent.append(linkedButton("السجلات التالية", `/cases/${caseId}?tab=logs&q=${encodeURIComponent(query)}&page=${page + 1}${jobFilter}`));
+  if (page > 1) tableContent.append(linkedButton("السجلات السابقة", autopsyCaseURL(caseId, { tab: "logs", page: page - 1 })));
+  if (data.has_next ?? (page * data.limit < data.total)) tableContent.append(linkedButton("السجلات التالية", autopsyCaseURL(caseId, { tab: "logs", page: page + 1 })));
   if (data.items.length && autopsy.current.can_update && autopsy.current.status !== "closed") {
     tableContent.append(autopsyForm({ event_id: { required: true, choices: data.items.map((item) => ({ value: item.id, label: `${item.title} · ${item.event_id}` })) } }, async (body) => {
       await api(`/api/cases/${caseId}/logs/${body.event_id}/exhibit`, { method: "POST", body: {} });

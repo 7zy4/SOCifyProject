@@ -7,6 +7,7 @@ from .autopsy_api import records_for_case
 from .autopsy_ingestion import log_query, metadata_scope
 from .autopsy_pipeline import case_full_access
 from .cases import _case_row, annotate_technique
+from .chronology_time import sql_utc_key
 from .db import get_db
 from .security import error_response, require_permission
 from .visualization import build_graph
@@ -32,7 +33,7 @@ def case_timeline(case_id: int):
     rows = (
         get_db()
         .execute(
-            f"WITH page AS MATERIALIZED (SELECT ce.event_id,ce.time_known,ce.event_time FROM {source} WHERE {where} ORDER BY ce.time_known DESC,ce.event_time,ce.event_id LIMIT ? OFFSET ?) SELECT e.id,e.title,e.event_time,e.ingested_at,e.source,e.event_type,e.severity,e.provenance,e.normalized_fields FROM page JOIN security_events e ON e.id=page.event_id ORDER BY page.time_known DESC,page.event_time,page.event_id",
+            f"WITH page AS MATERIALIZED (SELECT ce.event_id,ce.time_known,{sql_utc_key('ce.event_time')} AS ordered_time FROM {source} WHERE {where} ORDER BY ce.time_known DESC,{sql_utc_key('ce.event_time')},ce.event_id LIMIT ? OFFSET ?) SELECT e.id,e.title,e.event_time,e.ingested_at,e.source,e.event_type,e.severity,e.provenance,e.normalized_fields FROM page JOIN security_events e ON e.id=page.event_id ORDER BY page.time_known DESC,page.ordered_time,page.event_id",
             (*args, limit + 1, (page - 1) * limit),
         )
         .fetchall()

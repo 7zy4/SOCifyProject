@@ -1507,6 +1507,35 @@
         ]
       }
     },
+    "/api/cases/{case_id}/chronology": {
+      "get": {
+        "operationId": "autopsy_chronology_case_chronology_get__api_cases_case_id_chronology",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
     "/api/cases/{case_id}/collections": {
       "post": {
         "operationId": "autopsy_workflow_request_collection_post__api_cases_case_id_collections",

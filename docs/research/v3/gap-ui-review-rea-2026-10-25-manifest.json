@@ -2,15 +2,15 @@
   "tool": "https://github.com/7zy4/rea",
   "tool_commit": "2250e67bc271c83f9e200ee298aa04a2457438a6",
   "date": "2026-10-25",
-  "evidence_id": "ev_63f72d397bd70fe5fad8d0295584e6eb7ef3079991ed759af97310cde6abdd83",
+  "evidence_id": "ev_c013f5d3c15ab0d3f1f148e72ba73217ec925013f00759992115ae1453c1ba6a",
   "evidence_file": "socify-gap-review-rea-2026-10-25.json.gz",
-  "compressed_sha256": "7cfbdeca514317fb920681ca112ff2a4b19bfcde6fc99efdf9f14ccc3eed9031",
+  "compressed_sha256": "ecf7bcf2feb18f506d0d623bc149a3c0aea7893430684c5124ebe59948fab912",
   "inputs": {
     "static/app.js": "25230863d809c7189b3e8da7c54d0b6b5a986926fd61c29c43e0dcac915d5e51",
-    "static/autopsy.js": "07df7a073bb34ccece85d3298060c76543073eb31dfaf10f498aeeecb5a12795",
+    "static/autopsy.js": "e786171b13b845f30a80719968c6d2cbff78b62db2fe3e5b64202f826ebf7ee3",
     "static/autopsy_analysis.js": "6d2c7cfea7dd9d7b51eb6fff81145fcaf71cd229bdc362bd3c55ee6a9293004b",
-    "static/autopsy_data.js": "ef38c917c0177b49af20f3eb65942f0022df920c64f8c65f26d7718458cef445",
-    "static/autopsy_investigation.js": "976a3a47a9c1d5e4aafd6e69ef8a0f7094ecbcba86cde302bb04e39dd7e82f27",
+    "static/autopsy_data.js": "4b006d4456c19ff893bcf8ebbf776682aa3033c06cb06774a3bb2119a772218b",
+    "static/autopsy_investigation.js": "73da92bc10fbb5f53809bc16f52df7730d0f56a72c154af6d121bd3bc0733a64",
     "static/autopsy_operations.js": "78c2180066747ab8e222a5d95aedfa739e34c390bf3662ebab852a4c5950ce92",
     "static/autopsy_procedures.js": "7c4166e2fae81dd094a74b250726217fd892f7dafd3730d0cdf60e11dcb491c8",
     "static/autopsy_profile.js": "55732e8361ce79081141a4584a543a3918b44388de8bfbe30a17fef3074bd990",
@@ -24,17 +24,17 @@
   "statistics": {
     "relevant_files": 14,
     "nested_asar_containers": 0,
-    "text_bytes_read": 198606,
+    "text_bytes_read": 204976,
     "invalid_utf8_files": 0,
     "parsed_javascript_files": 11,
     "skipped_javascript_files": 0,
-    "visited_ast_nodes": 28791,
-    "findings": 41,
+    "visited_ast_nodes": 29929,
+    "findings": 55,
     "modules": 0,
     "parse_failures": 0
   },
   "integrity_contradictions": [],
-  "semantic_unknowns": 5632,
+  "semantic_unknowns": 5914,
   "route_unknowns": 4,
   "limitations": [
     "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
@@ -44,5 +44,5 @@
     "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
     "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
   ],
-  "scope": "V3 local YARA, shift handoff, case restore, linked War Room tasks and evidence, investigation scope; static analysis does not certify runtime behavior or complete acceptance"
+  "scope": "V3 collaborative chronology, persistent case/tab/search/batch/view context, keyboard autocomplete and native 200 percent zoom; static relationships do not prove runtime or security acceptance"
 }

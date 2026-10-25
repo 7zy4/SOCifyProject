@@ -1,0 +1,12 @@
+services:
+  ingress:
+    labels: &capacity-labels
+      io.socify.synthetic-capacity: "true"
+  socify:
+    labels: *capacity-labels
+  import-worker:
+    labels: *capacity-labels
+  autopsy-worker:
+    labels: *capacity-labels
+  analysis:
+    labels: *capacity-labels

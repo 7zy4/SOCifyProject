@@ -16,6 +16,10 @@ FORMATS = {
     "pdf": "application/pdf",
 }
 LABELS = {
+    "entry_type": "نوع عنصر الخط الزمني",
+    "time_basis": "أساس التوقيت",
+    "actor_id": "معرف المسجل",
+    "key": "مرجع العنصر",
     "decision": "القرار الموثق",
     "task_id": "المهمة المرتبطة",
     "scope": "نطاق الفحص وحدود الاستنتاج",
@@ -112,6 +116,18 @@ LABELS = {
     "integrity_valid": "سلامة السلسلة عند إعداد التقرير",
 }
 ENUM_LABELS = {
+    "log": "سجل مصدر",
+    "record": "سجل تحقيق أو إجراء",
+    "note": "ملاحظة تحقيق",
+    "documentation_time": "وقت التوثيق؛ ليس وقت وقوع الهجوم",
+    "reported_action_time": "وقت إجراء مسجل بواسطة المنفذ",
+    "investigator_observation_time": "وقت ملاحظة أدخله المحقق",
+    "hypothesis_time": "توقيت فرضية غير مؤكدة",
+    "escalation_time": "وقت إحالة داخل الفريق؛ ليس وقت وقوع الهجوم",
+    "source": "وقت مسجل في المصدر",
+    "source_year_and_zone_declared": "وقت المصدر مع سنة ومنطقة زمنية معلنتين",
+    "source_year_assumed_not_verified": "سنة المصدر مفترضة وغير متحققة",
+    "ingestion_fallback_not_observed_time": "وقت استيراد بديل؛ لا يثبت وقت الحدث",
     "new": "مسودة",
     "open": "مفتوحة",
     "investigating": "قيد التحقيق",
@@ -167,6 +183,8 @@ def lines(value, depth=0):
                     "alert_verdict",
                     "role",
                     "responsibility",
+                    "time_basis",
+                    "entry_type",
                 } and isinstance(item, str):
                     value = ENUM_LABELS.get(item, item)
                 yield depth, f"{LABELS.get(key, key)}: {value}"
@@ -203,6 +221,7 @@ def sections(payload):
         if records:
             yield LABELS[kind], records
     for title, key in (
+        ("الخط الزمني المشترك للأدلة والتحقيق والإجراءات", "chronology"),
         ("الإثراء المحلي ومصادر السمعة وإصداراتها", "observables"),
         ("SLA وجمع الأدلة ومراجعة ما بعد الحادثة", "workflow"),
         ("توثيق MITRE ATT&CK وإصداره وأدلته", "techniques"),

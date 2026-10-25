@@ -11,11 +11,12 @@ from werkzeug.utils import secure_filename
 from .autopsy_domain import custody, touch_case
 from .autopsy_pipeline import activate_import, event_visible, job_visible, visibility_sql
 from .cases import _attach_event, _case_row
+from .chronology_time import sql_utc_key, utc_key
 from .db import connect_readonly, get_db, transaction
 from .events import _event_view
 from .ingestion import _job_content, _job_view, cancel_import, create_import, preview_import, resume_import
 from .security import actor_id, current_user, error_response, has_permission, require_permission
-from .timeutils import iso_now, iso_timestamp
+from .timeutils import iso_now
 
 autopsy_ingestion_api = Blueprint("autopsy_ingestion", __name__)
 SEARCH_COUNT_LIMIT = 10000
@@ -215,10 +216,16 @@ def log_query(case_id: int) -> tuple[str, list[Any]]:
             args.append(" AND ".join('"' + word + '"' for word in words))
         else:
             clauses.append("0 = 1")
+    ranges = {}
     for key, operator in (("start", ">="), ("end", "<=")):
         if request.args.get(key):
-            clauses.append(f"ce.event_time {operator} ?")
-            args.append(iso_timestamp(request.args[key]))
+            ranges[key] = utc_key(request.args[key])
+            clauses.append(f"{sql_utc_key('ce.event_time')} {operator} ?")
+            args.append(ranges[key])
+    if ranges:
+        clauses.append("ce.time_known=1")
+    if ranges.get("start") and ranges.get("end") and ranges["start"] > ranges["end"]:
+        raise ValueError("بداية الفترة تتجاوز نهايتها")
     if request.args.get("severity"):
         severity = request.args["severity"]
         if severity not in {"critical", "high", "medium", "low"}:

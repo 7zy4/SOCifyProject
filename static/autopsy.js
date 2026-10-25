@@ -20,13 +20,53 @@ function autopsySelect(name, values, current = "") {
   return node("select", { name }, values.map((value) => node("option", { value, selected: value === current, text: autopsyLabel(value) })));
 }
 
+function autopsyCaseURL(caseId, changes = {}) {
+  const path = `/cases/${caseId}`;
+  const target = new URL(path, window.location.origin);
+  if (window.location.pathname === path) target.search = window.location.search;
+  for (const [key, value] of Object.entries(changes)) {
+    if (value === null || value === "") target.searchParams.delete(key);
+    else target.searchParams.set(key, String(value));
+  }
+  return target.pathname + target.search;
+}
+
+function autopsyCaseListURL() {
+  const current = new URLSearchParams(window.location.search);
+  const target = new URL("/cases", window.location.origin);
+  if (current.get("list_q")) target.searchParams.set("q", current.get("list_q"));
+  if (current.get("list_page")) target.searchParams.set("page", current.get("list_page"));
+  return target.pathname + target.search;
+}
+
 function autopsyChoice(name, values, current = "", required = false) {
   const id = `choice-${name}-${crypto.randomUUID()}`;
   const input = node("input", { name, list: id, required, autocomplete: "off", class: "search-choice" });
   const choices = values.map((entry) => typeof entry === "object" ? { ...entry, label: displayText(entry.label) } : { value: entry, label: displayText(autopsyLabel(entry)) });
+  const labelCounts = new Map();
+  for (const entry of choices) labelCounts.set(entry.label, (labelCounts.get(entry.label) || 0) + 1);
+  for (const entry of choices) if (labelCounts.get(entry.label) > 1) entry.label = `${entry.label} · ${entry.value}`;
   const selected = choices.find((entry) => String(entry.value) === String(current));
   input.value = selected?.label || "";
   const list = node("datalist", { id }, choices.map((entry) => node("option", { value: entry.label })));
+  let typedQuery = input.value, highlighted = -1;
+  input.addEventListener("input", () => { typedQuery = input.value; highlighted = -1; });
+  input.addEventListener("blur", () => { highlighted = -1; });
+  input.addEventListener("keydown", (event) => {
+    if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+      const candidates = choices.filter((entry) => entry.label.toLocaleLowerCase().includes(typedQuery.trim().toLocaleLowerCase())).slice(0, 100);
+      if (!candidates.length) return;
+      event.preventDefault();
+      const next = highlighted < 0 ? (event.key === "ArrowDown" ? 0 : candidates.length - 1) : (highlighted + (event.key === "ArrowDown" ? 1 : -1) + candidates.length) % candidates.length;
+      const query = typedQuery;
+      input.value = candidates[next].label;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      typedQuery = query; highlighted = next;
+    } else if (event.key === "Enter" && highlighted >= 0) {
+      event.preventDefault();
+      typedQuery = input.value; highlighted = -1;
+    }
+  });
   input.autopsyValue = () => {
     if (!input.value.trim() && !required) return null;
     const entry = choices.find((item) => item.label === input.value);
@@ -127,7 +167,14 @@ function autopsyNewCase() {
   autopsyModal("إنشاء قضية: الاسم والسبب والهدف", form);
 }
 
-async function autopsyCases(page = 1, query = "") {
+async function autopsyCases(page = null, query = null) {
+  const location = new URL(window.location.href);
+  page = page ?? Number(location.searchParams.get("page") || 1);
+  if (!Number.isSafeInteger(page) || page < 1 || page > 1000000) page = 1;
+  query = query ?? location.searchParams.get("q") ?? "";
+  if (page > 1) location.searchParams.set("page", String(page)); else location.searchParams.delete("page");
+  if (query) location.searchParams.set("q", query); else location.searchParams.delete("q");
+  window.history.replaceState(null, "", location.pathname + location.search);
   begin("cases");
   document.getElementById("section-title").textContent = "قضايا الفريق";
   document.getElementById("section-kicker").textContent = "SOCIFY DIGITAL AUTOPSY";
@@ -136,7 +183,7 @@ async function autopsyCases(page = 1, query = "") {
   const filters = node("form", { class: "filter-row", "aria-label": "بحث القضايا" }, [field("بحث", search), node("button", { type: "submit", class: "button ghost", text: "بحث" })]);
   filters.addEventListener("submit", (event) => { event.preventDefault(); autopsyCases(1, search.value).catch(handleError); });
   const root = node("div", {}, [pageHead("ابدأ بقضية واضحة الهدف", "تجتمع الأدلة والتحليل والمسؤوليات والقرارات والتقرير داخل القضية نفسها.", permission("cases.create") ? [button("إنشاء قضية", autopsyNewCase, "primary")] : []), filters]);
-  root.append(data.items.length ? table([{ label: "المرجع", value: (row) => node("bdi", { text: row.reference }) }, { label: "القضية", value: "title" }, { label: "الحالة", value: (row) => autopsyLabel(row.status) }, { label: "الخطورة", value: (row) => autopsyLabel(row.severity) }, { label: "الأدلة", value: "evidence_count" }, { label: "المسؤول", value: "assignee_name" }, { label: "فتح", value: (row) => linkedButton("فتح القضية", `/cases/${row.id}`) }], data.items) : emptyState("لا توجد قضايا في النطاق المصرح", "أنشئ القضية باسم وسبب وهدف، ثم أضف الأدلة إلى مساحة التحقيق."));
+  root.append(data.items.length ? table([{ label: "المرجع", value: (row) => node("bdi", { text: row.reference }) }, { label: "القضية", value: "title" }, { label: "الحالة", value: (row) => autopsyLabel(row.status) }, { label: "الخطورة", value: (row) => autopsyLabel(row.severity) }, { label: "الأدلة", value: "evidence_count" }, { label: "المسؤول", value: "assignee_name" }, { label: "فتح", value: (row) => linkedButton("فتح القضية", autopsyCaseURL(row.id, { list_q: query, list_page: page })) }], data.items) : emptyState("لا توجد قضايا في النطاق المصرح", "أنشئ القضية باسم وسبب وهدف، ثم أضف الأدلة إلى مساحة التحقيق."));
   const pages = node("div", { class: "action-row" }, node("p", { text: `${data.total} قضية · الصفحة ${page}` }));
   if (page > 1) pages.append(button("السابق", () => autopsyCases(page - 1, query).catch(handleError)));
   if (page * 25 < data.total) pages.append(button("التالي", () => autopsyCases(page + 1, query).catch(handleError)));
@@ -196,13 +243,13 @@ async function autopsyCase(caseId) {
   if (restricted && !["summary", "logs"].includes(selected)) selected = "logs";
   const assetData = restricted ? { items: [] } : await api(`/api/cases/${caseId}/records?kind=asset&limit=100`);
   autopsy.assets = assetData.items;
-  const root = node("div", {}, [pageHead(current.title, `${current.reference} · ${autopsyLabel(current.status)} · ${autopsyLabel(current.severity)}`, [linkedButton("جميع القضايا", "/cases")])]);
+  const root = node("div", {}, [pageHead(current.title, `${current.reference} · ${autopsyLabel(current.status)} · ${autopsyLabel(current.severity)}`, [linkedButton("جميع القضايا", autopsyCaseListURL())])]);
   let tabs = [["summary", "الملخص والمسؤوليات"], ["logs", "السجلات والأدلة"], ["analysis", "الأصول والمؤشرات"], ["investigation", "التحقيق والخط الزمني"], ["response", "الاستجابة والتصعيد"], ["activity", "الحيازة والنشاط"]];
   if (restricted) {
     tabs = tabs.slice(0, 2);
     root.append(node("p", { class: "notice", text: "نطاق دفعات محدد: تظهر السجلات المصرح بها فقط. يتطلب سياق التحقيق والتقارير الوصول إلى جميع دفعات القضية." }));
   }
-  root.append(node("nav", { class: "case-tabs", "aria-label": "أقسام القضية" }, tabs.map(([id, label]) => node("a", { class: "button ghost", href: `/cases/${caseId}?tab=${id}`, "aria-current": selected === id ? "page" : null, text: label }))));
+  root.append(node("nav", { class: "case-tabs", "aria-label": "أقسام القضية" }, tabs.map(([id, label]) => node("a", { class: "button ghost", href: autopsyCaseURL(caseId, { tab: id }), "aria-current": selected === id ? "page" : null, text: label }))));
   const content = node("div", { class: "case-content" });
   if (selected === "summary") {
     const transitions = autopsy.catalog.case_transitions[current.status] || [];
@@ -237,7 +284,7 @@ async function autopsyCase(caseId) {
     content.append(panel("نشاط القضية", table([{ label: "الحدث", value: "action" }, { label: "الفاعل", value: "actor_name" }, { label: "الوقت", value: (row) => formatTime(row.created_at) }], current.history), true));
   }
   if (!restricted && selected === "reports" && window.SOCifyAutopsy.capsules) content.append(await window.SOCifyAutopsy.capsules(caseId));
-  if (!restricted && window.SOCifyAutopsy.reports && !tabs.some(([id]) => id === "reports")) root.querySelector(".case-tabs").append(linkedButton("التقارير والمراجعة", `/cases/${caseId}?tab=reports`));
+  if (!restricted && window.SOCifyAutopsy.reports && !tabs.some(([id]) => id === "reports")) root.querySelector(".case-tabs").append(linkedButton("التقارير والمراجعة", autopsyCaseURL(caseId, { tab: "reports" })));
   root.append(content);
   finish(root);
 }

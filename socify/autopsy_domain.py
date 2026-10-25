@@ -37,6 +37,7 @@ KINDS: dict[str, dict[str, dict[str, Any]]] = {
         "visibility": {"choices": ["team", "private"], "required": True},
     },
     "timeline_view": {
+        "scope": {"choices": ["all", "logs"]},
         "title": {"max": 160, "required": True},
         "query": {"max": 200},
         "severity": {"choices": ["critical", "high", "medium", "low"]},

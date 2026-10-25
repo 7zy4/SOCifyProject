@@ -180,11 +180,14 @@ def build_snapshot(case, revision: int, profile: str):
         2000,
     )
     payload["shared_notes"] = bounded_rows(
-        "SELECT author_id, body, created_at FROM case_notes WHERE case_id = ? AND visibility = 'team' ORDER BY id", (case_id,), 1000
+        "SELECT id,author_id,body,created_at,updated_at,version FROM case_notes WHERE case_id = ? AND visibility = 'team' ORDER BY id", (case_id,), 1000
     )
     payload["history"] = bounded_rows(
         "SELECT action, previous_value, new_value, reason, actor_id, created_at FROM case_history WHERE case_id = ? ORDER BY id", (case_id,), 3000
     )
+    from .autopsy_chronology import report_chronology
+
+    payload["chronology"] = report_chronology(payload)
     previous, valid, count = "0" * 64, True, 0
     for entry in get_db().execute("SELECT * FROM autopsy_custody WHERE case_id = ? ORDER BY id", (case_id,)):
         material = [case_id, entry["actor_id"], entry["action"], entry["details"], entry["previous_hash"], entry["created_at"]]
