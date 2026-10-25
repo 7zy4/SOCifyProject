@@ -16,6 +16,11 @@ FORMATS = {
     "pdf": "application/pdf",
 }
 LABELS = {
+    "decision": "القرار الموثق",
+    "task_id": "المهمة المرتبطة",
+    "scope": "نطاق الفحص وحدود الاستنتاج",
+    "counts_by_assessment": "تقييم أصول النطاق",
+    "earliest_retained_observation": "أقدم ملاحظة محفوظة مدعومة بدليل",
     "counts": "موجز الأدلة المتاحة",
     "normalized_logs": "السجلات المطبعّة",
     "status_at_preparation": "حالة القضية عند إعداد النسخة",
@@ -176,7 +181,7 @@ def lines(value, depth=0):
 
 
 def sections(payload):
-    for key in ("summary", "case", "context", "metrics", "members", "alerts"):
+    for key in ("summary", "case", "context", "metrics", "scope", "members", "alerts"):
         if payload.get(key):
             yield LABELS[key], payload[key]
     for kind in (

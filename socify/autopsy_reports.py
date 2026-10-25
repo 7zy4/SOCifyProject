@@ -133,6 +133,9 @@ def build_snapshot(case, revision: int, profile: str):
     from .autopsy_workflow import factual_metrics, sla_status
 
     payload["metrics"] = factual_metrics(case, {kind: [row["payload"] for row in records] for kind, records in payload["records"].items()})
+    from .autopsy_scope import investigation_scope
+
+    payload["scope"] = investigation_scope({kind: [row["payload"] for row in records] for kind, records in payload["records"].items()})
     payload["workflow"] = {
         "sla": sla_status(case),
         "collections": payload["records"].get("collection_request", []),

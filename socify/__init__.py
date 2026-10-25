@@ -28,7 +28,7 @@ from .ingestion import ingestion_api
 from .operational import operational_mode
 from .platform import platform_api
 from .playbooks import playbooks_api
-from .request_limits import BoundedRequest, StructureLimitError
+from .request_limits import BoundedRequest, NumericInputError, StructureLimitError
 from .schema import ensure_schema
 from .scoring import scoring_api
 from .security import correlation_id, error_response
@@ -174,6 +174,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.errorhandler(StructureLimitError)
     def structure_too_deep(_: Exception):
         return error_response("STRUCTURE_LIMIT_EXCEEDED", "عمق البيانات أو عدد عناصرها يتجاوز الحد المسموح", 422)
+
+    @app.errorhandler(NumericInputError)
+    def numeric_input_invalid(_: Exception):
+        return error_response("NUMERIC_INPUT_OUT_OF_RANGE", "استخدم أعدادًا منتهية ومعرفات ضمن نطاق الأعداد الصحيحة المسموح", 422)
 
     @app.errorhandler(500)
     def internal_error(error: Exception):

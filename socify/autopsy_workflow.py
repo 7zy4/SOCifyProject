@@ -307,9 +307,13 @@ def factual_metrics(case, records, now=None):
 
 def workflow_snapshot(case):
     records: dict[str, list] = {}
-    for row in get_db().execute("SELECT kind, payload FROM autopsy_records WHERE case_id = ? AND kind IN ('response', 'foothold') ORDER BY id", (case["id"],)):
+    for row in get_db().execute(
+        "SELECT kind, payload FROM autopsy_records WHERE case_id = ? AND kind IN ('response', 'foothold', 'asset') ORDER BY id", (case["id"],)
+    ):
         records.setdefault(row["kind"], []).append(json.loads(row["payload"]))
-    return {"sla": sla_status(case), "metrics": factual_metrics(case, records)}
+    from .autopsy_scope import investigation_scope
+
+    return {"sla": sla_status(case), "metrics": factual_metrics(case, records), "scope": investigation_scope(records)}
 
 
 @autopsy_workflow_api.get("/api/cases/<int:case_id>/workflow")

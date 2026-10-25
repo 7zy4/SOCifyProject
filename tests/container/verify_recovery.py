@@ -30,9 +30,10 @@ def main():
         result = subprocess.run([docker, *arguments], input=content, capture_output=True, check=True, shell=False)  # noqa: S603
         return result.stdout
 
-    email, password = "recovery-" + secrets.token_hex(6) + "@example.test", secrets.token_urlsafe(28) + "Aa9!"
-    bootstrap = "import json,sys; from scripts.bootstrap_team import create_manager; from socify import create_app; p=json.load(sys.stdin); create_manager(create_app(),p['email'],'Synthetic recovery owner','Synthetic recovery team',p['password'])"
-    run(compose + ["exec", "-T", "socify", "python", "-c", bootstrap], json.dumps({"email": email, "password": password}).encode())
+    email = "recovery-" + secrets.token_hex(6) + "@example.test"
+    password = secrets.token_urlsafe(28) + "Aa9!"
+    bootstrap = "import json,sys; from scripts.bootstrap_team import create_manager; from socify import create_app; p=json.load(sys.stdin); create_manager(create_app(),p['email'],'Synthetic recovery owner','Synthetic recovery team',p['access_value'])"
+    run(compose + ["exec", "-T", "socify", "python", "-c", bootstrap], json.dumps({"email": email, "access_value": password}).encode())
     cookie = ""
 
     def call(path, body=None, raw=False):
@@ -102,6 +103,24 @@ def main():
     assert call(base + "/custody")["integrity_valid"]
     pdf, headers = call(base + "/reports/" + str(pending_report["id"]) + "/files/pdf", raw=True)
     assert pdf.startswith(b"%PDF-") and hashlib.sha256(pdf).hexdigest() == headers["X-Content-SHA256"]
+    run(compose + ["stop", "--timeout", "60", "analysis"])
+    try:
+        outage_report = call(base + "/reports", {"version": call(base)["version"]})
+        job_path = base + "/jobs/" + str(outage_report["job_id"])
+        deadline = time.monotonic() + 15
+        while True:
+            status = call(job_path)
+            if status["attempts"]:
+                assert status["state"] == "queued" and status["error_code"] == "ANALYSIS_UNAVAILABLE", status
+                assert status["available_at"]
+                break
+            if time.monotonic() >= deadline:
+                raise TimeoutError("Worker did not observe the isolated backend outage")
+            time.sleep(0.1)
+    finally:
+        run(compose + ["start", "analysis"])
+    recovered_analysis = wait(job_path, "state", {"queued", "processing"})
+    assert recovered_analysis["state"] == "completed" and recovered_analysis["attempts"] >= 2, recovered_analysis
     isolation = {}
     probe = 'import socket,json; s=socket.socket(); s.settimeout(1);\ntry: s.connect(("192.0.2.1",443)); result={"blocked":False}\nexcept OSError as e: result={"blocked":e.errno in (1,13,101,113),"errno":e.errno}\nprint(json.dumps(result))'
     for service in ("socify", "import-worker", "autopsy-worker", "analysis"):
@@ -133,6 +152,7 @@ def main():
         "original_evidence_hashes_retained": True,
         "custody_chain_valid": True,
         "pdf_sha256_verified": True,
+        "analysis_outage_backoff_and_automatic_recovery": True,
         "seconds": round(time.monotonic() - restarted, 3),
         "isolation": isolation,
         "limitations": [

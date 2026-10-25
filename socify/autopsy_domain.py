@@ -74,7 +74,13 @@ KINDS: dict[str, dict[str, dict[str, Any]]] = {
         "tags": {"list": True},
         "details": {"max": 4000},
     },
-    "war_room": {"title": {"required": True, "max": 255}, "body": {"required": True, "max": 6000}, "visibility": {"choices": ["team", "private"]}},
+    "war_room": {
+        "title": {"required": True, "max": 255},
+        "body": {"required": True, "max": 6000},
+        "visibility": {"choices": ["team", "private"]},
+        "decision": {"max": 2000},
+        "task_id": {"task": True},
+    },
     "hypothesis": {
         "title": {"required": True, "max": 255},
         "statement": {"required": True, "max": 4000},
@@ -208,6 +214,9 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
         elif spec.get("event"):
             if type(value) is not int or not get_db().execute("SELECT 1 FROM case_events WHERE case_id = ? AND event_id = ?", (case_id, value)).fetchone():
                 raise ValueError("السجل لا ينتمي إلى القضية")
+        elif spec.get("task"):
+            if type(value) is not int or not get_db().execute("SELECT 1 FROM case_tasks WHERE id=? AND case_id=?", (value, case_id)).fetchone():
+                raise ValueError("المهمة لا تنتمي إلى القضية")
         elif spec.get("record_kind"):
             if (
                 type(value) is not int

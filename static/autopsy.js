@@ -14,7 +14,7 @@ const autopsyLabels = {
 function autopsyLabel(value) { return autopsyLabels[value] || value; }
 
 autopsyLabels.reason = "السبب";
-Object.assign(autopsyLabels, { handoff_to: "العضو البديل للمسؤوليات", assignee: "المحلل المسؤول", instructions: "المطلوب تحليله وتسليمه", email: "البريد الإلكتروني الداخلي" });
+Object.assign(autopsyLabels, { handoff_to: "العضو البديل للمسؤوليات", assignee: "المحلل المسؤول", instructions: "المطلوب تحليله وتسليمه", email: "البريد الإلكتروني الداخلي", task_id: "المهمة المرتبطة", decision: "القرار الموثق" });
 
 function autopsySelect(name, values, current = "") {
   return node("select", { name }, values.map((value) => node("option", { value, selected: value === current, text: autopsyLabel(value) })));
@@ -83,6 +83,7 @@ function autopsyForm(schema, submit, initial = {}) {
     if (spec.user) choices = autopsy.team.members.filter((member) => member.is_active && (!(spec.case_member || key === "owner_id") || ["admin", "soc_manager"].includes(member.role) || autopsy.current?.members.some((item) => item.user_id === member.id))).map((member) => ({ value: member.id, label: `${member.name} · ${autopsyLabel(member.role)}` }));
     if (spec.evidence) choices = (autopsy.current?.evidence || []).map((evidence) => ({ value: evidence.id, label: `${evidence.title} · ${evidence.id}` }));
     if (spec.asset) choices = (autopsy.assets || []).map((record) => ({ value: record.id, label: `${record.payload.name} · ${record.id}` }));
+    if (spec.task) choices = (autopsy.current?.tasks || []).map((task) => ({ value: task.id, label: `${task.title} · ${task.id}` }));
     if (choices) {
       const choice = autopsyChoice(key, choices, initial[key], spec.required);
       control = choice.control;

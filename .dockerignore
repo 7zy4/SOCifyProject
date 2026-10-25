@@ -12,6 +12,7 @@ instance
 .coverage*
 .mypy_cache
 .venv
+venv
 node_modules
 artifacts
 docs/research
