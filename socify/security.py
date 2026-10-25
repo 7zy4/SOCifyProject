@@ -7,9 +7,11 @@ import json
 import re
 import secrets
 import socket
+import sqlite3
 import struct
 import time
 from collections.abc import Callable
+from datetime import timedelta
 from typing import Any, TypeVar, cast
 from urllib.parse import urlparse
 
@@ -17,7 +19,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from flask import current_app, g, jsonify, redirect, request, session, url_for
 
 from .db import get_db
-from .timeutils import iso_now
+from .timeutils import iso_now, utc_now
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -140,6 +142,25 @@ def redact(value: object) -> object:
     return value
 
 
+def _touch_session(record, now: str) -> None:
+    cutoff = (utc_now() - timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
+    if record["last_seen_at"] >= cutoff:
+        return
+    connection = get_db()
+    timeout = connection.execute("PRAGMA busy_timeout").fetchone()[0]
+    try:
+        connection.execute("PRAGMA busy_timeout = 0")
+        connection.execute(
+            "UPDATE auth_sessions SET last_seen_at=? WHERE id=? AND last_seen_at<? AND revoked_at IS NULL AND expires_at>?",
+            (now, record["id"], cutoff, now),
+        )
+    except sqlite3.OperationalError as exc:
+        if getattr(exc, "sqlite_errorcode", 0) & 0xFF not in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}:
+            raise
+    finally:
+        connection.execute(f"PRAGMA busy_timeout = {int(timeout)}")
+
+
 def _session_valid(user_id: int) -> bool:
     if current_app.config.get("TESTING") and not session.get("session_id"):
         return True
@@ -150,14 +171,15 @@ def _session_valid(user_id: int) -> bool:
     record = (
         get_db()
         .execute(
-            "SELECT id, expires_at, revoked_at FROM auth_sessions WHERE session_hash = ? AND user_id = ?",
+            "SELECT id, expires_at, revoked_at, last_seen_at FROM auth_sessions WHERE session_hash = ? AND user_id = ?",
             (digest, user_id),
         )
         .fetchone()
     )
-    if not record or record["revoked_at"] or record["expires_at"] <= iso_now():
+    now = iso_now()
+    if not record or record["revoked_at"] or record["expires_at"] <= now:
         return False
-    get_db().execute("UPDATE auth_sessions SET last_seen_at = ? WHERE id = ?", (iso_now(), record["id"]))
+    _touch_session(record, now)
     return True
 
 
