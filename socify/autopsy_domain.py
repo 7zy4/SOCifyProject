@@ -9,7 +9,7 @@ from .audit import record_audit
 from .cases import _case_row
 from .db import get_db
 from .security import actor_id
-from .timeutils import iso_now, iso_timestamp
+from .timeutils import iso_now, iso_timestamp, parse_timestamp
 
 ASSET_TYPES = [
     "web_server",
@@ -27,6 +27,22 @@ ASSET_TYPES = [
 ]
 ASSET_ROLES = ["suspected_attacker", "defender", "affected", "intermediary", "unknown"]
 KINDS: dict[str, dict[str, dict[str, Any]]] = {
+    "bookmark": {
+        "event_id": {"event": True, "required": True},
+        "title": {"max": 255, "required": True},
+        "color": {"choices": ["blue", "orange", "gold"]},
+        "tags": {"list": True},
+        "notes": {"max": 2000},
+        "visibility": {"choices": ["team", "private"], "required": True},
+    },
+    "timeline_view": {
+        "title": {"max": 160, "required": True},
+        "query": {"max": 200},
+        "severity": {"choices": ["critical", "high", "medium", "low"]},
+        "start": {"timestamp": True},
+        "end": {"timestamp": True},
+        "visibility": {"choices": ["team", "private"], "required": True},
+    },
     "asset": {
         "name": {"required": True, "max": 255},
         "type": {"choices": ASSET_TYPES, "required": True},
@@ -186,6 +202,9 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
                 or not get_db().execute("SELECT 1 FROM autopsy_records WHERE id = ? AND case_id = ? AND kind = 'asset'", (value, case_id)).fetchone()
             ):
                 raise ValueError("الأصل لا ينتمي إلى القضية")
+        elif spec.get("event"):
+            if type(value) is not int or not get_db().execute("SELECT 1 FROM case_events WHERE case_id = ? AND event_id = ?", (case_id, value)).fetchone():
+                raise ValueError("السجل لا ينتمي إلى القضية")
         elif spec.get("integer"):
             if type(value) is not int or not spec.get("min", 0) <= value <= spec["max"]:
                 raise ValueError(f"قيمة {key} غير صالحة")
@@ -224,6 +243,8 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
         result["value"] = normalize_indicator(result["type"], result["value"])
         if result["classification"] == "ioc" and not result.get("evidence_id"):
             raise ValueError("تصنيف IOC يتطلب دليلًا مرتبطًا")
+    if kind == "timeline_view" and result.get("start") and result.get("end") and parse_timestamp(result["start"]) > parse_timestamp(result["end"]):
+        raise ValueError("بداية الفترة تتجاوز نهايتها")
     if kind == "corrective" and result["status"] == "validated" and not result.get("validation"):
         raise ValueError("توثيق التحقق من فاعلية الإجراء مطلوب")
     if (

@@ -1,4 +1,4 @@
-# SOCify
+# SOCify Digital Autopsy
 
 > **النسخة الثالثة قيد التنفيذ:** [socify-version-3](https://github.com/7zy4/SOCifyProject/tree/socify-version-3) — التوجه الجديد **SOCify Digital Autopsy** للتحليل والتحقيق والتوثيق داخل الشركة. نُفذ أساس القضية وصلاحياتها والاستيراد والتصدير المقيدان بها؛ بقية متطلبات V3 قيد العمل والقبول. [التشغيل والحساب الداخلي](docs/operations-v3.md) · [البرومت التنفيذي](docs/plans/v3-digital-autopsy-implementation-prompt-ar.md) · [سجل الاستكمال](docs/plans/v3-progress.md) · [مصفوفة V3](docs/qa/v3-acceptance.csv). لا تُستخدم بيانات شركة حقيقية في Codespaces أو بيئة سحابية غير معتمدة داخل الشركة.
 >
@@ -6,7 +6,9 @@
 >
 > [تجربة Codespaces من المتصفح](docs/codespaces.md) · [مصفوفة 132 مطلبًا](docs/qa/requirements-traceability.csv) · [60 رحلة قبول](docs/qa/e2e-acceptance.csv)
 
-SOCify منصة عربية مفتوحة المصدر لتدريب محللي مراكز العمليات الأمنية داخل بيئة محاكاة معزولة. تربط المنصة الاستيراد والتطبيع بقواعد الكشف والتنبيهات والتحقيقات وMITRE ATT&CK والصيد والرسم الزمني وخطط الاستجابة والتقييم، مع حفظ مصدر الدليل وسجل التدقيق.
+V3 مساحة تحقيق داخلية تبدأ بقضية وهدف، ثم تحفظ السجلات والأدلة وتربط الأصول والمؤشرات والخط الزمني والتصعيد والتحليل المحلي والتقرير المعتمد. لا ترسل العينات أو البصمات إلى VirusTotal؛ تستورد نتائجه يدويًا. وظائف التدريب القديمة محفوظة في التاريخ ومرجع V2، ومساراتها متقاعدة في الوضع التشغيلي.
+
+آخر نقطة تحقق V3: **505 اختبارات و12 رحلة Chromium**، مع اختبار حاويات إنتاجي اصطناعي. تفاصيل التنفيذ والحدود في [دليل التحقيق والتحليل المحلي](docs/qa/v3-investigation-local-analysis-2026-10-25.md). هذه الأعداد لا تثبت اكتمال الرحلات الـ75.
 
 حالة القبول الحالية: **NO-GO**. النسخة فرع تطوير للاختبار المعزول، ولم يثبت اجتياز جميع متطلبات الإصدار النهائي. راجع [تقرير القبول](docs/qa/final-acceptance-report.md) و[نتائج المراجعة](docs/qa/final-audit-findings.md) قبل استخدامها أو دمجها.
 
@@ -18,15 +20,13 @@ SOCify منصة عربية مفتوحة المصدر لتدريب محللي م�
 python -m venv .venv
 . .venv/bin/activate
 python -m pip install -r requirements.txt
-export SOCIFY_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
-export SOCIFY_CREDENTIAL_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
-export SOCIFY_DATABASE="$PWD/instance/socify.db"
-mkdir -p instance
-python create_db.py
-gunicorn --config gunicorn.conf.py app:app
+python -m scripts.bootstrap_team --email manager@example.test --name "مدير الفريق" --team "فريق التحقيق الداخلي"
+python run.py
 ```
 
-افتح `http://127.0.0.1:5000`. التسجيل متاح افتراضيًا في بيئة `development` وينشئ دور `analyst` فقط.
+افتح `http://127.0.0.1:5000`. يطلب bootstrap كلمة مرور ولا يغير حسابًا موجودًا. تُحفظ مفاتيح التطوير بين التشغيلات، ويشغّل `python run.py` عاملي الاستيراد والتحليل/التقارير تلقائيًا. التسجيل العام مغلق؛ يدعو المدير أعضاء الفريق بأدوارهم. إن كان لديك حساب وقاعدة سابقة فلا تنشئ مديرًا جديدًا لمجرد إعادة التشغيل.
+
+للنشر داخل الشركة وتعريف المفاتيح الدائمة والعزل راجع [تشغيل V3](docs/operations-v3.md). مدخل Docker الافتراضي localhost:5000، ويمكن تغييره بـ`SOCIFY_HTTP_PORT` دون تغيير منافذ الخدمات الداخلية. بقية توثيق وظائف التدريب أدناه مرجع توافق V2، ولا يعني إتاحتها في V3.
 
 ## بيانات تطوير صريحة
 

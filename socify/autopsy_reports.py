@@ -93,6 +93,12 @@ def build_snapshot(case, revision: int, profile: str):
         .fetchone()
     )
     payload["context"] = dict(context) if context else {"reason": "قضية موروثة؛ راجع الهدف والنطاق قبل الاعتماد"}
+    if profile == "full":
+        payload["legacy_closure"] = {
+            key: case[key]
+            for key in ("disposition", "root_cause", "impact", "response_summary", "evidence_summary", "lessons_learned", "validation")
+            if case[key]
+        }
     counts = {
         name: get_db().execute(f"SELECT COUNT(*) FROM {table} WHERE case_id = ?", (case_id,)).fetchone()[0]
         for name, table in (("normalized_logs", "case_events"), ("evidence", "case_evidence"), ("alerts", "case_alerts"))
@@ -116,7 +122,7 @@ def build_snapshot(case, revision: int, profile: str):
         payload["limitations"].append("نسخة منقحة تقتصر على البيانات الإحصائية والحالة؛ لا تصلح وحدها لاعتماد إغلاق القضية.")
         return payload
     records = bounded_rows(
-        "SELECT * FROM autopsy_records WHERE case_id = ? AND (kind != 'war_room' OR COALESCE(json_extract(payload, '$.visibility'), 'team') != 'private') ORDER BY id",
+        "SELECT * FROM autopsy_records WHERE case_id = ? AND COALESCE(json_extract(payload, '$.visibility'), 'team') != 'private' ORDER BY id",
         (case_id,),
         2000,
     )
@@ -148,6 +154,11 @@ def build_snapshot(case, revision: int, profile: str):
         "SELECT technique_id, attack_version, event_id, assessment, reason, created_by, created_at FROM case_technique_annotations WHERE case_id = ? ORDER BY id",
         (case_id,),
         1000,
+    )
+    payload["evidenced_timeline"] = bounded_rows(
+        "SELECT e.id, e.title, e.event_time, e.source, e.event_type, e.severity, e.raw_hash, e.provenance, e.normalized_fields FROM security_events e JOIN case_evidence ce ON ce.case_id = ? AND ce.evidence_type = 'event' AND ce.reference_id = CAST(e.id AS TEXT) ORDER BY e.event_time, e.id",
+        (case_id,),
+        2000,
     )
     payload["shared_notes"] = bounded_rows(
         "SELECT author_id, body, created_at FROM case_notes WHERE case_id = ? AND visibility = 'team' ORDER BY id", (case_id,), 1000
@@ -323,12 +334,18 @@ def closure_gaps(case_id: int, version: int):
         gaps.append("أدلة محفوظة")
     if not records.get("root_cause"):
         gaps.append("تحليل سبب جذري أو توثيق عدم إمكان تحديده")
+    if any(item.get("status") in {"raised", "acknowledged"} for item in records.get("escalation", [])):
+        gaps.append("تصعيد لم تتم الاستجابة له")
     responses = records.get("response", [])
     if not any(item.get("phase") == "validation" and item.get("status") in {"succeeded", "not_applicable"} for item in responses):
         gaps.append("نتيجة التحقق من الاستجابة أو سبب عدم انطباقها")
     if any(step["required"] and step["status"] not in {"completed", "not_applicable"} for record in records.get("playbook", []) for step in record["steps"]):
         gaps.append("خطوات كتيب استجابة إلزامية")
-    if get_db().execute("SELECT 1 FROM case_tasks WHERE case_id = ? AND required = 1 AND status != 'completed' LIMIT 1", (case_id,)).fetchone():
+    if (
+        get_db()
+        .execute("SELECT 1 FROM case_tasks WHERE case_id = ? AND required = 1 AND status NOT IN ('completed', 'reviewed') LIMIT 1", (case_id,))
+        .fetchone()
+    ):
         gaps.append("مهام إلزامية")
     if (
         get_db().execute("SELECT 1 FROM autopsy_jobs WHERE case_id = ? AND state IN ('queued', 'processing') LIMIT 1", (case_id,)).fetchone()

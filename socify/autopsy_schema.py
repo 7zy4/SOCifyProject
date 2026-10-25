@@ -135,6 +135,22 @@ CREATE TABLE IF NOT EXISTS autopsy_jobs (
     started_at TEXT,
     completed_at TEXT
 );
+CREATE TABLE IF NOT EXISTS autopsy_samples (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id INTEGER NOT NULL REFERENCES incident_cases(id),
+    evidence_id INTEGER NOT NULL REFERENCES case_evidence(id),
+    filename TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    ciphertext BLOB NOT NULL,
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    UNIQUE(case_id, sha256)
+);
+CREATE TRIGGER IF NOT EXISTS autopsy_sample_immutable_update BEFORE UPDATE ON autopsy_samples
+BEGIN SELECT RAISE(ABORT, 'quarantined samples are immutable'); END;
+CREATE TRIGGER IF NOT EXISTS autopsy_sample_immutable_delete BEFORE DELETE ON autopsy_samples
+BEGIN SELECT RAISE(ABORT, 'quarantined samples are immutable'); END;
 CREATE INDEX IF NOT EXISTS idx_autopsy_jobs_queue ON autopsy_jobs(state, id);
 CREATE INDEX IF NOT EXISTS idx_autopsy_jobs_case ON autopsy_jobs(case_id, id);
 CREATE VIRTUAL TABLE IF NOT EXISTS autopsy_log_search USING fts5(title, description, source_ip, destination_ip, hostname, username, raw_data, content='security_events', content_rowid='id');
@@ -192,9 +208,12 @@ def migrate(connection: sqlite3.Connection) -> None:
         "autopsy_case_imports",
     ):
         for operation, reference in (("INSERT", "new"), ("UPDATE", "new"), ("DELETE", "old")):
+            if table == "case_evidence" and operation == "UPDATE":
+                continue
             connection.execute(
                 f"CREATE TRIGGER IF NOT EXISTS autopsy_version_{table}_{operation.lower()} AFTER {operation} ON {table} WHEN EXISTS (SELECT 1 FROM autopsy_case_context WHERE case_id = {reference}.case_id) BEGIN UPDATE incident_cases SET version = version + 1 WHERE id = {reference}.case_id; END;"
             )
+    connection.execute("DROP TRIGGER IF EXISTS autopsy_version_case_evidence_update")
     connection.execute(
         "INSERT INTO schema_meta(key, value, updated_at) VALUES ('autopsy_schema_version', '3', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at WHERE schema_meta.value != excluded.value",
         (iso_now(),),

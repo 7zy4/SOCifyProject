@@ -16,6 +16,48 @@ FORMATS = {
     "pdf": "application/pdf",
 }
 LABELS = {
+    "counts": "موجز الأدلة المتاحة",
+    "normalized_logs": "السجلات المطبعّة",
+    "status_at_preparation": "حالة القضية عند إعداد النسخة",
+    "created_at": "وقت الإنشاء",
+    "closed_at": "وقت الإغلاق",
+    "updated_at": "آخر تعديل",
+    "priority": "الأولوية",
+    "severity": "درجة الخطورة",
+    "version": "الإصدار",
+    "name": "الاسم",
+    "role": "الدور",
+    "responsibility": "المسؤولية",
+    "user_id": "معرف العضو",
+    "created_by": "معرف المؤلف",
+    "updated_by": "معرف آخر محرر",
+    "added_by": "أضافه العضو",
+    "added_at": "وقت حفظ الدليل",
+    "id": "المعرف",
+    "basis": "أساس حساب القياسات وحدودها",
+    "first_evidenced_activity": "أقدم نشاط مثبت بالدليل",
+    "detection": "وقت الرصد المثبت",
+    "acknowledgement": "وقت إقرار الاستلام",
+    "containment": "وقت الاحتواء المثبت",
+    "recovery": "وقت التعافي المثبت",
+    "detection_delay_seconds": "المدة حتى الرصد بالثواني",
+    "acknowledgement_delay_seconds": "المدة حتى الإقرار بالثواني",
+    "containment_delay_seconds": "المدة حتى الاحتواء بالثواني",
+    "recovery_delay_seconds": "المدة حتى التعافي بالثواني",
+    "missing_or_inconsistent_times": "الأوقات الناقصة أو غير المتسقة",
+    "evidence_type": "نوع الدليل",
+    "source": "المصدر",
+    "confidence": "الثقة",
+    "details": "تفاصيل التحقيق",
+    "legal_hold": "الحجز القانوني",
+    "retention_until": "الاحتفاظ حتى",
+    "format": "الصيغة",
+    "original_filename": "اسم الأصل",
+    "parser_version": "إصدار المحلل",
+    "accepted": "السجلات المقبولة",
+    "rejected": "السجلات المرفوضة",
+    "head_sha256": "بصمة رأس سلسلة الحيازة",
+    "entries": "عدد حركات الحيازة",
     "summary": "الملخص التنفيذي",
     "case": "بيانات القضية ونطاق التحقيق",
     "context": "الهدف وقرار التنبيه ونتيجة الهجوم",
@@ -64,6 +106,37 @@ LABELS = {
     "profile": "سياسة مشاركة التقرير",
     "integrity_valid": "سلامة السلسلة عند إعداد التقرير",
 }
+ENUM_LABELS = {
+    "new": "مسودة",
+    "open": "مفتوحة",
+    "investigating": "قيد التحقيق",
+    "awaiting_review": "بانتظار المراجعة",
+    "closed": "مغلقة",
+    "reopened": "أعيد فتحها",
+    "successful": "ناجح",
+    "blocked": "محجوب أو فاشل",
+    "partial": "نجاح جزئي",
+    "unknown": "غير معروف",
+    "undetermined": "غير محسوم",
+    "malicious": "خبيث",
+    "benign": "حميد",
+    "false_positive": "إيجابي كاذب",
+    "internal": "داخلي",
+    "confidential": "سري",
+    "restricted": "مقيد",
+    "critical": "حرج",
+    "high": "عالٍ",
+    "medium": "متوسط",
+    "low": "منخفض",
+    "soc_manager": "مدير الفريق",
+    "investigator": "محقق",
+    "reviewer": "مراجع",
+    "analyst": "محلل",
+    "owner": "مسؤول القضية",
+    "l1": "المستوى الأول",
+    "l2": "المستوى الثاني",
+    "monitoring": "المراقبة",
+}
 
 
 def display(value) -> str:
@@ -78,7 +151,20 @@ def lines(value, depth=0):
                 yield depth, LABELS.get(key, key)
                 yield from lines(item, depth + 1)
             else:
-                yield depth, f"{LABELS.get(key, key)}: {display(item)}"
+                value = "غير قابل للحساب" if item is None and key.endswith("_seconds") else display(item)
+                if key in {
+                    "status",
+                    "status_at_preparation",
+                    "severity",
+                    "priority",
+                    "classification",
+                    "attack_outcome",
+                    "alert_verdict",
+                    "role",
+                    "responsibility",
+                } and isinstance(item, str):
+                    value = ENUM_LABELS.get(item, item)
+                yield depth, f"{LABELS.get(key, key)}: {value}"
     elif isinstance(value, list):
         if not value:
             yield depth, "لا توجد عناصر مسجلة"
@@ -91,7 +177,7 @@ def lines(value, depth=0):
 
 def sections(payload):
     for key in ("summary", "case", "context", "metrics", "members", "alerts"):
-        if key in payload:
+        if payload.get(key):
             yield LABELS[key], payload[key]
     for kind in (
         "asset",
@@ -109,11 +195,19 @@ def sections(payload):
         "corrective",
     ):
         records = payload.get("records", {}).get(kind, [])
-        yield LABELS[kind], records
-    yield "توثيق MITRE ATT&CK وإصداره وأدلته", payload.get("techniques", [])
-    yield "الملاحظات المشتركة الموروثة", payload.get("shared_notes", [])
+        if records:
+            yield LABELS[kind], records
+    for title, key in (
+        ("توثيق MITRE ATT&CK وإصداره وأدلته", "techniques"),
+        ("خط زمني للسجلات المختارة كأدلة وتوقيت مصادرها", "evidenced_timeline"),
+        ("الملاحظات المشتركة الموروثة", "shared_notes"),
+        ("نتائج الإغلاق الموروثة محفوظة بتاريخها", "legacy_closure"),
+    ):
+        if payload.get(key):
+            yield title, payload[key]
     for key in ("tasks", "evidence", "imports", "custody", "history", "limitations"):
-        yield LABELS[key], payload.get(key, [])
+        if payload.get(key):
+            yield LABELS[key], payload[key]
 
 
 def render_html(payload) -> str:
@@ -126,7 +220,7 @@ def render_html(payload) -> str:
     cover = f'<header class="report-cover"><p dir="ltr">SOCify Digital Autopsy</p><h1>{html.escape(display(case["title"]))}</h1><p>{html.escape(case["reference"])} · الإصدار {payload["revision"]}</p></header><p class="report-note">نسخة ثابتة من بيانات القضية عند إعدادها. اعتماد هذه النسخة محفوظ منفصلًا في سجل المنصة. البصمة أدناه تخص JSON المعياري، لا بايتات PDF.</p><p>SHA-256: <bdi>{digest}</bdi></p>'
     style = (
         report_style()
-        + ".report-line{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 10pt;font-size:14pt}.depth-1{padding-inline-start:10pt}.depth-2,.depth-3{padding-inline-start:18pt}"
+        + ".report-section{break-before:auto}.report-section:first-of-type{break-before:page}.report-line{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 10pt;font-size:14pt}.depth-1{padding-inline-start:10pt}.depth-2,.depth-3{padding-inline-start:18pt}"
     )
     return f'<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{html.escape(case["reference"])}</title><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; font-src data:"><style>{style}</style></head><body>{cover}{"".join(content)}</body></html>'
 
@@ -158,6 +252,11 @@ def render_docx(payload) -> bytes:
     for name in ("Title", "Heading 1", "Heading 2"):
         document.styles[name].font.name = "Baloo Bhaijaan 2"
         document.styles[name].font.color.rgb = RGBColor.from_string("1C4286")
+        document.styles[name].font.bold = True
+        document.styles[name].font.size = Pt({"Title": 48, "Heading 1": 30, "Heading 2": 20}[name])
+    for name in ("Normal", "Title", "Heading 1", "Heading 2"):
+        family = "IBM Plex Sans Arabic" if name == "Normal" else "Baloo Bhaijaan 2"
+        document.styles[name].element.get_or_add_rPr().get_or_add_rFonts().set(qn("w:cs"), family)
     document.add_heading("SOCify Digital Autopsy", 0)
     document.add_heading(display(payload["case"]["title"]), 1)
     document.add_paragraph(f"{payload['case']['reference']} · {payload['revision']}")
@@ -179,7 +278,14 @@ def render_files(payload):
     from weasyprint import HTML
 
     html_document = render_html(payload)
-    markdown = ["# SOCify Digital Autopsy", "", html.escape(display(payload["case"]["title"])).replace("`", "\\u0060"), "", "نسخة ثابتة؛ راجع سجل الاعتماد في المنصة.", ""]
+    markdown = [
+        "# SOCify Digital Autopsy",
+        "",
+        html.escape(display(payload["case"]["title"])).replace("`", "\\u0060"),
+        "",
+        "نسخة ثابتة؛ راجع سجل الاعتماد في المنصة.",
+        "",
+    ]
     for title, value in sections(payload):
         markdown.extend([f"## {title}", "", "```text"])
         markdown.extend(text.replace("`", "\\u0060") for _, text in lines(value))

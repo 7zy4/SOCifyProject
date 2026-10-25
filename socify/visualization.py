@@ -54,12 +54,12 @@ def _scope() -> tuple[str, list[object]]:
     ]
 
 
-def _filters(alias: str = "e") -> tuple[str, list[object]]:
+def _filters(alias: str = "e", fixed_case_id: int | None = None) -> tuple[str, list[object]]:
     clauses = [f"{alias}.workspace_id = ?"]
     parameters: list[object] = [workspace_id()]
     if request.args.get("include_derived") != "1":
         clauses.append(f"{alias}.source != 'rules_engine'")
-    case_id = request.args.get("case_id")
+    case_id = fixed_case_id if fixed_case_id is not None else request.args.get("case_id")
     if case_id:
         from .cases import _case_row
 
@@ -127,8 +127,8 @@ def _edge(
     }
 
 
-def build_graph(limit: int) -> dict[str, Any]:
-    where, parameters = _filters()
+def build_graph(limit: int, case_id: int | None = None) -> dict[str, Any]:
+    where, parameters = _filters(fixed_case_id=case_id)
     scope, scope_parameters = _scope()
     rows = (
         get_db()
@@ -142,6 +142,12 @@ def build_graph(limit: int) -> dict[str, Any]:
     for event in rows:
         event_node = f"event:{event['id']}"
         nodes[event_node] = _node(event_node, "Event", event["title"], event["event_time"], event["source"], event["id"])
+        if case_id is not None:
+            known = json.loads(event["normalized_fields"] or "{}").get("event_time_known") is True
+            nodes[event_node]["observed_time_known"] = known
+            nodes[event_node]["time_basis"] = json.loads(event["provenance"] or "{}").get("event_time_basis", "legacy_timestamp_not_verified")
+            if not known:
+                nodes[event_node]["timestamp"] = None
         relationships = [
             ("source_ip", "IP", event["source_ip"], "observed_on"),
             ("destination_ip", "IP", event["destination_ip"], "communicated_with"),
@@ -158,7 +164,7 @@ def build_graph(limit: int) -> dict[str, Any]:
             identifier = f"edge:{event['id']}:{field}"
             edges[identifier] = _edge(identifier, event_node, entity, relation, event["event_time"], event["id"])
         for technique_id in json.loads(event["mitre_ids"] or "[]"):
-            technique = get_db().execute("SELECT name FROM attack_techniques WHERE technique_id = ?", (technique_id,)).fetchone()
+            technique = get_db().execute("SELECT name, attack_version FROM attack_techniques WHERE technique_id = ?", (technique_id,)).fetchone()
             entity = f"technique:{technique_id}"
             nodes.setdefault(
                 entity,
@@ -167,7 +173,7 @@ def build_graph(limit: int) -> dict[str, Any]:
                     "Technique",
                     f"{technique_id} {technique['name'] if technique else ''}".strip(),
                     event["event_time"],
-                    "MITRE ATT&CK 20.0",
+                    f"MITRE ATT&CK {technique['attack_version'] if technique else 'unknown'}",
                     technique_id,
                     1.0,
                     "mapped",
@@ -187,6 +193,8 @@ def build_graph(limit: int) -> dict[str, Any]:
             .fetchall()
         )
         for alert in alerts:
+            if case_id is not None and not get_db().execute("SELECT 1 FROM case_alerts WHERE case_id = ? AND alert_id = ?", (case_id, alert["id"])).fetchone():
+                continue
             if not can_access_training_run(alert["training_run_id"]):
                 continue
             alert_node = f"alert:{alert['id']}"
@@ -213,6 +221,8 @@ def build_graph(limit: int) -> dict[str, Any]:
             .fetchall()
         )
         for case in cases:
+            if case_id is not None and case["id"] != case_id:
+                continue
             if not can_access_training_run(case["training_run_id"]):
                 continue
             case_node = f"incident:{case['id']}"

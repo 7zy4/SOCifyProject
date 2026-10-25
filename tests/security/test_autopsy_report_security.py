@@ -33,6 +33,8 @@ def test_rendered_reports_escape_active_content_and_never_resolve_network(monkey
     with zipfile.ZipFile(io.BytesIO(files["docx"])) as archive:
         assert b"&lt;script" in archive.read("word/document.xml")
         assert b'TargetMode="External"' not in archive.read("word/_rels/document.xml.rels")
+        assert b'w:cs="IBM Plex Sans Arabic"' in archive.read("word/styles.xml")
+        assert b'w:cs="Baloo Bhaijaan 2"' in archive.read("word/styles.xml")
     assert list(lines(None)) == [(0, "غير مسجل")]
     assert list(lines([])) == [(0, "لا توجد عناصر مسجلة")]
     with pytest.raises(PermissionError):

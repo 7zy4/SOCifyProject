@@ -16,3 +16,9 @@ EXPOSE 5000
 VOLUME ["/data"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health/ready', timeout=3).read()"]
 CMD ["gunicorn", "--config", "gunicorn.conf.py", "app:app"]
+
+FROM runtime AS ingress
+USER root
+RUN --mount=type=secret,id=build_ca,mode=0444 build_ca_path=/etc/ssl/certs/ca-certificates.crt; if [ -f /run/secrets/build_ca ]; then build_ca_path=/run/secrets/build_ca; fi; apt-get -o Acquire::https::CaInfo="$build_ca_path" update && apt-get -o Acquire::https::CaInfo="$build_ca_path" install --yes --no-install-recommends nginx && rm -rf /var/lib/apt/lists/*
+USER socify
+CMD ["nginx", "-c", "/app/deploy/nginx.conf", "-g", "daemon off;"]

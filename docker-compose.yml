@@ -1,4 +1,27 @@
 services:
+  ingress:
+    build:
+      context: .
+      target: ingress
+    depends_on:
+      socify:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${SOCIFY_HTTP_PORT:-5000}:5000"
+    networks:
+      - socify-internal
+      - ingress
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 128m
+    cpus: 1
+    pids_limit: 64
+    restart: unless-stopped
   socify:
     build:
       context: .
@@ -10,8 +33,6 @@ services:
       SOCIFY_DATABASE: /data/socify.db
       SOCIFY_HTTPS: "0"
       SOCIFY_TRUSTED_HOSTS: localhost,127.0.0.1
-    ports:
-      - "127.0.0.1:5000:5000"
     networks:
       - socify-internal
     mem_limit: 1g
@@ -28,6 +49,10 @@ services:
       - ALL
     restart: unless-stopped
   autopsy-worker:
+    init: true
+    stop_grace_period: 60s
+    healthcheck:
+      disable: true
     build:
       context: .
       target: runtime
@@ -52,6 +77,9 @@ services:
       - ALL
     restart: unless-stopped
   import-worker:
+    init: true
+    healthcheck:
+      disable: true
     build:
       context: .
       target: runtime
@@ -80,5 +108,6 @@ volumes:
   socify-data:
 
 networks:
+  ingress:
   socify-internal:
     internal: true

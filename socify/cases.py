@@ -1134,6 +1134,8 @@ def get_report(case_id: int):
     case = _case_row(case_id)
     if not case:
         return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
+    if operational_mode() and not has_permission(current_user(), "evidence.download"):
+        return error_response("PERMISSION_DENIED", "تنزيل التقرير المؤرشف يتطلب صلاحية تنزيل الأدلة", 403)
     report_format = request.args.get("format", "json")
     if report_format not in {"json", "html"}:
         return error_response("REPORT_FORMAT_UNSUPPORTED", "الصيغ المتاحة هي JSON وHTML", 422)
@@ -1153,6 +1155,8 @@ def get_report(case_id: int):
         .fetchone()
     )
     if not row:
+        if operational_mode():
+            return error_response("REPORT_NOT_FOUND", "لا نسخة مؤرشفة؛ أعد تقرير V3 من مساحة القضية", 404)
         if revision is not None:
             return error_response("REPORT_NOT_FOUND", "إصدار التقرير غير موجود", 404)
         if case["status"] != "closed":
@@ -1164,6 +1168,8 @@ def get_report(case_id: int):
         )
     if row is None:
         raise RuntimeError("Report generation returned no result")
+    if operational_mode() and hashlib.sha256(row["content"].encode()).hexdigest() != row["sha256"]:
+        return error_response("REPORT_INTEGRITY_FAILED", "بصمة التقرير المؤرشف غير مطابقة", 409)
     mimetype = "application/json" if report_format == "json" else "text/html; charset=utf-8"
     return Response(
         row["content"],

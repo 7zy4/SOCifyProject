@@ -9,8 +9,10 @@ from .attack import attack_api
 from .auth import auth_api
 from .autopsy_api import autopsy_api
 from .autopsy_ingestion import autopsy_ingestion_api
+from .autopsy_investigation import autopsy_investigation_api
 from .autopsy_procedures import autopsy_procedures_api
 from .autopsy_reports import autopsy_reports_api
+from .autopsy_samples import autopsy_samples_api
 from .cases import cases_api
 from .config import build_config
 from .db import close_db, connect_path
@@ -51,6 +53,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         autopsy_ingestion_api,
         autopsy_procedures_api,
         autopsy_reports_api,
+        autopsy_samples_api,
+        autopsy_investigation_api,
         auth_api,
         events_api,
         detection_api,
@@ -76,6 +80,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         if (
             operational_mode()
             and request.path.startswith("/api/")
+            and (request.blueprint is not None or request.path.split("/", 3)[2] in {"training", "scores", "scenarios", "lab"})
             and request.blueprint not in {"auth", "cases", "teams"}
             and not str(request.blueprint or "").startswith("autopsy")
         ):
@@ -87,8 +92,9 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
         )
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
         response.headers["Cross-Origin-Resource-Policy"] = "same-origin"

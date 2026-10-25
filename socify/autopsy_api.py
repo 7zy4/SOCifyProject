@@ -17,6 +17,31 @@ def manager() -> bool:
     return (current_user() or {}).get("role") in {"admin", "soc_manager"}
 
 
+def validate_escalation_routing(payload):
+    levels = {
+        "monitoring": {"analyst", "l1_analyst"},
+        "l1": {"analyst", "l1_analyst"},
+        "l2": {"l2_responder"},
+        "investigation": {"investigator"},
+        "management": {"soc_manager", "admin"},
+    }
+    if not manager() and (current_user() or {}).get("role") not in levels[payload["from_level"]]:
+        raise ValueError("مستوى إرسال التصعيد لا يطابق دورك")
+    target = get_db().execute("SELECT id, role, workspace_id FROM users WHERE id = ? AND is_active = 1", (payload["to_user"],)).fetchone()
+    if target is None or target["role"] not in levels[payload["to_level"]] | {"admin", "soc_manager"}:
+        raise ValueError("دور المستلم لا يطابق مستوى التصعيد")
+    principal = dict(target)
+    policy = (
+        get_db()
+        .execute("SELECT permissions FROM team_role_permissions WHERE workspace_id = ? AND role = ?", (target["workspace_id"], target["role"]))
+        .fetchone()
+    )
+    if policy:
+        principal["role_permissions"] = json.loads(policy[0])
+    if not has_permission(principal, "cases.read") or not has_permission(principal, "cases.update"):
+        raise ValueError("مستقبل التصعيد يحتاج صلاحية قراءة القضية وتحديثها")
+
+
 def record_view(row) -> dict[str, Any]:
     return {**dict(row), "payload": json.loads(row["payload"])}
 
@@ -31,26 +56,27 @@ def records_for_case(case_id: int, kind: str | None = None, limit: int = 100, be
         clauses.append("id < ?")
         args.append(before)
     if not manager():
-        clauses.append("(kind != 'war_room' OR COALESCE(json_extract(payload, '$.visibility'), 'team') != 'private' OR created_by = ?)")
+        clauses.append("(COALESCE(json_extract(payload, '$.visibility'), 'team') != 'private' OR created_by = ?)")
         args.append(actor_id())
     rows = get_db().execute(f"SELECT * FROM autopsy_records WHERE {' AND '.join(clauses)} ORDER BY id DESC LIMIT ?", (*args, limit)).fetchall()
     return [record_view(row) for row in rows]
 
 
-def insert_record(case_id: int, kind: str, payload: dict[str, Any]) -> int:
+def insert_record(case_id: int, kind: str, payload: dict[str, Any], actor: int | None = None) -> int:
     now = iso_now()
     serialized = canonical(payload)
+    principal = actor if actor is not None else actor_id()
     record_id = inserted_id(
         get_db().execute(
             "INSERT INTO autopsy_records(case_id, kind, payload, created_by, updated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (case_id, kind, serialized, actor_id(), actor_id(), now, now),
+            (case_id, kind, serialized, principal, principal, now, now),
         )
     )
     get_db().execute(
         "INSERT INTO autopsy_record_revisions(record_id, version, payload, actor_id, created_at) VALUES (?, 1, ?, ?, ?)",
-        (record_id, serialized, actor_id(), now),
+        (record_id, serialized, principal, now),
     )
-    custody(case_id, "record_added", {"record_id": record_id, "kind": kind, "sha256": hashlib.sha256(serialized.encode()).hexdigest()})
+    custody(case_id, "record_added", {"record_id": record_id, "kind": kind, "sha256": hashlib.sha256(serialized.encode()).hexdigest()}, actor=principal)
     touch_case(case_id)
     return record_id
 
@@ -64,6 +90,15 @@ def case_summary(case_id: int):
         name: get_db().execute(f"SELECT COUNT(*) FROM {table} WHERE case_id = ?", (case_id,)).fetchone()[0]
         for name, table in [("events", "case_events"), ("evidence", "case_evidence"), ("tasks", "case_tasks"), ("records", "autopsy_records")]
     }
+    if not manager():
+        result["counts"]["records"] = (
+            get_db()
+            .execute(
+                "SELECT COUNT(*) FROM autopsy_records WHERE case_id = ? AND (COALESCE(json_extract(payload, '$.visibility'), 'team') != 'private' OR created_by = ?)",
+                (case_id, actor_id()),
+            )
+            .fetchone()[0]
+        )
     result["members"] = [
         dict(row)
         for row in get_db()
@@ -94,6 +129,12 @@ def case_summary(case_id: int):
             (case_id,),
         )
         .fetchall()
+    ]
+    result["archived_reports"] = [
+        dict(row)
+        for row in get_db().execute(
+            "SELECT id, revision, format, sha256, created_at FROM case_reports WHERE case_id = ? ORDER BY revision DESC, format LIMIT 100", (case_id,)
+        )
     ]
     result["can_manage"] = manager()
     result["can_update"] = has_permission(current_user(), "cases.update")
@@ -255,6 +296,7 @@ def record_create(case_id: int, kind: str):
         try:
             payload = validate_record(case_id, kind, request.get_json(silent=True))
             if kind == "escalation":
+                validate_escalation_routing(payload)
                 if payload["status"] != "raised":
                     raise ValueError("يبدأ التصعيد بحالة raised")
                 payload.update({"from_user": actor_id(), "raised_at": iso_now()})
@@ -302,6 +344,8 @@ def record_update(case_id: int, record_id: int):
         try:
             payload = validate_record(case_id, row["kind"], data["payload"])
             if row["kind"] == "escalation":
+                if any(payload[key] != previous[key] for key in ("to_user", "from_level", "to_level")):
+                    raise ValueError("حافظ على مسار التصعيد؛ أضف تصعيدًا جديدًا أو سلّم المسؤوليات من إدارة الفريق")
                 if not manager() and previous["to_user"] != actor_id():
                     return error_response("PERMISSION_DENIED", "الإقرار والاستجابة لمتلقي التصعيد أو المدير", 403)
                 transitions = {
@@ -344,6 +388,7 @@ def case_member(case_id: int):
         not isinstance(data, dict)
         or set(data) - {"user_id", "responsibility"}
         or type(data.get("user_id")) is not int
+        or not isinstance(data.get("responsibility"), str)
         or data.get("responsibility") not in {"monitoring", "l1", "l2", "investigator", "reviewer", "owner"}
     ):
         return error_response("INVALID_MEMBER", "حدد العضو ومسؤوليته", 422)
@@ -358,6 +403,8 @@ def case_member(case_id: int):
             "INSERT INTO autopsy_case_members(case_id, user_id, responsibility, assigned_by, assigned_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(case_id, user_id) DO UPDATE SET responsibility = excluded.responsibility, assigned_by = excluded.assigned_by, assigned_at = excluded.assigned_at",
             (case_id, data["user_id"], data["responsibility"], actor_id(), iso_now()),
         )
+        if data["responsibility"] == "owner":
+            get_db().execute("UPDATE incident_cases SET assignee = ? WHERE id = ?", (data["user_id"], case_id))
         custody(case_id, "member_assigned", {"user_id": data["user_id"], "responsibility": data["responsibility"]})
         touch_case(case_id)
     return case_summary(case_id)

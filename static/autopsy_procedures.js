@@ -5,6 +5,7 @@ Object.assign(autopsyLabels, { any: "أي عضو مخول", manager: "المدي
 async function autopsyProcedureLibrary() {
   begin("playbooks");
   const library = await api("/api/autopsy/procedures");
+  let copyTemplate = null;
   const root = node("div", {}, pageHead("كتيبات الاستجابة", "قوالب داخلية بإصدارات ثابتة. تحفظ القضية نسخة مستقلة، وتوثق الإجراءات دون تنفيذ أوامر على الأجهزة."));
   if (library.can_manage) {
     root.append(button("إضافة القوالب الإرشادية للمراجعة", async () => { try { await api("/api/autopsy/procedures/seed", { method: "POST", body: {} }); await autopsyProcedureLibrary(); } catch (error) { handleError(error); } }));
@@ -23,6 +24,7 @@ async function autopsyProcedureLibrary() {
       steps.append(row);
     };
     add();
+    copyTemplate = (template) => { name.value = template.name; steps.replaceChildren(); template.steps.forEach(add); name.focus(); name.scrollIntoView({ block: "center" }); };
     const form = node("form", { class: "panel-body" }, [field("اسم القالب أو اسم الإصدار السابق", name), steps, button("إضافة خطوة", () => { if (steps.children.length < 30) add(); }), node("button", { type: "submit", class: "button primary", text: "حفظ إصدار مسودة" })]);
     form.addEventListener("submit", async (event) => { event.preventDefault(); try { await api("/api/autopsy/procedures", { method: "POST", body: { name: name.value, steps: [...steps.children].map((row) => row.autopsyValue()) } }); await autopsyProcedureLibrary(); } catch (error) { handleError(error); } });
     root.append(panel("إنشاء إصدار جديد", form, true));
@@ -30,6 +32,7 @@ async function autopsyProcedureLibrary() {
   for (const template of library.items) {
     const card = node("article", { class: "card" }, [node("h2", { text: `${template.name} · الإصدار ${template.version}` }), node("p", { text: template.state }), node("ol", {}, template.steps.map((step) => node("li", { text: `${step.title} · ${autopsyLabel(step.phase)} · ${autopsyLabel(step.role)}` })))]);
     if (library.can_manage && template.state === "draft") card.append(button("اعتماد ونشر هذا الإصدار", async () => { try { await api(`/api/autopsy/procedures/${template.id}/publish`, { method: "POST", body: {} }); await autopsyProcedureLibrary(); } catch (error) { handleError(error); } }));
+    if (library.can_manage) card.append(button("إنشاء إصدار قابل للتعديل من هذا القالب", () => copyTemplate(template)));
     root.append(card);
   }
   finish(root);

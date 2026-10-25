@@ -88,6 +88,7 @@ def run(output: Path, bulk_count: int, import_count: int, samples: int) -> dict[
             {
                 "DATABASE": str(database_path),
                 "TESTING": True,
+                "LEGACY_TRAINING_TESTS": True,
                 "WTF_CSRF_ENABLED": False,
                 "SECRET_KEY": "benchmark-session-key",  # pragma: allowlist secret
                 "CREDENTIAL_KEY": "benchmark-credential-key",  # pragma: allowlist secret
@@ -153,6 +154,7 @@ def run(output: Path, bulk_count: int, import_count: int, samples: int) -> dict[
 
         result: dict[str, Any] = {
             "schema_version": 1,
+            "benchmark_scope": "archived V2 training workflow; does not establish V3 capacity",
             "commit": git_revision(),
             "command": f"python -m scripts.benchmark_reference --bulk-events {bulk_count} --import-events {import_count} --samples {samples}",
             "fixture_seed": 20261023,

@@ -14,7 +14,7 @@ V3-E12,مهمة استيراد متوقفة/فاشلة وإعادة محاولة
 V3-E13,رفض ملف كبير/أرشيف قنبلة/XXE ومسار خبيث دون انهيار العامل,PARTIAL,docs/qa/v3-ingestion-2026-10-24.md,Complete remaining acceptance boundaries; component coverage is not full journey acceptance
 V3-E14,حفظ الأصل وإثبات البصمة والفرق بين الخام والمطبع,VERIFIED,tests/integration/test_autopsy_ingestion.py; tests/e2e/test_autopsy_browser.py,
 V3-E15,بحث وفلاتر وترقيم سجلات دون تحميل المجموعة كاملة,PARTIAL,docs/qa/v3-ingestion-2026-10-24.md,Complete remaining acceptance boundaries; component coverage is not full journey acceptance
-V3-E16,إسناد مجموعة سجلات لعضو وربطها بمهمة القضية,NOT_STARTED,,Complete remaining implementation and acceptance evidence
+V3-E16,إسناد مجموعة سجلات لعضو وربطها بمهمة القضية,VERIFIED,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,
 V3-E17,منع العضو من قراءة مجموعات أو قضايا خارج الإسناد المصرح,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
 V3-E18,تصدير CSV آمن من formulas وJSON/JSONL مطابق للفلاتر,VERIFIED,tests/integration/test_autopsy_ingestion.py; tests/e2e/test_autopsy_browser.py,
 V3-E19,حزمة قضية مع manifest واستيراد صحيح ورفض عبث بالبصمات,NOT_STARTED,,Complete remaining implementation and acceptance evidence
@@ -24,41 +24,41 @@ V3-E22,قبول IPv6 وhash صحيح ورفض قيم ومراجع كيان غي�
 V3-E23,كشف مؤشرات مكررة وربطها دون تسرب بين الفرق,NOT_STARTED,,Complete remaining implementation and acceptance evidence
 V3-E24,عرض URL مشبوه بلا زيارة تلقائية أو DNS خارجي,NOT_STARTED,,Complete remaining implementation and acceptance evidence
 V3-E25,أصول متعددة مهاجمة/مدافعة/وسيطة بأنواع ومالكين,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
-V3-E26,تنبيه بمصدر ونوع وخطورة وحالة، وربطه بسجلات القضية,NOT_STARTED,,Complete remaining implementation and acceptance evidence
+V3-E26,تنبيه بمصدر ونوع وخطورة وحالة، وربطه بسجلات القضية,PARTIAL,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,Complete full acceptance boundaries and deployment evidence; see current QA limitations
 V3-E27,فصل حكم التنبيه عن نجاح/فشل/جهالة نتيجة الهجوم,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
 V3-E28,إسناد مسؤول المراقبة ومحلل L1 مع حفظ التغير التاريخي,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
 V3-E29,تصعيد L1 إلى مستجيب L2، إقرار الاستلام وتوثيق الإجراء,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
 V3-E30,إحالة مستقلة من الاستجابة إلى المحقق مع الأدلة والسبب,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
 V3-E31,رفض/إعادة تصعيد وتسليم مناوبة دون فقد المسؤول السابق,NOT_STARTED,,Complete remaining implementation and acceptance evidence
 V3-E32,حساب الأزمنة مع UTC وDST وطوابع ناقصة/مستقبلية,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E33,SLA وتوقف مسبب وتنبيه داخلي وصلاحيات تجاوز,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E34,خط زمني من سجلات وملاحظات وإجراءات مع مصدر ودقة الوقت,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
+V3-E33,SLA وتوقف مسبب وتنبيه داخلي وصلاحيات تجاوز,PARTIAL,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,Complete full acceptance boundaries and deployment evidence; see current QA limitations
+V3-E34,خط زمني من سجلات وملاحظات وإجراءات مع مصدر ودقة الوقت,PARTIAL,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,Complete full acceptance boundaries and deployment evidence; see current QA limitations
 V3-E35,فرضيات وأدلة مؤيدة/ناقضة وتصحيح بإصدار,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
-V3-E36,ربط ATT&CK محليًا بإصدار وثقة ودليل، دون إنترنت,NOT_STARTED,,Complete remaining implementation and acceptance evidence
+V3-E36,ربط ATT&CK محليًا بإصدار وثقة ودليل، دون إنترنت,VERIFIED,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,
 V3-E37,سبب جذري وعوامل مساهمة وأثر وتوصيات مرتبطة,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
 V3-E38,نشر Playbook من المدير ورفض تعديل غير مصرح,VERIFIED,tests/integration/test_autopsy_procedures.py; tests/integration/test_autopsy_reports.py; tests/e2e/test_autopsy_browser.py,
 V3-E39,نسخة إجراء ثابتة داخل القضية بعد تحديث قالب المكتبة,VERIFIED,tests/integration/test_autopsy_procedures.py; tests/integration/test_autopsy_reports.py; tests/e2e/test_autopsy_browser.py,
 V3-E40,إكمال وفشل وعدم انطباق خطوة مع دليل وموافقة لازمة,VERIFIED,tests/integration/test_autopsy_procedures.py; tests/integration/test_autopsy_reports.py; tests/e2e/test_autopsy_browser.py,
 V3-E41,توثيق احتواء وتعافٍ والتحقق دون تنفيذ أوامر خارجية,PARTIAL,docs/qa/v3-procedures-reports-2026-10-24.md,Complete remaining acceptance boundaries; verified components do not establish full V3 acceptance
-V3-E42,استيراد تقرير VirusTotal يدوي وعرض المصدر والوقت والقيود,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E43,رفض تقرير بصمة مختلفة أو مخطط/حجم غير مقبول,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E44,حجر عينة ورفض عرض نشط/تنزيل بلا صلاحية وعدم تنفيذها,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E45,تحليل محلي اصطناعي بحدود موارد وعدم وجود egress,NOT_STARTED,,Complete remaining implementation and acceptance evidence
+V3-E42,استيراد تقرير VirusTotal يدوي وعرض المصدر والوقت والقيود,VERIFIED,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,
+V3-E43,رفض تقرير بصمة مختلفة أو مخطط/حجم غير مقبول,VERIFIED,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,
+V3-E44,حجر عينة ورفض عرض نشط/تنزيل بلا صلاحية وعدم تنفيذها,VERIFIED,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,
+V3-E45,تحليل محلي اصطناعي بحدود موارد وعدم وجود egress,PARTIAL,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,Complete full acceptance boundaries and deployment evidence; see current QA limitations
 V3-E46,تقرير تنفيذي وفني مكتمل آليًا بمراجع الأدلة والقرارات,PARTIAL,docs/qa/v3-procedures-reports-2026-10-24.md,Complete remaining acceptance boundaries; verified components do not establish full V3 acceptance
 V3-E47,اعتماد تقرير بإصدار وبصمة ثم إصدار جديد مع حفظ القديم,VERIFIED,tests/integration/test_autopsy_procedures.py; tests/integration/test_autopsy_reports.py; tests/e2e/test_autopsy_browser.py,
-V3-E48,PDF/HTML عربي إنجليزي طويل بلا تداخل أو قص أو طلبات شبكة,PARTIAL,docs/qa/v3-procedures-reports-2026-10-24.md,Complete remaining acceptance boundaries; verified components do not establish full V3 acceptance
+V3-E48,PDF/HTML عربي إنجليزي طويل بلا تداخل أو قص أو طلبات شبكة,PARTIAL,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,Complete full acceptance boundaries and deployment evidence; see current QA limitations
 V3-E49,منع الإغلاق قبل الحد الأدنى، ثم إغلاق وإعادة فتح بسبب,VERIFIED,tests/integration/test_autopsy_procedures.py; tests/integration/test_autopsy_reports.py; tests/e2e/test_autopsy_browser.py,
 V3-E50,تعديل متزامن من مستخدمين ورفض الكتابة القديمة دون فقد بيانات,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
-V3-E51,دعوة/إيقاف عضو وسحب جلساته وتسليم مهامه,NOT_STARTED,,Complete remaining implementation and acceptance evidence
+V3-E51,دعوة/إيقاف عضو وسحب جلساته وتسليم مهامه,VERIFIED,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,
 V3-E52,صلاحيات كل دور، مع BOLA/IDOR على القوائم والبحث والملفات والتقارير,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
 V3-E53,حقن XSS/SQL/أوامر/CRLF وmass assignment في المدخلات والمرفقات,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
 V3-E54,تجاوز حصص الطلبات وحدود البحث/الرفع والتعافي دون تعطيل الخدمة,NOT_STARTED,,Complete remaining implementation and acceptance evidence
 V3-E55,هجرة نسخة V2 مع الأعداد والبصمات والعلاقات واسترجاع النسخة الاحتياطية,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E56,اختفاء وظائف التدريب وتعطيل APIs التشغيلية الخاصة بها دون فقد التاريخ,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
+V3-E56,اختفاء وظائف التدريب وتعطيل APIs التشغيلية الخاصة بها دون فقد التاريخ,PARTIAL,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,Complete full acceptance boundaries and deployment evidence; see current QA limitations
 V3-E57,واجهة 360–1920 وتكبير 200% ولوحة مفاتيح وcombobox وRTL/LTR,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
-V3-E58,عزل شبكة مثبت للتطبيق والعمال والتقارير وعدم إرسال أي بيانات للخارج,PARTIAL,docs/qa/v3-ingestion-2026-10-24.md,Complete remaining acceptance boundaries; component coverage is not full journey acceptance
+V3-E58,عزل شبكة مثبت للتطبيق والعمال والتقارير وعدم إرسال أي بيانات للخارج,PARTIAL,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,Complete full acceptance boundaries and deployment evidence; see current QA limitations
 V3-E59,حمل ممثل وقياسات p95/p99 وموارد، مع حدود وسعة مثبتة لا مفترضة,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E60,انقطاع خدمة/عامل، ثم إعادة تشغيل واستعادة القضية والمهام والأدلة والتدقيق,PARTIAL,docs/qa/v3-procedures-reports-2026-10-24.md,Complete remaining acceptance boundaries; verified components do not establish full V3 acceptance
+V3-E60,انقطاع خدمة/عامل، ثم إعادة تشغيل واستعادة القضية والمهام والأدلة والتدقيق,PARTIAL,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,Complete full acceptance boundaries and deployment evidence; see current QA limitations
 V3-E61,استيراد PCAP وPCAPNG واستخلاص تدفقات ومؤشرات دون التقاط حي أو زيارة عناوين,VERIFIED,tests/integration/test_autopsy_ingestion.py; tests/e2e/test_autopsy_browser.py,
 V3-E62,ملف شبكة تالف/مبتور/ضخم وحدود المحلل وعرض نقص التغطية والتشفير بصدق,PARTIAL,docs/qa/v3-ingestion-2026-10-24.md,Complete remaining acceptance boundaries; component coverage is not full journey acceptance
 V3-E63,Pipeline بإصدارات ومعاينة وحجر وإعادة معالجة دون تعديل الأصل,PARTIAL,docs/qa/v3-ingestion-2026-10-24.md,Complete remaining acceptance boundaries; component coverage is not full journey acceptance
@@ -66,11 +66,11 @@ V3-E64,استيراد TI وGeoIP محليًا مع مصدر وإصدار وصل�
 V3-E65,Sigma مدعومة تُطابق fixtures، ورفض operator غير مدعوم وYAML عدائي,NOT_STARTED,,Complete remaining implementation and acceptance evidence
 V3-E66,تجميع تنبيهات وفك التجميع مع حفظ الأدلة وsuppression منتهية الصلاحية,NOT_STARTED,,Complete remaining implementation and acceptance evidence
 V3-E67,كشف شذوذ محلي قابل للتفسير، مع cold start وإصدار baseline ونتائج سلبية,NOT_STARTED,,Complete remaining implementation and acceptance evidence
-V3-E68,تعليقات وbookmarks ووسوم ومناظر زمنية مشتركة دون تضارب أو تسرب صلاحيات,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
-V3-E69,War Room تربط قرارًا ومهمة ودليلًا بالتقرير، وتحجب الملاحظة المقيدة,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
+V3-E68,تعليقات وbookmarks ووسوم ومناظر زمنية مشتركة دون تضارب أو تسرب صلاحيات,PARTIAL,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,Complete full acceptance boundaries and deployment evidence; see current QA limitations
+V3-E69,War Room تربط قرارًا ومهمة ودليلًا بالتقرير، وتحجب الملاحظة المقيدة,PARTIAL,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,Complete full acceptance boundaries and deployment evidence; see current QA limitations
 V3-E70,5 Whys متفرعة/ناقصة بأدلتها، مع إجراء تصحيحي ومالك وتحقق من الفاعلية,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
 V3-E71,أقدم أصل مثبت ونطاق ضرر مؤكد/محتمل/غير مفحوص مع ظهور حدود الاستنتاج,PARTIAL,tests/integration/test_autopsy_core.py,Complete remaining implementation and acceptance evidence
 V3-E72,MTTD وقياسات الاستجابة ببيانات صالحة وناقصة، دون اختراع بداية أو متوسط مضلل,PARTIAL,docs/qa/v3-procedures-reports-2026-10-24.md,Complete remaining acceptance boundaries; verified components do not establish full V3 acceptance
-V3-E73,تصدير DOCX وMarkdown متسق مع PDF والهوية، بلا macros أو روابط نشطة خارجية,PARTIAL,docs/qa/v3-procedures-reports-2026-10-24.md,Complete remaining acceptance boundaries; verified components do not establish full V3 acceptance
-V3-E74,مسودة Postmortem ومراجعتها ثم متابعة إجراء تصحيحي بعد إغلاق القضية,PARTIAL,docs/qa/v3-procedures-reports-2026-10-24.md,Complete remaining acceptance boundaries; verified components do not establish full V3 acceptance
+V3-E73,تصدير DOCX وMarkdown متسق مع PDF والهوية، بلا macros أو روابط نشطة خارجية,PARTIAL,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,Complete full acceptance boundaries and deployment evidence; see current QA limitations
+V3-E74,مسودة Postmortem ومراجعتها ثم متابعة إجراء تصحيحي بعد إغلاق القضية,PARTIAL,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,Complete full acceptance boundaries and deployment evidence; see current QA limitations
 V3-E75,حزمة جمع أدلة داخلية بوصفة ومصدر وصلاحيات، دون افتراض وجود agent أو VQL منفذ,NOT_STARTED,,Complete remaining implementation and acceptance evidence

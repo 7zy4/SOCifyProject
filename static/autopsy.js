@@ -13,6 +13,9 @@ const autopsyLabels = {
 
 function autopsyLabel(value) { return autopsyLabels[value] || value; }
 
+autopsyLabels.reason = "السبب";
+Object.assign(autopsyLabels, { handoff_to: "العضو البديل للمسؤوليات", assignee: "المحلل المسؤول", instructions: "المطلوب تحليله وتسليمه", email: "البريد الإلكتروني الداخلي" });
+
 function autopsySelect(name, values, current = "") {
   return node("select", { name }, values.map((value) => node("option", { value, selected: value === current, text: autopsyLabel(value) })));
 }
@@ -189,6 +192,7 @@ async function autopsyCase(caseId) {
     for (const kind of ["asset", "indicator", "hypothesis", "foothold"]) content.append(await autopsyRecordPanel(kind));
     if (window.SOCifyAutopsy.analysis) content.append(await window.SOCifyAutopsy.analysis(caseId));
   } else if (selected === "investigation") {
+    if (window.SOCifyAutopsy.investigation) content.append(await window.SOCifyAutopsy.investigation(caseId));
     for (const kind of ["timeline", "root_cause", "war_room"]) content.append(await autopsyRecordPanel(kind));
   } else if (selected === "response") {
     for (const kind of ["escalation", "response", "corrective"]) content.append(await autopsyRecordPanel(kind));
@@ -209,7 +213,7 @@ async function autopsyStart() {
   const caseId = document.querySelector('meta[name="case-id"]')?.content;
   if (caseId) return autopsyCase(Number(caseId));
   if (state.section === "playbooks" && window.SOCifyAutopsy.procedureLibrary) return window.SOCifyAutopsy.procedureLibrary();
-  if (state.section === "team") return renderTeam();
+  if (state.section === "team") return window.SOCifyAutopsy.team();
   if (state.section === "my-tasks") {
     begin("my-tasks");
     finish(panel("مهامي داخل القضايا", autopsy.team.assignments.length ? table([{ label: "القضية", value: (row) => linkedButton(row.case_title, `/cases/${row.case_id}`) }, { label: "المهمة", value: "instructions" }, { label: "الحالة", value: "task_status" }], autopsy.team.assignments) : emptyState("لا دفعات مسندة", "تظهر مهام تحليل السجلات التي يسندها مدير الفريق إليك هنا."), true));

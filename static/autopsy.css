@@ -10,6 +10,8 @@
 .autopsy-shell .case-tabs { display: flex; flex-wrap: wrap; gap: 10pt; padding-block: 17pt; margin-block: 17pt; border-block: 1px solid var(--line-soft); }
 .autopsy-shell .case-tabs [aria-current="page"] { background: var(--blue); color: var(--panel); }
 .autopsy-shell .case-content { display: grid; gap: 17pt; min-width: 0; }
+.autopsy-shell .case-content > *, .autopsy-shell .panel-body { min-width: 0; max-width: 100%; }
+.autopsy-shell .graph-canvas { width: 100%; max-width: 100%; }
 .autopsy-shell .record-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 17pt; }
 .autopsy-shell dl { margin: 0; }
 .autopsy-shell dt { font-size: 14pt; font-weight: 700; color: var(--muted); }
@@ -31,3 +33,7 @@
   .autopsy-shell .sidebar nav a { flex: 1; justify-content: center; }
   .autopsy-shell .case-tabs .button { flex: 1 1 140px; }
 }
+.autopsy-timeline { list-style: none; padding: 0; }
+.autopsy-timeline > li { border-inline-start: 4px solid #1C4286; padding: 1rem; margin-block: 1rem; background: #FBF7F0; overflow-wrap: anywhere; }
+.autopsy-timeline > li.timeline-mark-orange { border-color: #DD4027; }
+.autopsy-timeline > li.timeline-mark-gold { border-color: #F3A257; }

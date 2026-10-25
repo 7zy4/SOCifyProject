@@ -15,6 +15,7 @@ window.SOCifyAutopsy.reports = async (caseId) => {
   }, "primary");
   body.append(field("سياسة مشاركة التقرير", choice.control), create, button("تحديث حالة التقارير", () => autopsyCase(caseId).catch(handleError)));
   let pending = false;
+  if (current.archived_reports?.length) body.append(panel("أرشيف تقارير V2 · النسخ الأصلية محفوظة دون إعادة توليد", table([{ label: "الإصدار", value: "revision" }, { label: "الصيغة", value: "format" }, { label: "البصمة", value: "sha256" }, { label: "الملف", value: (item) => permission("evidence.download") ? linkedButton("تنزيل النسخة المؤرشفة", `/api/incidents/${caseId}/report?format=${item.format}&revision=${item.revision}`) : "التنزيل يتطلب صلاحية مستقلة" }], current.archived_reports)));
   for (const item of current.reports) {
     const report = await api(`/api/cases/${caseId}/reports/${item.id}`);
     const stale = report.source_version !== current.version;
