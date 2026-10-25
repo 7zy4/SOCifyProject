@@ -34,7 +34,16 @@ def read_artifact(path, maximum=20 * 1024 * 1024):
 
 
 def compute_artifacts(payload, operation, formats, timeout, isolated_container=False):
-    if operation not in {"report", "sample", "probe"} or set(formats) - {"json", "html", "md", "docx", "pdf", "analysis", "probe"}:
+    if operation not in {"report", "sample", "probe", "yara_validation"} or set(formats) - {
+        "json",
+        "html",
+        "md",
+        "docx",
+        "pdf",
+        "analysis",
+        "probe",
+        "validation",
+    }:
         raise ValueError("Unknown local analysis operation")
     if not isolated_container and os.environ.get("SOCIFY_ANALYSIS_SOCKET"):
         from .analysis_transport import remote_artifacts
@@ -158,9 +167,29 @@ def run_autopsy_worker_once(identity="local-autopsy-worker"):
             if not sample:
                 raise ValueError("Quarantined sample is missing")
             content = cipher().decrypt(sample["ciphertext"])
-            analysis = compute_sample(
-                {"sample_id": sample["id"], "evidence_id": sample["evidence_id"], "sha256": sample["sha256"], "content": base64.b64encode(content).decode()}
-            )
+            payload = {
+                "sample_id": sample["id"],
+                "evidence_id": sample["evidence_id"],
+                "sha256": sample["sha256"],
+                "content": base64.b64encode(content).decode(),
+            }
+            if parameters.get("yara_pack_id") is not None:
+                pack = (
+                    get_db()
+                    .execute(
+                        "SELECT p.* FROM autopsy_yara_packs p JOIN incident_cases c ON c.workspace_id=p.workspace_id WHERE p.id=? AND c.id=?",
+                        (parameters["yara_pack_id"], job["case_id"]),
+                    )
+                    .fetchone()
+                )
+                if not pack or hashlib.sha256(pack["source"].encode()).hexdigest() != parameters.get("yara_pack_sha256"):
+                    raise ValueError("YARA snapshot integrity failed")
+                payload.update(
+                    rules=pack["source"],
+                    rules_source=pack["origin"],
+                    yara_pack={key: pack[key] for key in ("id", "name", "version", "license", "origin", "sha256")},
+                )
+            analysis = compute_sample(payload)
         elif job["kind"] == "detection":
             from .autopsy_detection import run_detection_job
 

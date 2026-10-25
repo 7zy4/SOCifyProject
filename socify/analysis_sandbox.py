@@ -227,7 +227,7 @@ def harden(directory: Path) -> dict:
 def main() -> int:
     operation = os.environ.get("SOCIFY_ANALYSIS_OPERATION")
     output = os.environ.get("SOCIFY_ANALYSIS_OUTPUT")
-    if len(sys.argv) != 1 or operation not in {"report", "sample", "probe"} or not output:
+    if len(sys.argv) != 1 or operation not in {"report", "sample", "probe", "yara_validation"} or not output:
         return 2
     directory = Path(output).resolve()
     try:
@@ -238,7 +238,7 @@ def main() -> int:
 
         from .autopsy_domain import canonical
         from .autopsy_report_render import render_files
-        from .autopsy_static_analysis import analyze_sample
+        from .autopsy_static_analysis import analyze_sample, validate_yara
 
         _ = Document, HTML
         tempfile.tempdir = str(directory)
@@ -251,6 +251,10 @@ def main() -> int:
             result = analyze_sample(payload)
             result["isolation"] = boundary
             files = {"analysis": canonical(result).encode()}
+        elif operation == "yara_validation":
+            result = validate_yara(payload)
+            result["isolation"] = boundary
+            files = {"validation": canonical(result).encode()}
         elif operation == "report":
             files = render_files(payload)
         else:

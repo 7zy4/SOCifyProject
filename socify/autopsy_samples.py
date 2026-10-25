@@ -114,8 +114,12 @@ def download_sample(case_id: int, sample_id: int):
 @require_permission("cases.update")
 def queue_analysis(case_id: int, sample_id: int):
     data = request.get_json(silent=True)
-    if not isinstance(data, dict) or data:
-        return error_response("INVALID_ANALYSIS", "التحليل يستخدم سياسة وقواعد محلية ثابتة؛ أرسل كائنًا فارغًا", 422)
+    if (
+        not isinstance(data, dict)
+        or set(data) - {"yara_pack_id"}
+        or ("yara_pack_id" in data and (type(data["yara_pack_id"]) is not int or data["yara_pack_id"] < 1))
+    ):
+        return error_response("INVALID_ANALYSIS", "أرسل كائنًا فارغًا أو رقم حزمة YARA محلية منشورة", 422)
     with transaction():
         case = _case_row(case_id)
         if not case:
@@ -125,15 +129,27 @@ def queue_analysis(case_id: int, sample_id: int):
         sample = get_db().execute("SELECT id FROM autopsy_samples WHERE case_id = ? AND id = ?", (case_id, sample_id)).fetchone()
         if not sample:
             return error_response("SAMPLE_NOT_FOUND", "العينة غير متاحة", 404)
+        parameters = {"sample_id": sample_id}
+        if "yara_pack_id" in data:
+            pack = (
+                get_db()
+                .execute("SELECT id,sha256 FROM autopsy_yara_packs WHERE id=? AND workspace_id=?", (data["yara_pack_id"], case["workspace_id"]))
+                .fetchone()
+            )
+            if not pack:
+                return error_response("YARA_PACK_NOT_FOUND", "الحزمة غير متاحة في الفريق", 404)
+            parameters.update(yara_pack_id=pack["id"], yara_pack_sha256=pack["sha256"])
         prior = (
             get_db()
             .execute(
-                "SELECT id FROM autopsy_jobs WHERE case_id = ? AND kind = 'sample' AND json_extract(parameters, '$.sample_id') = ? AND state IN ('queued', 'processing')",
+                "SELECT id,parameters FROM autopsy_jobs WHERE case_id = ? AND kind = 'sample' AND json_extract(parameters, '$.sample_id') = ? AND state IN ('queued', 'processing')",
                 (case_id, sample_id),
             )
             .fetchone()
         )
         if prior:
+            if json.loads(prior["parameters"]).get("yara_pack_id") != parameters.get("yara_pack_id"):
+                return error_response("ANALYSIS_ALREADY_QUEUED", "انتظر التحليل الحالي قبل تغيير حزمة القواعد", 409)
             return jsonify({"id": prior["id"], "duplicate": True})
         active = (
             get_db()
@@ -148,10 +164,10 @@ def queue_analysis(case_id: int, sample_id: int):
         identifier = inserted_id(
             get_db().execute(
                 "INSERT INTO autopsy_jobs(case_id, kind, parameters, created_by, created_at) VALUES (?, 'sample', ?, ?, ?)",
-                (case_id, canonical({"sample_id": sample_id}), actor_id(), iso_now()),
+                (case_id, canonical(parameters), actor_id(), iso_now()),
             )
         )
-        custody(case_id, "sample_analysis_queued", {"job_id": identifier, "sample_id": sample_id})
+        custody(case_id, "sample_analysis_queued", {"job_id": identifier, **parameters})
     return jsonify({"id": identifier, "state": "queued"}), 202
 
 

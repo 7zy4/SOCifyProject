@@ -1100,6 +1100,53 @@
         }
       }
     },
+    "/api/autopsy/yara": {
+      "get": {
+        "operationId": "autopsy_yara_list_packs_get__api_autopsy_yara",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "autopsy_yara_publish_pack_post__api_autopsy_yara",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/cases": {
       "get": {
         "operationId": "autopsy_cases_list_get__api_cases",
@@ -1692,6 +1739,46 @@
             }
           }
         ]
+      }
+    },
+    "/api/cases/{case_id}/handoff": {
+      "post": {
+        "operationId": "teams_shift_handoff_post__api_cases_case_id_handoff",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
       }
     },
     "/api/cases/{case_id}/imports": {

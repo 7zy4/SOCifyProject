@@ -22,7 +22,7 @@ def transition(client, case_id, status, path="/api/cases"):
     return client.post(f"{path}/{case_id}/transitions", json={"status": status, "version": version, "reason": "Documented investigation decision"})
 
 
-def test_local_report_formats_snapshot_review_and_closure(autopsy_case, app, client, login_as, database):
+def test_local_report_formats_snapshot_review_and_closure(autopsy_case, app, client, login_as, database, user_ids):
     case_id = autopsy_case
     base = f"/api/cases/{case_id}"
     for visibility, body in (("private", "PRIVATE_NOTE_NOT_FOR_REPORT"), ("team", "SHARED_DECISION_FOR_REPORT")):
@@ -91,6 +91,58 @@ def test_local_report_formats_snapshot_review_and_closure(autopsy_case, app, cli
     assert transition(client, case_id, "closed").status_code == 200
     assert client.get(base).json["status"] == "closed"
     assert client.post(base + "/records/asset", json={"name": "Late edit", "type": "workstation", "role": "defender"}).status_code == 409
+    login_as("analyst")
+    postmortem = client.post(base + "/postmortems", json={"version": client.get(base).json["version"]})
+    assert postmortem.status_code == 201, postmortem.json
+    corrective = client.post(
+        base + "/records/corrective",
+        json={
+            "title": "Retain missing initial-access logs",
+            "owner_id": user_ids["analyst"],
+            "due_at": "2026-11-01T10:00:00Z",
+            "status": "open",
+            "root_cause_id": client.get(base + "/records?kind=root_cause").json["items"][0]["id"],
+        },
+    )
+    assert corrective.status_code == 201, corrective.json
+    login_as("soc_manager")
+    reviewed = client.post(
+        base + f"/postmortems/{postmortem.json['id']}/review",
+        json={
+            "version": 1,
+            "case_version": client.get(base).json["version"],
+            "executive_summary": "Retained evidence reviewed after closure",
+            "lessons": "Improve initial-access source retention",
+            "limitations": "Initial access remains unverified",
+        },
+    )
+    assert reviewed.status_code == 409 and reviewed.json["error"]["code"] == "STALE_POSTMORTEM"
+    login_as("analyst")
+    current_draft = client.post(base + "/postmortems", json={"version": client.get(base).json["version"]})
+    assert current_draft.status_code == 201
+    login_as("soc_manager")
+    reviewed = client.post(
+        base + f"/postmortems/{current_draft.json['id']}/review",
+        json={
+            "version": 1,
+            "case_version": client.get(base).json["version"],
+            "executive_summary": "Retained evidence and corrective plan reviewed after closure",
+            "lessons": "Improve initial-access source retention",
+            "limitations": "Initial access remains unverified",
+        },
+    )
+    assert reviewed.status_code == 200, reviewed.json
+    resolved = client.patch(
+        base + f"/records/{corrective.json['id']}",
+        json={
+            "version": 1,
+            "payload": {**corrective.json["payload"], "status": "validated", "validation": "Verified source retention in a synthetic recurrence exercise"},
+        },
+    )
+    assert resolved.status_code == 200, resolved.json
+    assert client.get(base).json["status"] == "closed"
+    assert client.get(path + "/files/pdf").data == pdf.data
+    assert client.get(path).json["payload"] == snapshot
     assert transition(client, case_id, "reopened").status_code == 200
     assert client.get(path + "/files/pdf").data == pdf.data
     newer = request_report(client, case_id)

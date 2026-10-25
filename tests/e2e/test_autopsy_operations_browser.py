@@ -1,3 +1,4 @@
+import base64
 import json
 import shutil
 import threading
@@ -64,12 +65,47 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
             sigma_panel.locator("input[name=reason]").fill("Reviewed synthetic browser fixtures")
             sigma_panel.get_by_role("button", name="حفظ", exact=True).click()
             page.get_by_role("cell", name="Browser synthetic rule", exact=True).wait_for()
+            yara_panel = page.locator("section.panel").filter(has=page.get_by_role("heading", name="حزم YARA المحلية", exact=True))
+            yara_panel.get_by_label("ملف قواعد YARA", exact=True).set_input_files(
+                {"name": "synthetic.yar", "mimeType": "text/plain", "buffer": b'rule Browser_Test { strings: $a = "SOCIFY_BROWSER_MARKER" condition: $a }'}
+            )
+            yara_panel.get_by_label("أمثلة YARA الاصطناعية", exact=True).set_input_files(
+                {
+                    "name": "fixtures.json",
+                    "mimeType": "application/json",
+                    "buffer": json.dumps(
+                        {
+                            "positive": [base64.b64encode(b"SOCIFY_BROWSER_MARKER").decode()],
+                            "negative": [base64.b64encode(b"Unrelated synthetic bytes").decode()],
+                        }
+                    ).encode(),
+                }
+            )
+            for name, value in (
+                ("name", "Browser YARA pack"),
+                ("version", "1"),
+                ("origin", "Internal synthetic browser fixture"),
+                ("license", "Synthetic test permission"),
+            ):
+                yara_panel.locator(f"input[name={name}]").fill(value)
+            yara_panel.get_by_role("button", name="حفظ", exact=True).click()
+            page.get_by_role("cell", name="Browser YARA pack", exact=True).wait_for()
             violations = page.evaluate("async () => (await axe.run(document)).violations.filter(item => ['serious', 'critical'].includes(item.impact))")
             assert not violations, violations
             case = page.evaluate(
                 "async () => await api('/api/cases',{method:'POST',body:{title:'Browser integrated operations',reason:'alert_review',objective:'Verify linked local investigation workflow'}})"
             )
             case_id = case["id"]
+            page.goto(f"http://127.0.0.1:{server.server_port}/cases/{case_id}")
+            handoff = page.locator("section.panel").filter(has=page.get_by_role("heading", name="تسليم المناوبة", exact=True))
+            team = page.evaluate("async () => await api('/api/team')")
+            manager_name = next(member["name"] for member in team["members"] if member["role"] == "soc_manager")
+            analyst_name = next(member["name"] for member in team["members"] if member["role"] == "analyst")
+            handoff.locator("input[name=from_user]").fill(manager_name + " · مدير الفريق")
+            handoff.locator("input[name=to_user]").fill(analyst_name + " · محلل")
+            handoff.locator("input[name=reason]").fill("Scheduled shift transfer with retained prior access")
+            handoff.get_by_role("button", name="حفظ", exact=True).click()
+            page.get_by_role("cell", name="previous_shift", exact=True).wait_for()
             page.evaluate(
                 "id => api(`/api/cases/${id}/imports`,{method:'POST',body:{filename:'browser.json',content:JSON.stringify([{title:'Browser suspicious log',source_ip:'192.0.2.8'}])}})",
                 case_id,
@@ -121,8 +157,17 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
             page.get_by_role("heading", name="حزم القضية والاستعادة والأرشيف", exact=True).wait_for()
             with page.expect_download() as download:
                 page.get_by_role("link", name="تصدير حزمة الفريق", exact=True).click()
-            assert Path(download.value.path()).read_bytes().startswith(b"PK")
-            for width in (360, 390, 768, 1440):
+            capsule = Path(download.value.path()).read_bytes()
+            assert capsule.startswith(b"PK")
+            page.goto(f"http://127.0.0.1:{server.server_port}/analysis-library")
+            page.get_by_label("حزمة قضية محلية", exact=True).set_input_files({"name": "case.zip", "mimeType": "application/zip", "buffer": capsule})
+            page.get_by_role("button", name="استعادة كقضية جديدة", exact=True).click()
+            page.wait_for_url("**/cases/*?tab=reports")
+            assert f"/cases/{case_id}?" not in page.url
+            page.get_by_role("button", name="فحص الأرشيف", exact=True).click()
+            page.get_by_role("dialog").locator("pre").filter(has_text="Browser integrated operations").wait_for()
+            page.get_by_role("dialog").get_by_role("button", name="إغلاق", exact=True).click()
+            for width in (360, 390, 768, 1440, 1920):
                 page.set_viewport_size({"width": width, "height": 1000})
                 assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), width
             page.goto(f"http://127.0.0.1:{server.server_port}/profile")

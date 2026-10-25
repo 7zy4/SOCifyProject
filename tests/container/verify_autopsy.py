@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import http.client
 import json
@@ -82,6 +83,32 @@ def main():
     findings = call(base + "/records?kind=analysis")["items"]
     assert findings[0]["payload"]["execution"] == "never executed"
     assert findings[0]["payload"]["yara_matches"][0]["rule"] == "SOCify_EICAR_Test_Marker"
+    pack = call(
+        "/api/autopsy/yara",
+        {
+            "name": "Synthetic production pack",
+            "version": 1,
+            "origin": "Internal synthetic acceptance",
+            "license": "Synthetic test permission",
+            "source": 'rule Production_Test { strings: $a = "SOCify-production-fixture" condition: $a }',
+            "fixtures": {"positive": [base64.b64encode(b"SOCify-production-fixture").decode()], "negative": [base64.b64encode(b"unrelated bytes").decode()]},
+        },
+    )
+    assert pack["validation"]["valid"] and pack["validation"]["isolation"]["syscalls"] == "linux-seccomp"
+    custom = call(base + "/samples/" + str(quarantined["id"]) + "/analyze", {"yara_pack_id": pack["id"]})
+    assert wait(base + "/jobs/" + str(custom["id"]), "state", {"queued", "processing"})["state"] == "completed"
+    result = call(base + "/records?kind=analysis")["items"][0]["payload"]
+    assert result["yara_pack"]["id"] == pack["id"] and not result["yara_matches"]
+    archived, _ = call(base + "/capsule?profile=backup", raw=True)
+    restore_boundary = "SOCifyRestore" + secrets.token_hex(12)
+    restore_body = (
+        f'--{restore_boundary}\r\nContent-Disposition: form-data; name="file"; filename="case.zip"\r\nContent-Type: application/zip\r\n\r\n'.encode()
+        + archived
+        + f"\r\n--{restore_boundary}--\r\n".encode()
+    )
+    restored = call("/api/cases/import-capsule", restore_body, "multipart/form-data; boundary=" + restore_boundary)
+    assert restored["case_id"] != case["id"]
+    assert call("/api/cases/" + str(restored["case_id"]) + "/logs")["total"] == 1
     report = call(base + "/reports", {"version": call(base)["version"]})
     state = wait(base + "/jobs/" + str(report["job_id"]), "state", {"queued", "processing"})
     assert state["state"] == "completed", state
@@ -101,6 +128,8 @@ def main():
                 "import_state": import_status["status"],
                 "static_analysis": analysis_status["state"],
                 "sample_executed": False,
+                "custom_yara_validation_and_versioned_scan": True,
+                "case_archive_restore": True,
                 "report_state": state["state"],
                 "formats": ready["formats"],
                 "pdf_sha256_verified": True,

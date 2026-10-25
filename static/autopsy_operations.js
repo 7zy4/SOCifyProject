@@ -49,6 +49,16 @@ window.SOCifyAutopsy.library = async () => {
     form.append(autopsyAction("تحقق من الترجمة والاختبارات دون نشر", async () => { const result = await api("/api/autopsy/sigma/compile", { method: "POST", body: await compile() }); preview.replaceChildren(node("p", { text: "اجتازت الأمثلة الإيجابية والسلبية. التحقق لا يثبت تغطية جميع التهديدات." }), node("pre", { text: JSON.stringify(result.compiled, null, 2) })); }), preview);
     root.append(panel("تحقق ونشر Sigma subset", node("div", { class: "panel-body" }, [node("p", { text: `النطاق: ${rules.capabilities.conditions}. غير المدعوم يُرفض: ${rules.capabilities.unsupported.join("، ")}. لا يثبت اجتياز fixtures دقة الكشف في بيانات الشركة.` }), form]), true));
   }
+  const yara = await api("/api/autopsy/yara");
+  const yaraBody = node("div", { class: "panel-body" }, [node("p", { text: "حزم محلية ثابتة بإصدارات ورخص وبصمات. تنشر بعد تجميع معزول ونجاح أمثلة إيجابية وسلبية؛ لا تنزيل أو تحديث خارجي. لا يثبت غياب التطابق سلامة العينة." }), table([{ label: "الاسم", value: "name" }, { label: "الإصدار", value: "version" }, { label: "المصدر والرخصة", value: (row) => `${row.origin} · ${row.license}` }, { label: "SHA-256", value: "sha256" }], yara.items)]);
+  if (permission("rules.manage")) {
+    const packFile = node("input", { type: "file", accept: ".yar,.yara,text/plain", required: true, "aria-label": "ملف قواعد YARA" });
+    const fixtureFile = node("input", { type: "file", accept: ".json,application/json", required: true, "aria-label": "أمثلة YARA الاصطناعية" });
+    const form = autopsyForm({ name: { required: true, max: 120 }, version: { required: true, integer: true, min: 1, max: 1000000 }, origin: { required: true, max: 1000 }, license: { required: true, max: 500 } }, async (body) => { if (!packFile.files[0] || packFile.files[0].size > 65536) throw new Error("ملف YARA مطلوب بحد 64 KiB"); await api("/api/autopsy/yara", { method: "POST", body: { ...body, source: await packFile.files[0].text(), fixtures: await autopsyReadJSON(fixtureFile, 768 * 1024) } }); await window.SOCifyAutopsy.library(); });
+    form.prepend(field("قواعد YARA محلية · حتى 64 KiB", packFile), field("fixtures JSON: positive وnegative، كل قائمة عينات base64 اصطناعية", fixtureFile));
+    yaraBody.append(form);
+  }
+  root.append(panel("حزم YARA المحلية", yaraBody, true));
   if (permission("cases.create") && permission("evidence.add")) {
     const file = node("input", { type: "file", accept: ".zip,application/zip", required: true, "aria-label": "حزمة قضية محلية" });
     const form = node("form", { class: "form-grid" }, [field("حزمة ZIP محلية · حتى 64 MiB موسعة", file), node("button", { type: "submit", class: "button primary", text: "استعادة كقضية جديدة" })]);

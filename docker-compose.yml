@@ -33,6 +33,7 @@ services:
       SOCIFY_DATABASE: /data/socify.db
       SOCIFY_HTTPS: "0"
       SOCIFY_TRUSTED_HOSTS: localhost,127.0.0.1
+      SOCIFY_ANALYSIS_SOCKET: /analysis-ipc/analysis.sock
     networks:
       - socify-internal
     mem_limit: 1g
@@ -40,6 +41,7 @@ services:
     pids_limit: 128
     volumes:
       - socify-data:/data
+      - analysis-ipc:/analysis-ipc:ro
     read_only: true
     tmpfs:
       - /tmp:size=64m,noexec,nosuid,nodev

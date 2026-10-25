@@ -17,6 +17,7 @@ from .autopsy_procedures import autopsy_procedures_api
 from .autopsy_reports import autopsy_reports_api
 from .autopsy_samples import autopsy_samples_api
 from .autopsy_workflow import autopsy_workflow_api
+from .autopsy_yara import autopsy_yara_api
 from .cases import cases_api
 from .config import build_config
 from .db import close_db, connect_path
@@ -64,6 +65,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         autopsy_capsules_api,
         autopsy_detection_api,
         autopsy_workflow_api,
+        autopsy_yara_api,
         autopsy_investigation_api,
         auth_api,
         events_api,

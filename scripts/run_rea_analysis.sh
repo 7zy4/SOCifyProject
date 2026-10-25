@@ -12,7 +12,8 @@ cp "$repository_root/templates/app.html" "$analysis_target/templates/app.html"
 cp "$repository_root/templates/register.html" "$analysis_target/templates/register.html"
 cp "$repository_root/templates/login.html" "$analysis_target/templates/login.html"
 if [[ -n "${SOCIFY_REA_CLI:-}" ]]; then
-  node "$SOCIFY_REA_CLI" analyze-javascript-application "$analysis_target" --json | tee "$output_path"
+  node "$SOCIFY_REA_CLI" analyze-javascript-application "$analysis_target" --artifact-format directory --max-heap-mb 768 --format json > "$output_path"
 else
-  NPM_CONFIG_CACHE="${NPM_CONFIG_CACHE:-/tmp/socify-rea-npm-cache}" npx -y rea-agents@6.7.0 analyze-javascript-application "$analysis_target" --json | tee "$output_path"
+  NPM_CONFIG_CACHE="${NPM_CONFIG_CACHE:-/tmp/socify-rea-npm-cache}" npx -y rea-agents@6.7.0 analyze-javascript-application "$analysis_target" --artifact-format directory --max-heap-mb 768 --format json > "$output_path"
 fi
+printf 'REA evidence saved: %s\n' "$output_path"

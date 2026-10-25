@@ -143,7 +143,7 @@ def test_stix_misp_bounded_import_and_validity(autopsy_case, app, client, login_
     assert client.post("/api/autopsy/intelligence/999999/activate").status_code == 404
 
 
-def test_sigma_publication_fixture_proof_backfill_and_alert_review(autopsy_case, app, client, login_as, database):
+def test_sigma_publication_fixture_proof_backfill_and_alert_review(autopsy_case, app, client, login_as, database, monkeypatch):
     base = f"/api/cases/{autopsy_case}"
     client.post(
         base + "/imports", json={"filename": "events.json", "content": json.dumps([{"title": "Synthetic suspicious log"}, {"title": "Synthetic routine log"}])}
@@ -182,6 +182,13 @@ def test_sigma_publication_fixture_proof_backfill_and_alert_review(autopsy_case,
     visible = client.get(base + "/alerts").json["items"][0]
     assert visible["suppressed"] and visible["review"]["attack_outcome"] == "blocked"
     assert visible["review"]["verdict"] == "false_positive"
+    with monkeypatch.context() as clock:
+        expired = utc_now() + timedelta(hours=2)
+        clock.setattr("socify.autopsy_detection.utc_now", lambda: expired)
+        visible = client.get(base + "/alerts").json["items"][0]
+        assert visible["suppressed"] is False
+        assert visible["review"]["suppressed_until"] == patch["suppressed_until"]
+        assert visible["review"]["group"] == "Synthetic cluster"
     assert client.patch(path, json={**patch, "version": 1, "group": "", "suppressed_until": None}).status_code == 200
     assert client.get(base + "/alerts").json["items"][0]["review"]["group"] == ""
     assert client.get(base + "/custody").json["integrity_valid"] is True

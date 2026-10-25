@@ -87,9 +87,9 @@ def main():
                     if not isinstance(message, dict) or set(message) != {"operation", "payload"} or not isinstance(message["operation"], str):
                         raise ValueError("Invalid analysis operation")
                     operation = message["operation"]
-                    if operation not in {"report", "sample", "probe"}:
+                    if operation not in {"report", "sample", "probe", "yara_validation"}:
                         raise ValueError("Unknown analysis operation")
-                    formats = list(FORMATS) if operation == "report" else ["analysis" if operation == "sample" else "probe"]
+                    formats = list(FORMATS) if operation == "report" else [{"sample": "analysis", "probe": "probe", "yara_validation": "validation"}[operation]]
                     try:
                         files = compute_artifacts(message["payload"], operation, formats, 50 if operation == "report" else 30, isolated_container=True)
                     finally:

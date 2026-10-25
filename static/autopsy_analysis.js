@@ -4,7 +4,10 @@ window.SOCifyAutopsy.analysis = async (caseId) => {
   const samples = await api(`/api/cases/${caseId}/samples`);
   const indicators = (await api(`/api/cases/${caseId}/records?kind=indicator&limit=100`)).items;
   const root = node("div");
+  const packs = await api("/api/autopsy/yara");
+  const packChoice = autopsyChoice("yara_pack_id", [{ value: "", label: "الافتراضي · علامة اختبار EICAR فقط" }, ...packs.items.map((pack) => ({ value: pack.id, label: `${pack.name} · v${pack.version} · ${pack.license}` }))]);
   const body = node("div", { class: "panel-body" }, node("p", { text: "حجر مشفر، وتحليل ساكن محلي بموارد محدودة. لا تنفيذ للعينة، ولا sandbox ديناميكي، ولا إرسال إلى خدمة خارجية. YARA الافتراضي يكتشف علامة اختبار EICAR فقط؛ غياب التطابق لا يثبت السلامة." }));
+  body.append(field("حزمة YARA لهذا الفحص · يحفظ الإصدار والبصمة", packChoice.control), linkedButton("إدارة حزم YARA المحلية", "/analysis-library"));
   if (permission("evidence.add") && autopsy.current.status !== "closed") {
     const file = node("input", { type: "file", required: true, name: "sample" });
     const form = node("form", { class: "filter-row" }, [field("عينة للفحص المحلي", file), node("button", { type: "submit", class: "button primary", text: "حجر العينة" })]);
@@ -13,7 +16,8 @@ window.SOCifyAutopsy.analysis = async (caseId) => {
   }
   body.append(table([{ label: "العينة", value: "filename" }, { label: "SHA-256", value: (row) => node("bdi", { text: row.sha256 }) }, { label: "الحجم", value: "size" }, { label: "الفحص", value: (row) => autopsy.current.can_update && autopsy.current.status !== "closed" ? button("تحليل ساكن محلي", async () => {
     try {
-      const queued = await api(`/api/cases/${caseId}/samples/${row.id}/analyze`, { method: "POST", body: {} });
+      const selected = packChoice.input.autopsyValue();
+      const queued = await api(`/api/cases/${caseId}/samples/${row.id}/analyze`, { method: "POST", body: selected ? { yara_pack_id: Number(selected) } : {} });
       const status = node("p", { role: "status", text: "العمل في الطابور المحلي. يمكنك إغلاق هذه النافذة؛ ستبقى المهمة محفوظة." });
       const dialog = autopsyModal("التحليل المحلي", node("div", {}, [status, button("تحديث النتيجة", () => { dialog.close(); autopsyCase(caseId).catch(handleError); })]));
       let attempts = 0;

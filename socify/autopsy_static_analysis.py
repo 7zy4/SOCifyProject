@@ -10,6 +10,45 @@ import yara
 BUILTIN_RULES = 'rule SOCify_EICAR_Test_Marker { strings: $a = "EICAR-STANDARD-ANTIVIRUS-TEST-FILE" condition: $a }'
 
 
+def validate_yara(payload):
+    source, fixtures = payload["rules"], payload["fixtures"]
+    if not isinstance(source, str) or len(source.encode()) > 65536:
+        raise ValueError("YARA rules exceed the local limit")
+    digest = hashlib.sha256(source.encode()).hexdigest()
+    try:
+        compiled = yara.compile(source=source, includes=False, error_on_warning=True)
+        rules = [rule.identifier for rule in compiled]
+        if not 1 <= len(rules) <= 100 or any(len(name) > 256 for name in rules):
+            raise ValueError("YARA rule count or identifier exceeds limits")
+        passed = {}
+        for kind in ("positive", "negative"):
+            items = fixtures[kind]
+            if not isinstance(items, list) or not 1 <= len(items) <= 10:
+                raise ValueError("YARA fixture count exceeds limits")
+            for encoded in items:
+                content = base64.b64decode(encoded, validate=True)
+                if not 1 <= len(content) <= 65536 or bool(compiled.match(data=content, timeout=1)) != (kind == "positive"):
+                    raise ValueError("YARA fixture mismatch")
+            passed[kind] = len(items)
+        return {
+            "valid": True,
+            "sha256": digest,
+            "engine_version": yara.__version__,
+            "rules": rules,
+            "fixtures_passed": passed,
+            "fixtures_sha256": hashlib.sha256(json_fixtures(fixtures)).hexdigest(),
+            "limitations": "Provided synthetic fixtures only; no malware-free verdict",
+        }
+    except (yara.Error, ValueError):
+        return {"valid": False, "sha256": digest}
+
+
+def json_fixtures(fixtures):
+    from .autopsy_domain import canonical
+
+    return canonical(fixtures).encode()
+
+
 def analyze_sample(payload):
     content = base64.b64decode(payload["content"], validate=True)
     if not content or len(content) > 10 * 1024 * 1024 or hashlib.sha256(content).hexdigest() != payload["sha256"]:
@@ -56,6 +95,9 @@ def analyze_sample(payload):
         "printable_strings_first_100": strings,
         "yara_rules_sha256": hashlib.sha256(source.encode()).hexdigest(),
         "yara_rules_source": payload.get("rules_source", "Bundled EICAR test marker only"),
+        "yara_pack": payload.get(
+            "yara_pack", {"name": "SOCify EICAR test marker", "version": 1, "license": "SOCify project license; synthetic test marker only"}
+        ),
         "yara_matches": [{"rule": match.rule, "tags": match.tags} for match in matches[:100]],
         "network": "no network queries",
         "execution": "never executed",

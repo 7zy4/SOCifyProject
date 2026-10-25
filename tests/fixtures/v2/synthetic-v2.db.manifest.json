@@ -1,0 +1,16 @@
+{
+  "source_commit": "ee50518ce3b1d0fb5a09215f4644fb3d9f416d83",
+  "schema_origin": "Actual socify-version-2 code from git archive; no V3 imports",
+  "synthetic_only": true,
+  "credential_key": "test-credential-key",
+  "sha256": "4b2a29c12196403907647724f0567a4a7baa709d48e2eb92d9af380f95401605",
+  "compressed_sha256": "6697cb2db9866543ba848112eadf793fa088bc260584b4b01630c80539262ee0",
+  "case_id": 1,
+  "import_id": 1,
+  "event_ids": [
+    2,
+    1
+  ],
+  "evidence_id": 3,
+  "import_plaintext_sha256": "fb41932d1acbb8a7e21c4a8f5077b4846492fb617b280e9c3ae99bb01f2fb0fc"
+}

@@ -368,6 +368,90 @@ def deactivate_member(user_id: int):
     return jsonify({"deactivated": True, "handoff_to": target, "cases_transferred": len(cases)})
 
 
+@teams_api.post("/api/cases/<int:case_id>/handoff")
+@login_required
+def shift_handoff(case_id: int):
+    from .autopsy_domain import custody, text_value, touch_case
+    from .cases import _case_row
+
+    if not operational_mode() or not manager() or not all(has_permission(current_user(), permission) for permission in ("cases.update", "cases.assign")):
+        return error_response("PERMISSION_DENIED", "تسليم المناوبة للمدير المخول فقط", 403)
+    data = request.get_json(silent=True)
+    try:
+        if not isinstance(data, dict) or set(data) != {"from_user", "to_user", "version", "reason"}:
+            raise ValueError("حدد المسؤول السابق والبديل والإصدار والسبب")
+        source, target = data["from_user"], data["to_user"]
+        if any(type(item) is not int or item < 1 for item in (source, target, data["version"])) or source == target:
+            raise ValueError("حدد عضوين مختلفين وإصدارًا صالحًا")
+        reason = text_value(data["reason"], 1000, True)
+    except ValueError as exc:
+        return error_response("INVALID_HANDOFF", str(exc), 422)
+    with transaction():
+        case = _case_row(case_id)
+        if not case:
+            return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+        if case["version"] != data["version"]:
+            return error_response("VERSION_CONFLICT", "تغيرت القضية؛ حدث الصفحة قبل التسليم", 409)
+        if case["status"] == "closed":
+            return error_response("CASE_CLOSED", "أعد فتح القضية قبل تغيير المسؤوليات", 409)
+        member = (
+            get_db()
+            .execute(
+                "SELECT m.responsibility FROM autopsy_case_members m JOIN users u ON u.id=m.user_id AND u.is_active=1 WHERE m.case_id=? AND m.user_id=?",
+                (case_id, source),
+            )
+            .fetchone()
+        )
+        replacement = (
+            get_db().execute("SELECT id,role,workspace_id FROM users WHERE id=? AND workspace_id=? AND is_active=1", (target, workspace_id())).fetchone()
+        )
+        if not member or not replacement:
+            return error_response("HANDOFF_MEMBER_NOT_FOUND", "المسؤول أو البديل غير متاح في الفريق", 422)
+        if member["responsibility"] == "previous_shift":
+            return error_response("HANDOFF_ALREADY_COMPLETED", "هذا العضو سلم مناوبته بالفعل؛ حدد المسؤول الحالي", 409)
+        principal = dict(replacement)
+        policy = (
+            get_db().execute("SELECT permissions FROM team_role_permissions WHERE workspace_id=? AND role=?", (workspace_id(), principal["role"])).fetchone()
+        )
+        if policy:
+            principal["role_permissions"] = json.loads(policy[0])
+        if not all(has_permission(principal, permission) for permission in ("cases.read", "cases.update")):
+            return error_response("HANDOFF_PERMISSION_REQUIRED", "البديل يحتاج صلاحية قراءة القضية وتحديثها", 422)
+        duplicate = (
+            get_db()
+            .execute(
+                "SELECT 1 FROM team_log_assignments a JOIN team_log_assignments b ON a.job_id=b.job_id AND a.case_id=b.case_id WHERE a.case_id=? AND a.assignee=? AND b.assignee=? AND a.state!='completed' LIMIT 1",
+                (case_id, source, target),
+            )
+            .fetchone()
+        )
+        if duplicate:
+            return error_response("HANDOFF_ASSIGNMENT_CONFLICT", "البديل لديه إسناد لهذه الدفعة؛ عالج الإسناد الحالي أولًا", 409)
+        responsibility = get_db().execute("SELECT responsibility FROM autopsy_case_members WHERE case_id=? AND user_id=?", (case_id, source)).fetchone()[0]
+        get_db().execute(
+            "INSERT INTO autopsy_case_members(case_id,user_id,responsibility,assigned_by,assigned_at) VALUES (?,?,?,?,?) ON CONFLICT(case_id,user_id) DO UPDATE SET responsibility=excluded.responsibility,assigned_by=excluded.assigned_by,assigned_at=excluded.assigned_at",
+            (case_id, target, responsibility, actor_id(), iso_now()),
+        )
+        get_db().execute(
+            "UPDATE autopsy_case_members SET responsibility='previous_shift',assigned_by=?,assigned_at=? WHERE case_id=? AND user_id=?",
+            (actor_id(), iso_now(), case_id, source),
+        )
+        get_db().execute("UPDATE incident_cases SET assignee=CASE WHEN assignee=? THEN ? ELSE assignee END WHERE id=?", (source, target, case_id))
+        get_db().execute(
+            "UPDATE case_tasks SET assignee=? WHERE case_id=? AND assignee=? AND status NOT IN ('completed','reviewed')", (target, case_id, source)
+        )
+        get_db().execute(
+            "INSERT OR IGNORE INTO autopsy_batch_members(job_id,user_id) SELECT j.id,? FROM ingestion_jobs j JOIN autopsy_batch_access a ON a.job_id=j.id AND a.restricted=1 WHERE j.case_id=? AND (j.created_by=? OR EXISTS (SELECT 1 FROM autopsy_batch_members m WHERE m.job_id=j.id AND m.user_id=?))",
+            (target, case_id, source, source),
+        )
+        get_db().execute("UPDATE team_log_assignments SET assignee=? WHERE case_id=? AND assignee=? AND state!='completed'", (target, case_id, source))
+        handoff_records(case_id, source, target, reason)
+        touch_case(case_id)
+        custody(case_id, "shift_handed_off", {"from": source, "to": target, "reason": reason, "previous_access": "retained; account remains active"})
+        record_audit(get_db(), "shift_handoff", "case", case_id, details={"from": source, "to": target, "reason": reason})
+    return jsonify({"handed_off": True, "from_user": source, "to_user": target, "previous_access": "retained"})
+
+
 def handoff_records(case_id, source, target, reason):
     from .autopsy_api import insert_record
     from .autopsy_domain import canonical, custody, touch_case
