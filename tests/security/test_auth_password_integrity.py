@@ -17,7 +17,7 @@ def test_damaged_password_digest_rejects_login_without_server_error(client, data
 @pytest.mark.parametrize("route", ["password", "mfa_enroll", "mfa_disable"])
 def test_damaged_digest_cannot_authorize_sensitive_account_changes(client, database, login_as, route):
     login_as("analyst")
-    database.execute("UPDATE users SET password_hash='damaged' WHERE email='analyst@socify.local'")
+    database.execute("UPDATE users SET password_hash=? WHERE email=?", ("damaged", "analyst@socify.local"))
     if route == "password":
         response = client.post("/api/profile/password", json={"current_password": DEMO_LOGIN_VALUE, "new_password": "Synthetic-New-Password-2026!"})
     elif route == "mfa_enroll":
@@ -31,7 +31,7 @@ def test_damaged_digest_cannot_authorize_sensitive_account_changes(client, datab
 
 def test_login_form_explains_rate_limit_without_exposing_password_or_account(app, client):
     app.config["RATE_LIMIT_LOGIN_ATTEMPTS"] = 1
-    fields = {"email": "missing-login@example.test", "password": "Synthetic-Invalid-Password!"}
+    fields = {"email": "missing-login@example.test", "password": DEMO_LOGIN_VALUE}
     client.post("/login", data=fields)
     response = client.post("/login", data=fields, follow_redirects=True)
     assert "محاولات دخول كثيرة" in response.text
