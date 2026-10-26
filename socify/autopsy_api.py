@@ -108,7 +108,7 @@ def case_summary(case_id: int):
         return jsonify(result)
     result["counts"] = {
         name: get_db().execute(f"SELECT COUNT(*) FROM {table} WHERE case_id = ?", (case_id,)).fetchone()[0]
-        for name, table in [("events", "case_events"), ("evidence", "case_evidence"), ("tasks", "case_tasks"), ("records", "autopsy_records")]
+        for name, table in [("evidence", "case_evidence"), ("tasks", "case_tasks"), ("records", "autopsy_records")]
     }
     if not manager():
         result["counts"]["records"] = (

@@ -2,7 +2,7 @@ import sqlite3
 import uuid
 from datetime import timedelta
 
-from .db import transaction
+from .db import database_is_busy, transaction
 from .ingestion import _process_job
 from .timeutils import iso_now, utc_now
 
@@ -12,8 +12,17 @@ def _future(seconds: int) -> str:
 
 
 def claim_import_job(connection: sqlite3.Connection, worker_id: str, lease_seconds: int = 60) -> int | None:
+    try:
+        return claim_import_job_locked(connection, worker_id, lease_seconds)
+    except sqlite3.OperationalError as exc:
+        if not database_is_busy(exc):
+            raise
+        return None
+
+
+def claim_import_job_locked(connection: sqlite3.Connection, worker_id: str, lease_seconds: int) -> int | None:
     now = iso_now()
-    with transaction(connection):
+    with transaction(connection, wait=False):
         expired = connection.execute(
             "SELECT id, retry_count FROM ingestion_jobs WHERE status = 'processing' AND (lease_expires_at IS NULL OR lease_expires_at <= ?)",
             (now,),

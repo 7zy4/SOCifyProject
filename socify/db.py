@@ -38,10 +38,21 @@ def close_db(_: object | None = None) -> None:
         connection.close()
 
 
+def database_is_busy(error: sqlite3.Error) -> bool:
+    return getattr(error, "sqlite_errorcode", 0) & 0xFF in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}
+
+
 @contextmanager
-def transaction(connection: sqlite3.Connection | None = None) -> Iterator[sqlite3.Connection]:
+def transaction(connection: sqlite3.Connection | None = None, *, immediate: bool = True, wait: bool = True) -> Iterator[sqlite3.Connection]:
     target = connection or get_db()
-    target.execute("BEGIN IMMEDIATE")
+    timeout = target.execute("PRAGMA busy_timeout").fetchone()[0] if not wait else None
+    try:
+        if timeout is not None:
+            target.execute("PRAGMA busy_timeout = 0")
+        target.execute("BEGIN IMMEDIATE" if immediate else "BEGIN")
+    finally:
+        if timeout is not None:
+            target.execute(f"PRAGMA busy_timeout = {int(timeout)}")
     try:
         yield target
         target.commit()

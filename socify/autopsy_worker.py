@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import sqlite3
 import stat
 import subprocess  # nosec B404
 import sysconfig
@@ -12,7 +13,7 @@ from flask import current_app
 
 from .analysis_transport import AnalysisUnavailableError
 from .autopsy_domain import canonical, custody
-from .db import get_db, transaction
+from .db import database_is_busy, get_db, transaction
 from .operational import case_visible
 from .security import cipher, has_permission
 from .timeutils import iso_now, utc_now
@@ -99,8 +100,17 @@ def compute_sample(payload, timeout=30):
 
 
 def claim_job(identity):
+    try:
+        return claim_job_locked(identity)
+    except sqlite3.OperationalError as exc:
+        if not database_is_busy(exc):
+            raise
+        return None
+
+
+def claim_job_locked(identity):
     now = iso_now()
-    with transaction():
+    with transaction(wait=False):
         get_db().execute(
             "UPDATE autopsy_jobs SET state = CASE WHEN attempts >= 3 THEN 'failed' ELSE 'queued' END, worker_id = NULL, lease_expires_at = NULL, error_code = 'LEASE_EXPIRED' WHERE state = 'processing' AND lease_expires_at <= ?",
             (now,),

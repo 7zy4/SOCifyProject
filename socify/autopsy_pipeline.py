@@ -123,7 +123,7 @@ def visibility_sql(alias: str = "e", user: dict | None = None) -> tuple[str, lis
     if _manager(principal):
         return "1 = 1", []
     return (
-        f"({alias}.import_job_id IS NULL OR NOT EXISTS (SELECT 1 FROM autopsy_batch_access a WHERE a.job_id = {alias}.import_job_id AND a.restricted = 1) OR EXISTS (SELECT 1 FROM ingestion_jobs j WHERE j.id = {alias}.import_job_id AND j.created_by = ?) OR EXISTS (SELECT 1 FROM autopsy_batch_members m WHERE m.job_id = {alias}.import_job_id AND m.user_id = ?))",
+        f"({alias}.import_job_id IS NULL OR {alias}.import_job_id NOT IN (SELECT a.job_id FROM autopsy_batch_access a WHERE a.restricted=1 AND NOT EXISTS (SELECT 1 FROM ingestion_jobs j WHERE j.id=a.job_id AND j.created_by=?) AND NOT EXISTS (SELECT 1 FROM autopsy_batch_members m WHERE m.job_id=a.job_id AND m.user_id=?)))",
         [principal["id"], principal["id"]],
     )
 

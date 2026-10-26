@@ -429,6 +429,7 @@ def main():
             "timeline": base + "/timeline?limit=50",
             "chronology": base + "/chronology?limit=50",
         }
+        measurement_images = docker.identities()
         measurement_cpu = docker.resources()
         cold = {}
         for name, path in paths.items():
@@ -476,6 +477,13 @@ def main():
         for service, value in resources.items():
             value["measurement_cpu_used_usec"] = value["cpu_usage_usec"] - measurement_cpu[service]["cpu_usage_usec"]
         images = docker.identities()
+        if any(
+            value["container_id"] != measurement_images[service]["container_id"]
+            or value["restart_count"] != measurement_images[service]["restart_count"]
+            or resources[service]["measurement_cpu_used_usec"] < 0
+            for service, value in images.items()
+        ):
+            raise RuntimeError("A synthetic service restarted or was replaced during measurement; resource deltas and success cannot be claimed")
         if any(value["memory_limit_bytes"] != images[service]["memory_limit_bytes"] for service, value in resources.items()):
             raise RuntimeError("Kernel resource counters do not match the isolated container limits")
         if any(value["oom_killed"] for value in images.values()):
@@ -525,6 +533,7 @@ def main():
             },
             "environment": {"python": platform.python_version(), "kernel": platform.release(), "host_cpu_count": os.cpu_count()},
             "measured_images": images,
+            "measurement_start_images": measurement_images,
             "harness_elapsed_seconds": round(time.monotonic() - started, 3),
             "limitations": [
                 "Synthetic structured JSONL with 64 repeated reserved IPs, one host and one timestamp; different formats/cardinality need separate sizing",

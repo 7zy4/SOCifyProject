@@ -4,10 +4,11 @@ from datetime import datetime
 from typing import Any
 
 from cryptography.fernet import InvalidToken
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, g, jsonify, request
 
 from .autopsy_api import case_summary, manager, record_view
 from .autopsy_domain import canonical, custody, text_value
+from .autopsy_pipeline import case_full_access
 from .autopsy_report_render import FORMATS
 from .cases import _case_row, _history
 from .db import get_db, inserted_id, transaction
@@ -175,7 +176,7 @@ def build_snapshot(case, revision: int, profile: str):
         1000,
     )
     payload["evidenced_timeline"] = bounded_rows(
-        "SELECT e.id, e.title, e.event_time, e.source, e.event_type, e.severity, e.raw_hash, e.provenance, e.normalized_fields FROM security_events e JOIN case_evidence ce ON ce.case_id = ? AND ce.evidence_type = 'event' AND ce.reference_id = CAST(e.id AS TEXT) ORDER BY e.event_time, e.id",
+        "SELECT e.id, e.title, e.event_time, e.source, e.event_type, e.severity, e.raw_hash, e.provenance, e.normalized_fields FROM case_evidence ce JOIN security_events e ON e.id=CAST(ce.reference_id AS INTEGER) AND ce.reference_id=CAST(e.id AS TEXT) WHERE ce.case_id=? AND ce.evidence_type='event' ORDER BY e.event_time,e.id",
         (case_id,),
         2000,
     )
@@ -199,6 +200,18 @@ def build_snapshot(case, revision: int, profile: str):
     return payload
 
 
+def report_queue_full(workspace):
+    return (
+        get_db()
+        .execute(
+            "SELECT COUNT(*) FROM autopsy_jobs j JOIN incident_cases c ON c.id=j.case_id WHERE c.workspace_id=? AND j.state IN ('queued','processing')",
+            (workspace,),
+        )
+        .fetchone()[0]
+        >= 20
+    )
+
+
 @autopsy_reports_api.post("/api/cases/<int:case_id>/reports")
 @require_permission("cases.read")
 def create_report(case_id: int):
@@ -214,29 +227,37 @@ def create_report(case_id: int):
     profile = data.get("profile", "full")
     if profile == "full" and not has_permission(current_user(), "evidence.download"):
         return error_response("PERMISSION_DENIED", "التقرير الكامل يتطلب صلاحية تنزيل الأدلة", 403)
-    with transaction():
+    with transaction(immediate=False):
         case = _case_row(case_id)
         if not case:
             return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
         if case["version"] != data["version"]:
             return error_response("CASE_VERSION_CONFLICT", "تغيرت القضية؛ حدّث قبل إعداد التقرير", 409)
-        active = (
-            get_db()
-            .execute(
-                "SELECT COUNT(*) FROM autopsy_jobs j JOIN incident_cases c ON c.id = j.case_id WHERE c.workspace_id = ? AND j.state IN ('queued', 'processing')",
-                (case["workspace_id"],),
-            )
-            .fetchone()[0]
-        )
-        if active >= 20:
+        if not case_full_access(case_id):
+            return error_response("BATCH_SCOPE_REQUIRED", "التقرير الكامل يحتاج الوصول إلى كل دفعات القضية", 403)
+        if report_queue_full(case["workspace_id"]):
             return error_response("JOB_QUEUE_FULL", "طابور المعالجة ممتلئ؛ أعد المحاولة بعد انتهاء الأعمال الحالية", 429)
         revision = get_db().execute("SELECT COALESCE(MAX(revision), 0) + 1 FROM autopsy_reports WHERE case_id = ?", (case_id,)).fetchone()[0]
         try:
             payload = build_snapshot(case, revision, profile)
         except ValueError as exc:
             return error_response("REPORT_TOO_LARGE", str(exc), 422)
-        serialized = canonical(payload)
-        digest = hashlib.sha256(serialized.encode()).hexdigest()
+    serialized = canonical(payload)
+    digest = hashlib.sha256(serialized.encode()).hexdigest()
+    with transaction():
+        g.pop("current_user", None)
+        case = _case_row(case_id)
+        if not case:
+            return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+        if not has_permission(current_user(), "cases.read") or profile == "full" and not has_permission(current_user(), "evidence.download"):
+            return error_response("PERMISSION_DENIED", "تغيرت صلاحيات إعداد التقرير", 403)
+        if not case_full_access(case_id):
+            return error_response("BATCH_SCOPE_REQUIRED", "تغير نطاق الوصول إلى دفعات القضية", 403)
+        next_revision = get_db().execute("SELECT COALESCE(MAX(revision), 0) + 1 FROM autopsy_reports WHERE case_id = ?", (case_id,)).fetchone()[0]
+        if case["version"] != data["version"] or revision != next_revision:
+            return error_response("CASE_VERSION_CONFLICT", "تغيرت القضية أو إصدارات التقرير؛ حدّث قبل إعداد نسخة جديدة", 409)
+        if report_queue_full(case["workspace_id"]):
+            return error_response("JOB_QUEUE_FULL", "طابور المعالجة ممتلئ؛ أعد المحاولة بعد انتهاء الأعمال الحالية", 429)
         report_id = inserted_id(
             get_db().execute(
                 "INSERT INTO autopsy_reports(case_id, revision, payload, sha256, source_version, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
