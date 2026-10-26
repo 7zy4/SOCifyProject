@@ -2,7 +2,7 @@
   "tool": "https://github.com/7zy4/rea",
   "tool_commit": "2250e67bc271c83f9e200ee298aa04a2457438a6",
   "date": "2026-10-26",
-  "source_revision": "93a86ba30ed473f89691ee78e49c49fff325e40b",
+  "source_revision": "f8d982f3cc66433959a6d3c7ded4f95a1b2e313c",
   "operation": "inspect-python-pyc",
   "compilation": "CPython 3.12 py_compile CHECKED_HASH; logical source filenames retained; compilation does not execute source",
   "inputs": [
@@ -140,6 +140,66 @@
         "marshal_bytes": 81710,
         "marshal_depth": 8
       }
+    },
+    {
+      "source": "socify/codespaces_proxy.py",
+      "source_sha256": "7e94b676191debbafaf5e69841b083a3e7f8533d0e2cbae613fc6f060c41b6e6",
+      "pyc_sha256": "c8b41d750365e02b3d7f9e17ab540de38a73a47611ad11389fee6dd0ef2a25cc",
+      "evidence_id": "ev_60a38179556d770f68155f1f136dee3bea78c65a628965cfff036494ba60ca44",
+      "evidence_file": "python-codespaces_proxy-rea-2026-10-26.json.gz",
+      "compressed_sha256": "0df819afb250083663ee07083b53f2646106c680c0472510ff41734c1c398e6b",
+      "coverage": {
+        "status": "complete",
+        "objects": 136,
+        "code_objects": 4,
+        "marshal_bytes": 2857,
+        "marshal_depth": 7
+      }
+    },
+    {
+      "source": "socify/config.py",
+      "source_sha256": "34063a07d01dcfde9270c22aa20afd3cd66037b05b0e6f210fa72edb1b84bf63",
+      "pyc_sha256": "416b2ff2376d7202681f8e3e923131e914f5c5c0273b308b61746b8b5a8a7f20",
+      "evidence_id": "ev_3812a26a8b178d519fe5152bc2700b6e85de91f008981fae04e67fc87b9ae621",
+      "evidence_file": "python-config-rea-2026-10-26.json.gz",
+      "compressed_sha256": "09cc2f8b4d8eed1ea748776b99602f29e575b2c05527e1af2f782cc047572c04",
+      "coverage": {
+        "status": "complete",
+        "objects": 198,
+        "code_objects": 5,
+        "marshal_bytes": 4750,
+        "marshal_depth": 6
+      }
+    },
+    {
+      "source": "socify/__init__.py",
+      "source_sha256": "bb61f3cb3ec5a829b8c03147b6a28363d02a98477d24f11685527c7fb7d3db31",
+      "pyc_sha256": "71710e5a335d8acbed3317e6e2da0f8f798089d59a7e313887aa8429d8a11f3c",
+      "evidence_id": "ev_b8adb404793554ef21f9c68b9962a87533493bf7d5c477c0bfa0134788c3b8a8",
+      "evidence_file": "python-app_init-rea-2026-10-26.json.gz",
+      "compressed_sha256": "9de6138ba7e372e0f1c4a5f10a39cf8b2b7e29b2fd31890a3362258c3457d9a9",
+      "coverage": {
+        "status": "complete",
+        "objects": 639,
+        "code_objects": 14,
+        "marshal_bytes": 14804,
+        "marshal_depth": 8
+      }
+    },
+    {
+      "source": "scripts/bootstrap_team.py",
+      "source_sha256": "f679f79d50a8bd96380bdeaff2338b42da970e81995e7351f243579b540ee039",
+      "pyc_sha256": "3c27b90b2feac1d3c0e6d02ab1d9bcddf78418603ae01d7db0f40231f9a30a45",
+      "evidence_id": "ev_9dc7b0bd06d28bd48126cda87e0e17f83884f070467f1e279e6a82ce46107a98",
+      "evidence_file": "python-bootstrap_team-rea-2026-10-26.json.gz",
+      "compressed_sha256": "754bf3070587edb3f26a22212b30c9e0935ed8bb98573a512245063fb8b24b40",
+      "coverage": {
+        "status": "complete",
+        "objects": 295,
+        "code_objects": 4,
+        "marshal_bytes": 9494,
+        "marshal_depth": 5
+      }
     }
   ],
   "limitations": [
@@ -148,5 +208,5 @@
     "source_hash_hex is the PEP 552 header field; the original .py is not read.",
     "python_version is the pinned CPython magic table for this header, not a runtime interpreter."
   ],
-  "interpretation": "Bounded inventory of code objects, names and constants for nine final modules: sessions, schema, chronology, worker, transactions, reports, batch scope, count snapshots and cross-case attachments. Complete marshal coverage is not decompilation, vulnerability assessment or execution coverage."
+  "interpretation": "Static inventory for thirteen current backend/entrypoint modules, including Codespaces proxy boundaries and local account recovery; complete marshal coverage is not a vulnerability certification or execution coverage. Independent security, HTTP and browser tests prove behavior."
 }

@@ -1,5 +1,5 @@
 {
-  "name": "SOCify Secure Training",
+  "name": "SOCify Digital Autopsy",
   "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
   "forwardPorts": [5000],
   "portsAttributes": {

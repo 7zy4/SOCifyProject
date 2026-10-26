@@ -1,0 +1,13 @@
+{
+  "synthetic_only": true,
+  "real_gunicorn_workers": 2,
+  "bootstrap_cli": true,
+  "selected_database_status": true,
+  "interactive_recovery_preserves_existing_account": true,
+  "forwarded_https_login_status": 302,
+  "authenticated_status": 200,
+  "foreign_referrer_status": 400,
+  "rejected_client_remains_unauthenticated": true,
+  "secret_values_not_printed": true,
+  "company_data_used": false
+}

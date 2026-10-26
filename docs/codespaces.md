@@ -1,47 +1,67 @@
-# تشغيل GitHub Codespaces
+# تجربة SOCify Digital Autopsy في Codespaces — V3
 
-استخدم الفرع `socify-version-2`. للتجربة اليدوية بعد إيقاف الخادم السابق بـCtrl+C:
+استخدم البرنش `socify-version-3` الموجود. لا تغيّر `main` أو V2. أوقف خادم SOCify السابق بـCtrl+C في الطرفية التي تشغله قبل تنفيذ أوامر التشغيل؛ لا تشغّل خادمين على المنفذ 5000.
+
+## تحديث البيئة والحساب الموجود
+
+من مجلد المشروع داخل Codespaces:
+
+```bash
+git pull --ff-only origin socify-version-3
+. .venv/bin/activate
+python -m pip install -r requirements.txt
+export SOCIFY_ENV=development
+export SOCIFY_HOST=0.0.0.0
+export SOCIFY_PORT=5000
+python -m scripts.bootstrap_team --email manager@example.test --status
+```
+
+إذا لم توجد `.venv` في إعداد جديد فقط، أنشئها بـ`python -m venv .venv` ثم فعّلها. استبدل البريد بالبريد الذي استُخدم فعليًا عند إنشاء حسابك. يبين `--status` المسار الحقيقي للقاعدة وحالة الحساب وMFA، ولا يعرض كلمة مرور. عند غياب الحساب لا تنشئ فريقًا جديدًا عشوائيًا؛ تحقق من `SOCIFY_DATABASE` والقاعدة التي أُنشئ فيها الحساب.
+
+إذا كنت قد نفذت أوامر توليد مفاتيح عشوائية جديدة بالجلسة رغم وجود ملف التطوير المحفوظ، فأوقف الخادم واستخدم المفاتيح الأصلية. في الحالة التطويرية المعتادة التي تعتمد `instance/codespaces.env` أزل exports الجديدة من الجلسة بـ`unset SOCIFY_SECRET_KEY SOCIFY_CREDENTIAL_KEY` قبل فحص الحساب وتشغيله. لا تستخدم هذا الإجراء بدل استرجاع مفاتيح إنتاج مجهزة خارجيًا. لا تحذف الملف أو تستبدله ولا تحذف قواعد البيانات.
+
+إن كنت لا تتذكر كلمة مرور الحساب الموجود، استعدها محليًا:
+
+```bash
+python -m scripts.bootstrap_team --email manager@example.test --reset-password
+```
+
+اختر كلمة مرور قوية لا تقل عن 12 محرفًا، وأدخلها مرتين؛ الكتابة مخفية. يحافظ الأمر على الفريق والدور والأدلة وMFA، ويلغي جلسات الحساب ويسجل الاستعادة. لا يغير حسابًا معطلًا. تبقى المصادقة متعددة العوامل وحدود المحاولات فعالة. لا ترسل كلمة المرور أو ملفات المفاتيح أو cookies لأحد.
+
+## تشغيل المنصة
 
 ```bash
 python run.py
 ```
 
-أكد المستخدم نجاح تسجيل الدخول بهذا الأمر بعد فشل طريقة التشغيل السابقة. يشغّل `run.py` خادم تطوير بعملية واحدة؛ ليس أمر نشر إنتاجي. يستخدم إعدادات البيئة الموجودة، ولا يحمّل `instance/codespaces.env` بنفسه. إعادة تشغيله دون مفتاح جلسة ثابت تستلزم تسجيل الدخول من جديد. لا تشغّل خادمين على المنفذ نفسه.
+يشغّل هذا الأمر بيئة التطوير وعاملي الاستيراد والتقارير. يحمّل نفس البيئة المستخدمة بواسطة أداة الحساب؛ يحتفظ بقيمة `SOCIFY_DATABASE` المجهزة، ويستخدم مفاتيح التطوير المحفوظة عند عدم وجود مفاتيح مهيأة في البيئة. لا تحتاج إلى توليد مفاتيح جديدة أو إعادة إنشاء venv في كل مرة. بديل Gunicorn المهيأ هو `python -m scripts.start_codespace` بعد إيقاف الخادم السابق، وليس تشغيل `gunicorn ... app:app` يدويًا ببيئة أخرى.
 
-للتشغيل عبر Gunicorn مع تحميل المفاتيح المحفوظة تلقائيًا، بعد إيقاف الخادم السابق:
+افتح **Ports → 5000 → Open in Browser** في نافذة مستقلة، واجعل Visibility = **Private**. افتح `/login` من رابط نفس Codespace. أدخل بريد حسابك وكلمة المرور المختارة، واترك MFA فارغًا إن لم يكن مفعّلًا. عند تفعيل MFA استخدم الرمز أو رمز الاسترداد الخاص بك. حدّث صفحة الدخول بعد إعادة تشغيل الخادم للحصول على نموذج جديد.
 
-```bash
-git pull --ff-only origin socify-version-2
-SOCIFY_HOST=0.0.0.0 python -m scripts.start_codespace
-```
+لا تحتاج رمز CSRF يدويًا. يطابق التطبيق العنوان العام المحدد وHTTPS من وسيط Codespaces المحلي مع بقاء فحص رمز النموذج والمرجع فعالًا. لا تعطل CSRF أو SSL_STRICT ولا تضف wildcard للمضيفين لإصلاح الدخول.
 
-يحمّل هذا الأمر مفاتيح الجلسة والتشفير الموجودة من `instance/codespaces.env` قبل بدء جميع عمال Gunicorn، ويهيئ المخطط دون حذف القاعدة. لا يحذف المفاتيح ولا يعيد توليدها عند وجودها، ولا يعطل CSRF. لفحص إعداد التشغيل فقط: `python -m scripts.start_codespace --check`.
+## التحليل المحلي والتقارير
 
-افتح المنفذ 5000 من Ports في نافذة متصفح مستقلة، واجعله Private. عند `CSRF_VALIDATION_FAILED` لا تحتاج رمزًا يدويًا: حدّث `/login` لتوليد نموذج حديث، واسمح بملفات الارتباط. لا تعطل `WTF_CSRF_ENABLED` ولا تحذف ملف المفاتيح لإصلاح المشكلة. صفحات HTML الحساسة ترسل `Cache-Control: no-store`، ويُعرض فشل نموذج الدخول/التسجيل كنموذج قابل لإعادة المحاولة بدل JSON.
-
-1. افتح المستودع واختر **Code → Codespaces → Create codespace** على البرنش المطلوب.
-2. ينتظر `postCreateCommand` حتى يثبت runtime/dev dependencies ويهيئ `instance/socify.db` بلا حذف بيانات سابقة.
-3. يشغّل `postStartCommand` Gunicorn على `0.0.0.0:5000` داخل الحاوية فقط.
-4. افتح تبويب **Ports** وتحقق أن المنفذ 5000 يحمل Visibility بقيمة `Private` قبل فتحه.
-5. أنشئ حساب Analyst من `/register`، أو نفذ seed صريحًا من Terminal بعد وضع كلمة مرور تطوير قوية.
+يلزم تشغيل محرك التحليل المعزول لتجربة التقارير وYARA وتحليل الملفات في المسار المختبر. عند توفر Docker، نفذ التالي قبل `python run.py`:
 
 ```bash
-export SOCIFY_SEED_DEMO=1
-export SOCIFY_DEMO_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
-python create_db.py
-printf 'Temporary demo password: %s\n' "$SOCIFY_DEMO_PASSWORD"
+docker build --target analysis -t socify-v3-verification-analysis .
+bash scripts/start_local_analysis.sh
+export SOCIFY_ANALYSIS_SOCKET=/tmp/socify-v3-dev-analysis-ipc/analysis.sock
 ```
 
-إذا لم يبدأ الخادم، راجع `/tmp/socify-gunicorn.log` ثم نفذ `curl -fsS http://127.0.0.1:5000/health/ready`. لا تجعل المنفذ Public للتجربة العادية.
+تتحقق أداة البدء من هوية خدمة سابقة قبل إعادة استخدامها. إذا اختلفت الصورة فتوقف وافحص الخدمة المخصصة قبل استبدالها؛ لا تحذف volumes أو قواعد بيانات. لا تتجاوز العزل عند غياب المحرك؛ راجع `operations-v3.md` للحدود والتشغيل داخل الشركة.
 
-## فتح الموقع في المتصفح بعد إنشاء Codespace
+## الإعداد الأول فقط
 
-- أنشئ Codespace من البرنش `socify-version-2`.
-- يقوم Dev Container بتثبيت المتطلبات وإنشاء `instance/codespaces.env` وتشغيل Gunicorn تلقائيًا. قد يستغرق الإعداد الأول بعض الوقت.
-- افتح تبويب **Ports** داخل Codespaces. تأكد من أن المنفذ `5000` ظاهر وأن Visibility = **Private** ثم اضغط أيقونة فتح المتصفح بجواره.
-- يسمح التطبيق تلقائيًا بعنوان Codespaces الذي يطابق `CODESPACE_NAME-5000.app.github.dev` فقط، ولا يتطلب ضبط `TRUSTED_HOSTS` إلى `*`.
-- افتح `/register` لإنشاء حساب Analyst بكلمة مرور قوية لا تقل عن 12 حرفًا؛ لا يوجد حساب Admin افتراضي في هذا الفرع.
-- للتحقق من صحة الخادم من داخل Terminal: `curl -fsS http://127.0.0.1:5000/health/ready`.
-- لو لم يظهر المنفذ أو الموقع، راجع `tail -n 100 /tmp/socify-gunicorn.log` وابدأ الخادم يدويًا: `SOCIFY_HOST=0.0.0.0 python -m scripts.start_codespace`.
-- إذا ظهر خطأ `400 Bad Request` تأكد أن عنوان المتصفح هو المنفذ 5000 الخاص بنفس Codespace. لا تعطل حماية المضيف.
-- قاعدة البيانات محفوظة داخل مساحة Codespace على `instance/socify.db`؛ لا تحذف Codespace إذا أردت الاحتفاظ بالبيانات دون نسخة احتياطية.
+في Codespace جديد لا يحتوي حسابًا:
+
+```bash
+python -m scripts.bootstrap_team --email manager@example.test --name "مدير الفريق" --team "فريق التحقيق"
+```
+
+يطلب الأمر كلمة المرور ويطبع القاعدة ومعرف الحساب. لا يعيد تعيين حساب موجود؛ لا تستخدم حسابات الاختبارات أو seed عشوائيًا لحل مشكلة دخول. التسجيل العام مغلق في V3، ويدعو المدير الأعضاء من صفحة الفريق.
+
+يثبت Dev Container الاعتمادات ويجهز `instance/codespaces.env` و`instance/socify.db` دون حذف البيانات السابقة، ويبدأ الخادم المهيأ تلقائيًا عند بدء Codespace. عند التشغيل اليدوي أوقف نسخته السابقة أولًا. لفحص الإعداد دون تشغيل خادم آخر: `python -m scripts.start_codespace --check`.
+
+للتحقق: `curl -fsS http://127.0.0.1:5000/health/ready`. عند استخدام التشغيل التلقائي راجع `tail -n 40 /tmp/socify-gunicorn.log`. لا تفتح المنفذ Public للتجربة، ولا تستخدم بيانات شركة حقيقية في بيئة تطوير سحابية.

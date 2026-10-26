@@ -8,6 +8,8 @@
 
 شغّل Gunicorn خلف Proxy ينهي TLS، ثم فعّل `SOCIFY_HTTPS=1` لتطبيق Secure cookie وHSTS. اضبط `SOCIFY_TRUSTED_HOSTS` للأسماء الفعلية. لا تمرر forwarded headers إلا من Proxy موثوق، ولا تعرض خادم Flask التطويري.
 
+في Codespaces التطويري فقط، يشتق التطبيق عنوان المنفذ الوحيد من `CODESPACE_NAME` و`SOCIFY_PORT`، ويطابق HTTPS الوارد من اتصال loopback موثوق مع هذا العنوان. لا يُستخدم Referer لاختيار العنوان، ولا يُوثق X-Forwarded-For لتحديد الوسيط، ولا تُقبل سلطة forwarded-host متعارضة. لا يفعّل هذا السلوك تلقائيًا في الإنتاج. تبقى مطابقة المرجع ورمز CSRF والجلسة مطلوبة؛ توجد اختبارات لمرجع خارجي ورمز مزور ومضيف متعارض ومصدر غير موثوق.
+
 ## الشبكة
 
 `SOCIFY_SOURCE_ALLOWLIST` قائمة أسماء مضيفين دقيقة لموصل Sandbox. حتى مع القائمة تمنع الدالة loopback وprivate وlink-local وreserved بعد DNS. الإصدار الحالي لا ينفذ HTTP fetch من Web Request؛ يحتاج worker معزولًا ليصبح مدعومًا.

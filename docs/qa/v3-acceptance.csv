@@ -1,6 +1,6 @@
 journey_id,requirement,status,evidence,remaining
-V3-E01,تسجيل دخول بمفاتيح ثابتة وCSRF فعّال، ثم خروج وإبطال الجلسة,VERIFIED,tests/container/verify_recovery.py; tests/integration/test_autopsy_resource_recovery.py,
-V3-E02,MFA صحيح وخاطئ واسترداد مضبوط بلا تسرب أسرار,VERIFIED,tests/integration/test_autopsy_workflow_completion.py,
+V3-E01,تسجيل دخول بمفاتيح ثابتة وCSRF فعّال، ثم خروج وإبطال الجلسة,VERIFIED,tests/container/verify_recovery.py; tests/integration/test_autopsy_resource_recovery.py; tests/security/test_codespaces_proxy_login.py; docs/qa/v3-codespaces-login-2026-10-26.md,
+V3-E02,MFA صحيح وخاطئ واسترداد مضبوط بلا تسرب أسرار,VERIFIED,tests/integration/test_autopsy_workflow_completion.py; tests/integration/test_autopsy_bootstrap.py,
 V3-E03,إنشاء قضية بالاسم والسبب والهدف فقط وفتح مساحة عملها,VERIFIED,tests/e2e/test_autopsy_browser.py; tests/integration/test_autopsy_core.py,
 V3-E04,رفض اسم/سبب/هدف غير صالح من الخادم، مع بقاء المسودة قابلة للتصحيح,VERIFIED,tests/e2e/test_autopsy_navigation_state.py,
 V3-E05,فتح قضية من قائمة الفريق واستعادة السياق والفلاتر,VERIFIED,tests/e2e/test_autopsy_navigation_state.py,

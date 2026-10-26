@@ -1,0 +1,42 @@
+{
+  "source_revision": "f8d982f3cc66433959a6d3c7ded4f95a1b2e313c",
+  "synthetic_only": true,
+  "pytest_passed": 771,
+  "coverage": {
+    "covered_lines": 8995,
+    "num_statements": 9673,
+    "percent_covered": 90.74972025363671,
+    "percent_covered_display": "91",
+    "missing_lines": 678,
+    "excluded_lines": 0,
+    "percent_statements_covered": 92.99079913160344,
+    "percent_statements_covered_display": "93",
+    "num_branches": 3732,
+    "num_partial_branches": 510,
+    "covered_branches": 3170,
+    "missing_branches": 562,
+    "percent_branches_covered": 84.94105037513398,
+    "percent_branches_covered_display": "85"
+  },
+  "chromium_passed": 19,
+  "focused_security_and_recovery_passed": 38,
+  "gunicorn_http": {
+    "synthetic_only": true,
+    "real_gunicorn_workers": 2,
+    "bootstrap_cli": true,
+    "selected_database_status": true,
+    "interactive_recovery_preserves_existing_account": true,
+    "forwarded_https_login_status": 302,
+    "authenticated_status": 200,
+    "foreign_referrer_status": 400,
+    "rejected_client_remains_unauthenticated": true,
+    "secret_values_not_printed": true,
+    "company_data_used": false
+  },
+  "rea_current_source_inventories": 13,
+  "ui_inputs_unchanged": 14,
+  "main_or_v2_modified": false,
+  "csrf_enabled": true,
+  "csrf_ssl_strict": true,
+  "production_proxy_trust_unchanged": true
+}
