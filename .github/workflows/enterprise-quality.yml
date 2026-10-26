@@ -102,6 +102,9 @@ jobs:
                           name = html.escape(f"{case.get('classname')}.{case.get('name')}")
                           message = html.escape(failure.get("message", "")[:4000])
                           summary.write(f"<h3>{name}</h3><pre>{message}</pre>\n")
+                          annotation = f"{case.get('classname')}.{case.get('name')}: {failure.get('message', '')[:2000]}"
+                          annotation = annotation.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                          print(f"::error title=Browser acceptance failure::{annotation}")
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
