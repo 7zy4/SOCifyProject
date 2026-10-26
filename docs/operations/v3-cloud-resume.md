@@ -21,6 +21,8 @@ python run.py
 
 ## التحقق والاستكمال
 
+اجتازت فحوص GitHub بعد إصلاح نطاق مفاتيح Compose وتزامن اختبارَي المهمة وMITRE؛ الدليل في `../qa/v3-ci-corrections-2026-10-26.md`. فحص dependency-review مخصص لـpull_request، وتخطيه عند push متوقع. يختبر CI التكبير الأصلي في Chromium الكامل داخل Xvfb، مع بقاء بقية الرحلات فعالة. لمطابقة جلسة سطح المكتب محليًا عند توفر Xvfb استخدم `xvfb-run --auto-servernum --server-args='-screen 0 1600x1200x24' pytest -q -m e2e --no-cov tests/e2e`. في هذه البيئة فقط توجد أدوات Xvfb المفكوكة تحت `/workspace/.cache/socify-v3-tools/xvfb/root/usr/bin`؛ أضفها إلى PATH عند الحاجة. ليست مطلوبة لتشغيل المنصة نفسها.
+
 ```bash
 export PATH=/workspace/.venv/bin:$PATH
 export SOCIFY_ANALYSIS_SOCKET=/tmp/socify-v3-dev-analysis-ipc/analysis.sock

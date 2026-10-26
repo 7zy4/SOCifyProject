@@ -193,5 +193,53 @@
     "semantic_unknowns": 5914,
     "route_unknowns": 4,
     "interpretation": "Static artifact inventories plus independent execution tests; not a vulnerability certification"
+  },
+  "github_actions": {
+    "run_id": "40335174317",
+    "source_revision": "f1bcbc197fbf694fa28ba83d4c34010b6b099910",
+    "branch": "socify-version-3",
+    "state": {
+      "status": "WORKFLOW_RUN_STATUS_COMPLETED",
+      "conclusion": "WORKFLOW_RUN_CONCLUSION_SUCCESS"
+    },
+    "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40335174317",
+    "jobs": [
+      {
+        "name": "browser",
+        "state": "succeeded",
+        "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40335174317/job/121614688395",
+        "failed_steps": []
+      },
+      {
+        "name": "container",
+        "state": "succeeded",
+        "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40335174317/job/121614688387",
+        "failed_steps": []
+      },
+      {
+        "name": "dependency-review",
+        "state": "skipped",
+        "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40335174317/job/121614690162",
+        "failed_steps": []
+      },
+      {
+        "name": "performance",
+        "state": "succeeded",
+        "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40335174317/job/121614687866",
+        "failed_steps": []
+      },
+      {
+        "name": "quality",
+        "state": "succeeded",
+        "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40335174317/job/121614688577",
+        "failed_steps": []
+      },
+      {
+        "name": "security",
+        "state": "succeeded",
+        "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40335174317/job/121614688272",
+        "failed_steps": []
+      }
+    ]
   }
 }

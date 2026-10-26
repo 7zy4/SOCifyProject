@@ -23,4 +23,6 @@
 
 ## حالة GitHub
 
-إعادة التحقق على GitHub بعد إصلاح التزامن قيد التشغيل. تُثبت النتيجة النهائية ورابط التشغيل هنا بعد اكتماله؛ لا يُستنتج نجاح GitHub من نجاح التحقق المحلي.
+نجح [التشغيل 40335174317](https://github.com/7zy4/SOCifyProject/actions/runs/40335174317) على `f1bcbc1`: quality وsecurity وbrowser وcontainer وperformance كلها succeeded، وdependency-review skipped كما تقضي سياسة pull_request. النتيجة الكلية SUCCESS. الإثبات المنظم ومعرف المصدر وروابط الوظائف الست في `v3-ci-github-2026-10-26.json`.
+
+أُعيدت الرحلات الـ19 محليًا بعد الإصلاح النهائي ضمن جلسة Xvfb، واجتازت خلال 113.22 ثانية؛ الدليل `v3-ci-browser-local-2026-10-26.txt`. أي commit توثيق لاحق لا يغير التطبيق أو الاختبارات أو إعداد CI.
