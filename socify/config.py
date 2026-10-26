@@ -30,10 +30,13 @@ def build_config() -> dict[str, object]:
     trusted_hosts = [item.strip() for item in os.environ.get("SOCIFY_TRUSTED_HOSTS", "localhost,127.0.0.1").split(",") if item.strip()]
     codespace_name = os.environ.get("CODESPACE_NAME", "").strip()
     codespace_port = _integer("SOCIFY_PORT", 5000)
+    codespace_host = None
     if codespace_name and all(char in "abcdefghijklmnopqrstuvwxyz0123456789-" for char in codespace_name) and 1 <= codespace_port <= 65535:
-        trusted_hosts.append(f"{codespace_name}-{codespace_port}.app.github.dev")
+        codespace_host = f"{codespace_name}-{codespace_port}.app.github.dev"
+        trusted_hosts.append(codespace_host)
     return {
         "ENV_NAME": environment,
+        "CODESPACE_PUBLIC_HOST": codespace_host,
         "PRODUCT_NAME": "SOCify Digital Autopsy",
         "LEGACY_TRAINING_TESTS": False,
         "SECRET_KEY": effective_secret,

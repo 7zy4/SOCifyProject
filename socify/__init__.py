@@ -20,6 +20,7 @@ from .autopsy_samples import autopsy_samples_api
 from .autopsy_workflow import autopsy_workflow_api
 from .autopsy_yara import autopsy_yara_api
 from .cases import cases_api
+from .codespaces_proxy import CodespacesProxy
 from .config import build_config
 from .db import close_db, connect_path
 from .detection import detection_api
@@ -47,6 +48,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     app.config.update(build_config())
     if test_config:
         app.config.update(test_config)
+    if app.config["ENV_NAME"] == "development" and app.config.get("CODESPACE_PUBLIC_HOST"):
+        app.wsgi_app = CodespacesProxy(app.wsgi_app, app.config["CODESPACE_PUBLIC_HOST"])  # type: ignore[method-assign]
 
     @app.context_processor
     def product_context():
