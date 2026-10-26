@@ -2,7 +2,7 @@
   "tool": "https://github.com/7zy4/rea",
   "tool_commit": "2250e67bc271c83f9e200ee298aa04a2457438a6",
   "date": "2026-10-26",
-  "source_revision": "50bf3e82acfdbf8ed05c5733b54261688771e078",
+  "source_revision": "93a86ba30ed473f89691ee78e49c49fff325e40b",
   "operation": "inspect-python-pyc",
   "compilation": "CPython 3.12 py_compile CHECKED_HASH; logical source filenames retained; compilation does not execute source",
   "inputs": [
@@ -10,9 +10,9 @@
       "source": "socify/security.py",
       "source_sha256": "c80093c184a7c1a1c6b46c9497229234d61e57c1b9ab0bfaa6936faab4f29d38",
       "pyc_sha256": "9deb5276e4c08274c091a1b8382be9fa15b1e666d4efd748a961b3d654f989a6",
-      "evidence_id": "ev_f6e22cb2e6c9be4ec0ca6b843782965b44866b087798e82ce531ef360ea9a325",
+      "evidence_id": "ev_b4aafda794a4e0e252627442194fdd0fdb48702b969d8659fd549581a97e9ab0",
       "evidence_file": "python-security-rea-2026-10-26.json.gz",
-      "compressed_sha256": "13a00b51c8d39e83646cef8528d1a7f939cf7ab48310b8e4adc820c09c8c0155",
+      "compressed_sha256": "aa02f08ae370cfbd58274bad825c87c265e3f13a774fae51940569c6c1469abc",
       "coverage": {
         "status": "complete",
         "objects": 1039,
@@ -25,9 +25,9 @@
       "source": "socify/schema.py",
       "source_sha256": "51c199d6f73fd0c26ea1a55883280c4155fbfd5d0b41f75a45f96d5015d99811",
       "pyc_sha256": "2c736efc96657dd56dc1b24997aabfe80d3c5a6a6f7db02d8b3f21d0169911e2",
-      "evidence_id": "ev_d2d7fae85922e86200153b1cded9a5d381bebe333585bf0feea0d90b3e733fd2",
+      "evidence_id": "ev_77779d258b705b8a5888b25a1a5d2968b4929d71937248b62554ce1453910ff0",
       "evidence_file": "python-schema-rea-2026-10-26.json.gz",
-      "compressed_sha256": "46925452670e0fea15689a46b8396b78e1a9efe3309d148031bf1e8136ae5e69",
+      "compressed_sha256": "73c30d5dc953127243ff6a716dded8113ba6cc095255ce299bc3c3de539cd93d",
       "coverage": {
         "status": "complete",
         "objects": 649,
@@ -38,32 +38,107 @@
     },
     {
       "source": "socify/autopsy_chronology.py",
-      "source_sha256": "d0505223b62a89841d1c5c5791040915f6bc8b4300575bd862a4ae49df425230",
-      "pyc_sha256": "69c1c657b1c1847ac8986148b12ee42faab9eea7d2b01344c4c70be382366a5f",
-      "evidence_id": "ev_3f71ba51520bcbf6bad47d99f425306e0ffb7b2372079da724579ea806603fb8",
+      "source_sha256": "dbd695fc63d97f020fdca386b53ec542eb53db936c19cfb11b82bcc2576c4d10",
+      "pyc_sha256": "5d30b940a4d8135cf0ca42eb39cb0a5b13434f2fa64a5b530930b54cea1aa05f",
+      "evidence_id": "ev_ace64c9019463af686e694930a3b6d1416f6ce4f6d07f7a03b6c3c53c801070d",
       "evidence_file": "python-autopsy_chronology-rea-2026-10-26.json.gz",
-      "compressed_sha256": "04b746f0d04b7111e7de01ea269691a77e0ad6bf50252277fbb7f9ba481e023c",
+      "compressed_sha256": "74153ad7dbbb6241462b331b3b2011af97e875b754f7a91f4cace76fe60faa59",
       "coverage": {
         "status": "complete",
-        "objects": 612,
-        "code_objects": 12,
-        "marshal_bytes": 15520,
+        "objects": 664,
+        "code_objects": 13,
+        "marshal_bytes": 16316,
         "marshal_depth": 6
       }
     },
     {
       "source": "socify/autopsy_worker.py",
-      "source_sha256": "00e9ab8a4e8540a0847a61822f48280b15e9207c6202090daec70719dc2d0c9f",
-      "pyc_sha256": "012402f2556c1175324b3583da06fabee7662890ebcbfd385d87b9f932d62323",
-      "evidence_id": "ev_0346a48e463e578cbbe5808f98a9ba9d9bf18beed1a4fc631c9ef2974a6b61bf",
+      "source_sha256": "233ab43d923c196163fb3b4650bf60ca4d6ec4487d7b79b9470cb624e39f0b26",
+      "pyc_sha256": "c50e875fef4a43548c5af7405dc21ec43d8bb05dfcee7fce83d1f0bf706812f3",
+      "evidence_id": "ev_2518cfe8dec27f367b42d46c557084df659beab83adcc7230969573ff52a0dff",
       "evidence_file": "python-autopsy_worker-rea-2026-10-26.json.gz",
-      "compressed_sha256": "5483b00048e48e10fd17a19991dc5615f43634d06fb5d94bf49319dd996dc2fa",
+      "compressed_sha256": "289ae2726735cac4b943901f7c24a22e6aacdf907221d99561ba1a73b49e9292",
       "coverage": {
         "status": "complete",
-        "objects": 537,
-        "code_objects": 9,
-        "marshal_bytes": 14605,
+        "objects": 562,
+        "code_objects": 10,
+        "marshal_bytes": 14999,
         "marshal_depth": 5
+      }
+    },
+    {
+      "source": "socify/db.py",
+      "source_sha256": "9d9e8d9ce23a432070c817203271d28b1fbcb01da241b26b04114798a76513f4",
+      "pyc_sha256": "c094da044bf03a11ee8c8cc5b71f9c6438375b57c10a9dc479bf1d9ef7992a91",
+      "evidence_id": "ev_a90ee5e1f5f50edce8ebe653155c35327be1412677d525d3c9d0381677ba98f7",
+      "evidence_file": "python-db-rea-2026-10-26.json.gz",
+      "compressed_sha256": "53b836565d23b63c08f589a504edfa7c33036c03c7a7b00ef3c1518da9842d41",
+      "coverage": {
+        "status": "complete",
+        "objects": 277,
+        "code_objects": 10,
+        "marshal_bytes": 5186,
+        "marshal_depth": 5
+      }
+    },
+    {
+      "source": "socify/autopsy_reports.py",
+      "source_sha256": "34f5a0cda2f610d8e804d448b2569c61f8f2e8171b8450b7bcc47d32c7e8bb4f",
+      "pyc_sha256": "e910e1931b0ddb6e56b6431d608ba297527c51b802979ee855dc6f98a1b665f0",
+      "evidence_id": "ev_3f852928cb997f7e91668c031a76697d82534606d4360876364a398a9a9e33c2",
+      "evidence_file": "python-autopsy_reports-rea-2026-10-26.json.gz",
+      "compressed_sha256": "581757043a1eb344ae35a3ec61d813020189f477cfac4d7b5e0b63c747cffdeb",
+      "coverage": {
+        "status": "complete",
+        "objects": 1174,
+        "code_objects": 20,
+        "marshal_bytes": 38254,
+        "marshal_depth": 7
+      }
+    },
+    {
+      "source": "socify/autopsy_pipeline.py",
+      "source_sha256": "f9467227c8c239065eb3e3a8b704354edc54d294b693aa37f4b2246897367377",
+      "pyc_sha256": "e134c04bb06ade7d80d0bc59c97bc2b97ef7dcbb4d01a177f589d587cc51b1d8",
+      "evidence_id": "ev_83051eec18750bf7e09af92dcfdc8dd9a0e98575eebc56e83bff48c1090faba8",
+      "evidence_file": "python-autopsy_pipeline-rea-2026-10-26.json.gz",
+      "compressed_sha256": "80860814bba2e85c4587284ae164ac7eeac49e5ec7a12a4056663682966f2832",
+      "coverage": {
+        "status": "complete",
+        "objects": 398,
+        "code_objects": 10,
+        "marshal_bytes": 14194,
+        "marshal_depth": 5
+      }
+    },
+    {
+      "source": "socify/case_counts.py",
+      "source_sha256": "e10fccf00a1e2216ade0d79a3b1cff03eb16969cb5199ddf49e240004861ea08",
+      "pyc_sha256": "0d31850103e873e44a062678ed99a999b3df63586da5f90dc746bb6745b853d9",
+      "evidence_id": "ev_a4e689c0e5e4277f593a813aabc553a5aeb3f69cd1c1cae9dd2951834902bc04",
+      "evidence_file": "python-case_counts-rea-2026-10-26.json.gz",
+      "compressed_sha256": "2784f1ce7dcff7c9560b2db9108ded48f3ab75d7141a41209c2aa6e1f3ba1fd8",
+      "coverage": {
+        "status": "complete",
+        "objects": 185,
+        "code_objects": 6,
+        "marshal_bytes": 3311,
+        "marshal_depth": 6
+      }
+    },
+    {
+      "source": "socify/cases.py",
+      "source_sha256": "af2b0f2cb660b0aac521cfbeb452569e70b8ddcac989e5e795197d6911f4d027",
+      "pyc_sha256": "b9b084f8781bc0fccbce77a513edd0f3a7518f5a118adefcc911ab1ff2d4a7c5",
+      "evidence_id": "ev_57c4c54e19cb9f481e2fa8fcefc3f8b51c58d7a04bfe0db5859d079f13d5bd6d",
+      "evidence_file": "python-cases-rea-2026-10-26.json.gz",
+      "compressed_sha256": "a4b2a89e819aa50e43dfb616a4c0c4fbe0f087d1a14f18523034ecb1796e2011",
+      "coverage": {
+        "status": "complete",
+        "objects": 2561,
+        "code_objects": 41,
+        "marshal_bytes": 81710,
+        "marshal_depth": 8
       }
     }
   ],
@@ -73,5 +148,5 @@
     "source_hash_hex is the PEP 552 header field; the original .py is not read.",
     "python_version is the pinned CPython magic table for this header, not a runtime interpreter."
   ],
-  "interpretation": "A bounded inventory of code objects, names and constants for the session, schema, chronology and isolated worker boundaries; complete marshal coverage is not source decompilation, vulnerability assessment or execution coverage."
+  "interpretation": "Bounded inventory of code objects, names and constants for nine final modules: sessions, schema, chronology, worker, transactions, reports, batch scope, count snapshots and cross-case attachments. Complete marshal coverage is not decompilation, vulnerability assessment or execution coverage."
 }

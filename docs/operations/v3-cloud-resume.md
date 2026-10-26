@@ -37,4 +37,17 @@ SOCIFY_REA_CLI=/workspace/.cache/socify-v3-tools/rea/scripts/rea.mjs bash script
 
 الأداء قابل للإعادة عبر `python -m scripts.benchmark_autopsy --events 1000000 --concurrency 20 --requests 100 --output /tmp/capacity.json`. يفسر 10,000 سجل فعليًا ويزيد الباقي بـSQL لقياس التخزين والقراءة؛ لا تسوّق ذلك على أنه قياس استيراد مليون سجل أو TLS أو موارد خدمة التحليل.
 
+لقياس الاستيراد الإنتاجي الفعلي استخدم `tests/container/benchmark_production.py` مع ملفي Compose الأساسي و`tests/container/compose.performance.yml` ومشروع `socify-v3-performance` فقط. يتحقق البرنامج من marker اصطناعي على الخدمات الخمس قبل تأسيس حسابات الاختبار، ويرفع ملفات JSONL فعلية على دفعات 10,000 سجل، ويستخدم 20 جلسة مستقلة وTLS محليًا موثقًا وCSRF فعليًا. يسجل التوزيعات والموارد والتقارير والبصمات ولا يزيد عدد الأحداث عبر SQL.
+
+في البيئة الحالية ملفا الحالة الخاصان بالمشغل محفوظان خارج المستودع في `/workspace/.cache/socify-v3-tools/`: `performance.env` و`capacity-million-state.json`. لا تطبعهما أو ترفعهما إلى Git، ولا تغير مفاتيحهما أثناء استكمال قاعدة الاختبار. الحالة تحتوي بيانات دخول اصطناعية بصلاحيات 0600 وحارس flock. عند انقطاع البرنامج استأنف بنفس الملف؛ يجري التحقق من الدفعات المحفوظة ولا تعاد معالجة المكتمل. بعد اكتمال الاستيراد يمكن إعادة قياس القراءات والتقارير بـ`--measure-only` دون استيراد مليون سجل ثانية.
+
+```bash
+SOCIFY_HTTP_PORT=15006 PYTHONPATH=. python tests/container/benchmark_production.py \
+  --env-file /workspace/.cache/socify-v3-tools/performance.env \
+  --state /workspace/.cache/socify-v3-tools/capacity-million-state.json \
+  --events 1000000 --output /tmp/socify-capacity-production.json
+```
+
+احترم اختبارات TLS والفشل ولا تضف retries تخفي أخطاء HTTP. أوقف driver عند تحديث صور خدمات القياس ثم تحقق من اكتمال الدفعة وسجل حيازتها قبل إعادة تشغيل العامل؛ حافظ على volumes. مدة الحائط تشمل التوقفات والتحديثات، بينما تحفظ طوابع الدفعات الأصلية زمن المعالجة الفعلي؛ لا تحول هذه التجربة الاصطناعية إلى SLO للشركة.
+
 تواصل GitHub عبر proxy المثبت؛ لا تطلب token ما دامت عمليات Git تعمل. افحص الأسرار قبل commit، وارفع commits واضحة على V3، ثم حدث أدلة القبول دون تعطيل اختبارات أو خفض شرط التغطية. Codespaces وهذه البيئة للتطوير ببيانات اصطناعية؛ بيانات الشركة تعالج في نشرها الداخلي المعزول.

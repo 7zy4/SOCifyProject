@@ -1,25 +1,28 @@
 # SOCify Digital Autopsy
 
-> **النسخة الثالثة قيد التنفيذ:** [socify-version-3](https://github.com/7zy4/SOCifyProject/tree/socify-version-3) — التوجه الجديد **SOCify Digital Autopsy** للتحليل والتحقيق والتوثيق داخل الشركة. نُفذ أساس القضية وصلاحياتها والاستيراد والتصدير المقيدان بها؛ بقية متطلبات V3 قيد العمل والقبول. [التشغيل والحساب الداخلي](docs/operations-v3.md) · [البرومت التنفيذي](docs/plans/v3-digital-autopsy-implementation-prompt-ar.md) · [سجل الاستكمال](docs/plans/v3-progress.md) · [مصفوفة V3](docs/qa/v3-acceptance.csv). لا تُستخدم بيانات شركة حقيقية في Codespaces أو بيئة سحابية غير معتمدة داخل الشركة.
+> **النسخة الثالثة:** [socify-version-3](https://github.com/7zy4/SOCifyProject/tree/socify-version-3) — التوجه الجديد **SOCify Digital Autopsy** للتحليل والتحقيق والتوثيق داخل الشركة. منصة داخلية تربط القضية بالسجلات والمؤشرات والتحقيق والتصعيد والتحليل المحلي والتقارير. حالة القبول وأدلتها في [محضر V3](docs/qa/v3-final-acceptance-2026-10-26.md). [التشغيل والحساب الداخلي](docs/operations-v3.md) · [البرومت التنفيذي](docs/plans/v3-digital-autopsy-implementation-prompt-ar.md) · [سجل الاستكمال](docs/plans/v3-progress.md) · [مصفوفة V3](docs/qa/v3-acceptance.csv). لا تُستخدم بيانات شركة حقيقية في Codespaces أو بيئة سحابية غير معتمدة داخل الشركة.
 >
-> **مرجع النسخة الثانية:** [socify-version-2](https://github.com/7zy4/SOCifyProject/tree/socify-version-2) — يشمل أعمال المرحلة الأولى والمنصة المؤسسية وتحسين تشغيل Codespaces، دون تعديل `main`. [تقرير تدقيق الفروع والمتطلبات](docs/qa/branch-consolidation-2026-10-20.md). النسخة **NO-GO** حتى إغلاق متطلبات القبول.
+> **مرجع النسخة الثانية:** [socify-version-2](https://github.com/7zy4/SOCifyProject/tree/socify-version-2) — يشمل أعمال المرحلة الأولى والمنصة المؤسسية وتحسين تشغيل Codespaces، دون تعديل `main`. [تقرير تدقيق الفروع والمتطلبات](docs/qa/branch-consolidation-2026-10-20.md). هذه روابط مرحلة V2 التاريخية؛ يُقيّم V3 بمصفوفته ومحضر قبوله المستقلين.
 >
 > [تجربة Codespaces من المتصفح](docs/codespaces.md) · [مصفوفة 132 مطلبًا](docs/qa/requirements-traceability.csv) · [60 رحلة قبول](docs/qa/e2e-acceptance.csv)
 
 V3 مساحة تحقيق داخلية تبدأ بقضية وهدف، ثم تحفظ السجلات والأدلة وتربط الأصول والمؤشرات والخط الزمني والتصعيد والتحليل المحلي والتقرير المعتمد. لا ترسل العينات أو البصمات إلى VirusTotal؛ تستورد نتائجه يدويًا. وظائف التدريب القديمة محفوظة في التاريخ ومرجع V2، ومساراتها متقاعدة في الوضع التشغيلي.
 
-آخر نقطة تحقق V3: **505 اختبارات و12 رحلة Chromium**، مع اختبار حاويات إنتاجي اصطناعي. تفاصيل التنفيذ والحدود في [دليل التحقيق والتحليل المحلي](docs/qa/v3-investigation-local-analysis-2026-10-25.md). هذه الأعداد لا تثبت اكتمال الرحلات الـ75.
+آخر تحقق على المصدر `93a86ba`: **746 اختبارًا ناجحًا، تغطية 90.71%، و19 رحلة Chromium**، مع قبول إنتاج وتعافٍ ناجحين وتطابق 108 ملفات عبر خدمات المعالجة الأربع. مصفوفة V3: **75/75 VERIFIED ضمن الحدود الموثقة**. اكتمل مرجع مليون سجل مستورد و20 مستخدمًا عبر TLS و10 تقارير فعلية؛ تفاصيل الأزمنة وحدود القياس في [محضر القبول](docs/qa/v3-final-acceptance-2026-10-26.md). [الأدلة الخام والملخص](docs/qa/v3-verification-summary-2026-10-26.json) · [مصفوفة الرحلات](docs/qa/v3-acceptance.csv).
 
-حالة القبول الحالية: **NO-GO**. النسخة فرع تطوير للاختبار المعزول، ولم يثبت اجتياز جميع متطلبات الإصدار النهائي. راجع [تقرير القبول](docs/qa/final-acceptance-report.md) و[نتائج المراجعة](docs/qa/final-audit-findings.md) قبل استخدامها أو دمجها.
+حالة V3 تُحدّث في [محضر القبول الحالي](docs/qa/v3-final-acceptance-2026-10-26.md). تقارير NO-GO القديمة تخص checkpoints ومرحلة V2؛ لا تستبدل نتائج التحقق من المصدر الحالي. التسليم يستمر من `socify-version-3` دون دمج `main` أو تغيير V2.
 
 ## التشغيل السريع
 
-يتطلب التشغيل Python 3.12 أو أحدث. لا توجد حسابات افتراضية في الإنتاج ولا تُنشأ بيانات تجريبية دون طلب صريح.
+يتطلب التشغيل Python 3.12 أو أحدث وDocker لخدمة التحليل المحلية المعزولة في المسار المختبر. لا توجد حسابات افتراضية في الإنتاج ولا تُنشأ بيانات تجريبية دون طلب صريح.
 
 ```bash
 python -m venv .venv
 . .venv/bin/activate
 python -m pip install -r requirements.txt
+docker build --target analysis -t socify-v3-verification-analysis .
+bash scripts/start_local_analysis.sh
+export SOCIFY_ANALYSIS_SOCKET=/tmp/socify-v3-dev-analysis-ipc/analysis.sock
 python -m scripts.bootstrap_team --email manager@example.test --name "مدير الفريق" --team "فريق التحقيق الداخلي"
 python run.py
 ```
@@ -57,10 +60,10 @@ pip-audit -r requirements.txt
 
 ## Docker
 
+يُجهّز المسؤول ملف البيئة الخاص خارج المستودع مرة واحدة بمفتاحين مستقلين وعشوائيين لا يقل كل منهما عن 32 بايت: `SOCIFY_SECRET_KEY` و`SOCIFY_CREDENTIAL_KEY`، وصلاحية 0600. استخدم نفس الملف والمفاتيح عند إعادة تشغيل Volume موجود؛ لا تولدهما من جديد في كل جلسة.
+
 ```bash
-export SOCIFY_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
-export SOCIFY_CREDENTIAL_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
-docker compose up --build
+docker compose --env-file /secure/socify/production.env up --build
 ```
 
 خدمة الويب مربوطة بـ`127.0.0.1` افتراضيًا، ويشغّل Compose عاملي Import وPlaybook منفصلين يستهلكان قوائم المهام المحفوظة. تعمل الخدمات كمستخدم غير root وتستخدم Volume مستمرًا وقاعدة ملفات للقراءة فقط عدا `/data` و`/tmp`. النشر العام يحتاج Reverse Proxy موثوقًا وTLS ونسخًا احتياطية ومراقبة.

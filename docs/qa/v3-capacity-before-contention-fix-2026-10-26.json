@@ -1,0 +1,346 @@
+{
+  "schema": "socify-production-capacity/1",
+  "synthetic_only": true,
+  "revision": "be568153026f55616fae685b27a7ffb28369d61a",
+  "ingestion_revision": "0dc6ef58757d7a9892d76c44bf3a2ad5186b7d94",
+  "actual_parsed_events": 1000000,
+  "storage_seed_events": 0,
+  "hash_checked_batches": 100,
+  "parser_versions": [
+    "socify-import-2"
+  ],
+  "authenticated_identities": 20,
+  "concurrent_clients": 20,
+  "requests": 200,
+  "tls_versions": [
+    "TLSv1.3"
+  ],
+  "transport": "Verified localhost TLS fixture -> actual Nginx ingress -> production Gunicorn -> SQLite; independent authenticated cookie sessions with real CSRF and RBAC",
+  "ingestion": {
+    "wall_seconds_including_pauses": 37994.758,
+    "rows_per_processing_second": 461.521358266957,
+    "batches": 100,
+    "rows_per_batch": 10000,
+    "processing": {
+      "p50_ms": 20423.037,
+      "p95_ms": 29886.386,
+      "p99_ms": 38502.004
+    },
+    "queue_wait": {
+      "p50_ms": 1422.435,
+      "p95_ms": 2439.076,
+      "p99_ms": 3037.371
+    },
+    "processing_seconds_total": 2166.74696,
+    "images": {
+      "socify": {
+        "image": "sha256:4e913f314c4e3516581e51ec1280705a2ce7fbb8158cc11c760aec05f9c533b6",
+        "memory_limit_bytes": 1073741824,
+        "cpu_limit": 2.0,
+        "restart_count": 0,
+        "oom_killed": false
+      },
+      "import-worker": {
+        "image": "sha256:4e913f314c4e3516581e51ec1280705a2ce7fbb8158cc11c760aec05f9c533b6",
+        "memory_limit_bytes": 1073741824,
+        "cpu_limit": 2.0,
+        "restart_count": 0,
+        "oom_killed": false
+      },
+      "autopsy-worker": {
+        "image": "sha256:4e913f314c4e3516581e51ec1280705a2ce7fbb8158cc11c760aec05f9c533b6",
+        "memory_limit_bytes": 2147483648,
+        "cpu_limit": 2.0,
+        "restart_count": 0,
+        "oom_killed": false
+      },
+      "analysis": {
+        "image": "sha256:75d42cd3bcb78a743695e2fbcfac3cee55e7569764bd615121a8f07fdbbeb98b",
+        "memory_limit_bytes": 2147483648,
+        "cpu_limit": 2.0,
+        "restart_count": 0,
+        "oom_killed": false
+      },
+      "ingress": {
+        "image": "sha256:c7febd1ba54b1e55ed8cf13077be39b4b2b7c89e6a2bb48508f89fdb98548668",
+        "memory_limit_bytes": 134217728,
+        "cpu_limit": 1.0,
+        "restart_count": 0,
+        "oom_killed": false
+      }
+    },
+    "resources": {
+      "socify": {
+        "cpu_usage_usec": 81869562,
+        "memory_peak_bytes": 288268288,
+        "memory_limit_bytes": 1073741824,
+        "pids_peak": 17
+      },
+      "import-worker": {
+        "cpu_usage_usec": 738769292,
+        "memory_peak_bytes": 876691456,
+        "memory_limit_bytes": 1073741824,
+        "pids_peak": 8
+      },
+      "autopsy-worker": {
+        "cpu_usage_usec": 4352579,
+        "memory_peak_bytes": 43089920,
+        "memory_limit_bytes": 2147483648,
+        "pids_peak": 8
+      },
+      "analysis": {
+        "cpu_usage_usec": 1943517,
+        "memory_peak_bytes": 44068864,
+        "memory_limit_bytes": 2147483648,
+        "pids_peak": 9
+      },
+      "ingress": {
+        "cpu_usage_usec": 621158843,
+        "memory_peak_bytes": 18944000,
+        "memory_limit_bytes": 134217728,
+        "pids_peak": 10
+      }
+    },
+    "driver_runs": [
+      {
+        "started_at": "2026-10-26T07:20:14.524097+00:00",
+        "revision": "50bf3e82acfdbf8ed05c5733b54261688771e078",
+        "prior_completed_batches": 33,
+        "measure_only": false,
+        "images": {
+          "socify": {
+            "container_id": "750a9a24e620c6e5b92f74c34567cb2c83cf712e9a7f4314a70e667ce3ed87b0",
+            "image": "sha256:e659d1d32f3a184c241f26be4854251f95114597001f765455ac688dfc6397fd",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "import-worker": {
+            "container_id": "b2812f946529ab0e13961e76c3ba5eed259ebb3b88b4b7b3440fe3a2380f086e",
+            "image": "sha256:e659d1d32f3a184c241f26be4854251f95114597001f765455ac688dfc6397fd",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "autopsy-worker": {
+            "container_id": "f33193602798088d4d4fce2c97b2a1af8912fd8227e4fb9f049b9aa70abf296f",
+            "image": "sha256:e659d1d32f3a184c241f26be4854251f95114597001f765455ac688dfc6397fd",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "analysis": {
+            "container_id": "68b8adfe744d31d2660e554ab864494be4ecf25e56a4c8d0769e3efc46be808b",
+            "image": "sha256:75d42cd3bcb78a743695e2fbcfac3cee55e7569764bd615121a8f07fdbbeb98b",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "ingress": {
+            "container_id": "90f2765d5279106f73c56156b13060a848ae1a165ccce0e7e1fede601bbbcb48",
+            "image": "sha256:c7febd1ba54b1e55ed8cf13077be39b4b2b7c89e6a2bb48508f89fdb98548668",
+            "memory_limit_bytes": 134217728,
+            "cpu_limit": 1.0,
+            "restart_count": 0,
+            "oom_killed": false
+          }
+        }
+      },
+      {
+        "started_at": "2026-10-26T07:36:41.614830+00:00",
+        "revision": "be568153026f55616fae685b27a7ffb28369d61a",
+        "prior_completed_batches": 68,
+        "measure_only": false,
+        "images": {
+          "socify": {
+            "container_id": "9cc42c5cf3c0f10ebc1378c76a6e27dfa84bb5440071ab347eac150ace704e22",
+            "image": "sha256:3db05a7a7a03127a3665031111f2d81dbcf5667feedc4a88b96cc9dd8f9cfc75",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "import-worker": {
+            "container_id": "3667f4b770c9581b706d815e37c487c883ea1649272eb61df53deb5ae34738c8",
+            "image": "sha256:3db05a7a7a03127a3665031111f2d81dbcf5667feedc4a88b96cc9dd8f9cfc75",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "autopsy-worker": {
+            "container_id": "6e07d8281f80798a7898e89e934726b627daec332678ee8416699b06c593cbe3",
+            "image": "sha256:3db05a7a7a03127a3665031111f2d81dbcf5667feedc4a88b96cc9dd8f9cfc75",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "analysis": {
+            "container_id": "8a1fe0daf27ded96777f22c865cb99a4d84eae0ff65263bf1c3f24ce4431937d",
+            "image": "sha256:3758bf8e6a07b2e84ed09bfb1c2a661b0bfc5e6f22c48f99b1890fefcef108bd",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "ingress": {
+            "container_id": "90f2765d5279106f73c56156b13060a848ae1a165ccce0e7e1fede601bbbcb48",
+            "image": "sha256:c7febd1ba54b1e55ed8cf13077be39b4b2b7c89e6a2bb48508f89fdb98548668",
+            "memory_limit_bytes": 134217728,
+            "cpu_limit": 1.0,
+            "restart_count": 0,
+            "oom_killed": false
+          }
+        }
+      }
+    ],
+    "limits": "Worker timestamps measure each real batch. Wall time includes operator interruptions and fixes; lifetime cgroup peaks include the earlier synthetic smoke workload. Historical driver invocations before this manifest format are recorded separately in the QA log."
+  },
+  "first_reads_ms": {
+    "case_open": 195.004,
+    "log_page": 88.322,
+    "fts_search": 498.201,
+    "timeline": 84.625,
+    "chronology": 203.461
+  },
+  "reads": {
+    "case_open": {
+      "p50_ms": 6494.357,
+      "p95_ms": 19084.329,
+      "p99_ms": 22506.405
+    },
+    "log_page": {
+      "p50_ms": 7908.438,
+      "p95_ms": 12827.535,
+      "p99_ms": 19491.488
+    },
+    "fts_search": {
+      "p50_ms": 7979.011,
+      "p95_ms": 13894.699,
+      "p99_ms": 22503.776
+    },
+    "timeline": {
+      "p50_ms": 9395.643,
+      "p95_ms": 22087.642,
+      "p99_ms": 24806.785
+    },
+    "chronology": {
+      "p50_ms": 10004.864,
+      "p95_ms": 19329.48,
+      "p99_ms": 22188.716
+    }
+  },
+  "report": {
+    "samples": 10,
+    "latencies": {
+      "p50_ms": 20470.378,
+      "p95_ms": 27888.421,
+      "p99_ms": 27888.421
+    },
+    "pdf_bytes_min": 253739,
+    "pdf_bytes_max": 253759,
+    "sha256_verified": true,
+    "formats_per_report": 5
+  },
+  "resources": {
+    "socify": {
+      "cpu_usage_usec": 352172743,
+      "memory_peak_bytes": 288268288,
+      "memory_limit_bytes": 1073741824,
+      "pids_peak": 18,
+      "measurement_cpu_used_usec": 269475397
+    },
+    "import-worker": {
+      "cpu_usage_usec": 741025008,
+      "memory_peak_bytes": 876691456,
+      "memory_limit_bytes": 1073741824,
+      "pids_peak": 9,
+      "measurement_cpu_used_usec": 743200
+    },
+    "autopsy-worker": {
+      "cpu_usage_usec": 2238210,
+      "memory_peak_bytes": 61538304,
+      "memory_limit_bytes": 2147483648,
+      "pids_peak": 8,
+      "measurement_cpu_used_usec": -2283094
+    },
+    "analysis": {
+      "cpu_usage_usec": 137744133,
+      "memory_peak_bytes": 216260608,
+      "memory_limit_bytes": 2147483648,
+      "pids_peak": 9,
+      "measurement_cpu_used_usec": 135649944
+    },
+    "ingress": {
+      "cpu_usage_usec": 627808287,
+      "memory_peak_bytes": 18944000,
+      "memory_limit_bytes": 134217728,
+      "pids_peak": 10,
+      "measurement_cpu_used_usec": 6465920
+    }
+  },
+  "tls_fixture_and_driver": {
+    "peak_rss_kib": 68544,
+    "user_cpu_seconds": 21.901751,
+    "system_cpu_seconds": 6.114041
+  },
+  "environment": {
+    "python": "3.12.14",
+    "kernel": "6.18.55",
+    "host_cpu_count": 5
+  },
+  "measured_images": {
+    "socify": {
+      "container_id": "9cc42c5cf3c0f10ebc1378c76a6e27dfa84bb5440071ab347eac150ace704e22",
+      "image": "sha256:3db05a7a7a03127a3665031111f2d81dbcf5667feedc4a88b96cc9dd8f9cfc75",
+      "memory_limit_bytes": 1073741824,
+      "cpu_limit": 2.0,
+      "restart_count": 0,
+      "oom_killed": false
+    },
+    "import-worker": {
+      "container_id": "3667f4b770c9581b706d815e37c487c883ea1649272eb61df53deb5ae34738c8",
+      "image": "sha256:3db05a7a7a03127a3665031111f2d81dbcf5667feedc4a88b96cc9dd8f9cfc75",
+      "memory_limit_bytes": 1073741824,
+      "cpu_limit": 2.0,
+      "restart_count": 0,
+      "oom_killed": false
+    },
+    "autopsy-worker": {
+      "container_id": "6e07d8281f80798a7898e89e934726b627daec332678ee8416699b06c593cbe3",
+      "image": "sha256:3db05a7a7a03127a3665031111f2d81dbcf5667feedc4a88b96cc9dd8f9cfc75",
+      "memory_limit_bytes": 2147483648,
+      "cpu_limit": 2.0,
+      "restart_count": 2,
+      "oom_killed": false
+    },
+    "analysis": {
+      "container_id": "8a1fe0daf27ded96777f22c865cb99a4d84eae0ff65263bf1c3f24ce4431937d",
+      "image": "sha256:3758bf8e6a07b2e84ed09bfb1c2a661b0bfc5e6f22c48f99b1890fefcef108bd",
+      "memory_limit_bytes": 2147483648,
+      "cpu_limit": 2.0,
+      "restart_count": 0,
+      "oom_killed": false
+    },
+    "ingress": {
+      "container_id": "90f2765d5279106f73c56156b13060a848ae1a165ccce0e7e1fede601bbbcb48",
+      "image": "sha256:c7febd1ba54b1e55ed8cf13077be39b4b2b7c89e6a2bb48508f89fdb98548668",
+      "memory_limit_bytes": 134217728,
+      "cpu_limit": 1.0,
+      "restart_count": 0,
+      "oom_killed": false
+    }
+  },
+  "harness_elapsed_seconds": 1134.347,
+  "limitations": [
+    "Synthetic structured JSONL with 64 repeated reserved IPs, one host and one timestamp; different formats/cardinality need separate sizing",
+    "TLS termination is a locally trusted test fixture, not a company certificate/deployment",
+    "Kernel memory.peak covers each service lifetime including startup/cache; measured CPU deltas cover reads/report and separate ingestion counters are retained",
+    "No company production SLO has been agreed; this is a measured workload, not unlimited capacity or a zero-defect guarantee"
+  ]
+}

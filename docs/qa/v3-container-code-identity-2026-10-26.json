@@ -1,0 +1,27 @@
+{
+  "revision": "93a86ba30ed473f89691ee78e49c49fff325e40b",
+  "source_digest": "2ac312ef0b5884510b96cfec469e880335a1bdd87239f5c1aa314e3f585f4dca",
+  "selection": "Tracked app entrypoints, Dockerfile/docker-compose.yml/requirements.txt, and executable, configuration, font and data files under socify/scripts/static/templates/deploy/data",
+  "containers": {
+    "socify": {
+      "checked_files": 108,
+      "all_match": true,
+      "image": "sha256:ff5c4a9a1273c107141d98e0206446593d290ae833664c844330fb5feb7d4939"
+    },
+    "import-worker": {
+      "checked_files": 108,
+      "all_match": true,
+      "image": "sha256:ff5c4a9a1273c107141d98e0206446593d290ae833664c844330fb5feb7d4939"
+    },
+    "autopsy-worker": {
+      "checked_files": 108,
+      "all_match": true,
+      "image": "sha256:ff5c4a9a1273c107141d98e0206446593d290ae833664c844330fb5feb7d4939"
+    },
+    "analysis": {
+      "checked_files": 108,
+      "all_match": true,
+      "image": "sha256:6e47e69699dcb01d6a2ecce66b640f9cee666fb2b726c5355034954710da5a89"
+    }
+  }
+}

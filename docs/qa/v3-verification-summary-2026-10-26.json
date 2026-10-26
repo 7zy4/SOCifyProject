@@ -1,0 +1,197 @@
+{
+  "verified_source_revision": "93a86ba30ed473f89691ee78e49c49fff325e40b",
+  "synthetic_only": true,
+  "pytest": {
+    "passed": 746,
+    "e2e_deselected_then_run_separately": 19,
+    "warnings": 1,
+    "warning_scope": "Intentional duplicate ZIP member rejection fixture"
+  },
+  "coverage": {
+    "covered_lines": 8958,
+    "num_statements": 9636,
+    "percent_covered": 90.71107784431138,
+    "percent_covered_display": "91",
+    "missing_lines": 678,
+    "excluded_lines": 0,
+    "percent_statements_covered": 92.96388542963885,
+    "percent_statements_covered_display": "93",
+    "num_branches": 3724,
+    "num_partial_branches": 511,
+    "covered_branches": 3161,
+    "missing_branches": 563,
+    "percent_branches_covered": 84.88184747583244,
+    "percent_branches_covered_display": "85"
+  },
+  "chromium": {
+    "passed": 19,
+    "csrf_enabled": true,
+    "css_content_zoom_percent": 200,
+    "native_desktop_zoom_percent": 200,
+    "keyboard_arrow_enter_tab_escape": true
+  },
+  "static_checks": {
+    "ruff_lint": "passed",
+    "ruff_format": "passed: 151 Python files",
+    "mypy": "passed: 78 source files",
+    "bandit": "passed; existing narrow reviewed markers retained",
+    "pip_audit_runtime": "No known vulnerabilities in all 36 installed runtime-image packages at the time of the audit",
+    "pip_check": "No broken requirements found",
+    "repository_scan": "passed: full tracked repository; public commit/image/evidence digests reviewed individually; detectors retained"
+  },
+  "production": {
+    "case_archive_restore": true,
+    "custom_yara_validation_and_versioned_scan": true,
+    "fixed_internal_ingress": true,
+    "formats": [
+      "docx",
+      "html",
+      "json",
+      "md",
+      "pdf"
+    ],
+    "import_state": "completed",
+    "pdf_artifact": "/tmp/socify-acceptance-5oeyzt1i.pdf",
+    "pdf_sha256_verified": true,
+    "production_http_login_csrf": true,
+    "report_state": "completed",
+    "sample_executed": false,
+    "static_analysis": "completed"
+  },
+  "production_recovery": {
+    "schema": "socify-v3-production-recovery/1",
+    "synthetic_only": true,
+    "existing_authenticated_session_retained": true,
+    "all_five_services_restarted": true,
+    "queued_import_and_report_completed": true,
+    "original_evidence_hashes_retained": true,
+    "custody_chain_valid": true,
+    "pdf_sha256_verified": true,
+    "analysis_outage_backoff_and_automatic_recovery": true,
+    "seconds": 14.914,
+    "isolation": {
+      "socify": {
+        "image": "sha256:ff5c4a9a1273c107141d98e0206446593d290ae833664c844330fb5feb7d4939",
+        "network_mode": "socify-v3-verification_socify-internal",
+        "nonroot": true,
+        "read_only_root": true,
+        "capabilities_dropped": true,
+        "egress": {
+          "blocked": true,
+          "errno": 101
+        }
+      },
+      "import-worker": {
+        "image": "sha256:ff5c4a9a1273c107141d98e0206446593d290ae833664c844330fb5feb7d4939",
+        "network_mode": "none",
+        "nonroot": true,
+        "read_only_root": true,
+        "capabilities_dropped": true,
+        "egress": {
+          "blocked": true,
+          "errno": 101
+        }
+      },
+      "autopsy-worker": {
+        "image": "sha256:ff5c4a9a1273c107141d98e0206446593d290ae833664c844330fb5feb7d4939",
+        "network_mode": "none",
+        "nonroot": true,
+        "read_only_root": true,
+        "capabilities_dropped": true,
+        "egress": {
+          "blocked": true,
+          "errno": 101
+        }
+      },
+      "analysis": {
+        "image": "sha256:6e47e69699dcb01d6a2ecce66b640f9cee666fb2b726c5355034954710da5a89",
+        "network_mode": "none",
+        "nonroot": true,
+        "read_only_root": true,
+        "capabilities_dropped": true,
+        "egress": {
+          "blocked": true,
+          "errno": 101
+        }
+      }
+    },
+    "limitations": [
+      "Queued work and authenticated continuity tested; in-flight lease expiration has separate integration tests",
+      "Ingress proxies fixed internal upstream and intentionally receives browser traffic; network probes here cover data-processing services",
+      "Host administrators remain trusted"
+    ]
+  },
+  "acceptance": {
+    "verified": 75,
+    "partial": [],
+    "total": 75,
+    "scope": "V3 journeys in v3-acceptance.csv; measured synthetic workload and documented format/engine limits; not inherited V2 acceptance or an unbounded production SLA"
+  },
+  "capacity": {
+    "revision": "93a86ba30ed473f89691ee78e49c49fff325e40b",
+    "ingestion_revision": "0dc6ef58757d7a9892d76c44bf3a2ad5186b7d94",
+    "actual_parsed_events": 1000000,
+    "storage_seed_events": 0,
+    "hash_checked_batches": 100,
+    "authenticated_identities": 20,
+    "concurrent_clients": 20,
+    "requests": 200,
+    "tls_versions": [
+      "TLSv1.3"
+    ],
+    "reads": {
+      "case_open": {
+        "p50_ms": 314.68,
+        "p95_ms": 5126.426,
+        "p99_ms": 5737.962
+      },
+      "log_page": {
+        "p50_ms": 912.902,
+        "p95_ms": 5799.168,
+        "p99_ms": 7862.916
+      },
+      "fts_search": {
+        "p50_ms": 6000.196,
+        "p95_ms": 10213.811,
+        "p99_ms": 11122.336
+      },
+      "timeline": {
+        "p50_ms": 186.66,
+        "p95_ms": 4990.282,
+        "p99_ms": 5411.328
+      },
+      "chronology": {
+        "p50_ms": 1474.454,
+        "p95_ms": 5757.666,
+        "p99_ms": 6092.989
+      }
+    },
+    "report": {
+      "samples": 10,
+      "latencies": {
+        "p50_ms": 16955.749,
+        "p95_ms": 27989.094,
+        "p99_ms": 27989.094
+      },
+      "pdf_bytes_min": 253745,
+      "pdf_bytes_max": 253770,
+      "sha256_verified": true,
+      "formats_per_report": 5
+    },
+    "limitations": [
+      "Synthetic structured JSONL with 64 repeated reserved IPs, one host and one timestamp; different formats/cardinality need separate sizing",
+      "TLS termination is a locally trusted test fixture, not a company certificate/deployment",
+      "Kernel memory.peak covers each service lifetime including startup/cache; measured CPU deltas cover reads/report and separate ingestion counters are retained",
+      "No company production SLO has been agreed; this is a measured workload, not unlimited capacity or a zero-defect guarantee"
+    ]
+  },
+  "rea": {
+    "tool": "7zy4/rea",
+    "version": "6.7.0",
+    "ui_input_hashes_match": 14,
+    "python_inventories_match": 9,
+    "semantic_unknowns": 5914,
+    "route_unknowns": 4,
+    "interpretation": "Static artifact inventories plus independent execution tests; not a vulnerability certification"
+  }
+}

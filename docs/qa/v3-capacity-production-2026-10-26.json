@@ -1,0 +1,676 @@
+{
+  "schema": "socify-production-capacity/1",
+  "synthetic_only": true,
+  "revision": "93a86ba30ed473f89691ee78e49c49fff325e40b",
+  "ingestion_revision": "0dc6ef58757d7a9892d76c44bf3a2ad5186b7d94",
+  "actual_parsed_events": 1000000,
+  "storage_seed_events": 0,
+  "hash_checked_batches": 100,
+  "parser_versions": [
+    "socify-import-2"
+  ],
+  "authenticated_identities": 20,
+  "concurrent_clients": 20,
+  "requests": 200,
+  "tls_versions": [
+    "TLSv1.3"
+  ],
+  "transport": "Verified localhost TLS fixture -> actual Nginx ingress -> production Gunicorn -> SQLite; independent authenticated cookie sessions with real CSRF and RBAC",
+  "ingestion": {
+    "wall_seconds_including_pauses": 37994.758,
+    "rows_per_processing_second": 461.521358266957,
+    "batches": 100,
+    "rows_per_batch": 10000,
+    "processing": {
+      "p50_ms": 20423.037,
+      "p95_ms": 29886.386,
+      "p99_ms": 38502.004
+    },
+    "queue_wait": {
+      "p50_ms": 1422.435,
+      "p95_ms": 2439.076,
+      "p99_ms": 3037.371
+    },
+    "processing_seconds_total": 2166.74696,
+    "images": {
+      "socify": {
+        "image": "sha256:4e913f314c4e3516581e51ec1280705a2ce7fbb8158cc11c760aec05f9c533b6",
+        "memory_limit_bytes": 1073741824,
+        "cpu_limit": 2.0,
+        "restart_count": 0,
+        "oom_killed": false
+      },
+      "import-worker": {
+        "image": "sha256:4e913f314c4e3516581e51ec1280705a2ce7fbb8158cc11c760aec05f9c533b6",
+        "memory_limit_bytes": 1073741824,
+        "cpu_limit": 2.0,
+        "restart_count": 0,
+        "oom_killed": false
+      },
+      "autopsy-worker": {
+        "image": "sha256:4e913f314c4e3516581e51ec1280705a2ce7fbb8158cc11c760aec05f9c533b6",
+        "memory_limit_bytes": 2147483648,
+        "cpu_limit": 2.0,
+        "restart_count": 0,
+        "oom_killed": false
+      },
+      "analysis": {
+        "image": "sha256:75d42cd3bcb78a743695e2fbcfac3cee55e7569764bd615121a8f07fdbbeb98b",
+        "memory_limit_bytes": 2147483648,
+        "cpu_limit": 2.0,
+        "restart_count": 0,
+        "oom_killed": false
+      },
+      "ingress": {
+        "image": "sha256:c7febd1ba54b1e55ed8cf13077be39b4b2b7c89e6a2bb48508f89fdb98548668",
+        "memory_limit_bytes": 134217728,
+        "cpu_limit": 1.0,
+        "restart_count": 0,
+        "oom_killed": false
+      }
+    },
+    "resources": {
+      "socify": {
+        "cpu_usage_usec": 81869562,
+        "memory_peak_bytes": 288268288,
+        "memory_limit_bytes": 1073741824,
+        "pids_peak": 17
+      },
+      "import-worker": {
+        "cpu_usage_usec": 738769292,
+        "memory_peak_bytes": 876691456,
+        "memory_limit_bytes": 1073741824,
+        "pids_peak": 8
+      },
+      "autopsy-worker": {
+        "cpu_usage_usec": 4352579,
+        "memory_peak_bytes": 43089920,
+        "memory_limit_bytes": 2147483648,
+        "pids_peak": 8
+      },
+      "analysis": {
+        "cpu_usage_usec": 1943517,
+        "memory_peak_bytes": 44068864,
+        "memory_limit_bytes": 2147483648,
+        "pids_peak": 9
+      },
+      "ingress": {
+        "cpu_usage_usec": 621158843,
+        "memory_peak_bytes": 18944000,
+        "memory_limit_bytes": 134217728,
+        "pids_peak": 10
+      }
+    },
+    "driver_runs": [
+      {
+        "started_at": "2026-10-26T07:20:14.524097+00:00",
+        "revision": "50bf3e82acfdbf8ed05c5733b54261688771e078",
+        "prior_completed_batches": 33,
+        "measure_only": false,
+        "images": {
+          "socify": {
+            "container_id": "750a9a24e620c6e5b92f74c34567cb2c83cf712e9a7f4314a70e667ce3ed87b0",
+            "image": "sha256:e659d1d32f3a184c241f26be4854251f95114597001f765455ac688dfc6397fd",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "import-worker": {
+            "container_id": "b2812f946529ab0e13961e76c3ba5eed259ebb3b88b4b7b3440fe3a2380f086e",
+            "image": "sha256:e659d1d32f3a184c241f26be4854251f95114597001f765455ac688dfc6397fd",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "autopsy-worker": {
+            "container_id": "f33193602798088d4d4fce2c97b2a1af8912fd8227e4fb9f049b9aa70abf296f",
+            "image": "sha256:e659d1d32f3a184c241f26be4854251f95114597001f765455ac688dfc6397fd",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "analysis": {
+            "container_id": "68b8adfe744d31d2660e554ab864494be4ecf25e56a4c8d0769e3efc46be808b",
+            "image": "sha256:75d42cd3bcb78a743695e2fbcfac3cee55e7569764bd615121a8f07fdbbeb98b",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "ingress": {
+            "container_id": "90f2765d5279106f73c56156b13060a848ae1a165ccce0e7e1fede601bbbcb48",
+            "image": "sha256:c7febd1ba54b1e55ed8cf13077be39b4b2b7c89e6a2bb48508f89fdb98548668",
+            "memory_limit_bytes": 134217728,
+            "cpu_limit": 1.0,
+            "restart_count": 0,
+            "oom_killed": false
+          }
+        }
+      },
+      {
+        "started_at": "2026-10-26T07:36:41.614830+00:00",
+        "revision": "be568153026f55616fae685b27a7ffb28369d61a",
+        "prior_completed_batches": 68,
+        "measure_only": false,
+        "images": {
+          "socify": {
+            "container_id": "9cc42c5cf3c0f10ebc1378c76a6e27dfa84bb5440071ab347eac150ace704e22",
+            "image": "sha256:3db05a7a7a03127a3665031111f2d81dbcf5667feedc4a88b96cc9dd8f9cfc75",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "import-worker": {
+            "container_id": "3667f4b770c9581b706d815e37c487c883ea1649272eb61df53deb5ae34738c8",
+            "image": "sha256:3db05a7a7a03127a3665031111f2d81dbcf5667feedc4a88b96cc9dd8f9cfc75",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "autopsy-worker": {
+            "container_id": "6e07d8281f80798a7898e89e934726b627daec332678ee8416699b06c593cbe3",
+            "image": "sha256:3db05a7a7a03127a3665031111f2d81dbcf5667feedc4a88b96cc9dd8f9cfc75",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "analysis": {
+            "container_id": "8a1fe0daf27ded96777f22c865cb99a4d84eae0ff65263bf1c3f24ce4431937d",
+            "image": "sha256:3758bf8e6a07b2e84ed09bfb1c2a661b0bfc5e6f22c48f99b1890fefcef108bd",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "ingress": {
+            "container_id": "90f2765d5279106f73c56156b13060a848ae1a165ccce0e7e1fede601bbbcb48",
+            "image": "sha256:c7febd1ba54b1e55ed8cf13077be39b4b2b7c89e6a2bb48508f89fdb98548668",
+            "memory_limit_bytes": 134217728,
+            "cpu_limit": 1.0,
+            "restart_count": 0,
+            "oom_killed": false
+          }
+        }
+      },
+      {
+        "started_at": "2026-10-26T08:19:24.286846+00:00",
+        "revision": "5ca464052f973df925abfc3bcf0be8efbfe17fca",
+        "prior_completed_batches": 100,
+        "measure_only": true,
+        "images": {
+          "socify": {
+            "container_id": "a2c95375656bdb2251a37489ef1fcca605b4f0c1c47cd1e4d1e25b7ac61d0256",
+            "image": "sha256:47ecf70861aacb869e9d744a1cb71a7062b4ce2832f8516a7cb3d0cf11f8930e",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "import-worker": {
+            "container_id": "282791948a3e52c6d3bb77233f55b98ec83ea37af22fc1271102ab2b6b7a9cfc",
+            "image": "sha256:47ecf70861aacb869e9d744a1cb71a7062b4ce2832f8516a7cb3d0cf11f8930e",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "autopsy-worker": {
+            "container_id": "abdafdbee4effaa225d1315fdb6c8fb44764419e6fa9539c45f5a6da2c070948",
+            "image": "sha256:47ecf70861aacb869e9d744a1cb71a7062b4ce2832f8516a7cb3d0cf11f8930e",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "analysis": {
+            "container_id": "7995faaa59ce67f63cb33a408ab4c763f6f72a467342f797903ef522d4432f3b",
+            "image": "sha256:483cc590a1975f44f6a2df41da474746d6bf366fad56d5ec98eb3f0c2b6b3d5f",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "ingress": {
+            "container_id": "90f2765d5279106f73c56156b13060a848ae1a165ccce0e7e1fede601bbbcb48",
+            "image": "sha256:c7febd1ba54b1e55ed8cf13077be39b4b2b7c89e6a2bb48508f89fdb98548668",
+            "memory_limit_bytes": 134217728,
+            "cpu_limit": 1.0,
+            "restart_count": 0,
+            "oom_killed": false
+          }
+        }
+      },
+      {
+        "started_at": "2026-10-26T08:21:36.508850+00:00",
+        "revision": "5ca464052f973df925abfc3bcf0be8efbfe17fca",
+        "prior_completed_batches": 100,
+        "measure_only": true,
+        "images": {
+          "socify": {
+            "container_id": "a2c95375656bdb2251a37489ef1fcca605b4f0c1c47cd1e4d1e25b7ac61d0256",
+            "image": "sha256:47ecf70861aacb869e9d744a1cb71a7062b4ce2832f8516a7cb3d0cf11f8930e",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "import-worker": {
+            "container_id": "282791948a3e52c6d3bb77233f55b98ec83ea37af22fc1271102ab2b6b7a9cfc",
+            "image": "sha256:47ecf70861aacb869e9d744a1cb71a7062b4ce2832f8516a7cb3d0cf11f8930e",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "autopsy-worker": {
+            "container_id": "abdafdbee4effaa225d1315fdb6c8fb44764419e6fa9539c45f5a6da2c070948",
+            "image": "sha256:47ecf70861aacb869e9d744a1cb71a7062b4ce2832f8516a7cb3d0cf11f8930e",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "analysis": {
+            "container_id": "7995faaa59ce67f63cb33a408ab4c763f6f72a467342f797903ef522d4432f3b",
+            "image": "sha256:483cc590a1975f44f6a2df41da474746d6bf366fad56d5ec98eb3f0c2b6b3d5f",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "ingress": {
+            "container_id": "90f2765d5279106f73c56156b13060a848ae1a165ccce0e7e1fede601bbbcb48",
+            "image": "sha256:c7febd1ba54b1e55ed8cf13077be39b4b2b7c89e6a2bb48508f89fdb98548668",
+            "memory_limit_bytes": 134217728,
+            "cpu_limit": 1.0,
+            "restart_count": 0,
+            "oom_killed": false
+          }
+        }
+      },
+      {
+        "started_at": "2026-10-26T08:33:40.987549+00:00",
+        "revision": "510f1ff588928999b5b7840eab33cf5de46dc69f",
+        "prior_completed_batches": 100,
+        "measure_only": true,
+        "images": {
+          "socify": {
+            "container_id": "34d3999884efae4dbb551094e94d74ae44061110afa6f12461e207c8cb74dcde",
+            "image": "sha256:43ca164b2dc040a072b8db23b4b0c1f8341e8eedc3c079bf8c3e68fb00ab48b8",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "import-worker": {
+            "container_id": "f0a3ff772224dcf74d39ca9eea79721e9fee77841883482994058583a95a4cb9",
+            "image": "sha256:43ca164b2dc040a072b8db23b4b0c1f8341e8eedc3c079bf8c3e68fb00ab48b8",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "autopsy-worker": {
+            "container_id": "7638187a1578d1905912a35ec6adeb9c04239df22e7a55e6b9e7eca297791f40",
+            "image": "sha256:43ca164b2dc040a072b8db23b4b0c1f8341e8eedc3c079bf8c3e68fb00ab48b8",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "analysis": {
+            "container_id": "9f0023d360e14e78c2e6566d5b3d5c83eae2e479a2c5f276417fb6d16981ab7e",
+            "image": "sha256:36fa9e58b9913d8f2e0e9b5d103c251c2e74fb85d5a8e743a58d2b2daae01941",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "ingress": {
+            "container_id": "90f2765d5279106f73c56156b13060a848ae1a165ccce0e7e1fede601bbbcb48",
+            "image": "sha256:c7febd1ba54b1e55ed8cf13077be39b4b2b7c89e6a2bb48508f89fdb98548668",
+            "memory_limit_bytes": 134217728,
+            "cpu_limit": 1.0,
+            "restart_count": 0,
+            "oom_killed": false
+          }
+        }
+      },
+      {
+        "started_at": "2026-10-26T08:49:20.871493+00:00",
+        "revision": "0a79ccaaddf5123a84bc3bebf192bf198464b618",
+        "prior_completed_batches": 100,
+        "measure_only": true,
+        "images": {
+          "socify": {
+            "container_id": "cfe3968f28f3c8f2947536019798e8417b893f0b575973c7a0e2908fbbaf215b",
+            "image": "sha256:e74f0c034fe5d08a14b8f120cef9804f62728ac2b54564d8c3d789ac51ec2103",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "import-worker": {
+            "container_id": "2d660036bb9b859c43ac2383d3866f0257a25937fc0e5a89b5f8192297e63a76",
+            "image": "sha256:e74f0c034fe5d08a14b8f120cef9804f62728ac2b54564d8c3d789ac51ec2103",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "autopsy-worker": {
+            "container_id": "f090397583a023506326cc4c379db1472ad4a11b790a2419b05f60ffbba1a0d1",
+            "image": "sha256:e74f0c034fe5d08a14b8f120cef9804f62728ac2b54564d8c3d789ac51ec2103",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "analysis": {
+            "container_id": "3d9619d947824ffc828cd8e9ca446d358b32740d452ad667b701de8b57fcb286",
+            "image": "sha256:b9678b8f9d589645f596c2927fcd2c777eae6bac9790d59b520f50a8a9561890",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "ingress": {
+            "container_id": "90f2765d5279106f73c56156b13060a848ae1a165ccce0e7e1fede601bbbcb48",
+            "image": "sha256:c7febd1ba54b1e55ed8cf13077be39b4b2b7c89e6a2bb48508f89fdb98548668",
+            "memory_limit_bytes": 134217728,
+            "cpu_limit": 1.0,
+            "restart_count": 0,
+            "oom_killed": false
+          }
+        }
+      },
+      {
+        "started_at": "2026-10-26T09:21:07.609453+00:00",
+        "revision": "e883b3594171856087c5d374ddc6ef4d7a2ef494",
+        "prior_completed_batches": 100,
+        "measure_only": true,
+        "images": {
+          "socify": {
+            "container_id": "738e72323a74a592439d300151cbd55933149a1c147b6167227ed1732b279030",
+            "image": "sha256:1f578c2be7ac3f7578833b1aaa245bff8d0176b5c8bece2244910f832b2bfb79",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "import-worker": {
+            "container_id": "cba41b2d13b34c1bf2bbc3b687361265bffc043fe7eb9b5bcca604a17dca0e2b",
+            "image": "sha256:1f578c2be7ac3f7578833b1aaa245bff8d0176b5c8bece2244910f832b2bfb79",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "autopsy-worker": {
+            "container_id": "d64c62a2e9f79def6f29dfb6827ff16acb8da0b766f81d8f80e6d86940488cd2",
+            "image": "sha256:1f578c2be7ac3f7578833b1aaa245bff8d0176b5c8bece2244910f832b2bfb79",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "analysis": {
+            "container_id": "ee1a80011e5279b53575d5e286895c61482756f8e558e5d4553e5d14b3d42de8",
+            "image": "sha256:6295436b0293788d6188fc3b03c9650eb2a1fe5a97fbc0d7d10c80269d13e846",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "ingress": {
+            "container_id": "90f2765d5279106f73c56156b13060a848ae1a165ccce0e7e1fede601bbbcb48",
+            "image": "sha256:c7febd1ba54b1e55ed8cf13077be39b4b2b7c89e6a2bb48508f89fdb98548668",
+            "memory_limit_bytes": 134217728,
+            "cpu_limit": 1.0,
+            "restart_count": 0,
+            "oom_killed": false
+          }
+        }
+      },
+      {
+        "started_at": "2026-10-26T09:35:59.217966+00:00",
+        "revision": "93a86ba30ed473f89691ee78e49c49fff325e40b",
+        "prior_completed_batches": 100,
+        "measure_only": true,
+        "images": {
+          "socify": {
+            "container_id": "36e6c2e69fa2de151078f7688f71afb989511e8db8a8f55a94d2bf551c06af10",
+            "image": "sha256:ff5c4a9a1273c107141d98e0206446593d290ae833664c844330fb5feb7d4939",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "import-worker": {
+            "container_id": "7a0757efdbcb4e24ccf2d4e9d6441812ca821d38ba31d5d1bfed19bd08108925",
+            "image": "sha256:ff5c4a9a1273c107141d98e0206446593d290ae833664c844330fb5feb7d4939",
+            "memory_limit_bytes": 1073741824,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "autopsy-worker": {
+            "container_id": "7b1ec3d0211bffe712ec73ca1393516129672095fb8e77bc00728b9322d2d7e0",
+            "image": "sha256:ff5c4a9a1273c107141d98e0206446593d290ae833664c844330fb5feb7d4939",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "analysis": {
+            "container_id": "7cea8eb51bf26a83e02ef19991d24d251b97287bc94fbc2dff58107a8c941a9d",
+            "image": "sha256:6e47e69699dcb01d6a2ecce66b640f9cee666fb2b726c5355034954710da5a89",
+            "memory_limit_bytes": 2147483648,
+            "cpu_limit": 2.0,
+            "restart_count": 0,
+            "oom_killed": false
+          },
+          "ingress": {
+            "container_id": "90f2765d5279106f73c56156b13060a848ae1a165ccce0e7e1fede601bbbcb48",
+            "image": "sha256:c7febd1ba54b1e55ed8cf13077be39b4b2b7c89e6a2bb48508f89fdb98548668",
+            "memory_limit_bytes": 134217728,
+            "cpu_limit": 1.0,
+            "restart_count": 0,
+            "oom_killed": false
+          }
+        }
+      }
+    ],
+    "limits": "Worker timestamps measure each real batch. Wall time includes operator interruptions and fixes; lifetime cgroup peaks include the earlier synthetic smoke workload. Historical driver invocations before this manifest format are recorded separately in the QA log."
+  },
+  "first_reads_ms": {
+    "case_open": 305.382,
+    "log_page": 14.865,
+    "fts_search": 474.176,
+    "timeline": 42.917,
+    "chronology": 519.096
+  },
+  "reads": {
+    "case_open": {
+      "p50_ms": 314.68,
+      "p95_ms": 5126.426,
+      "p99_ms": 5737.962
+    },
+    "log_page": {
+      "p50_ms": 912.902,
+      "p95_ms": 5799.168,
+      "p99_ms": 7862.916
+    },
+    "fts_search": {
+      "p50_ms": 6000.196,
+      "p95_ms": 10213.811,
+      "p99_ms": 11122.336
+    },
+    "timeline": {
+      "p50_ms": 186.66,
+      "p95_ms": 4990.282,
+      "p99_ms": 5411.328
+    },
+    "chronology": {
+      "p50_ms": 1474.454,
+      "p95_ms": 5757.666,
+      "p99_ms": 6092.989
+    }
+  },
+  "report": {
+    "samples": 10,
+    "latencies": {
+      "p50_ms": 16955.749,
+      "p95_ms": 27989.094,
+      "p99_ms": 27989.094
+    },
+    "pdf_bytes_min": 253745,
+    "pdf_bytes_max": 253770,
+    "sha256_verified": true,
+    "formats_per_report": 5
+  },
+  "resources": {
+    "socify": {
+      "cpu_usage_usec": 150502459,
+      "memory_peak_bytes": 160784384,
+      "memory_limit_bytes": 1073741824,
+      "pids_peak": 17,
+      "measurement_cpu_used_usec": 130722665
+    },
+    "import-worker": {
+      "cpu_usage_usec": 5344875,
+      "memory_peak_bytes": 71688192,
+      "memory_limit_bytes": 1073741824,
+      "pids_peak": 8,
+      "measurement_cpu_used_usec": 645049
+    },
+    "autopsy-worker": {
+      "cpu_usage_usec": 4264724,
+      "memory_peak_bytes": 61263872,
+      "memory_limit_bytes": 2147483648,
+      "pids_peak": 8,
+      "measurement_cpu_used_usec": 717390
+    },
+    "analysis": {
+      "cpu_usage_usec": 126545853,
+      "memory_peak_bytes": 216272896,
+      "memory_limit_bytes": 2147483648,
+      "pids_peak": 8,
+      "measurement_cpu_used_usec": 124440865
+    },
+    "ingress": {
+      "cpu_usage_usec": 737551557,
+      "memory_peak_bytes": 18989056,
+      "memory_limit_bytes": 134217728,
+      "pids_peak": 10,
+      "measurement_cpu_used_usec": 4140440
+    }
+  },
+  "tls_fixture_and_driver": {
+    "peak_rss_kib": 62284,
+    "user_cpu_seconds": 4.235754,
+    "system_cpu_seconds": 1.436956
+  },
+  "environment": {
+    "python": "3.12.14",
+    "kernel": "6.18.55",
+    "host_cpu_count": 5
+  },
+  "measured_images": {
+    "socify": {
+      "container_id": "36e6c2e69fa2de151078f7688f71afb989511e8db8a8f55a94d2bf551c06af10",
+      "image": "sha256:ff5c4a9a1273c107141d98e0206446593d290ae833664c844330fb5feb7d4939",
+      "memory_limit_bytes": 1073741824,
+      "cpu_limit": 2.0,
+      "restart_count": 0,
+      "oom_killed": false
+    },
+    "import-worker": {
+      "container_id": "7a0757efdbcb4e24ccf2d4e9d6441812ca821d38ba31d5d1bfed19bd08108925",
+      "image": "sha256:ff5c4a9a1273c107141d98e0206446593d290ae833664c844330fb5feb7d4939",
+      "memory_limit_bytes": 1073741824,
+      "cpu_limit": 2.0,
+      "restart_count": 0,
+      "oom_killed": false
+    },
+    "autopsy-worker": {
+      "container_id": "7b1ec3d0211bffe712ec73ca1393516129672095fb8e77bc00728b9322d2d7e0",
+      "image": "sha256:ff5c4a9a1273c107141d98e0206446593d290ae833664c844330fb5feb7d4939",
+      "memory_limit_bytes": 2147483648,
+      "cpu_limit": 2.0,
+      "restart_count": 0,
+      "oom_killed": false
+    },
+    "analysis": {
+      "container_id": "7cea8eb51bf26a83e02ef19991d24d251b97287bc94fbc2dff58107a8c941a9d",
+      "image": "sha256:6e47e69699dcb01d6a2ecce66b640f9cee666fb2b726c5355034954710da5a89",
+      "memory_limit_bytes": 2147483648,
+      "cpu_limit": 2.0,
+      "restart_count": 0,
+      "oom_killed": false
+    },
+    "ingress": {
+      "container_id": "90f2765d5279106f73c56156b13060a848ae1a165ccce0e7e1fede601bbbcb48",
+      "image": "sha256:c7febd1ba54b1e55ed8cf13077be39b4b2b7c89e6a2bb48508f89fdb98548668",
+      "memory_limit_bytes": 134217728,
+      "cpu_limit": 1.0,
+      "restart_count": 0,
+      "oom_killed": false
+    }
+  },
+  "measurement_start_images": {
+    "socify": {
+      "container_id": "36e6c2e69fa2de151078f7688f71afb989511e8db8a8f55a94d2bf551c06af10",
+      "image": "sha256:ff5c4a9a1273c107141d98e0206446593d290ae833664c844330fb5feb7d4939",
+      "memory_limit_bytes": 1073741824,
+      "cpu_limit": 2.0,
+      "restart_count": 0,
+      "oom_killed": false
+    },
+    "import-worker": {
+      "container_id": "7a0757efdbcb4e24ccf2d4e9d6441812ca821d38ba31d5d1bfed19bd08108925",
+      "image": "sha256:ff5c4a9a1273c107141d98e0206446593d290ae833664c844330fb5feb7d4939",
+      "memory_limit_bytes": 1073741824,
+      "cpu_limit": 2.0,
+      "restart_count": 0,
+      "oom_killed": false
+    },
+    "autopsy-worker": {
+      "container_id": "7b1ec3d0211bffe712ec73ca1393516129672095fb8e77bc00728b9322d2d7e0",
+      "image": "sha256:ff5c4a9a1273c107141d98e0206446593d290ae833664c844330fb5feb7d4939",
+      "memory_limit_bytes": 2147483648,
+      "cpu_limit": 2.0,
+      "restart_count": 0,
+      "oom_killed": false
+    },
+    "analysis": {
+      "container_id": "7cea8eb51bf26a83e02ef19991d24d251b97287bc94fbc2dff58107a8c941a9d",
+      "image": "sha256:6e47e69699dcb01d6a2ecce66b640f9cee666fb2b726c5355034954710da5a89",
+      "memory_limit_bytes": 2147483648,
+      "cpu_limit": 2.0,
+      "restart_count": 0,
+      "oom_killed": false
+    },
+    "ingress": {
+      "container_id": "90f2765d5279106f73c56156b13060a848ae1a165ccce0e7e1fede601bbbcb48",
+      "image": "sha256:c7febd1ba54b1e55ed8cf13077be39b4b2b7c89e6a2bb48508f89fdb98548668",
+      "memory_limit_bytes": 134217728,
+      "cpu_limit": 1.0,
+      "restart_count": 0,
+      "oom_killed": false
+    }
+  },
+  "harness_elapsed_seconds": 242.349,
+  "limitations": [
+    "Synthetic structured JSONL with 64 repeated reserved IPs, one host and one timestamp; different formats/cardinality need separate sizing",
+    "TLS termination is a locally trusted test fixture, not a company certificate/deployment",
+    "Kernel memory.peak covers each service lifetime including startup/cache; measured CPU deltas cover reads/report and separate ingestion counters are retained",
+    "No company production SLO has been agreed; this is a measured workload, not unlimited capacity or a zero-defect guarantee"
+  ]
+}
