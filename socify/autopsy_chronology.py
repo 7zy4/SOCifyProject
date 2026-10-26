@@ -1,6 +1,8 @@
 import json
 import re
 from contextlib import contextmanager
+from heapq import merge
+from itertools import islice
 from typing import Any
 
 from flask import Blueprint, jsonify, request
@@ -144,6 +146,33 @@ def source_filter(case_id, source, clock, private_clause):
     return " AND ".join(clauses), args
 
 
+def metadata_page(source, where, args, record_where, record_args, note_where, note_args, page, limit):
+    queries = (
+        (
+            f"SELECT 'log' AS entry_type,ce.event_id AS id,ce.time_known AS known,{sql_utc_key('ce.event_time')} AS time_key FROM {source} WHERE {where} ORDER BY ce.time_known DESC,{sql_utc_key('ce.event_time')},ce.event_id",
+            args,
+        ),
+        (
+            f"SELECT 'record' AS entry_type,r.id,1 AS known,{sql_utc_key(record_clock('r'))} AS time_key FROM autopsy_records r INDEXED BY idx_autopsy_chronology_records WHERE {record_where} ORDER BY {sql_utc_key(record_clock('r'))},r.id",
+            record_args,
+        ),
+        (
+            f"SELECT 'note' AS entry_type,n.id,1 AS known,{sql_utc_key('n.created_at')} AS time_key FROM case_notes n WHERE {note_where} ORDER BY {sql_utc_key('n.created_at')},n.id",
+            note_args,
+        ),
+    )
+    cursors = []
+    try:
+        for sql, parameters in queries:
+            cursors.append(get_db().execute(sql, parameters))
+        ordered = merge(*cursors, key=lambda row: (-row["known"], row["time_key"], row["entry_type"], row["id"]))
+        offset = (page - 1) * limit
+        return list(islice(ordered, offset, offset + limit + 1))
+    finally:
+        for cursor in cursors:
+            cursor.close()
+
+
 def chronology_page(case_id, page, limit):
     where, args = log_query(case_id)
     source, where, total, relation = metadata_scope(where, args)
@@ -156,8 +185,7 @@ def chronology_page(case_id, page, limit):
         total += min(count, 10000)
         if count > 10000:
             relation = "gte"
-    sql = f"WITH entries AS (SELECT 'log' AS entry_type,ce.event_id AS id,ce.time_known AS known,{sql_utc_key('ce.event_time')} AS time_key FROM {source} WHERE {where} UNION ALL SELECT 'record',r.id,1,{sql_utc_key(record_clock('r'))} FROM autopsy_records r WHERE {record_where} UNION ALL SELECT 'note',n.id,1,{sql_utc_key('n.created_at')} FROM case_notes n WHERE {note_where}) SELECT entry_type,id FROM entries ORDER BY known DESC,time_key,entry_type,id LIMIT ? OFFSET ?"
-    metadata = get_db().execute(sql, (*args, *record_args, *note_args, limit + 1, (page - 1) * limit)).fetchall()
+    metadata = metadata_page(source, where, args, record_where, record_args, note_where, note_args, page, limit)
     details: dict[str, dict[int, dict[str, Any]]] = {kind: {} for kind in ("log", "record", "note")}
     for kind in details:
         ids = [row["id"] for row in metadata[:limit] if row["entry_type"] == kind]

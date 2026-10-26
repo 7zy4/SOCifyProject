@@ -154,3 +154,32 @@ def test_timeline_clock_expressions_are_closed_and_preserve_fractional_precision
         sql_utc_key("event_time); DROP TABLE users; --")
     with pytest.raises(ValueError):
         record_clock("untrusted")
+
+
+def test_streamed_chronology_keeps_cross_source_equal_time_ties_stable_across_pages(autopsy_case, client, database):
+    base = f"/api/cases/{autopsy_case}"
+    assert (
+        client.post(
+            base + "/imports",
+            json={
+                "filename": "ties.json",
+                "content": json.dumps([{"title": title, "event_time": "2026-10-20T10:00:00Z"} for title in ("Tie first log", "Tie second log")]),
+            },
+        ).status_code
+        == 201
+    )
+    for index in range(2):
+        add(
+            client,
+            base,
+            "timeline",
+            {"title": f"Tie observation {index}", "event_time": "2026-10-20T10:00:00Z", "category": "observed", "source": "Synthetic timing tie"},
+        )
+        assert client.post(f"/api/incidents/{autopsy_case}/notes", json={"body": f"Tie shared note {index}", "visibility": "team"}).status_code == 201
+    database.execute("UPDATE case_notes SET created_at='2026-10-20T10:00:00Z' WHERE case_id=?", (autopsy_case,))
+    all_items = client.get(base + "/chronology?limit=100").json["items"]
+    assert [row["entry_type"] for row in all_items] == ["log", "log", "note", "note", "record", "record"]
+    pages = [client.get(base + f"/chronology?limit=2&page={page}").json for page in range(1, 4)]
+    assert [row["key"] for page in pages for row in page["items"]] == [row["key"] for row in all_items]
+    assert [page["has_next"] for page in pages] == [True, True, False]
+    assert client.get(base + "/chronology?limit=100&page=1000000").json["items"] == []
