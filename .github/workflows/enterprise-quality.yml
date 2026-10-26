@@ -77,14 +77,56 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - run: npm install --no-save --ignore-scripts axe-core@4.14.0
       - uses: ./.github/actions/analysis-backend
-      - run: python -m pytest -m e2e tests/e2e
+      - run: python -m pytest -m e2e tests/e2e --junitxml=artifacts/browser-junit.xml
+      - name: Publish browser failure details in the job summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import html
+          import os
+          from pathlib import Path
+
+          report = Path("artifacts/browser-junit.xml")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write("## Browser acceptance\n\n")
+              if not report.is_file():
+                  summary.write("The browser test runner did not produce a JUnit report. Inspect the preceding setup step.\n")
+              else:
+                  from defusedxml import ElementTree
+
+                  root = ElementTree.parse(report).getroot()
+                  for suite in root.iter("testsuite"):
+                      summary.write(f"Tests: {suite.get('tests')}; failures: {suite.get('failures')}; errors: {suite.get('errors')}; skipped: {suite.get('skipped')}\n\n")
+                  for case in root.iter("testcase"):
+                      for failure in (*case.findall("failure"), *case.findall("error")):
+                          name = html.escape(f"{case.get('classname')}.{case.get('name')}")
+                          message = html.escape(failure.get("message", "")[:4000])
+                          summary.write(f"<h3>{name}</h3><pre>{message}</pre>\n")
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: browser-results
+          path: artifacts/browser-junit.xml
       - if: always()
         run: docker rm --force socify-ci-analysis
   container:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - run: SOCIFY_SECRET_KEY=ci-only-secret-key-with-at-least-32-bytes SOCIFY_CREDENTIAL_KEY=ci-only-distinct-credential-key-with-at-least-32-bytes docker compose up --detach --build  # pragma: allowlist secret
+      - name: Generate ephemeral keys for every container step
+        run: |
+          python - <<'PY'
+          import os
+          import secrets
+
+          with open(os.environ["GITHUB_ENV"], "a") as environment:
+              for name in ("SOCIFY_SECRET_KEY", "SOCIFY_CREDENTIAL_KEY"):
+                  value = secrets.token_urlsafe(48)
+                  print(f"::add-mask::{value}")
+                  environment.write(f"{name}={value}\n")
+          PY
+      - run: docker compose up --detach --build
       - run: curl --fail --retry 20 --retry-delay 2 --retry-all-errors http://127.0.0.1:5000/health/ready
       - run: docker compose exec -T -e SOCIFY_CONTAINER_ACCEPTANCE=synthetic socify python - < tests/container/verify_autopsy.py
       - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp autopsy-worker
