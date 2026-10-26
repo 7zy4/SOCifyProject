@@ -821,6 +821,7 @@ COLUMN_MIGRATIONS: dict[str, dict[str, str]] = {
 
 INDEX_SCHEMA = """
 CREATE INDEX IF NOT EXISTS idx_users_workspace ON users(workspace_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users(lower(email));
 CREATE INDEX IF NOT EXISTS idx_events_workspace_time ON security_events(workspace_id, event_time DESC);
 CREATE INDEX IF NOT EXISTS idx_events_source_time ON security_events(workspace_id, source, event_time DESC);
 CREATE INDEX IF NOT EXISTS idx_events_identity ON security_events(workspace_id, source_ip, username, event_time DESC);

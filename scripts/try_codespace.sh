@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  printf '%s\n' 'Usage: bash scripts/try_codespace.sh EMAIL [--create-manager|--reset-password|--recover-access]'
+}
+
 if [[ "${1:-}" == --help || "${1:-}" == -h ]]; then
-  printf '%s\n' 'Usage: bash scripts/try_codespace.sh EMAIL [--reset-password|--recover-access]'
+  usage
   exit 0
 fi
-if [[ $# -lt 1 || $# -gt 2 || ( $# -eq 2 && "$2" != --reset-password && "$2" != --recover-access ) ]]; then
-  printf '%s\n' 'Usage: bash scripts/try_codespace.sh EMAIL [--reset-password|--recover-access]' >&2
+if [[ $# -lt 1 || $# -gt 2 || ( $# -eq 2 && "$2" != --create-manager && "$2" != --reset-password && "$2" != --recover-access ) ]]; then
+  usage >&2
   exit 2
 fi
 
@@ -42,7 +46,9 @@ PY
 export SOCIFY_ENV=development
 export SOCIFY_HOST=0.0.0.0
 export SOCIFY_PORT="$listen_port"
-"$python_command" -m scripts.bootstrap_team --email "$account_email" --status
+if [[ "${2:-}" != --create-manager ]]; then
+  "$python_command" -m scripts.bootstrap_team --email "$account_email" --status
+fi
 
 if ! command -v docker >/dev/null 2>&1; then
   printf '%s\n' 'Docker is missing. Run Codespaces: Rebuild Container on this existing Codespace, then retry.' >&2
@@ -58,7 +64,9 @@ fi
 bash scripts/start_local_analysis.sh
 export SOCIFY_ANALYSIS_SOCKET=/tmp/socify-v3-dev-analysis-ipc/analysis.sock
 
-if [[ "${2:-}" == --reset-password ]]; then
+if [[ "${2:-}" == --create-manager ]]; then
+  "$python_command" -m scripts.bootstrap_team --email "$account_email" --name 'مالك المنصة' --team 'فريق التحقيق الداخلي' --generate-password-file
+elif [[ "${2:-}" == --reset-password ]]; then
   "$python_command" -m scripts.bootstrap_team --email "$account_email" --reset-password
 elif [[ "${2:-}" == --recover-access ]]; then
   "$python_command" -m scripts.bootstrap_team --email "$account_email" --reset-password --generate-password-file

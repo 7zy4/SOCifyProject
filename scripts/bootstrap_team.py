@@ -2,15 +2,16 @@ import argparse
 import getpass
 import os
 import secrets
-import sqlite3
 import stat
 import tempfile
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import bcrypt
 
-from scripts.start_codespace import load_environment
+from scripts.environment import load_environment
 from socify import create_app
 from socify.audit import record_audit
 from socify.auth import re_email
@@ -20,17 +21,22 @@ from socify.security import password_error
 from socify.timeutils import iso_now
 
 
-def create_manager(app, email: str, name: str, team: str, password: str) -> int:
+def normalized_email(email: str) -> str:
     normalized = text_value(email, 254, True).lower()
-    name, team = text_value(name, 120, True), text_value(team, 120, True)
     if not re_email(normalized):
         raise ValueError("البريد الإلكتروني غير صالح")
+    return normalized
+
+
+def create_manager(app, email: str, name: str, team: str, password: str) -> int:
+    normalized = normalized_email(email)
+    name, team = text_value(name, 120, True), text_value(team, 120, True)
     problem = password_error(password)
     if problem:
         raise ValueError(problem)
     encoded = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12)).decode()
     with app.app_context(), transaction():
-        if get_db().execute("SELECT 1 FROM users WHERE email = ?", (normalized,)).fetchone():
+        if get_db().execute("SELECT 1 FROM users WHERE lower(email) = ?", (normalized,)).fetchone():
             raise ValueError("الحساب موجود؛ لن تتم إعادة تعيينه أو تعديل بياناته")
         now = iso_now()
         workspace = inserted_id(
@@ -48,9 +54,7 @@ def create_manager(app, email: str, name: str, team: str, password: str) -> int:
 
 
 def reset_password(app, email: str, password: str) -> int:
-    normalized = text_value(email, 254, True).lower()
-    if not re_email(normalized):
-        raise ValueError("البريد الإلكتروني غير صالح")
+    normalized = normalized_email(email)
     problem = password_error(password)
     if problem:
         raise ValueError(problem)
@@ -75,23 +79,33 @@ def reset_password(app, email: str, password: str) -> int:
     return int(user["id"])
 
 
-def recovery_account(app, email: str) -> dict:
-    normalized = text_value(email, 254, True).lower()
-    if not re_email(normalized):
-        raise ValueError("البريد الإلكتروني غير صالح")
+def account_status(app, email: str) -> dict:
+    normalized = normalized_email(email)
     with app.app_context():
-        user = get_db().execute("SELECT id,email,is_active FROM users WHERE lower(email)=?", (normalized,)).fetchone()
+        user = (
+            get_db()
+            .execute(
+                "SELECT u.id,u.email,u.is_active,COALESCE(m.enabled,0) AS mfa_enabled FROM users u LEFT JOIN mfa_enrollments m ON m.user_id=u.id WHERE lower(u.email)=?",
+                (normalized,),
+            )
+            .fetchone()
+        )
         if not user:
             raise ValueError("الحساب غير موجود في قاعدة البيانات المحددة؛ لن يُنشأ حساب بديل")
-        if not user["is_active"]:
-            raise ValueError("الحساب معطل؛ يلزم الرجوع إلى مسؤول الفريق")
         return dict(user)
 
 
-def generate_recovery_file(app, email: str) -> Path:
+def recovery_account(app, email: str) -> dict:
+    user = account_status(app, email)
+    if not user["is_active"]:
+        raise ValueError("الحساب معطل؛ يلزم الرجوع إلى مسؤول الفريق")
+    return user
+
+
+@contextmanager
+def private_password_file(app, prefix: str) -> Iterator[tuple[Path, str]]:
     if app.config["ENV_NAME"] != "development":
-        raise ValueError("الاستعادة إلى ملف خاص مخصصة للتطوير؛ استخدم الاستعادة التفاعلية في الإنتاج")
-    user = recovery_account(app, email)
+        raise ValueError("حفظ كلمة المرور في ملف خاص مخصص للتطوير؛ استخدم الإدخال التفاعلي في الإنتاج")
     directory = Path(app.config["DATABASE"]).resolve().parent / ".account-recovery"
     destination = None
     try:
@@ -100,19 +114,31 @@ def generate_recovery_file(app, email: str) -> Path:
         directory.mkdir(mode=0o700, exist_ok=True)
         if stat.S_IMODE(directory.stat().st_mode) != 0o700 or directory.stat().st_uid != os.geteuid():
             raise ValueError("مجلد الاستعادة يجب أن يكون خاصًا بمالك الخادم بصلاحية 0700")
-        descriptor, filename = tempfile.mkstemp(prefix=f"access-{user['id']}-", suffix=".txt", dir=directory)
+        descriptor, filename = tempfile.mkstemp(prefix=prefix, suffix=".txt", dir=directory)
         destination = Path(filename)
         password = secrets.token_urlsafe(24)
         with os.fdopen(descriptor, "w", encoding="utf-8") as output:
             output.write(password + "\n")
             output.flush()
             os.fsync(output.fileno())
-        reset_password(app, user["email"], password)
-    except (OSError, ValueError, sqlite3.Error):
+        yield destination, password
+    except Exception:
         if destination is not None:
             destination.unlink(missing_ok=True)
         raise
+
+
+def generate_recovery_file(app, email: str) -> Path:
+    user = recovery_account(app, email)
+    with private_password_file(app, f"access-{user['id']}-") as (destination, password):
+        reset_password(app, user["email"], password)
     return destination
+
+
+def generate_manager_file(app, email: str, name: str, team: str) -> tuple[int, Path]:
+    with private_password_file(app, "new-manager-") as (destination, password):
+        user_id = create_manager(app, email, name, team, password)
+    return user_id, destination
 
 
 def main() -> None:
@@ -125,10 +151,10 @@ def main() -> None:
     modes.add_argument(
         "--reset-password", action="store_true", help="Local server administrator recovery; revoke sessions and preserve MFA, roles and evidence"
     )
-    parser.add_argument("--generate-password-file", action="store_true", help="Development-only recovery to a private local file; no password is printed")
+    parser.add_argument("--generate-password-file", action="store_true", help="Development-only creation or recovery with a private local password file")
     options = parser.parse_args()
-    if options.generate_password_file and not options.reset_password:
-        parser.error("--generate-password-file requires --reset-password")
+    if options.generate_password_file and options.status:
+        parser.error("--generate-password-file cannot be combined with --status")
     if not options.status and not options.reset_password and (not options.name or not options.team):
         parser.error("--name and --team are required when creating a manager")
     if os.environ.get("SOCIFY_ENV", "development").strip().lower() != "production":
@@ -137,15 +163,8 @@ def main() -> None:
         app = create_app()
         print(f"Database: {Path(app.config['DATABASE']).resolve()}")
         if options.status:
-            normalized = text_value(options.email, 254, True).lower()
-            if not re_email(normalized):
-                raise ValueError("البريد الإلكتروني غير صالح")
-            with app.app_context():
-                user = get_db().execute("SELECT id, is_active FROM users WHERE lower(email)=?", (normalized,)).fetchone()
-                if not user:
-                    raise ValueError("الحساب غير موجود في قاعدة البيانات المحددة")
-                mfa = get_db().execute("SELECT enabled FROM mfa_enrollments WHERE user_id=?", (user["id"],)).fetchone()
-                print(f"Account found (user_id={user['id']}, active={bool(user['is_active'])}, MFA={bool(mfa and mfa['enabled'])})")
+            user = account_status(app, options.email)
+            print(f"Account found (user_id={user['id']}, active={bool(user['is_active'])}, MFA={bool(user['mfa_enabled'])})")
             return
         if options.reset_password:
             target = recovery_account(app, options.email)
@@ -160,6 +179,12 @@ def main() -> None:
                 raise ValueError("كلمتا المرور غير متطابقتين؛ لم يتغير الحساب")
             user_id = reset_password(app, options.email, password)
             print(f"Password reset (user_id={user_id}); sessions revoked; MFA, roles and evidence preserved")
+            return
+        if options.generate_password_file:
+            user_id, destination = generate_manager_file(app, options.email, options.name, options.team)
+            print(f"Internal team manager created (user_id={user_id}); existing users and evidence preserved")
+            print(f"Recovery file: {destination}")
+            print("Open the private file in your editor. Do not share its contents.")
             return
         password = os.environ.get("SOCIFY_BOOTSTRAP_PASSWORD") or getpass.getpass("كلمة مرور مدير الفريق: ")
         user_id = create_manager(app, options.email, options.name, options.team, password)

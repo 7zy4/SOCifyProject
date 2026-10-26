@@ -42,6 +42,20 @@ def _bounded_utf8(value: object, maximum: int) -> TypeGuard[str]:
         return False
 
 
+def _password_matches(candidate: object, encoded: object) -> bool:
+    if not _bounded_utf8(candidate, 72) or not candidate:
+        return False
+    if isinstance(encoded, str):
+        try:
+            matched = bcrypt.checkpw(candidate.encode(), encoded.encode())
+        except (ValueError, UnicodeError):
+            matched = None
+        if matched is not None:
+            return matched
+    bcrypt.hashpw(candidate.encode(), bcrypt.gensalt(rounds=12))
+    return False
+
+
 def _payload() -> dict[str, Any]:
     if request.is_json:
         data = request.get_json(silent=True)
@@ -155,7 +169,8 @@ def _login_response(data: dict[str, Any]):
         )
         .fetchone()
     )
-    valid_password = bool(user and user["is_active"] and bcrypt.checkpw(password.encode(), str(user["password_hash"]).encode()))
+    matched = _password_matches(password, user["password_hash"] if user else None)
+    valid_password = bool(user and user["is_active"] and matched)
     if not valid_password:
         _record_attempt(normalized_email, ip_address, False)
         if user:
@@ -193,7 +208,13 @@ def login_form():
     if request.is_json:
         return response
     if isinstance(response, tuple):
-        flash("تعذر تسجيل الدخول. تحقق من البيانات أو انتظر قبل المحاولة", "error")
+        messages = {
+            "LOGIN_RATE_LIMITED": "محاولات دخول كثيرة. انتظر انتهاء مدة الحماية ثم أعد المحاولة دون تكرار الطلب.",
+            "MFA_REQUIRED": "أدخل رمز المصادقة متعددة العوامل أو رمز الاسترداد الخاص بك.",
+            "INVALID_MFA_CODE": "رمز المصادقة غير صحيح. تحقق من الرمز وتوقيت جهازك.",
+        }
+        body = response[0].get_json(silent=True) or {}
+        flash(messages.get(body.get("error", {}).get("code"), "تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور."), "error")
         return redirect(url_for("auth.login_page"))
     return redirect("/dashboard")
 
@@ -238,6 +259,8 @@ def _register(data: dict[str, Any]):
     password_hash = bcrypt.hashpw(str(password).encode(), bcrypt.gensalt(rounds=12)).decode()
     try:
         with transaction():
+            if get_db().execute("SELECT 1 FROM users WHERE lower(email)=?", (email.strip().lower(),)).fetchone():
+                return error_response("ACCOUNT_EXISTS", "تعذر إنشاء الحساب بهذه البيانات", 409)
             target_workspace, target_role, target_team = 1, "analyst", str(data.get("team") or "المتدربون")[:120]
             invite_row = None
             if team_name:
@@ -395,7 +418,7 @@ def change_password():
     if not _bounded_utf8(current, 72) or problem:
         return error_response("INVALID_PASSWORD_CHANGE", problem or "كلمة المرور الحالية مطلوبة", 422)
     user = get_db().execute("SELECT password_hash FROM users WHERE id = ? AND is_active = 1", (actor_id(),)).fetchone()
-    if not user or not bcrypt.checkpw(current.encode(), user["password_hash"].encode()):
+    if not _password_matches(current, user["password_hash"] if user else None):
         record_audit(get_db(), "password_change", "user", actor_id(), "denied", {"reason": "current_password_mismatch"})
         return error_response("CURRENT_PASSWORD_INCORRECT", "كلمة المرور الحالية غير صحيحة", 403)
     replacement = bcrypt.hashpw(str(new).encode(), bcrypt.gensalt(rounds=12)).decode()
@@ -418,16 +441,7 @@ def mfa_enroll():
     if operational_mode():
         supplied = _payload().get("current_password")
         user = get_db().execute("SELECT password_hash FROM users WHERE id = ?", (actor_id(),)).fetchone()
-        try:
-            valid = (
-                isinstance(supplied, str)
-                and len(supplied.encode()) <= 72
-                and user is not None
-                and bcrypt.checkpw(supplied.encode(), user["password_hash"].encode())
-            )
-        except (ValueError, UnicodeError):
-            valid = False
-        if not valid:
+        if not _password_matches(supplied, user["password_hash"] if user else None):
             return error_response("REAUTHENTICATION_FAILED", "أدخل كلمة المرور الحالية لبدء إعداد المصادقة", 403)
     enrollment = get_db().execute("SELECT enabled FROM mfa_enrollments WHERE user_id = ?", (actor_id(),)).fetchone()
     if enrollment and enrollment["enabled"]:
@@ -501,7 +515,7 @@ def mfa_disable():
     password = data.get("current_password")
     code = data.get("code")
     user = get_db().execute("SELECT password_hash FROM users WHERE id = ?", (actor_id(),)).fetchone()
-    if not _bounded_utf8(password, 72) or not user or not bcrypt.checkpw(password.encode(), user["password_hash"].encode()) or not _mfa_valid(actor_id(), code):
+    if not _password_matches(password, user["password_hash"] if user else None) or not _mfa_valid(actor_id(), code):
         return error_response("REAUTHENTICATION_FAILED", "يلزم التحقق من كلمة المرور ورمز المصادقة", 403)
     with transaction():
         get_db().execute("DELETE FROM mfa_backup_codes WHERE user_id = ?", (actor_id(),))

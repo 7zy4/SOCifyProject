@@ -17,7 +17,7 @@ build/
 *.egg-info/
 .DS_Store
 *.db
-*.db-journal
+*.db-*
 .env
 .env.*
 !.env.example

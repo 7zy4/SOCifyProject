@@ -5,7 +5,7 @@ from pathlib import Path
 import bcrypt
 import pytest
 
-from scripts.bootstrap_team import create_manager, generate_recovery_file, reset_password
+from scripts.bootstrap_team import create_manager, generate_manager_file, generate_recovery_file, reset_password
 from socify.security import encrypt_secret, generate_totp_secret, totp_code
 
 
@@ -188,3 +188,64 @@ def test_recovery_rejects_unknown_email_before_prompting(app, monkeypatch, capsy
         bootstrap_team.main()
     assert rejected.value.code == 2
     assert "الحساب غير موجود" in capsys.readouterr().err
+
+
+def test_generated_manager_creation_adds_one_user_and_preserves_all_existing_records(app, database):
+    before = [tuple(row) for row in database.execute("SELECT * FROM users ORDER BY id")]
+    workspaces = database.execute("SELECT COUNT(*) FROM training_workspaces").fetchone()[0]
+    user_id, destination = generate_manager_file(app, "owner@socify.local", "Owner", "Internal investigations")
+    assert database.execute("SELECT COUNT(*) FROM users").fetchone()[0] == len(before) + 1
+    assert database.execute("SELECT COUNT(*) FROM training_workspaces").fetchone()[0] == workspaces + 1
+    assert [tuple(row) for row in database.execute("SELECT * FROM users WHERE id<>? ORDER BY id", (user_id,))] == before
+    assert stat.S_IMODE(destination.stat().st_mode) == 0o600
+    password = destination.read_text().strip()
+    client = app.test_client()
+    assert client.post("/api/auth/login", json={"email": "owner@socify.local", "password": password}).status_code == 200
+    assert client.get("/api/auth/me").json["user"]["role"] == "soc_manager"
+    assert database.execute("SELECT COUNT(*) FROM security_audit_logs WHERE action='bootstrap' AND actor_id=?", (user_id,)).fetchone()[0] == 1
+    with pytest.raises(ValueError, match="الحساب موجود"):
+        generate_manager_file(app, "OWNER@SOCIFY.LOCAL", "Other", "Other team")
+    assert list(destination.parent.glob("*.txt")) == [destination]
+    assert database.execute("SELECT COUNT(*) FROM users").fetchone()[0] == len(before) + 1
+
+
+def test_generated_manager_cli_does_not_prompt_or_print_credentials(app, monkeypatch, capsys):
+    from scripts import bootstrap_team
+
+    monkeypatch.setenv("SOCIFY_ENV", "production")
+    monkeypatch.setattr(bootstrap_team, "create_app", lambda: app)
+    monkeypatch.setattr(
+        "sys.argv", ["bootstrap_team", "--email", "owner@socify.local", "--name", "Owner", "--team", "Internal team", "--generate-password-file"]
+    )
+    monkeypatch.setattr(bootstrap_team.getpass, "getpass", lambda prompt: pytest.fail("Generated creation must not prompt for credentials"))
+    bootstrap_team.main()
+    output = capsys.readouterr()
+    destination = next((Path(app.config["DATABASE"]).parent / ".account-recovery").glob("new-manager-*.txt"))
+    assert "Internal team manager created" in output.out and str(destination) in output.out
+    assert destination.read_text().strip() not in output.out + output.err
+
+
+def test_failed_generated_manager_creation_preserves_existing_database(app, database, monkeypatch):
+    from scripts import bootstrap_team
+
+    before = [tuple(row) for row in database.execute("SELECT * FROM users ORDER BY id")]
+
+    def no_space(descriptor):
+        raise OSError("Synthetic full disk")
+
+    monkeypatch.setattr(bootstrap_team.os, "fsync", no_space)
+    with pytest.raises(OSError, match="Synthetic full disk"):
+        generate_manager_file(app, "owner@socify.local", "Owner", "Internal team")
+    assert [tuple(row) for row in database.execute("SELECT * FROM users ORDER BY id")] == before
+    assert not list((Path(app.config["DATABASE"]).parent / ".account-recovery").glob("*.txt"))
+
+
+def test_generated_manager_creation_rejects_production_and_mixed_case_duplicates(app, database):
+    database.execute("UPDATE users SET email='Analyst@SOCify.Local' WHERE email='analyst@socify.local'")
+    before = [tuple(row) for row in database.execute("SELECT * FROM users ORDER BY id")]
+    with pytest.raises(ValueError, match="الحساب موجود"):
+        generate_manager_file(app, "analyst@socify.local", "Owner", "Internal team")
+    app.config["ENV_NAME"] = "production"
+    with pytest.raises(ValueError, match="للتطوير"):
+        generate_manager_file(app, "owner@socify.local", "Owner", "Internal team")
+    assert [tuple(row) for row in database.execute("SELECT * FROM users ORDER BY id")] == before
