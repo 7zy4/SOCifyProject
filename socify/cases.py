@@ -9,6 +9,7 @@ from typing import Any
 from flask import Blueprint, Response, jsonify, request
 
 from .audit import record_audit, record_training_action
+from .autopsy_pipeline import job_visible
 from .db import get_db, inserted_id, transaction
 from .operational import case_scope, case_visible, operational_mode
 from .report_brand import report_style
@@ -107,11 +108,13 @@ def _source_visible(owner_case_id: int | None, created_by: int | None = None) ->
 
 def _attach_event(connection: sqlite3.Connection, case_id: int, event_id: int) -> bool:
     event = connection.execute(
-        "SELECT id, event_id, title, raw_hash, provenance, training_run_id, owner_case_id, created_by FROM security_events WHERE id = ? AND workspace_id = ?",
+        "SELECT id, event_id, title, raw_hash, provenance, training_run_id, owner_case_id, created_by, import_job_id FROM security_events WHERE id = ? AND workspace_id = ?",
         (event_id, workspace_id()),
     ).fetchone()
     case = connection.execute("SELECT training_run_id FROM incident_cases WHERE id = ? AND workspace_id = ?", (case_id, workspace_id())).fetchone()
     if not event or not case or event["training_run_id"] != case["training_run_id"] or not can_access_training_run(event["training_run_id"]):
+        return False
+    if operational_mode() and event["import_job_id"] is not None and not job_visible(event["import_job_id"]):
         return False
     already_linked = connection.execute("SELECT 1 FROM case_events WHERE case_id = ? AND event_id = ?", (case_id, event_id)).fetchone()
     if not already_linked and not _source_visible(event["owner_case_id"], event["created_by"]):
@@ -147,6 +150,20 @@ def _attach_alert(connection: sqlite3.Connection, case_id: int, alert_id: int) -
         return False
     if not _source_visible(alert["owner_case_id"]):
         return False
+    events = connection.execute(
+        "SELECT e.id, e.workspace_id, e.training_run_id, e.owner_case_id, e.created_by, e.import_job_id FROM alert_events ae JOIN security_events e ON e.id=ae.event_id WHERE ae.alert_id=?",
+        (alert_id,),
+    ).fetchall()
+    if any(
+        event["workspace_id"] != workspace_id()
+        or event["training_run_id"] != case["training_run_id"]
+        or not _source_visible(event["owner_case_id"], event["created_by"])
+        or operational_mode()
+        and event["import_job_id"] is not None
+        and not job_visible(event["import_job_id"])
+        for event in events
+    ):
+        return False
     now = iso_now()
     connection.execute(
         "INSERT OR IGNORE INTO case_alerts (case_id, alert_id, attached_by, attached_at) VALUES (?, ?, ?, ?)", (case_id, alert_id, actor_id(), now)
@@ -165,9 +182,8 @@ def _attach_alert(connection: sqlite3.Connection, case_id: int, alert_id: int) -
             now,
         ),
     )
-    event_ids = connection.execute("SELECT event_id FROM alert_events WHERE alert_id = ?", (alert_id,)).fetchall()
-    for event in event_ids:
-        _attach_event(connection, case_id, int(event["event_id"]))
+    for event in events:
+        _attach_event(connection, case_id, int(event["id"]))
     return True
 
 

@@ -62,6 +62,9 @@ def migrate(connection: sqlite3.Connection) -> None:
     connection.execute("CREATE INDEX IF NOT EXISTS idx_autopsy_case_events_event ON case_events(event_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_autopsy_case_events_access ON case_events(case_id,active_event,import_job_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_autopsy_import_authorization ON ingestion_jobs(case_id,created_by,id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_autopsy_import_scope ON ingestion_jobs(id,case_id,created_by)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_autopsy_case_events_job ON case_events(case_id,import_job_id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_autopsy_batch_restricted ON autopsy_batch_access(restricted,job_id)")
     projection = "e.event_time, CASE WHEN json_valid(e.normalized_fields) THEN COALESCE(json_extract(e.normalized_fields, '$.event_time_known'),0) ELSE 0 END, e.import_job_id, e.autopsy_active, e.severity"
     connection.execute(
         f"CREATE TRIGGER IF NOT EXISTS autopsy_case_event_projection AFTER INSERT ON case_events BEGIN UPDATE case_events SET (event_time,time_known,import_job_id,active_event,event_severity) = (SELECT {projection} FROM security_events e WHERE e.id = NEW.event_id) WHERE case_id = NEW.case_id AND event_id = NEW.event_id; END"
@@ -152,8 +155,20 @@ def case_full_access(case_id: int, user: dict | None = None) -> bool:
     return not bool(
         get_db()
         .execute(
-            "SELECT 1 FROM ingestion_jobs j JOIN autopsy_batch_access a ON a.job_id = j.id AND a.restricted = 1 WHERE j.case_id = ? AND j.created_by != ? AND NOT EXISTS (SELECT 1 FROM autopsy_batch_members m WHERE m.job_id = j.id AND m.user_id = ?) LIMIT 1",
-            (case_id, principal["id"], principal["id"]),
+            """SELECT 1 FROM autopsy_batch_access a
+            CROSS JOIN ingestion_jobs j INDEXED BY idx_autopsy_import_scope ON j.id=a.job_id
+            WHERE a.restricted=1 AND j.created_by != ?
+            AND NOT EXISTS (SELECT 1 FROM autopsy_batch_members m WHERE m.job_id=j.id AND m.user_id=?)
+            AND (j.case_id=?
+                OR EXISTS (SELECT 1 FROM case_events ce WHERE ce.case_id=? AND ce.import_job_id=j.id)
+                OR EXISTS (SELECT 1 FROM case_evidence ev JOIN security_events e ON e.id=CAST(ev.reference_id AS INTEGER)
+                    WHERE ev.case_id=? AND ev.evidence_type='event' AND ev.reference_id=CAST(e.id AS TEXT) AND e.import_job_id=j.id)
+                OR EXISTS (SELECT 1 FROM case_alerts ca JOIN alert_events ae ON ae.alert_id=ca.alert_id
+                    JOIN security_events e ON e.id=ae.event_id WHERE ca.case_id=? AND e.import_job_id=j.id)
+                OR EXISTS (SELECT 1 FROM case_evidence ev JOIN alert_events ae ON ae.alert_id=CAST(ev.reference_id AS INTEGER)
+                    JOIN security_events e ON e.id=ae.event_id WHERE ev.case_id=? AND ev.evidence_type='alert'
+                    AND ev.reference_id=CAST(ae.alert_id AS TEXT) AND e.import_job_id=j.id)) LIMIT 1""",
+            (principal["id"], principal["id"], case_id, case_id, case_id, case_id, case_id),
         )
         .fetchone()
     )
