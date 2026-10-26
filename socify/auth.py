@@ -101,8 +101,8 @@ def _backup_code_valid(user_id: int, code: str) -> bool:
     )
     for candidate in row:
         if secrets.compare_digest(candidate["code_hash"], digest):
-            get_db().execute("UPDATE mfa_backup_codes SET consumed_at = ? WHERE id = ?", (iso_now(), candidate["id"]))
-            return True
+            consumed = get_db().execute("UPDATE mfa_backup_codes SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL", (iso_now(), candidate["id"]))
+            return consumed.rowcount == 1
     return False
 
 
