@@ -3,6 +3,7 @@ venv/
 __pycache__/
 *.pyc
 instance/
+.account-recovery/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/

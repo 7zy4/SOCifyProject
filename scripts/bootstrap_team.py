@@ -1,6 +1,10 @@
 import argparse
 import getpass
 import os
+import secrets
+import sqlite3
+import stat
+import tempfile
 import uuid
 from pathlib import Path
 
@@ -71,6 +75,46 @@ def reset_password(app, email: str, password: str) -> int:
     return int(user["id"])
 
 
+def recovery_account(app, email: str) -> dict:
+    normalized = text_value(email, 254, True).lower()
+    if not re_email(normalized):
+        raise ValueError("البريد الإلكتروني غير صالح")
+    with app.app_context():
+        user = get_db().execute("SELECT id,email,is_active FROM users WHERE lower(email)=?", (normalized,)).fetchone()
+        if not user:
+            raise ValueError("الحساب غير موجود في قاعدة البيانات المحددة؛ لن يُنشأ حساب بديل")
+        if not user["is_active"]:
+            raise ValueError("الحساب معطل؛ يلزم الرجوع إلى مسؤول الفريق")
+        return dict(user)
+
+
+def generate_recovery_file(app, email: str) -> Path:
+    if app.config["ENV_NAME"] != "development":
+        raise ValueError("الاستعادة إلى ملف خاص مخصصة للتطوير؛ استخدم الاستعادة التفاعلية في الإنتاج")
+    user = recovery_account(app, email)
+    directory = Path(app.config["DATABASE"]).resolve().parent / ".account-recovery"
+    destination = None
+    try:
+        if directory.is_symlink():
+            raise ValueError("مجلد الاستعادة يجب ألا يكون رابطًا رمزيًا")
+        directory.mkdir(mode=0o700, exist_ok=True)
+        if stat.S_IMODE(directory.stat().st_mode) != 0o700 or directory.stat().st_uid != os.geteuid():
+            raise ValueError("مجلد الاستعادة يجب أن يكون خاصًا بمالك الخادم بصلاحية 0700")
+        descriptor, filename = tempfile.mkstemp(prefix=f"access-{user['id']}-", suffix=".txt", dir=directory)
+        destination = Path(filename)
+        password = secrets.token_urlsafe(24)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+            output.write(password + "\n")
+            output.flush()
+            os.fsync(output.fileno())
+        reset_password(app, user["email"], password)
+    except (OSError, ValueError, sqlite3.Error):
+        if destination is not None:
+            destination.unlink(missing_ok=True)
+        raise
+    return destination
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Create an internal team manager without public registration or default credentials")
     parser.add_argument("--email", required=True)
@@ -81,10 +125,13 @@ def main() -> None:
     modes.add_argument(
         "--reset-password", action="store_true", help="Local server administrator recovery; revoke sessions and preserve MFA, roles and evidence"
     )
+    parser.add_argument("--generate-password-file", action="store_true", help="Development-only recovery to a private local file; no password is printed")
     options = parser.parse_args()
+    if options.generate_password_file and not options.reset_password:
+        parser.error("--generate-password-file requires --reset-password")
     if not options.status and not options.reset_password and (not options.name or not options.team):
         parser.error("--name and --team are required when creating a manager")
-    if os.environ.get("SOCIFY_ENV", "development") != "production":
+    if os.environ.get("SOCIFY_ENV", "development").strip().lower() != "production":
         load_environment(Path(__file__).resolve().parent.parent)
     try:
         app = create_app()
@@ -101,6 +148,13 @@ def main() -> None:
                 print(f"Account found (user_id={user['id']}, active={bool(user['is_active'])}, MFA={bool(mfa and mfa['enabled'])})")
             return
         if options.reset_password:
+            target = recovery_account(app, options.email)
+            print(f"Recovering existing account: {target['email']} (user_id={target['id']})")
+            if options.generate_password_file:
+                destination = generate_recovery_file(app, options.email)
+                print(f"Recovery file: {destination}")
+                print("Password reset; open the private file in your editor. Do not share its contents. MFA, roles and evidence preserved.")
+                return
             password = getpass.getpass("كلمة المرور الجديدة: ")
             if password != getpass.getpass("أعد إدخال كلمة المرور الجديدة: "):
                 raise ValueError("كلمتا المرور غير متطابقتين؛ لم يتغير الحساب")

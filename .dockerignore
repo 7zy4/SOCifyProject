@@ -1,4 +1,6 @@
 .git
+.account-recovery
+**/.account-recovery
 .github
 .pytest_cache
 .ruff_cache

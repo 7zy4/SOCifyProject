@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
+if ! command -v docker >/dev/null 2>&1; then
+  printf '%s\n' 'Docker is not installed. In Codespaces, update V3 and run Codespaces: Rebuild Container on the existing Codespace.' >&2
+  exit 1
+fi
+if ! docker info >/dev/null 2>&1; then
+  printf '%s\n' 'Docker is installed but its daemon is unavailable. Finish the container rebuild and verify docker info before starting analysis.' >&2
+  exit 1
+fi
 analysis_container=socify-v3-dev-analysis
 analysis_directory=/tmp/socify-v3-dev-analysis-ipc
 analysis_image=socify-v3-verification-analysis

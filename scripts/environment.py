@@ -5,7 +5,7 @@ from scripts.prepare_codespace import prepare
 
 
 def load_environment(root: Path) -> None:
-    if os.environ.get("SOCIFY_ENV", "development") == "production":
+    if os.environ.get("SOCIFY_ENV", "development").strip().lower() == "production":
         raise RuntimeError("Production requires explicitly provisioned environment and encryption keys")
     destination = prepare(root / "instance" / "codespaces.env")
     saved = dict(line.split("=", 1) for line in destination.read_text().splitlines() if "=" in line)

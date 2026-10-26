@@ -1,6 +1,7 @@
 import logging
 import multiprocessing
 import os
+import signal
 import uuid
 from contextlib import contextmanager
 from typing import Any
@@ -12,6 +13,7 @@ from socify.import_worker import run_import_worker_once
 
 
 def worker_loop(configuration: dict[str, Any], stop, parent: int, kind: str) -> None:
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
     application = create_app(configuration)
     identity = f"local-import-{uuid.uuid4().hex}"
     with application.app_context():

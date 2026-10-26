@@ -7,7 +7,7 @@ from socify import create_app
 
 
 def main() -> None:
-    if os.environ.get("SOCIFY_ENV", "development") == "production":
+    if os.environ.get("SOCIFY_ENV", "development").strip().lower() == "production":
         raise RuntimeError("Use Gunicorn and the independently supervised workers for production")
     load_environment(Path(__file__).resolve().parent)
     app = create_app()

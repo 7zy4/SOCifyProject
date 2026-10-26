@@ -1,9 +1,11 @@
 import secrets
+import stat
+from pathlib import Path
 
 import bcrypt
 import pytest
 
-from scripts.bootstrap_team import create_manager, reset_password
+from scripts.bootstrap_team import create_manager, generate_recovery_file, reset_password
 from socify.security import encrypt_secret, generate_totp_secret, totp_code
 
 
@@ -110,3 +112,79 @@ def test_local_recovery_confirmation_mismatch_preserves_the_original_password(ap
     assert rejected.value.code == 2
     assert database.execute("SELECT password_hash FROM users WHERE id=?", (user_id,)).fetchone()[0] == original
     assert "غير متطابقتين" in capsys.readouterr().err
+
+
+def test_generated_recovery_file_is_private_and_authenticates_the_existing_account(app, database):
+    user_id = create_manager(app, "generated@example.test", "Generated recovery", "Existing team", secrets.token_urlsafe(24))
+    original = tuple(database.execute("SELECT email,role,team,workspace_id FROM users WHERE id=?", (user_id,)).fetchone())
+    destination = generate_recovery_file(app, "generated@example.test")
+    password = destination.read_text().strip()
+    assert len(password) >= 24
+    assert stat.S_IMODE(destination.stat().st_mode) == 0o600
+    assert stat.S_IMODE(destination.parent.stat().st_mode) == 0o700
+    assert tuple(database.execute("SELECT email,role,team,workspace_id FROM users WHERE id=?", (user_id,)).fetchone()) == original
+    assert app.test_client().post("/api/auth/login", json={"email": "generated@example.test", "password": password}).status_code == 200
+
+
+def test_generated_recovery_cli_prints_only_the_file_path(app, database, monkeypatch, capsys):
+    from scripts import bootstrap_team
+
+    user_id = create_manager(app, "file-cli@example.test", "File owner", "File team", secrets.token_urlsafe(24))
+    monkeypatch.setenv("SOCIFY_ENV", "production")
+    monkeypatch.setattr(bootstrap_team, "create_app", lambda: app)
+    monkeypatch.setattr("sys.argv", ["bootstrap_team", "--email", "file-cli@example.test", "--reset-password", "--generate-password-file"])
+    monkeypatch.setattr(bootstrap_team.getpass, "getpass", lambda prompt: pytest.fail("Generated recovery does not prompt for a password"))
+    bootstrap_team.main()
+    output = capsys.readouterr()
+    destination = next((Path(app.config["DATABASE"]).parent / ".account-recovery").glob(f"access-{user_id}-*.txt"))
+    password = destination.read_text().strip()
+    assert str(destination) in output.out
+    assert password not in output.out + output.err
+
+
+def test_failed_recovery_file_write_does_not_reset_the_password(app, database, monkeypatch):
+    from scripts import bootstrap_team
+
+    user_id = create_manager(app, "file-error@example.test", "File error owner", "Existing team", secrets.token_urlsafe(24))
+    original = database.execute("SELECT password_hash FROM users WHERE id=?", (user_id,)).fetchone()[0]
+
+    def no_space(descriptor):
+        raise OSError("Synthetic full disk")
+
+    monkeypatch.setattr(bootstrap_team.os, "fsync", no_space)
+    with pytest.raises(OSError, match="Synthetic full disk"):
+        generate_recovery_file(app, "file-error@example.test")
+    assert database.execute("SELECT password_hash FROM users WHERE id=?", (user_id,)).fetchone()[0] == original
+    assert not list((Path(app.config["DATABASE"]).parent / ".account-recovery").glob("*.txt"))
+
+
+def test_generated_recovery_rejects_symbolic_directories(app, database, tmp_path):
+    user_id = create_manager(app, "symlink@example.test", "Symlink owner", "Existing team", secrets.token_urlsafe(24))
+    original = database.execute("SELECT password_hash FROM users WHERE id=?", (user_id,)).fetchone()[0]
+    directory = Path(app.config["DATABASE"]).parent / ".account-recovery"
+    directory.symlink_to(tmp_path / "other-location", target_is_directory=True)
+    with pytest.raises(ValueError, match="رمزي"):
+        generate_recovery_file(app, "symlink@example.test")
+    assert database.execute("SELECT password_hash FROM users WHERE id=?", (user_id,)).fetchone()[0] == original
+
+
+def test_generated_recovery_is_not_available_in_production(app, database):
+    user_id = create_manager(app, "prod-recovery@example.test", "Production owner", "Existing team", secrets.token_urlsafe(24))
+    original = database.execute("SELECT password_hash FROM users WHERE id=?", (user_id,)).fetchone()[0]
+    app.config["ENV_NAME"] = "production"
+    with pytest.raises(ValueError, match="للتطوير"):
+        generate_recovery_file(app, "prod-recovery@example.test")
+    assert database.execute("SELECT password_hash FROM users WHERE id=?", (user_id,)).fetchone()[0] == original
+
+
+def test_recovery_rejects_unknown_email_before_prompting(app, monkeypatch, capsys):
+    from scripts import bootstrap_team
+
+    monkeypatch.setenv("SOCIFY_ENV", "production")
+    monkeypatch.setattr(bootstrap_team, "create_app", lambda: app)
+    monkeypatch.setattr("sys.argv", ["bootstrap_team", "--email", "missing@example.test", "--reset-password"])
+    monkeypatch.setattr(bootstrap_team.getpass, "getpass", lambda prompt: pytest.fail("Unknown account must not request credentials"))
+    with pytest.raises(SystemExit) as rejected:
+        bootstrap_team.main()
+    assert rejected.value.code == 2
+    assert "الحساب غير موجود" in capsys.readouterr().err
