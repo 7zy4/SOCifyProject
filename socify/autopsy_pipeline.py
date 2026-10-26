@@ -61,6 +61,7 @@ def migrate(connection: sqlite3.Connection) -> None:
     )
     connection.execute("CREATE INDEX IF NOT EXISTS idx_autopsy_case_events_event ON case_events(event_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_autopsy_case_events_access ON case_events(case_id,active_event,import_job_id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_autopsy_import_authorization ON ingestion_jobs(case_id,created_by,id)")
     projection = "e.event_time, CASE WHEN json_valid(e.normalized_fields) THEN COALESCE(json_extract(e.normalized_fields, '$.event_time_known'),0) ELSE 0 END, e.import_job_id, e.autopsy_active, e.severity"
     connection.execute(
         f"CREATE TRIGGER IF NOT EXISTS autopsy_case_event_projection AFTER INSERT ON case_events BEGIN UPDATE case_events SET (event_time,time_known,import_job_id,active_event,event_severity) = (SELECT {projection} FROM security_events e WHERE e.id = NEW.event_id) WHERE case_id = NEW.case_id AND event_id = NEW.event_id; END"
