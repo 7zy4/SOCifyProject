@@ -1,0 +1,24 @@
+........................................................................ [  9%]
+........................................................................ [ 18%]
+........................................................................ [ 27%]
+........................................................................ [ 36%]
+........................................................................ [ 45%]
+........................................................................ [ 55%]
+........................................................................ [ 64%]
+........................................................................ [ 73%]
+........................................................................ [ 82%]
+........................................................................ [ 91%]
+...............................................................          [100%]
+=============================== warnings summary ===============================
+tests/integration/test_autopsy_capsules_pipeline.py::test_capsule_rejects_tampering_traversal_and_invalid_schema_without_partial_restore[duplicate_member]
+  /opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/zipfile/__init__.py:1625: UserWarning: Duplicate name: 'manifest.json'
+    return self._open_to_write(zinfo, force_zip64=force_zip64)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.12.14-final-0 _______________
+
+Coverage XML written to file /tmp/socify-v3-startup-coverage.xml
+Coverage JSON written to file /tmp/socify-v3-startup-coverage.json
+Required test coverage of 90% reached. Total coverage: 90.75%
+783 passed, 19 deselected, 1 warning in 346.37s (0:05:46)

@@ -1,0 +1,12 @@
+{
+  "synthetic_only": true,
+  "confirmation_mismatch_aborts_startup": true,
+  "generated_recovery_file_mode": "0600",
+  "credentials_absent_from_logs": true,
+  "existing_account_login_status": 302,
+  "authenticated_status": 200,
+  "analysis_backend_started": true,
+  "clean_sigint_shutdown": true,
+  "database_or_keys_deleted": false,
+  "company_data_used": false
+}

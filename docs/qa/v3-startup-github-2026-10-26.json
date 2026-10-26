@@ -1,0 +1,48 @@
+{
+  "run_id": "40359084070",
+  "source_revision": "a051d9567865b3adc073ee862cd73946d9b21400",
+  "branch": "socify-version-3",
+  "state": {
+    "status": "WORKFLOW_RUN_STATUS_COMPLETED",
+    "conclusion": "WORKFLOW_RUN_CONCLUSION_SUCCESS"
+  },
+  "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40359084070",
+  "jobs": [
+    {
+      "name": "browser",
+      "state": "succeeded",
+      "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40359084070/job/121699459219",
+      "failed_steps": []
+    },
+    {
+      "name": "container",
+      "state": "succeeded",
+      "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40359084070/job/121699458608",
+      "failed_steps": []
+    },
+    {
+      "name": "dependency-review",
+      "state": "skipped",
+      "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40359084070/job/121699431489",
+      "failed_steps": []
+    },
+    {
+      "name": "performance",
+      "state": "succeeded",
+      "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40359084070/job/121699458401",
+      "failed_steps": []
+    },
+    {
+      "name": "quality",
+      "state": "succeeded",
+      "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40359084070/job/121699458550",
+      "failed_steps": []
+    },
+    {
+      "name": "security",
+      "state": "succeeded",
+      "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40359084070/job/121699458864",
+      "failed_steps": []
+    }
+  ]
+}

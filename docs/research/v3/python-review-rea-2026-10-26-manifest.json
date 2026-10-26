@@ -2,7 +2,7 @@
   "tool": "https://github.com/7zy4/rea",
   "tool_commit": "2250e67bc271c83f9e200ee298aa04a2457438a6",
   "date": "2026-10-26",
-  "source_revision": "f8d982f3cc66433959a6d3c7ded4f95a1b2e313c",
+  "source_revision": "a051d9567865b3adc073ee862cd73946d9b21400",
   "operation": "inspect-python-pyc",
   "compilation": "CPython 3.12 py_compile CHECKED_HASH; logical source filenames retained; compilation does not execute source",
   "inputs": [
@@ -188,16 +188,61 @@
     },
     {
       "source": "scripts/bootstrap_team.py",
-      "source_sha256": "f679f79d50a8bd96380bdeaff2338b42da970e81995e7351f243579b540ee039",
-      "pyc_sha256": "3c27b90b2feac1d3c0e6d02ab1d9bcddf78418603ae01d7db0f40231f9a30a45",
-      "evidence_id": "ev_9dc7b0bd06d28bd48126cda87e0e17f83884f070467f1e279e6a82ce46107a98",
+      "source_sha256": "5eb07616350676aa15c51f228d2c3ff15a1d0fdd497f84d30fae68847e5b288b",
+      "pyc_sha256": "3489e241d243addba708835a70ea739d3b4ad589cc6a491a7b76906ae5b6d541",
+      "evidence_id": "ev_6af4496f9ced4ce4755b0d1fb4a3b4f21e3ef9369bd8f8080590156507e1fdeb",
       "evidence_file": "python-bootstrap_team-rea-2026-10-26.json.gz",
-      "compressed_sha256": "754bf3070587edb3f26a22212b30c9e0935ed8bb98573a512245063fb8b24b40",
+      "compressed_sha256": "cbca4a3f05872378190e6db4c3714e3300d0148a264de49e31d4f49d44145e91",
       "coverage": {
         "status": "complete",
-        "objects": 295,
-        "code_objects": 4,
-        "marshal_bytes": 9494,
+        "objects": 426,
+        "code_objects": 6,
+        "marshal_bytes": 13716,
+        "marshal_depth": 5
+      }
+    },
+    {
+      "source": "scripts/environment.py",
+      "source_sha256": "35b57006c2b0ba0d38351f1130ff7cfa5a26d274a4c6720dfa7cfc8322b08a32",
+      "pyc_sha256": "aef21208ec3d272e05b8fc784ddeb35b91f0b14edba6342470a23719e4722996",
+      "evidence_id": "ev_59b9b9847378205c3474b9f78eaeacf81b67d53b7025ef5c728526f86e78300a",
+      "evidence_file": "python-environment-rea-2026-10-26.json.gz",
+      "compressed_sha256": "3bacf6656fd7a82a601b283d72f4ae63164058393c65a58ac91bba1495e3b970",
+      "coverage": {
+        "status": "complete",
+        "objects": 90,
+        "code_objects": 3,
+        "marshal_bytes": 2185,
+        "marshal_depth": 6
+      }
+    },
+    {
+      "source": "scripts/local_services.py",
+      "source_sha256": "41ed5faafd917613c89fa60df04b67ba434e25286d43514c76cab938bdf77412",
+      "pyc_sha256": "d0a7457e111f4c1f268b51eb32c0846686dc1a55d98ca26c09eb4272eaec2722",
+      "evidence_id": "ev_b40a808b9cfce440cddac23f55fb2c3f762900a5dd417c9a18015acba85cdc21",
+      "evidence_file": "python-local_services-rea-2026-10-26.json.gz",
+      "compressed_sha256": "06be52cf012469297b75bcc800d911e8881faab9fcc2bc9052ddb02e0829d043",
+      "coverage": {
+        "status": "complete",
+        "objects": 151,
+        "code_objects": 3,
+        "marshal_bytes": 3883,
+        "marshal_depth": 5
+      }
+    },
+    {
+      "source": "run.py",
+      "source_sha256": "5983594690e996cd57643e2d13621fbea5a41ae365e0a1407dee1f6ad85b7dd8",
+      "pyc_sha256": "9a4d97c6f6d789dd97eaeaefdb45b258dea6de38b388c23352e557c008c3ce0b",
+      "evidence_id": "ev_2cccfe5e7ecefaabb285d183f51ef74caa95c95545e673c6521c544c9ddac57f",
+      "evidence_file": "python-run-rea-2026-10-26.json.gz",
+      "compressed_sha256": "4c4a9b66caad85f8722ae77a8fc0439e27e4f29b97f514dacec84ea63326f156",
+      "coverage": {
+        "status": "complete",
+        "objects": 86,
+        "code_objects": 2,
+        "marshal_bytes": 1714,
         "marshal_depth": 5
       }
     }
@@ -208,5 +253,5 @@
     "source_hash_hex is the PEP 552 header field; the original .py is not read.",
     "python_version is the pinned CPython magic table for this header, not a runtime interpreter."
   ],
-  "interpretation": "Static inventory for thirteen current backend/entrypoint modules, including Codespaces proxy boundaries and local account recovery; complete marshal coverage is not a vulnerability certification or execution coverage. Independent security, HTTP and browser tests prove behavior."
+  "interpretation": "Static inventory for sixteen current backend and entrypoint modules, including Codespaces proxy boundaries, local account recovery, environment guards and local worker lifecycle; complete marshal coverage is not a vulnerability certification or execution coverage. Independent security, HTTP and browser tests prove behavior."
 }

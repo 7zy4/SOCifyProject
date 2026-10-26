@@ -1,0 +1,88 @@
+{
+  "source_revision": "a051d9567865b3adc073ee862cd73946d9b21400",
+  "synthetic_only": true,
+  "pytest_passed": 783,
+  "coverage": {
+    "covered_lines": 8995,
+    "num_statements": 9673,
+    "percent_covered": 90.74972025363671,
+    "percent_covered_display": "91",
+    "missing_lines": 678,
+    "excluded_lines": 0,
+    "percent_statements_covered": 92.99079913160344,
+    "percent_statements_covered_display": "93",
+    "num_branches": 3732,
+    "num_partial_branches": 510,
+    "covered_branches": 3170,
+    "missing_branches": 562,
+    "percent_branches_covered": 84.94105037513398,
+    "percent_branches_covered_display": "85"
+  },
+  "chromium_passed": 19,
+  "focused_security_and_recovery_passed": 50,
+  "launcher_http": {
+    "synthetic_only": true,
+    "confirmation_mismatch_aborts_startup": true,
+    "generated_recovery_file_mode": "0600",
+    "credentials_absent_from_logs": true,
+    "existing_account_login_status": 302,
+    "authenticated_status": 200,
+    "analysis_backend_started": true,
+    "clean_sigint_shutdown": true,
+    "database_or_keys_deleted": false,
+    "company_data_used": false
+  },
+  "rea_current_source_inventories": 16,
+  "ui_inputs_unchanged": 14,
+  "github": {
+    "run_id": "40359084070",
+    "source_revision": "a051d9567865b3adc073ee862cd73946d9b21400",
+    "branch": "socify-version-3",
+    "state": {
+      "status": "WORKFLOW_RUN_STATUS_COMPLETED",
+      "conclusion": "WORKFLOW_RUN_CONCLUSION_SUCCESS"
+    },
+    "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40359084070",
+    "jobs": [
+      {
+        "name": "browser",
+        "state": "succeeded",
+        "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40359084070/job/121699459219",
+        "failed_steps": []
+      },
+      {
+        "name": "container",
+        "state": "succeeded",
+        "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40359084070/job/121699458608",
+        "failed_steps": []
+      },
+      {
+        "name": "dependency-review",
+        "state": "skipped",
+        "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40359084070/job/121699431489",
+        "failed_steps": []
+      },
+      {
+        "name": "performance",
+        "state": "succeeded",
+        "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40359084070/job/121699458401",
+        "failed_steps": []
+      },
+      {
+        "name": "quality",
+        "state": "succeeded",
+        "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40359084070/job/121699458550",
+        "failed_steps": []
+      },
+      {
+        "name": "security",
+        "state": "succeeded",
+        "url": "https://github.com/7zy4/SOCifyProject/actions/runs/40359084070/job/121699458864",
+        "failed_steps": []
+      }
+    ]
+  },
+  "main_or_v2_modified": false,
+  "owner_codespace_rebuilt": false,
+  "owner_account_login_confirmed": false
+}
