@@ -887,10 +887,12 @@ def _normalize_existing_rows(connection: sqlite3.Connection) -> None:
                 (indicator["id"], event_id, indicator["context"], indicator["last_seen"]),
             )
     connection.execute("UPDATE users SET workspace_id = 1 WHERE workspace_id IS NULL")
-    connection.execute("UPDATE users SET created_at = COALESCE(created_at, ?)", (now,))
+    connection.execute("UPDATE users SET created_at = ? WHERE created_at IS NULL", (now,))
     if _table_exists(connection, "security_events"):
-        connection.execute("UPDATE security_events SET event_time = COALESCE(event_time, timestamp, ?)", (now,))
-        connection.execute("UPDATE security_events SET ingested_at = COALESCE(ingested_at, timestamp, ?)", (now,))
+        for column in ("event_time", "ingested_at", "workspace_id", "raw_hash"):
+            connection.execute(f"CREATE INDEX IF NOT EXISTS idx_events_missing_{column} ON security_events(id) WHERE {column} IS NULL")
+        connection.execute("UPDATE security_events SET event_time = COALESCE(timestamp, ?) WHERE event_time IS NULL", (now,))
+        connection.execute("UPDATE security_events SET ingested_at = COALESCE(timestamp, ?) WHERE ingested_at IS NULL", (now,))
         connection.execute("UPDATE security_events SET workspace_id = 1 WHERE workspace_id IS NULL")
         rows = connection.execute("SELECT id, raw_data FROM security_events WHERE raw_hash IS NULL").fetchall()
         for row in rows:
@@ -898,10 +900,10 @@ def _normalize_existing_rows(connection: sqlite3.Connection) -> None:
             connection.execute("UPDATE security_events SET raw_hash = ? WHERE id = ?", (hashlib.sha256(raw.encode()).hexdigest(), row["id"]))
     if _table_exists(connection, "rules"):
         connection.execute("UPDATE rules SET workspace_id = 1 WHERE workspace_id IS NULL")
-        connection.execute("UPDATE rules SET updated_at = COALESCE(updated_at, created_at, ?)", (now,))
+        connection.execute("UPDATE rules SET updated_at = COALESCE(created_at, ?) WHERE updated_at IS NULL", (now,))
     if _table_exists(connection, "event_sources"):
         connection.execute("UPDATE event_sources SET workspace_id = 1 WHERE workspace_id IS NULL")
-        connection.execute("UPDATE event_sources SET updated_at = COALESCE(updated_at, created_at, ?)", (now,))
+        connection.execute("UPDATE event_sources SET updated_at = COALESCE(created_at, ?) WHERE updated_at IS NULL", (now,))
     if _table_exists(connection, "ingestion_jobs"):
         connection.execute(
             """UPDATE ingestion_jobs SET status = 'interrupted', worker_id = NULL, lease_expires_at = NULL,
@@ -909,10 +911,10 @@ def _normalize_existing_rows(connection: sqlite3.Connection) -> None:
             WHERE status = 'processing' AND (lease_expires_at IS NULL OR lease_expires_at <= ?)""",
             (now, now, now),
         )
-        connection.execute("UPDATE ingestion_jobs SET updated_at = COALESCE(updated_at, created_at, ?)", (now,))
-        connection.execute("UPDATE ingestion_jobs SET available_at = COALESCE(available_at, created_at, ?)", (now,))
+        connection.execute("UPDATE ingestion_jobs SET updated_at = COALESCE(created_at, ?) WHERE updated_at IS NULL", (now,))
+        connection.execute("UPDATE ingestion_jobs SET available_at = COALESCE(created_at, ?) WHERE available_at IS NULL", (now,))
     if _table_exists(connection, "playbook_runs"):
-        connection.execute("UPDATE playbook_runs SET available_at = COALESCE(available_at, created_at, ?)", (now,))
+        connection.execute("UPDATE playbook_runs SET available_at = COALESCE(created_at, ?) WHERE available_at IS NULL", (now,))
         connection.execute("UPDATE playbook_step_runs SET effect_key = 'playbook-step:' || run_id || ':' || step_id WHERE effect_key IS NULL")
 
 

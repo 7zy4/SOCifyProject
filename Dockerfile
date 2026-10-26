@@ -17,6 +17,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD ["pyt
 CMD ["gunicorn", "--config", "gunicorn.conf.py", "app:app"]
 
 FROM runtime AS analysis
+HEALTHCHECK NONE
 USER root
 RUN --mount=type=secret,id=build_ca,mode=0444 build_ca_path=/etc/ssl/certs/ca-certificates.crt; if [ -f /run/secrets/build_ca ]; then build_ca_path=/run/secrets/build_ca; fi; apt-get -o Acquire::https::CaInfo="$build_ca_path" update && apt-get -o Acquire::https::CaInfo="$build_ca_path" install --yes --no-install-recommends libseccomp2 && rm -rf /var/lib/apt/lists/* /data
 ENV SOCIFY_ISOLATED_ANALYSIS_CONTAINER=1

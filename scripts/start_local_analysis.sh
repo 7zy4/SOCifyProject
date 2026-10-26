@@ -24,7 +24,7 @@ if [[ -e "$analysis_directory/analysis.sock" && ! -S "$analysis_directory/analys
   exit 1
 fi
 rm -f "$analysis_directory/analysis.sock"
-docker run --detach --init --name "$analysis_container" --network none --read-only --cap-drop ALL --security-opt no-new-privileges --group-add "$(id -g)" --memory 2g --pids-limit 32 --tmpfs /tmp:size=128m,noexec,nosuid,nodev --mount "type=bind,source=${analysis_directory},target=/analysis-ipc" "$analysis_image" >/dev/null
+docker run --detach --init --name "$analysis_container" --no-healthcheck --network none --read-only --cap-drop ALL --security-opt no-new-privileges --group-add "$(id -g)" --memory 2g --pids-limit 32 --tmpfs /tmp:size=128m,noexec,nosuid,nodev --mount "type=bind,source=${analysis_directory},target=/analysis-ipc" "$analysis_image" >/dev/null
 for attempt in $(seq 1 30); do
   if test -S "$analysis_directory/analysis.sock" && test -f "$analysis_directory/analysis.lock"; then
     chmod 555 "$analysis_directory"
