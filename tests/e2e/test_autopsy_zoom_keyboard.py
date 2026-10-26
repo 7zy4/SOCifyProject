@@ -1,5 +1,6 @@
 import json
 import math
+import os
 import shutil
 import threading
 
@@ -24,7 +25,12 @@ def test_200_percent_zoom_keyboard_modal_and_searchable_choices(app, tmp_path, z
                 zoom_level = math.log(2) / math.log(1.2)
                 preferences.write_text(json.dumps({"partition": {"default_zoom_level": {"x": zoom_level, "1": zoom_level}}}))
                 browser = playwright.chromium.launch_persistent_context(
-                    str(profile), channel="chromium", executable_path=shutil.which("chromium"), no_viewport=True, args=["--window-size=1440,1000"]
+                    str(profile),
+                    channel="chromium",
+                    executable_path=shutil.which("chromium"),
+                    headless=not bool(os.environ.get("DISPLAY")),
+                    no_viewport=True,
+                    args=["--window-size=1440,1000"],
                 )
                 page = browser.pages[0]
             else:

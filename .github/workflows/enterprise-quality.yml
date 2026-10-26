@@ -77,7 +77,7 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - run: npm install --no-save --ignore-scripts axe-core@4.14.0
       - uses: ./.github/actions/analysis-backend
-      - run: python -m pytest -m e2e tests/e2e --junitxml=artifacts/browser-junit.xml
+      - run: xvfb-run --auto-servernum --server-args="-screen 0 1600x1200x24" python -m pytest -m e2e tests/e2e --junitxml=artifacts/browser-junit.xml
       - name: Publish browser failure details in the job summary
         if: always()
         run: |
