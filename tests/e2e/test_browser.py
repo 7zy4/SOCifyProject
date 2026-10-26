@@ -158,12 +158,21 @@ def test_browser_case_workspace_supports_investigation_actions(app, client, logi
             page.locator("form").filter(has_text="ملاحظة التحقيق").locator("textarea[name=body]").fill("تم التحقق من مصدر السجل وسلامة الأثر")
             page.get_by_role("button", name="إضافة الملاحظة").click()
             page.get_by_text("تم التحقق من مصدر السجل وسلامة الأثر").wait_for()
-            page.get_by_role("button", name="إكمال").first.click()
+            task = page.get_by_role("row").filter(has=page.get_by_role("button", name="إكمال", exact=True)).first
+            task_title = task.get_by_role("cell").first.inner_text()
+            with page.expect_response(lambda response: "/tasks/" in response.url and response.request.method == "PATCH") as completion:
+                task.get_by_role("button", name="إكمال", exact=True).click()
+            assert completion.value.status == 200
+            page.get_by_role("row").filter(has=page.get_by_role("cell", name=task_title, exact=True)).get_by_role(
+                "cell", name="completed", exact=True
+            ).wait_for()
             workflow = page.locator("#case-transition-form")
             workflow.locator("select[name=status]").select_option("open")
             workflow.locator("input[name=reason]").fill("بدء التحقيق الموثق")
-            workflow.get_by_role("button", name="تسجيل الانتقال").click()
-            page.locator(".case-workspace").get_by_text("open", exact=True).first.wait_for()
+            with page.expect_response(lambda response: response.url.endswith("/transitions") and response.request.method == "POST") as transition:
+                workflow.get_by_role("button", name="تسجيل الانتقال").click()
+            assert transition.value.status == 200
+            page.locator(".case-workspace .metric-grid .badge.open").wait_for()
             assert page.get_by_role("heading", name="الأدلة وسلسلة الحيازة").is_visible()
             assert page.get_by_role("heading", name="سجل النشاط").is_visible()
             assert_accessible(page)

@@ -187,11 +187,18 @@ def test_local_sample_manual_reputation_and_team_assignment_browser(app):
             page.get_by_role("heading", name="علامات السجلات المهمة · Important shared evidence", exact=True).wait_for()
             assert "Investigators should examine this retained record" in page.locator(".autopsy-timeline").inner_text()
             page.locator("input[name=attack_search]").fill("T1059")
-            page.get_by_role("button", name="بحث التقنيات", exact=True).click()
+            previous_choices = page.locator("input[name=technique_id]").get_attribute("list")
+            assert previous_choices
+            with page.expect_response(lambda response: response.url.endswith("/attack?q=T1059") and response.request.method == "GET") as search:
+                page.get_by_role("button", name="بحث التقنيات", exact=True).click()
+            assert search.value.status == 200
+            page.locator(f'datalist[id="{previous_choices}"]').wait_for(state="detached")
             page.locator("input[name=technique_id]").fill("T1059 · Command and Scripting Interpreter")
             page.locator("input[name=assessment]").fill("مقترح")
             page.locator("textarea[name=reason]").fill("Retain as a hypothesis until command execution evidence is found")
-            page.locator("form").filter(has=page.locator("input[name=assessment]")).get_by_role("button", name="حفظ", exact=True).click()
+            with page.expect_response(lambda response: response.url.endswith("/attack") and response.request.method == "POST") as annotation:
+                page.locator("form").filter(has=page.locator("input[name=assessment]")).get_by_role("button", name="حفظ", exact=True).click()
+            assert annotation.value.status == 201
             page.get_by_role("cell", name="T1059", exact=True).wait_for()
             violations = page.evaluate("async () => (await axe.run(document)).violations.filter(item => ['serious', 'critical'].includes(item.impact))")
             assert not violations, [(item["id"], item["nodes"]) for item in violations]
