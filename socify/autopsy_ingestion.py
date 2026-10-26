@@ -10,6 +10,7 @@ from werkzeug.utils import secure_filename
 
 from .autopsy_domain import custody, touch_case
 from .autopsy_pipeline import activate_import, event_visible, job_visible, visibility_sql
+from .case_counts import cached_case_count, consistent_read
 from .cases import _attach_event, _case_row
 from .chronology_time import sql_utc_key, utc_key
 from .db import connect_readonly, get_db, transaction
@@ -241,6 +242,11 @@ def metadata_source(where):
 
 def metadata_scope(where, args):
     source = metadata_source(where)
+    if not any(request.args.get(key) for key in ("q", "start", "end", "severity")):
+        job_id = int(request.args["job_id"]) if request.args.get("job_id") else None
+        count = cached_case_count(args[0], job_id=job_id, active_only=job_id is None)
+        if count is not None:
+            return source, where, count, "eq"
     if FTS_PREDICATE in where:
         count = get_db().execute(f"SELECT COUNT(*) FROM (SELECT 1 FROM {source} WHERE {where} LIMIT ?)", (*args, SEARCH_COUNT_LIMIT + 1)).fetchone()[0]
         if count > SEARCH_COUNT_LIMIT:
@@ -252,6 +258,7 @@ def metadata_scope(where, args):
 
 @autopsy_ingestion_api.get("/api/cases/<int:case_id>/logs")
 @require_permission("cases.read")
+@consistent_read
 def case_logs(case_id: int):
     if not _case_row(case_id):
         return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)

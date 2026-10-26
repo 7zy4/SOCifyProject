@@ -5,6 +5,7 @@ from typing import Any
 from flask import Blueprint, jsonify, request
 
 from .autopsy_domain import KINDS, canonical, custody, text_value, touch_case, validate_record
+from .case_counts import cached_case_count, consistent_read
 from .cases import _case_row, _case_view, create_case, list_cases
 from .db import get_db, inserted_id, transaction
 from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
@@ -81,6 +82,7 @@ def insert_record(case_id: int, kind: str, payload: dict[str, Any], actor: int |
     return record_id
 
 
+@consistent_read
 def case_summary(case_id: int):
     case = _case_row(case_id)
     if not case:
@@ -119,7 +121,10 @@ def case_summary(case_id: int):
             )
             .fetchone()[0]
         )
-    result["counts"]["events"] = get_db().execute("SELECT COUNT(*) FROM case_events WHERE case_id = ? AND active_event = 1", (case_id,)).fetchone()[0]
+    count = cached_case_count(case_id)
+    result["counts"]["events"] = (
+        count if count is not None else get_db().execute("SELECT COUNT(*) FROM case_events WHERE case_id = ? AND active_event = 1", (case_id,)).fetchone()[0]
+    )
     result["members"] = [
         dict(row)
         for row in get_db()

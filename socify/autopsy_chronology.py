@@ -1,6 +1,5 @@
 import json
 import re
-from contextlib import contextmanager
 from heapq import merge
 from itertools import islice
 from typing import Any
@@ -10,6 +9,7 @@ from flask import Blueprint, jsonify, request
 from .autopsy_api import manager, record_view, records_for_case
 from .autopsy_ingestion import log_query, metadata_scope
 from .autopsy_pipeline import case_full_access
+from .case_counts import read_snapshot
 from .cases import _case_row
 from .chronology_time import record_clock, sql_utc_key, utc_key
 from .db import get_db
@@ -27,16 +27,6 @@ def migrate(connection):
     )
     connection.execute(f"CREATE INDEX IF NOT EXISTS idx_autopsy_chronology_records ON autopsy_records(case_id,({sql_utc_key(record_clock())}),id)")
     connection.execute(f"CREATE INDEX IF NOT EXISTS idx_autopsy_chronology_notes ON case_notes(case_id,({sql_utc_key('created_at')}),id)")
-
-
-@contextmanager
-def read_snapshot():
-    connection = get_db()
-    connection.execute("BEGIN")
-    try:
-        yield
-    finally:
-        connection.rollback()
 
 
 def record_entry(row):
