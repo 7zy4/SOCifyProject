@@ -330,6 +330,16 @@ def main():
             save_state(state_path, state)
         if state["project"] != PROJECT or state["events"] != options.events:
             raise RuntimeError("Synthetic state does not match this isolated workload")
+        state.setdefault("driver_runs", []).append(
+            {
+                "started_at": datetime.now(UTC).isoformat(),
+                "revision": git_revision(),
+                "prior_completed_batches": sum(bool(batch.get("completed")) for batch in state["batches"].values()),
+                "measure_only": options.measure_only,
+                "images": images_before,
+            }
+        )
+        save_state(state_path, state)
         sessions = [Session(port, context) for _ in state["accounts"]]
         for session, account in zip(sessions, state["accounts"], strict=True):
             session.call("/api/auth/login", {"email": account["email"], "password": account["login_value"]})
@@ -485,8 +495,8 @@ def main():
             "tls_versions": sorted(set().union(*(session.tls_versions for session in sessions))),
             "transport": "Verified localhost TLS fixture -> actual Nginx ingress -> production Gunicorn -> SQLite; independent authenticated cookie sessions with real CSRF and RBAC",
             "ingestion": {
-                "seconds": round(state["ingestion_completed_epoch"] - state["ingestion_started_epoch"], 3),
-                "rows_per_second": options.events / (state["ingestion_completed_epoch"] - state["ingestion_started_epoch"]),
+                "wall_seconds_including_pauses": round(state["ingestion_completed_epoch"] - state["ingestion_started_epoch"], 3),
+                "rows_per_processing_second": options.events / sum(ingestion_times),
                 "batches": len(ingestion_times),
                 "rows_per_batch": 10000,
                 "processing": distribution(ingestion_times),
@@ -494,6 +504,8 @@ def main():
                 "processing_seconds_total": sum(ingestion_times),
                 "images": state["ingestion_images"],
                 "resources": state.get("ingestion_resources", {}),
+                "driver_runs": state["driver_runs"],
+                "limits": "Worker timestamps measure each real batch. Wall time includes operator interruptions and fixes; lifetime cgroup peaks include the earlier synthetic smoke workload. Historical driver invocations before this manifest format are recorded separately in the QA log.",
             },
             "first_reads_ms": cold,
             "reads": {name: distribution(values) for name, values in observations.items()},

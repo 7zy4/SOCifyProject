@@ -1,0 +1,52 @@
+{
+  "schema": "socify-bilingual-report-layout/1",
+  "synthetic_only": true,
+  "revision": "558cc333d85347dd20b11428ab8700222b1b414a",
+  "fixture": "255-character mixed Arabic/English title",
+  "renderer_sources": {
+    "socify/autopsy_report_render.py": "0f92318699bdb96364e640cc3864e1cae921f33aa25b7f66443c0d92ca45c31a",
+    "socify/report_brand.py": "a92a1e298dc310dbfac9415eb252d187ee1b7d3534507369d6de3ba3eac55016",
+    "static/report.css": "7de562a5506254822eab2c5ce18cf61c37fec0a1c15818a445177416b9a99e43"
+  },
+  "renderer": "Actual network-isolated analysis service, five output formats",
+  "files": {
+    "json": {
+      "bytes": 28853,
+      "sha256": "9b8a2c319cda9eb5b170065a861acf4953792e7603a8447752b61243532338bc"
+    },
+    "html": {
+      "bytes": 386587,
+      "sha256": "30cd08eea490cb1e5885e96aeaac8e49bd31061a22d9ce8db522caf1703fc3c0"
+    },
+    "md": {
+      "bytes": 32427,
+      "sha256": "4b844de7b66ffa33fab30206cb20dcafb7a320748e1389e97e9e8048825f3443"
+    },
+    "docx": {
+      "bytes": 39391,
+      "sha256": "cda871bb911634b19f35d90fd70d5a913302e02060acc986cb0f2530ad3e1bcf"
+    },
+    "pdf": {
+      "bytes": 49250,
+      "sha256": "ed0a607c8cce9058092c1c0bf2a853d285c54ee7205c8291773fac3c73550e86"
+    }
+  },
+  "visual_review": {
+    "status": "PASS",
+    "date": "2026-10-26",
+    "method": "Direct rendered-page inspection of the bilingual cover, middle and final pages and all-page contact sheet; separate inspection of the 255-character wide-title cover. Poppler geometry checks every page. No sampled screenshot establishes all possible content layouts.",
+    "images": {
+      "page-12.png": "26c65e21aceb8d16302c4fc9017fb2666aed0e148836d419e6c49bbbbe2ffd00",
+      "page-24.png": "3fe39a6a54d97a90e8524c66ee87d6218bfd2c548408159de2556b748a79f99e",
+      "contact-sheet.png": "a0b1889bad1b2f0f65938c5e7c29de6da125f08dc2a53fcc2d6fa12c151e65a3",
+      "page-1.png": "e4862d19eb1ddc93c0afcac0635ee9d9ea4f05fc0cd2fde332a4c3bca7e83d52"
+    }
+  },
+  "geometry": {
+    "pages": 24,
+    "words_checked": 2938,
+    "clipped_words": 0,
+    "empty_pages": [],
+    "scope": "Poppler word bounds on every page; visual review remains a separate recorded check."
+  }
+}

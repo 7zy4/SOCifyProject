@@ -1,0 +1,77 @@
+{
+  "tool": "https://github.com/7zy4/rea",
+  "tool_commit": "2250e67bc271c83f9e200ee298aa04a2457438a6",
+  "date": "2026-10-26",
+  "source_revision": "50bf3e82acfdbf8ed05c5733b54261688771e078",
+  "operation": "inspect-python-pyc",
+  "compilation": "CPython 3.12 py_compile CHECKED_HASH; logical source filenames retained; compilation does not execute source",
+  "inputs": [
+    {
+      "source": "socify/security.py",
+      "source_sha256": "c80093c184a7c1a1c6b46c9497229234d61e57c1b9ab0bfaa6936faab4f29d38",
+      "pyc_sha256": "9deb5276e4c08274c091a1b8382be9fa15b1e666d4efd748a961b3d654f989a6",
+      "evidence_id": "ev_f6e22cb2e6c9be4ec0ca6b843782965b44866b087798e82ce531ef360ea9a325",
+      "evidence_file": "python-security-rea-2026-10-26.json.gz",
+      "compressed_sha256": "13a00b51c8d39e83646cef8528d1a7f939cf7ab48310b8e4adc820c09c8c0155",
+      "coverage": {
+        "status": "complete",
+        "objects": 1039,
+        "code_objects": 28,
+        "marshal_bytes": 20689,
+        "marshal_depth": 8
+      }
+    },
+    {
+      "source": "socify/schema.py",
+      "source_sha256": "51c199d6f73fd0c26ea1a55883280c4155fbfd5d0b41f75a45f96d5015d99811",
+      "pyc_sha256": "2c736efc96657dd56dc1b24997aabfe80d3c5a6a6f7db02d8b3f21d0169911e2",
+      "evidence_id": "ev_d2d7fae85922e86200153b1cded9a5d381bebe333585bf0feea0d90b3e733fd2",
+      "evidence_file": "python-schema-rea-2026-10-26.json.gz",
+      "compressed_sha256": "46925452670e0fea15689a46b8396b78e1a9efe3309d148031bf1e8136ae5e69",
+      "coverage": {
+        "status": "complete",
+        "objects": 649,
+        "code_objects": 13,
+        "marshal_bytes": 47153,
+        "marshal_depth": 5
+      }
+    },
+    {
+      "source": "socify/autopsy_chronology.py",
+      "source_sha256": "d0505223b62a89841d1c5c5791040915f6bc8b4300575bd862a4ae49df425230",
+      "pyc_sha256": "69c1c657b1c1847ac8986148b12ee42faab9eea7d2b01344c4c70be382366a5f",
+      "evidence_id": "ev_3f71ba51520bcbf6bad47d99f425306e0ffb7b2372079da724579ea806603fb8",
+      "evidence_file": "python-autopsy_chronology-rea-2026-10-26.json.gz",
+      "compressed_sha256": "04b746f0d04b7111e7de01ea269691a77e0ad6bf50252277fbb7f9ba481e023c",
+      "coverage": {
+        "status": "complete",
+        "objects": 612,
+        "code_objects": 12,
+        "marshal_bytes": 15520,
+        "marshal_depth": 6
+      }
+    },
+    {
+      "source": "socify/autopsy_worker.py",
+      "source_sha256": "00e9ab8a4e8540a0847a61822f48280b15e9207c6202090daec70719dc2d0c9f",
+      "pyc_sha256": "012402f2556c1175324b3583da06fabee7662890ebcbfd385d87b9f932d62323",
+      "evidence_id": "ev_0346a48e463e578cbbe5808f98a9ba9d9bf18beed1a4fc631c9ef2974a6b61bf",
+      "evidence_file": "python-autopsy_worker-rea-2026-10-26.json.gz",
+      "compressed_sha256": "5483b00048e48e10fd17a19991dc5615f43634d06fb5d94bf49319dd996dc2fa",
+      "coverage": {
+        "status": "complete",
+        "objects": 537,
+        "code_objects": 9,
+        "marshal_bytes": 14605,
+        "marshal_depth": 5
+      }
+    }
+  ],
+  "limitations": [
+    "Bytecode is retained as length and SHA-256 only; this workflow does not decompile, disassemble, or recover source.",
+    "The selected file is not executed and CPython is not invoked.",
+    "source_hash_hex is the PEP 552 header field; the original .py is not read.",
+    "python_version is the pinned CPython magic table for this header, not a runtime interpreter."
+  ],
+  "interpretation": "A bounded inventory of code objects, names and constants for the session, schema, chronology and isolated worker boundaries; complete marshal coverage is not source decompilation, vulnerability assessment or execution coverage."
+}

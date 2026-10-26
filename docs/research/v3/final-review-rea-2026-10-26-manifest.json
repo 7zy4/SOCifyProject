@@ -1,0 +1,49 @@
+{
+  "tool": "https://github.com/7zy4/rea",
+  "tool_commit": "2250e67bc271c83f9e200ee298aa04a2457438a6",
+  "inputs": {
+    "static/app.js": "25230863d809c7189b3e8da7c54d0b6b5a986926fd61c29c43e0dcac915d5e51",
+    "static/autopsy.js": "e786171b13b845f30a80719968c6d2cbff78b62db2fe3e5b64202f826ebf7ee3",
+    "static/autopsy_analysis.js": "6d2c7cfea7dd9d7b51eb6fff81145fcaf71cd229bdc362bd3c55ee6a9293004b",
+    "static/autopsy_data.js": "4b006d4456c19ff893bcf8ebbf776682aa3033c06cb06774a3bb2119a772218b",
+    "static/autopsy_investigation.js": "73da92bc10fbb5f53809bc16f52df7730d0f56a72c154af6d121bd3bc0733a64",
+    "static/autopsy_operations.js": "78c2180066747ab8e222a5d95aedfa739e34c390bf3662ebab852a4c5950ce92",
+    "static/autopsy_procedures.js": "7c4166e2fae81dd094a74b250726217fd892f7dafd3730d0cdf60e11dcb491c8",
+    "static/autopsy_profile.js": "55732e8361ce79081141a4584a543a3918b44388de8bfbe30a17fef3074bd990",
+    "static/autopsy_reports.js": "f08000dbae0a0b033805e460795db9789f5820b56c708bf2bc1a7f260048e2e1",
+    "static/autopsy_team.js": "30df8aea9ad8c76890712a50d9e3d4cc5c07e0eb67dcf5df5a99527d7892f1f7",
+    "static/register.js": "d40c7d22fcc3b711f5dc09f6e2a07b0f195fc3d36c9f91c9c8474405b587abc0",
+    "templates/app.html": "cc51bfde0417c33f8ebc81b054a47f32709d102e4f9c098330f6836248cd57af",
+    "templates/login.html": "23b5200086a8eb9ebe9f3bc74fc17d79924aacb5a1056291584f37b04ba11800",
+    "templates/register.html": "1e658312d7327129502146741db05aa06cae3682fa160754610c789e96af089e"
+  },
+  "date": "2026-10-26",
+  "source_revision": "50bf3e82acfdbf8ed05c5733b54261688771e078",
+  "evidence_id": "ev_401551e36f563a9cdb81742c47ed1b72f2baeb38a709eb346763aca48ebdf710",
+  "evidence_file": "socify-final-review-rea-2026-10-26.json.gz",
+  "compressed_sha256": "7ef9808c0e511e3e3b7247a87bf8406e73c043ed91d4b69d694c17302b15c3fe",
+  "statistics": {
+    "relevant_files": 14,
+    "nested_asar_containers": 0,
+    "text_bytes_read": 204976,
+    "invalid_utf8_files": 0,
+    "parsed_javascript_files": 11,
+    "skipped_javascript_files": 0,
+    "visited_ast_nodes": 29929,
+    "findings": 55,
+    "modules": 0,
+    "parse_failures": 0
+  },
+  "integrity_contradictions": [],
+  "semantic_unknowns": 5914,
+  "route_unknowns": 4,
+  "limitations": [
+    "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+    "Graph coverage is incomplete; unavailable facts remain explicit and must not be read as absence.",
+    "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+    "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+    "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+    "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
+  ],
+  "interpretation": "Actual current UI execution of the user REA fork. Static syntax recovery does not establish secure behavior, semantic equivalence or commercial product parity; API, security, browser, native isolation and load tests provide independent runtime evidence."
+}

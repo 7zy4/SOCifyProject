@@ -1,0 +1,49 @@
+{
+  "schema": "socify-bilingual-report-layout/1",
+  "synthetic_only": true,
+  "revision": "558cc333d85347dd20b11428ab8700222b1b414a",
+  "fixture": "255-character unbroken wide title",
+  "renderer_sources": {
+    "socify/autopsy_report_render.py": "0f92318699bdb96364e640cc3864e1cae921f33aa25b7f66443c0d92ca45c31a",
+    "socify/report_brand.py": "a92a1e298dc310dbfac9415eb252d187ee1b7d3534507369d6de3ba3eac55016",
+    "static/report.css": "7de562a5506254822eab2c5ce18cf61c37fec0a1c15818a445177416b9a99e43"
+  },
+  "renderer": "Actual network-isolated analysis service, five output formats",
+  "files": {
+    "json": {
+      "bytes": 28771,
+      "sha256": "225ddc0fd8c6338c48dd5408e6d878dbaf52908a6961f041467824fcfc57746a"
+    },
+    "html": {
+      "bytes": 386423,
+      "sha256": "1f586a26864dcfe3d93c34ed287efc58fc67b2047c4709f66e29bccffba57711"
+    },
+    "md": {
+      "bytes": 32263,
+      "sha256": "c29649a56d2fd6c6c3775cb3d2938da06311d3ddbfe71073ca8212630feb25f2"
+    },
+    "docx": {
+      "bytes": 39369,
+      "sha256": "eb6408c95cd82b416ee5611d6300faf58671f5712b5caef2325121a429a97de6"
+    },
+    "pdf": {
+      "bytes": 48295,
+      "sha256": "bb341527b30d08a21f0ca0bbaf224746ec75a26278be6085cc051d4035e7c5f5"
+    }
+  },
+  "visual_review": {
+    "status": "PASS",
+    "date": "2026-10-26",
+    "method": "Direct rendered-page inspection of the bilingual cover, middle and final pages and all-page contact sheet; separate inspection of the 255-character wide-title cover. Poppler geometry checks every page. No sampled screenshot establishes all possible content layouts.",
+    "images": {
+      "page-1.png": "9cf4c61d5581e6e82e60a8a64e265821d3ad2c829effde3e3d0fde02b77fa462"
+    }
+  },
+  "geometry": {
+    "pages": 24,
+    "words_checked": 2881,
+    "clipped_words": 0,
+    "empty_pages": [],
+    "scope": "Poppler word bounds on every page; visual review remains a separate recorded check."
+  }
+}

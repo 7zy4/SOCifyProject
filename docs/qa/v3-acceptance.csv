@@ -32,7 +32,7 @@ V3-E30,إحالة مستقلة من الاستجابة إلى المحقق مع 
 V3-E31,رفض/إعادة تصعيد وتسليم مناوبة دون فقد المسؤول السابق,VERIFIED,tests/integration/test_autopsy_yara_handoff.py; tests/e2e/test_autopsy_operations_browser.py,
 V3-E32,حساب الأزمنة مع UTC وDST وطوابع ناقصة/مستقبلية,VERIFIED,tests/integration/test_autopsy_workflow_completion.py,
 V3-E33,SLA وتوقف مسبب وتنبيه داخلي وصلاحيات تجاوز,VERIFIED,tests/integration/test_autopsy_workflow_completion.py,
-V3-E34,خط زمني من سجلات وملاحظات وإجراءات مع مصدر ودقة الوقت,PARTIAL,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,"Complete and verify a single chronological view combining logs, investigator notes and response actions with source time precision"
+V3-E34,خط زمني من سجلات وملاحظات وإجراءات مع مصدر ودقة الوقت,VERIFIED,tests/integration/test_autopsy_chronology.py; tests/e2e/test_autopsy_navigation_state.py::test_combined_timeline_renders_source_observation_action_notes_and_unknown_clock; docs/qa/v3-report-layout-2026-10-26/bilingual/manifest.json,
 V3-E35,فرضيات وأدلة مؤيدة/ناقضة وتصحيح بإصدار,VERIFIED,tests/integration/test_autopsy_remaining_journeys.py,
 V3-E36,ربط ATT&CK محليًا بإصدار وثقة ودليل، دون إنترنت,VERIFIED,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,
 V3-E37,سبب جذري وعوامل مساهمة وأثر وتوصيات مرتبطة,VERIFIED,tests/integration/test_autopsy_connected_facts.py,
@@ -46,7 +46,7 @@ V3-E44,حجر عينة ورفض عرض نشط/تنزيل بلا صلاحية و�
 V3-E45,تحليل محلي اصطناعي بحدود موارد وعدم وجود egress,VERIFIED,tests/security/test_autopsy_analysis_boundary.py; tests/integration/test_autopsy_yara_handoff.py,
 V3-E46,تقرير تنفيذي وفني مكتمل آليًا بمراجع الأدلة والقرارات,VERIFIED,tests/integration/test_autopsy_reports.py; tests/security/test_autopsy_report_security.py,
 V3-E47,اعتماد تقرير بإصدار وبصمة ثم إصدار جديد مع حفظ القديم,VERIFIED,tests/integration/test_autopsy_procedures.py; tests/integration/test_autopsy_reports.py; tests/e2e/test_autopsy_browser.py,
-V3-E48,PDF/HTML عربي إنجليزي طويل بلا تداخل أو قص أو طلبات شبكة,PARTIAL,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,"Retain a long bilingual PDF/HTML visual review across page breaks, tables, mixed direction text and large values"
+V3-E48,PDF/HTML عربي إنجليزي طويل بلا تداخل أو قص أو طلبات شبكة,VERIFIED,tests/container/verify_report_layout.py; docs/qa/v3-report-layout-2026-10-26/bilingual/manifest.json; docs/qa/v3-report-layout-2026-10-26/wide-title/manifest.json,
 V3-E49,منع الإغلاق قبل الحد الأدنى، ثم إغلاق وإعادة فتح بسبب,VERIFIED,tests/integration/test_autopsy_procedures.py; tests/integration/test_autopsy_reports.py; tests/e2e/test_autopsy_browser.py,
 V3-E50,تعديل متزامن من مستخدمين ورفض الكتابة القديمة دون فقد بيانات,VERIFIED,tests/integration/test_autopsy_remaining_journeys.py,
 V3-E51,دعوة/إيقاف عضو وسحب جلساته وتسليم مهامه,VERIFIED,docs/qa/v3-investigation-local-analysis-2026-10-25.md; tests/e2e/test_autopsy_browser.py,
