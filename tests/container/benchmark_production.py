@@ -190,7 +190,10 @@ def tls_proxy(upstream_port):
             def log_message(self, *_args):
                 return
 
-        server = ThreadingHTTPServer(("127.0.0.1", 0), Proxy)
+        class CapacityServer(ThreadingHTTPServer):
+            request_queue_size = 128
+
+        server = CapacityServer(("127.0.0.1", 0), Proxy)
         server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         server_context.minimum_version = ssl.TLSVersion.TLSv1_2
         server_context.load_cert_chain(cert_path, private_path)
