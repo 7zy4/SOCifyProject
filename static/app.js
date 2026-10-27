@@ -121,12 +121,12 @@ function emptyState(title, description, actions = []) {
 }
 
 function table(columns, rows) {
-  const head = node("thead", {}, node("tr", {}, columns.map((column) => node("th", { text: column.label, scope: "col" }))));
+  const head = node("thead", {}, node("tr", {}, columns.map((column) => node("th", { text: column.label, scope: "col", class: rows.some((row) => typeof (typeof column.value === "string" ? row[column.value] : undefined) === "number") ? "numeric-cell" : "" }))));
   const body = node("tbody");
   rows.forEach((row) => {
     body.append(node("tr", {}, columns.map((column) => {
       const value = typeof column.value === "function" ? column.value(row) : row[column.value];
-      return node("td", {}, value instanceof Node ? value : value == null || value === "" ? "—" : String(value));
+      return node("td", { class: typeof value === "number" ? "numeric-cell" : "" }, value instanceof Node ? value : value == null || value === "" ? "—" : String(value));
     })));
   });
   return node("div", { class: "table-wrap", tabindex: "0", role: "region", "aria-label": SOCifyLocale.template`جدول بيانات: ${columns.map((column) => column.label).join(SOCifyLocale.text("، "))}` }, node("table", {}, [head, body]));
@@ -866,5 +866,16 @@ menu.addEventListener("click", () => {
   const open = sidebar.classList.toggle("open");
   menu.setAttribute("aria-expanded", String(open));
 });
+function closeNavigation() {
+  document.querySelector(".sidebar").classList.remove("open");
+  menu.setAttribute("aria-expanded", "false");
+}
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && document.querySelector(".sidebar.open")) { closeNavigation(); menu.focus(); }
+});
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".sidebar, #menu-toggle")) closeNavigation();
+});
+
 
 document.addEventListener("DOMContentLoaded", () => initialize().catch(handleError), { once: true });

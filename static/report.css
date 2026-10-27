@@ -1,39 +1,41 @@
-@page { size: 595pt 842pt; margin: 42pt 44pt 40pt; background: #FBF7F0; @bottom-right { content: counter(page); font: 400 11pt "IBM Plex Sans Arabic"; color: #4A5A7A; } }
+@page { size: 595pt 842pt; margin: 42pt 44pt 40pt; background: #FFFFFF; @bottom-right { content: counter(page); font: 400 11pt "IBM Plex Sans Arabic"; color: #4A5A7A; } }
 @page:first { @bottom-right { content: none; } }
 * { box-sizing: border-box; }
-html { background: #C9D1DE; color: #1D3461; font: 400 17pt/1.6 "IBM Plex Sans Arabic"; }
-body { max-width: 595pt; margin: 24pt auto; padding: 42pt 44pt 40pt; background: #FBF7F0; overflow-wrap: anywhere; }
-h1, h2, h3 { font-family: "Baloo Bhaijaan 2"; font-weight: 800; line-height: 1.2; color: #1C4286; margin: 0 0 17pt; }
-h1 { font-size: 30pt; } h2 { font-size: 30pt; margin-block-start: 24pt; break-after: avoid; } h3 { font-size: 20pt; }
+html { background: #C9D1DE; color: #142B49; font: 400 17pt/1.6 "IBM Plex Sans Arabic"; }
+body { max-width: 595pt; margin: 24pt auto; padding: 42pt 44pt 40pt; background: #FFFFFF; overflow-wrap: anywhere; }
+h1, h2, h3 { font-family: "IBM Plex Sans Arabic"; font-weight: 700; line-height: 1.6; color: #142B49; margin: 0 0 17pt; }
+h1 { font-size: 28pt; } h2 { font-size: 24pt; margin-block-start: 24pt; break-after: avoid; } h3 { font-size: 20pt; }
 p { margin: 0 0 17pt; }
 strong, dt { font-weight: 700; }
-a { color: #1C4286; }
-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; border: 3pt solid #1C4286; border-radius: 18pt; margin-block: 17pt; font-size: 14pt; }
+a { color: #142B49; }
+table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; border: 3pt solid #142B49; border-radius: 18pt; margin-block: 17pt; font-size: 14pt; }
 th, td { padding: 12pt; border-bottom: 1pt solid #B9C8E4; text-align: start; overflow-wrap: anywhere; vertical-align: top; font-size: 14pt; }
-th { font-weight: 700; background: #E4ECF8; }
+th { font-weight: 700; background: #EDF1F7; }
 tr:last-child td, tr:last-child th { border-bottom: 0; }
 thead { display: table-header-group; }
 tr { break-inside: avoid; }
-.report-record { border: 3pt solid #1C4286; border-radius: 18pt; padding: 12pt; margin-block: 17pt; break-inside: avoid-page; }
+.report-record { border: 3pt solid #142B49; border-radius: 18pt; padding: 12pt; margin-block: 17pt; break-inside: avoid-page; }
 .report-record dl { margin: 0; font-size: 14pt; }
-.report-record dt { color: #1C4286; margin-block-start: 10pt; break-after: avoid; }
+.report-record dt { color: #142B49; margin-block-start: 10pt; break-after: avoid; }
 .report-record dd { margin: 0 0 10pt; white-space: pre-wrap; overflow-wrap: anywhere; }
 .report-section { break-before: page; }
 .report-section h2 { margin-block-start: 0; }
-.report-cover { background: #1C4286; color: #FFFFFF; padding: 24pt; border-radius: 26pt; margin-block-end: 17pt; }
+.report-cover { background: #142B49; color: #FFFFFF; padding: 24pt; border-radius: 26pt; margin-block-end: 17pt; }
 .report-cover h1, .report-cover h2 { color: #FFFFFF; }
-.report-cover h1 { font-size: 48pt; line-height: 1.1; }
-.report-note { background: #E4ECF8; color: #1D3461; border: 3pt solid #1C4286; border-radius: 16pt; padding: 12pt; font-size: 14pt; }
+.report-cover h1 { font-size: 30pt; line-height: 1.5; }
+.report-note { background: #EDF1F7; color: #142B49; border: 3pt solid #142B49; border-radius: 16pt; padding: 12pt; font-size: 14pt; }
 pre, code { font: 400 14pt/1.6 "IBM Plex Sans Arabic"; white-space: pre-wrap; overflow-wrap: anywhere; }
 [dir="ltr"] h1, [dir="ltr"] h2 { letter-spacing: -.005em; }
 @media (max-width: 700px) { body { margin: 0; padding: 24pt 12pt; } }
-@media print { html, body { background: #FBF7F0; } body { width: auto; max-width: none; padding: 0; margin: 0; } }
+@media print { html, body { background: #FFFFFF; } body { width: auto; max-width: none; padding: 0; margin: 0; } }
 
-.report-outline { border: 2pt solid #1C4286; border-radius: 18pt; padding: 17pt; margin-block: 24pt; background: #FFFFFF; }
+.report-outline { border: 2pt solid #142B49; border-radius: 18pt; padding: 17pt; margin-block: 24pt; background: #FFFFFF; }
 .report-outline h2 { font-size: 20pt; margin: 0 0 12pt; }
 .report-outline ul { padding-inline-start: 20pt; columns: 2; column-gap: 24pt; }
 .report-outline li { margin-block: 6pt; break-inside: avoid; font-size: 14pt; }
-.report-section h2 { border-block-end: 2pt solid #1C4286; padding-block-end: 10pt; }
+.report-section h2 { padding-block-start: 10pt; border-block-end: 2pt solid #142B49; padding-block-end: 10pt; }
 .report-section { scroll-margin-block-start: 17pt; }
 @media (max-width: 600px) { .report-outline ul { columns: 1; } }
 @media print { .report-outline { display: none; } }
+
+.report-logo { display: block; width: 150pt; height: 50pt; object-fit: contain; padding: 5pt; background: #FFFFFF; border-radius: 6pt; margin-block-end: 16pt; }

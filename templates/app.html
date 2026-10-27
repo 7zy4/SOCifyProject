@@ -2,6 +2,9 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
+  <meta name="theme-color" content="#F3F5F9">
+  <link rel="icon" href="{{ url_for('static', filename='brand/socify-symbol.svg') }}" type="image/svg+xml">
+  <link rel="preload" href="{{ url_for('static', filename='fonts/IBMPlexSansArabic-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
   <script src="{{ url_for('static', filename='localization.js') }}"></script>
   <meta name="description" content="SOCify منصة تحليل الحوادث والتحقيق وإصدار التقارير" data-ui-attributes>
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,8 +21,8 @@
 <body class="app-shell{{ ' autopsy-shell' if operational else '' }}">
   <a class="skip-link" href="#workspace" data-ui-copy>انتقل إلى مساحة العمل</a>
   {% if operational %}<script src="{{ url_for('static', filename='autopsy_team.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_investigation.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_profile.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_operations.js') }}" defer></script>{% endif %}
-  <aside class="sidebar" aria-label="تنقل المنصة" data-ui-attributes>
-    <a class="brand" href="{{ '/cases' if operational else '/dashboard' }}"><span class="brand-mark" aria-hidden="true">S</span><span dir="ltr">{{ product_name }}</span></a>
+  <aside id="workspace-navigation" class="sidebar" aria-label="تنقل المنصة" data-ui-attributes>
+    <a class="brand" aria-label="{{ product_name }}" translate="no" href="{{ '/cases' if operational else '/dashboard' }}"><img class="brand-logo" src="{{ url_for('static', filename='brand/socify-logo.png') }}" width="180" height="60" alt="SOCify" translate="no"></a>
     <nav id="primary-nav">
       {% if operational %}
       <a data-section="cases" href="/cases" data-ui-copy>القضايا</a>
@@ -41,16 +44,16 @@
       <a data-section="graph" href="/graph" data-ui-copy><span aria-hidden="true">⌘</span>الرسم الزمني</a>
       <a data-section="playbooks" href="/playbooks"><span aria-hidden="true">▷</span>Playbooks</a>
       <a data-section="scores" href="/scores" data-ui-copy><span aria-hidden="true">⌁</span>التقييم</a>
-      <a data-section="audit" href="/audit" data-ui-copy><span aria-hidden="true">✓</span>التدقيق</a>
-      <a data-section="admin" href="/admin" data-ui-copy><span aria-hidden="true">⚙</span>الإدارة</a>
-      <a data-section="team" href="/team" data-ui-copy><span aria-hidden="true">♧</span>الفريق والمهام</a>
+      <a data-section="audit" href="/audit" data-ui-copy>التدقيق</a>
+      <a data-section="admin" href="/admin" data-ui-copy>الإدارة</a>
+      <a data-section="team" href="/team" data-ui-copy>الفريق والمهام</a>
       {% endif %}
     </nav>
     <div class="sidebar-foot"><span class="status-dot" aria-hidden="true"></span><span data-ui-copy>{{ 'تحليل داخلي · إثراء محلي' if operational else 'تحليل الحوادث والتحقيق والتقارير' }}</span></div>
   </aside>
   <div class="app-main">
     <header class="topbar">
-      <button id="menu-toggle" class="icon-button" type="button" aria-label="فتح القائمة" aria-expanded="false" data-ui-attributes>☰</button>
+      <button id="menu-toggle" aria-controls="workspace-navigation" class="icon-button" type="button" aria-label="فتح القائمة" aria-expanded="false" data-ui-attributes><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
       <div><p id="section-kicker" class="eyebrow">Incident investigation</p><h1 id="section-title" data-ui-copy>مركز العمليات</h1></div>
       <button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button>
       <div class="user-menu"><span><strong>{{ user.name }}</strong><small>{{ user.role }} · {{ user.team or '—' }}</small></span><a class="avatar" href="/profile" aria-label="الملف الشخصي" data-ui-attributes>{{ user.name[:1] }}</a><form method="post" action="{{ url_for('auth.logout_page') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button ghost compact" type="submit" data-ui-copy>خروج</button></form></div>

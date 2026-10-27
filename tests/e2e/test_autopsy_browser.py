@@ -205,6 +205,8 @@ def test_local_sample_manual_reputation_and_team_assignment_browser(app):
             page.set_viewport_size({"width": 360, "height": 1000})
             assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
             assert errors == []
+            page.get_by_role("button", name="فتح القائمة", exact=True).click()
+            assert page.locator("#menu-toggle").get_attribute("aria-expanded") == "true"
             page.get_by_role("link", name="الفريق", exact=True).click()
             page.locator("input[name=email]").fill("invited-investigator@example.test")
             page.locator("input[name=role]").fill("محقق")

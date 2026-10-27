@@ -9,6 +9,23 @@ from socify.autopsy_report_render import FORMATS, lines, render_files
 from socify.autopsy_worker import deny_network, run_autopsy_worker_once
 
 
+def test_only_bundled_brand_image_can_be_resolved_in_reports():
+    from weasyprint.urls import URLFetchingError
+
+    from socify.autopsy_report_render import bundled_report_asset_fetcher, render_docx, render_html
+    from socify.report_brand import report_logo
+
+    payload = {"case": {"title": "Retained case evidence", "reference": "CASE-BRAND"}, "revision": 1}
+    document = render_html(payload)
+    assert report_logo() in document
+    assert bundled_report_asset_fetcher(report_logo()).content_type == "image/png"
+    for destination in ("https://example.test/logo.png", "file:///etc/passwd", "data:image/png;base64,dW50cnVzdGVk"):
+        with pytest.raises(URLFetchingError):
+            bundled_report_asset_fetcher(destination)
+    with zipfile.ZipFile(io.BytesIO(render_docx(payload))) as archive:
+        assert any(name.startswith("word/media/") for name in archive.namelist())
+
+
 def test_rendered_reports_escape_active_content_and_never_resolve_network(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "font-cache"))
     monkeypatch.setattr(socket, "create_connection", deny_network)
@@ -34,7 +51,7 @@ def test_rendered_reports_escape_active_content_and_never_resolve_network(monkey
         assert b"&lt;script" in archive.read("word/document.xml")
         assert b'TargetMode="External"' not in archive.read("word/_rels/document.xml.rels")
         assert b'w:cs="IBM Plex Sans Arabic"' in archive.read("word/styles.xml")
-        assert b'w:cs="Baloo Bhaijaan 2"' in archive.read("word/styles.xml")
+        assert b'w:cs="IBM Plex Sans Arabic"' in archive.read("word/styles.xml")
     assert list(lines(None)) == [(0, "غير مسجل")]
     assert list(lines([])) == [(0, "لا توجد عناصر مسجلة")]
     with pytest.raises(PermissionError):

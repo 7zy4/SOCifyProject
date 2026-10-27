@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 from .autopsy_domain import canonical
-from .report_brand import report_style
+from .report_brand import report_logo, report_style
 
 FORMATS = {
     "json": "application/json",
@@ -253,24 +253,26 @@ def render_html(payload) -> str:
         content.append(f'<section id="report-section-{index}" class="report-section"><h2>{html.escape(title)}</h2>{rows}</section>')
     digest = hashlib.sha256(canonical(payload).encode()).hexdigest()
     title_class = ' class="report-title-long"' if len(case["title"]) > 100 else ""
-    cover = f'<header class="report-cover"><p dir="ltr">SOCify Digital Autopsy</p><p>تقرير تحليل وتحقيق في حادثة أمنية</p><h1{title_class}><bdi dir="auto">{html.escape(display(case["title"]))}</bdi></h1><p><bdi dir="ltr">{html.escape(case["reference"])}</bdi> · الإصدار {payload["revision"]}</p></header><p class="report-note">نسخة ثابتة من بيانات القضية عند إعدادها. اعتماد هذه النسخة محفوظ منفصلًا في سجل المنصة. البصمة أدناه تخص JSON المعياري، لا بايتات PDF.</p><p dir="ltr">SHA-256: <bdi>{digest}</bdi></p>'
+    cover = f'<header class="report-cover"><img class="report-logo" src="{report_logo()}" width="180" height="60" alt="SOCify"><p dir="ltr">SOCify Digital Autopsy</p><p>تقرير تحليل وتحقيق في حادثة أمنية</p><h1{title_class}><bdi dir="auto">{html.escape(display(case["title"]))}</bdi></h1><p><bdi dir="ltr">{html.escape(case["reference"])}</bdi> · الإصدار {payload["revision"]}</p></header><p class="report-note">نسخة ثابتة من بيانات القضية عند إعدادها. اعتماد هذه النسخة محفوظ منفصلًا في سجل المنصة. البصمة أدناه تخص JSON المعياري، لا بايتات PDF.</p><p dir="ltr">SHA-256: <bdi>{digest}</bdi></p>'
     navigation = '<nav class="report-outline" aria-label="أقسام التقرير"><h2>محتويات التقرير</h2><ul>' + "".join(outline) + "</ul></nav>"
     style = (
         report_style()
-        + ".report-cover{break-inside:avoid}.report-cover h1.report-title-long{font-size:24pt;line-height:1.1}.report-section{break-before:auto}.report-section:first-of-type{break-before:page}.report-line{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 10pt;font-size:14pt}.depth-1{padding-inline-start:10pt}.depth-2,.depth-3{padding-inline-start:18pt}"
+        + ".report-cover{break-inside:avoid}.report-cover h1.report-title-long{font-size:20pt;line-height:1.5}.report-section{break-before:auto}.report-section:first-of-type{break-before:page}.report-line{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 10pt;font-size:14pt}.depth-1{padding-inline-start:10pt}.depth-2,.depth-3{padding-inline-start:18pt}"
     )
-    return f'<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{html.escape(case["reference"])}</title><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; font-src data:"><style>{style}</style></head><body>{cover}{navigation}{"".join(content)}</body></html>'
+    return f'<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{html.escape(case["reference"])}</title><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; font-src data:; img-src data:"><style>{style}</style></head><body>{cover}{navigation}{"".join(content)}</body></html>'
 
 
-def local_font_fetcher(url, timeout=10, ssl_context=None):
-    from weasyprint.urls import URLFetchingError
+def bundled_report_asset_fetcher(url, timeout=10, ssl_context=None):
+    from weasyprint.urls import URLFetcherResponse, URLFetchingError
 
     root = Path(__file__).resolve().parent.parent / "static" / "fonts"
     for filename in ("BalooBhaijaan2.woff2", "IBMPlexSansArabic-Regular.woff2", "IBMPlexSansArabic-Bold.woff2"):
         content = (root / filename).read_bytes()
         if url == "data:font/woff2;base64," + base64.b64encode(content).decode():
-            return {"string": content, "mime_type": "font/woff2"}
-    raise URLFetchingError("Only bundled SOCify report fonts are permitted")
+            return URLFetcherResponse(url, body=content, headers={"Content-Type": "font/woff2"})
+    if url == report_logo():
+        return URLFetcherResponse(url, body=base64.b64decode(url.split(",", 1)[1]), headers={"Content-Type": "image/png"})
+    raise URLFetchingError("Only bundled SOCify report fonts and logo are permitted")
 
 
 def render_docx(payload) -> bytes:
@@ -285,15 +287,16 @@ def render_docx(payload) -> bytes:
     section.top_margin, section.bottom_margin = Pt(42), Pt(40)
     section.left_margin, section.right_margin = Pt(44), Pt(44)
     normal = document.styles["Normal"]
-    normal.font.name, normal.font.size, normal.font.color.rgb = "IBM Plex Sans Arabic", Pt(14), RGBColor.from_string("1D3461")
+    normal.font.name, normal.font.size, normal.font.color.rgb = "IBM Plex Sans Arabic", Pt(14), RGBColor.from_string("142B49")
     for name in ("Title", "Heading 1", "Heading 2"):
-        document.styles[name].font.name = "Baloo Bhaijaan 2"
-        document.styles[name].font.color.rgb = RGBColor.from_string("1C4286")
+        document.styles[name].font.name = "IBM Plex Sans Arabic"
+        document.styles[name].font.color.rgb = RGBColor.from_string("255DD9")
         document.styles[name].font.bold = True
-        document.styles[name].font.size = Pt({"Title": 48, "Heading 1": 30, "Heading 2": 20}[name])
+        document.styles[name].font.size = Pt({"Title": 28, "Heading 1": 24, "Heading 2": 18}[name])
     for name in ("Normal", "Title", "Heading 1", "Heading 2"):
-        family = "IBM Plex Sans Arabic" if name == "Normal" else "Baloo Bhaijaan 2"
+        family = "IBM Plex Sans Arabic"
         document.styles[name].element.get_or_add_rPr().get_or_add_rFonts().set(qn("w:cs"), family)
+    document.add_picture(io.BytesIO(base64.b64decode(report_logo().split(",", 1)[1])), width=Pt(120))
     document.add_heading("SOCify Digital Autopsy", 0)
     document.add_heading(display(payload["case"]["title"]), 1)
     document.add_paragraph(f"{payload['case']['reference']} · {payload['revision']}")
@@ -332,5 +335,5 @@ def render_files(payload):
         "html": html_document.encode(),
         "md": "\n".join(markdown).encode(),
         "docx": render_docx(payload),
-        "pdf": HTML(string=html_document, url_fetcher=local_font_fetcher).write_pdf(),
+        "pdf": HTML(string=html_document, url_fetcher=bundled_report_asset_fetcher).write_pdf(),
     }

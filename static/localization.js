@@ -9,6 +9,7 @@
   document.documentElement.lang = language;
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
   const english = {
+    "التقارير": "Reports",
     "القضايا": "Cases",
     "مهامي": "My tasks",
     "الفريق": "Team",
@@ -24,7 +25,7 @@
     "خروج": "Sign out",
     "جارٍ تحميل البيانات المصرّح بها…": "Loading authorized data…",
     "انتقل إلى النموذج": "Skip to form",
-    "من الأدلة إلى تحقيق موثق": "From evidence to a documented investigation",
+    "من الأدلة إلى تحقيق موثق": "Investigate with evidence",
     "مساحة عمل داخلية للتحليل والتحقيق والاستجابة والتقارير. استخدم حساب فريقك المصرح به.": "An internal workspace for analysis, investigation, response and reporting. Use your authorized team account.",
     "جلسات محمية · MFA متاح · Default deny": "Protected sessions · MFA available · Default deny",
     "دخول آمن": "Secure sign-in",

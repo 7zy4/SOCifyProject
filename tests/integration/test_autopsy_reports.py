@@ -7,7 +7,7 @@ import zipfile
 import pytest
 
 from socify.autopsy_domain import canonical
-from socify.autopsy_report_render import local_font_fetcher
+from socify.autopsy_report_render import bundled_report_asset_fetcher
 from socify.autopsy_reports import case_metrics, duration
 from socify.autopsy_worker import run_autopsy_worker_once
 
@@ -225,7 +225,7 @@ def test_renderer_rejects_every_unbundled_resource(url):
     from weasyprint.urls import URLFetchingError
 
     with pytest.raises(URLFetchingError):
-        local_font_fetcher(url)
+        bundled_report_asset_fetcher(url)
 
 
 def test_evidence_based_metrics_do_not_invent_unknown_or_negative_durations():
