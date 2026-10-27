@@ -1,0 +1,14 @@
+# Design research and feature decisions
+
+The user's LetsDefend screenshot is the primary visual reference: a stable application shell, ordered security-tool navigation, three alert channels and a table that exposes details when needed. SOCify adopts that organization with its own wordmark, palette, languages and real operational capabilities.
+
+| Primary source | Observed principle | SOCify decision |
+|---|---|---|
+| [LetsDefend official Incident Response documentation](https://letsdefend.io/blog/incident-response-edition-documentation) | Monitoring, case investigation and endpoint tooling are distinct parts of a response workflow. Training and live endpoint access are separate capabilities. | Give tools their own navigation entries, preserve case context, and state the actual limits of recorded assets and static analysis. |
+| [IBM Carbon data table guidelines](https://www.carbondesignsystem.com/building-blocks/core/components/data-table/guidelines) | Tables support task-oriented search/filter toolbars, disclosure and pagination. | Put triage controls directly above alerts, expand one row's context on demand, and paginate server results. Avoid a decorative KPI wall above the work queue. |
+| [GitLab Pajamas layout](https://design.gitlab.com/product-foundations/layout/) | Persistent application navigation and contextual content should have a predictable structural relationship; responsive reflow should retain hierarchy. | Retain one shell and a clearly identified case context rather than overlapping independent windows. Use a mobile drawer while keeping the main task accessible. |
+| [Vercel Web Interface Guidelines](https://github.com/vercel-labs/web-interface-guidelines) | Semantic controls, deep links, visible focus, safe content handling, reduced motion and theme-aware native controls improve interaction quality. | Use native links/buttons, URL-backed filters and case selection, local fonts, internal table overflow, safe DOM text and explicit asynchronous states. |
+
+These are published design systems and product documentation. Their authorship or documentation cannot establish that AI was never used anywhere in their production. No such claim is made. The rejection of generic AI-looking output is implemented through concrete constraints: one action accent, a legible data hierarchy, no stock cyber art, decorative glow, repetitive feature cards, meaningless metrics or nonfunctional controls.
+
+The full gap analysis, role matrix, dimensions, color values, contracts and execution order are in the [corrective prompt](soc-workbench-corrective-prompt.md). Existing training scores/courses, live EDR isolation and dynamic malware execution are not fabricated to fill reference navigation. Email MIME inspection and a scoped cross-case monitoring queue are actual new functions, backed by tests and the retained evidence model.

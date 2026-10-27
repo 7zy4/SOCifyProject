@@ -199,3 +199,26 @@ def activate_import(job, actor: int | None = None) -> None:
         actor=actor if actor is not None else actor_id(),
     )
     touch_case(job["case_id"])
+
+
+def full_case_scope_sql(user: dict) -> tuple[str, list[object]]:
+    if _manager(user):
+        return "", []
+    return (
+        " AND NOT EXISTS ("
+        + """SELECT 1 FROM autopsy_batch_access a
+            CROSS JOIN ingestion_jobs j INDEXED BY idx_autopsy_import_scope ON j.id=a.job_id
+            WHERE a.restricted=1 AND j.created_by != ?
+            AND NOT EXISTS (SELECT 1 FROM autopsy_batch_members m WHERE m.job_id=j.id AND m.user_id=?)
+            AND (j.case_id=c.id
+                OR EXISTS (SELECT 1 FROM case_events ce WHERE ce.case_id=c.id AND ce.import_job_id=j.id)
+                OR EXISTS (SELECT 1 FROM case_evidence ev JOIN security_events e ON e.id=CAST(ev.reference_id AS INTEGER)
+                    WHERE ev.case_id=c.id AND ev.evidence_type='event' AND ev.reference_id=CAST(e.id AS TEXT) AND e.import_job_id=j.id)
+                OR EXISTS (SELECT 1 FROM case_alerts ca JOIN alert_events ae ON ae.alert_id=ca.alert_id
+                    JOIN security_events e ON e.id=ae.event_id WHERE ca.case_id=c.id AND e.import_job_id=j.id)
+                OR EXISTS (SELECT 1 FROM case_evidence ev JOIN alert_events ae ON ae.alert_id=CAST(ev.reference_id AS INTEGER)
+                    JOIN security_events e ON e.id=ae.event_id WHERE ev.case_id=c.id AND ev.evidence_type='alert'
+                    AND ev.reference_id=CAST(ae.alert_id AS TEXT) AND e.import_job_id=j.id)) LIMIT 1"""
+        + ")",
+        [user["id"], user["id"]],
+    )

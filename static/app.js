@@ -21,7 +21,7 @@ const titles = {
   attack: ["MITRE ATT&CK", "COVERAGE ANALYTICS"],
   hunt: [SOCifyLocale.text("مساحة الصيد"), "PARAMETERIZED HUNTING"],
   graph: [SOCifyLocale.text("الرسم والأثر الزمني"), "EVIDENCE VISUALIZATION"],
-  playbooks: [SOCifyLocale.text("خطط الاستجابة"), "SIMULATED SOAR"],
+  playbooks: [SOCifyLocale.text("كتيبات الاستجابة"), "RESPONSE PLAYBOOKS"],
   scores: [SOCifyLocale.text("التقييم والنتائج"), "ASSESSMENT ENGINE"],
   audit: [SOCifyLocale.text("سجل التدقيق"), "IMMUTABLE ACTIVITY"],
   admin: [SOCifyLocale.text("إدارة المنصة"), "ROLE GOVERNANCE"],

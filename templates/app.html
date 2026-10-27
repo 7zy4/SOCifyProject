@@ -3,7 +3,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="theme-color" content="#DDE2E9">
+  <meta name="theme-color" content="#F4F6FA">
 
   <link rel="preload" href="{{ url_for('static', filename='fonts/Almarai-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
   <script src="{{ url_for('static', filename='localization.js') }}"></script>
@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
   {% if operational %}<link rel="stylesheet" href="{{ url_for('static', filename='autopsy.css') }}">{% endif %}
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
-  {% if operational %}<script src="{{ url_for('static', filename='desktop.js') }}" defer></script>{% else %}<script src="{{ url_for('static', filename='window-controls.js') }}" defer></script>{% endif %}
+  {% if operational %}<script src="{{ url_for('static', filename='soc-workbench.js') }}" defer></script>{% endif %}
   {% if operational %}<script src="{{ url_for('static', filename='autopsy.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_data.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_procedures.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_reports.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_analysis.js') }}" defer></script>{% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='design-system.css') }}">
 </head>
@@ -28,14 +28,22 @@
   <a class="skip-link" href="#workspace" data-ui-copy>انتقل إلى مساحة العمل</a>
   {% if operational %}<script src="{{ url_for('static', filename='autopsy_team.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_investigation.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_profile.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_operations.js') }}" defer></script>{% endif %}
   <aside id="workspace-navigation" class="sidebar" aria-label="تنقل المنصة" data-ui-attributes>
-    <a class="brand" aria-label="{{ product_name }}" translate="no" href="{{ '/cases' if operational else '/dashboard' }}"><span class="brand-wordmark" lang="en" dir="ltr">SOCify</span></a>
+    <span class="sidebar-label" data-ui-copy>العمليات الأمنية</span>
     <nav id="primary-nav">
       {% if operational %}
-      <a data-section="cases" href="/cases" data-ui-copy>{{ nav_icon("cases") }}القضايا</a>
-      <a data-section="my-tasks" href="/my-tasks" data-ui-copy>{{ nav_icon("my-tasks") }}مهامي</a>
-      <a data-section="team" href="/team" data-ui-copy>{{ nav_icon("team") }}الفريق</a>
-      <a data-section="playbooks" href="/playbooks" data-ui-copy>{{ nav_icon("playbooks") }}كتيبات الاستجابة</a>
-      <a data-section="analysis-library" href="/analysis-library" data-ui-copy>{{ nav_icon("analysis-library") }}مكتبة التحليل المحلي</a>
+      <a data-section="monitoring" data-nav-permission="cases.read" href="/monitoring" data-ui-copy>{{ nav_icon("monitoring") }}المراقبة</a>
+      <a data-section="log-management" data-nav-permission="cases.read" href="/log-management" data-ui-copy>{{ nav_icon("log-management") }}إدارة السجلات</a>
+      <a data-section="cases" data-nav-permission="cases.read" href="/cases" data-ui-copy>{{ nav_icon("cases") }}إدارة القضايا</a>
+      <a data-section="endpoint-security" data-nav-permission="cases.read" href="/endpoint-security" data-ui-copy>{{ nav_icon("endpoint-security") }}أمن الأجهزة والأصول</a>
+      <a data-section="threat-intel" data-nav-permission="cases.read" href="/threat-intel" data-ui-copy>{{ nav_icon("threat-intel") }}استخبارات التهديدات</a>
+      <a data-section="email-security" data-nav-permission="cases.read" href="/email-security" data-ui-copy>{{ nav_icon("email-security") }}أمن البريد الإلكتروني</a>
+      <a data-section="sandbox" data-nav-permission="cases.read" href="/sandbox" data-ui-copy>{{ nav_icon("sandbox") }}تحليل العينات</a>
+      <span class="nav-group-label" data-ui-copy>مساحة العمل</span>
+      <a data-section="reports" data-nav-permission="cases.read" href="/reports" data-ui-copy>{{ nav_icon("reports") }}التقارير</a>
+      <a data-section="my-tasks" data-nav-permission="cases.read" href="/my-tasks" data-ui-copy>{{ nav_icon("my-tasks") }}مهامي</a>
+      <a data-section="playbooks" data-nav-permission="cases.read" href="/playbooks" data-ui-copy>{{ nav_icon("playbooks") }}كتيبات الاستجابة</a>
+      <a data-section="analysis-library" data-nav-permission="cases.read" href="/analysis-library" data-ui-copy>{{ nav_icon("analysis-library") }}مكتبة التحليل المحلي</a>
+      <a data-section="team" data-nav-permission="cases.read" href="/team" data-ui-copy>{{ nav_icon("team") }}الفريق</a>
       {% else %}
       <a data-section="dashboard" href="/dashboard" data-ui-copy><span aria-hidden="true">⌂</span>نظرة عامة</a>
       <a data-section="events" href="/events" data-ui-copy><span aria-hidden="true">≋</span>مستكشف السجلات</a>
@@ -55,19 +63,21 @@
       <a data-section="team" href="/team" data-ui-copy>{{ nav_icon("team") }}الفريق والمهام</a>
       {% endif %}
     </nav>
+    <a class="sidebar-account" href="/profile" data-ui-copy>الملف والأمان</a>
+    <form class="sidebar-logout" method="post" action="{{ url_for('auth.logout_page') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button ghost" type="submit" data-ui-copy>خروج</button></form>
     <div class="sidebar-foot"><strong translate="no">DIGITAL AUTOPSY</strong><span data-ui-copy>{{ 'تحليل داخلي · إثراء محلي' if operational else 'تحليل الحوادث والتحقيق والتقارير' }}</span></div>
   </aside>
   <div class="app-main">
     <header class="topbar">
       <button id="menu-toggle" aria-controls="workspace-navigation" class="icon-button" type="button" aria-label="فتح القائمة" aria-expanded="false" data-ui-attributes><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
-      <div><p id="section-kicker" class="eyebrow">Incident investigation</p><h1 id="section-title" data-ui-copy>مركز العمليات</h1></div>
-      <button class="button ghost compact workspace-focus" type="button" data-workspace-focus aria-pressed="false" data-ui-copy>توسيع مساحة العمل</button>
+      <a aria-label="{{ product_name }}" class="brand topbar-brand" href="{{ '/monitoring' if operational else '/dashboard' }}" translate="no"><span class="brand-wordmark" lang="en" dir="ltr">SOCify</span></a>
+      {% if operational %}<nav class="global-nav" aria-label="التنقل الرئيسي" data-ui-attributes><a href="/monitoring" data-global-section="operations" data-nav-permission="cases.read" data-ui-copy>العمليات</a><a href="/cases" data-global-section="cases" data-nav-permission="cases.read" data-ui-copy>القضايا</a><a href="/reports" data-global-section="reports" data-nav-permission="cases.read" data-ui-copy>التقارير</a></nav>{% endif %}
+      <div class="section-context sr-only"><p id="section-kicker" class="eyebrow">Incident investigation</p><h1 id="section-title" data-ui-copy>مركز العمليات</h1></div>
       <div class="appearance-tools"><div data-theme-control></div><button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button></div>
       <div class="user-menu"><span><strong>{{ user.name }}</strong><small><span data-user-role>{{ user.role }}</span> · {{ user.team or '—' }}</small></span><a class="avatar" href="/profile" aria-label="الملف الشخصي" data-ui-attributes>{{ user.name[:1] }}</a><form method="post" action="{{ url_for('auth.logout_page') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button ghost compact" type="submit" data-ui-copy>خروج</button></form></div>
     </header>
     <div id="global-message" class="global-message" role="status" aria-live="polite" hidden></div>
     <main id="workspace" tabindex="-1" aria-busy="true"><div class="loading"><span></span><p data-ui-copy>جارٍ تحميل البيانات المصرّح بها…</p></div></main>
   </div>
-  {% if operational %}<footer class="desktop-taskbar" aria-label="مساحات العمل" data-ui-attributes><span class="taskbar-brand" translate="no">SOCify</span><a href="/cases" data-ui-copy>ملفات القضايا</a><a href="/my-tasks" data-ui-copy>المهام المسندة</a><a href="/profile" data-ui-copy>الحساب والأمان</a></footer>{% endif %}
 </body>
 </html>

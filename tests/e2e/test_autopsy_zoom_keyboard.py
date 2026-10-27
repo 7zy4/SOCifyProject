@@ -36,7 +36,6 @@ def test_200_percent_zoom_keyboard_modal_and_searchable_choices(app, tmp_path, z
             else:
                 browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
                 page = browser.new_page(viewport={"width": 1440, "height": 1000})
-                page.add_init_script("sessionStorage.setItem('socify-desktop-layout','focus')")
             root = f"http://127.0.0.1:{server.server_port}"
             page.goto(root + "/login")
             page.locator("input[name=email]").fill("manager@socify.local")

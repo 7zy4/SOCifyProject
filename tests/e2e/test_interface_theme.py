@@ -23,7 +23,6 @@ def test_theme_system_persistence_languages_and_operational_surfaces(app):
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
             page = browser.new_page(viewport={"width": 1440, "height": 1000}, color_scheme="dark")
-            page.add_init_script("sessionStorage.setItem('socify-desktop-layout','focus')")
             page.add_init_script(path=str(Path("node_modules/axe-core/axe.min.js").resolve()))
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
@@ -59,6 +58,13 @@ def test_theme_system_persistence_languages_and_operational_surfaces(app):
             editor.get_by_role("button", name="حفظ", exact=True).click()
             page.locator(".case-overview").get_by_text(updated_objective, exact=True).wait_for()
             routes = ["/cases", "/my-tasks", "/team", "/playbooks", "/analysis-library", "/profile"]
+            routes += [
+                "/monitoring",
+                *[
+                    f"/{section}?case_id={case['id']}"
+                    for section in ("log-management", "endpoint-security", "threat-intel", "email-security", "sandbox", "reports")
+                ],
+            ]
             routes += [f"/cases/{case['id']}?tab={tab}" for tab in ("summary", "logs", "analysis", "investigation", "response", "activity", "reports")]
             for language in ("ar", "en"):
                 page.evaluate("language => localStorage.setItem('socify-interface-language', language)", language)
@@ -101,7 +107,6 @@ def test_theme_control_works_when_browser_storage_is_unavailable(app):
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
             page = browser.new_page(color_scheme="dark")
-            page.add_init_script("sessionStorage.setItem('socify-desktop-layout','focus')")
             page.add_init_script("Storage.prototype.getItem = Storage.prototype.setItem = () => { throw new Error('Storage unavailable'); };")
             page.goto(f"http://127.0.0.1:{server.server_port}/login")
             assert page.locator("html").get_attribute("data-theme") == "dark"
@@ -124,7 +129,6 @@ def test_public_pages_theme_typography_and_responsive_layout(app):
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
             page = browser.new_page(viewport={"width": 1440, "height": 1000})
-            page.add_init_script("sessionStorage.setItem('socify-desktop-layout','focus')")
             page.add_init_script(path=str(Path("node_modules/axe-core/axe.min.js").resolve()))
             base = f"http://127.0.0.1:{server.server_port}"
             page.goto(base + "/login")

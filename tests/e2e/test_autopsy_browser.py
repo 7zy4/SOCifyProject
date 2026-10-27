@@ -21,7 +21,6 @@ def test_case_first_operational_browser_with_csrf_and_mobile_layout(app):
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
             page = browser.new_page(viewport={"width": 1440, "height": 1000})
-            page.add_init_script("sessionStorage.setItem('socify-desktop-layout','focus')")
             page.add_init_script(path=str(Path("node_modules/axe-core/axe.min.js").resolve()))
             page.goto(f"http://127.0.0.1:{server.server_port}/login")
             page.locator("input[name=email]").fill("analyst@socify.local")
@@ -67,7 +66,6 @@ def test_manager_procedure_library_and_report_worker_browser(app):
         with local_worker_services(app.config), sync_playwright() as playwright:
             browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
             page = browser.new_page(viewport={"width": 1440, "height": 1000})
-            page.add_init_script("sessionStorage.setItem('socify-desktop-layout','focus')")
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.add_init_script(path=str(Path("node_modules/axe-core/axe.min.js").resolve()))
@@ -123,7 +121,6 @@ def test_local_sample_manual_reputation_and_team_assignment_browser(app):
         with local_worker_services(app.config), sync_playwright() as playwright:
             browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
             page = browser.new_page(viewport={"width": 1440, "height": 1000})
-            page.add_init_script("sessionStorage.setItem('socify-desktop-layout','focus')")
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.add_init_script(path=str(Path("node_modules/axe-core/axe.min.js").resolve()))
@@ -248,7 +245,6 @@ def test_case_import_preview_commit_and_export_browser(app):
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
             page = browser.new_page(viewport={"width": 1440, "height": 1000})
-            page.add_init_script("sessionStorage.setItem('socify-desktop-layout','focus')")
             page.add_init_script(path=str(Path("node_modules/axe-core/axe.min.js").resolve()))
             page.goto(f"http://127.0.0.1:{server.server_port}/login")
             page.locator("input[name=email]").fill("analyst@socify.local")

@@ -21,7 +21,6 @@ def test_language_toggle_persists_and_preserves_case_content(app, tmp_path):
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
             page = browser.new_page(viewport={"width": 1440, "height": 1000})
-            page.add_init_script("sessionStorage.setItem('socify-desktop-layout','focus')")
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             root = f"http://127.0.0.1:{server.server_port}"

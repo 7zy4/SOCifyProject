@@ -233,7 +233,7 @@ async function autopsyCases(page = null, query = null) {
   if (query) location.searchParams.set("q", query); else location.searchParams.delete("q");
   window.history.replaceState(null, "", location.pathname + location.search);
   begin("cases");
-  document.getElementById("section-title").textContent = SOCifyLocale.text("مركز العمليات");
+  document.getElementById("section-title").textContent = SOCifyLocale.text("إدارة القضايا");
   document.getElementById("section-kicker").textContent = "SOCIFY DIGITAL AUTOPSY";
   const data = await api(`/api/cases?page=${page}&page_size=25&q=${encodeURIComponent(query)}`);
   const search = node("input", { name: "q", type: "search", value: query, maxlength: 200, placeholder: SOCifyLocale.text("الاسم أو مرجع القضية") });
@@ -242,36 +242,6 @@ async function autopsyCases(page = null, query = null) {
   const root = node("div", { class: "cases-view" }, [pageHead(SOCifyLocale.text("قضايا الفريق"), SOCifyLocale.text("تجتمع الأدلة والتحليل والمسؤوليات والقرارات والتقرير داخل القضية نفسها."), permission("cases.create") ? [button(SOCifyLocale.text("إنشاء قضية"), autopsyNewCase, "primary")] : []), filters]);
   root.append(data.items.length ? table([{ label: SOCifyLocale.text("المرجع"), value: (row) => node("bdi", { class: "case-reference", text: row.reference }) }, { label: SOCifyLocale.text("القضية"), value: (row) => node("a", { class: "case-link", href: autopsyCaseURL(row.id, { list_q: query, list_page: page }), text: row.title }) }, { label: SOCifyLocale.text("الحالة"), value: (row) => autopsyBadge(row.status) }, { label: SOCifyLocale.text("الخطورة"), value: (row) => autopsyBadge(row.severity) }, { label: SOCifyLocale.text("الأدلة"), value: "evidence_count" }, { label: SOCifyLocale.text("المسؤول"), value: "assignee_name" }, { label: SOCifyLocale.text("فتح"), value: (row) => linkedButton(SOCifyLocale.text("فتح القضية"), autopsyCaseURL(row.id, { list_q: query, list_page: page })) }], data.items) : emptyState(SOCifyLocale.text("لا توجد قضايا في النطاق المصرح"), SOCifyLocale.text("أنشئ القضية باسم وسبب وهدف، ثم أضف الأدلة إلى مساحة التحقيق.")));
   root.querySelector(".table-wrap")?.classList.add("case-table");
-  if (data.items.length) {
-    const folders = node("div", { class: "case-folder-grid" });
-    for (const row of data.items) {
-      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      for (const [key, value] of Object.entries({ width: 52, height: 44, viewBox: "0 0 48 40", "aria-hidden": "true" })) svg.setAttribute(key, String(value));
-      const path = document.createElementNS(svg.namespaceURI, "path");
-      path.setAttribute("d", "M2 7h15l5 5h24v26H2Z M2 7V3h15l5 4");
-      path.setAttribute("fill", "currentColor");
-      svg.append(path);
-      folders.append(node("a", { class: "case-folder", href: autopsyCaseURL(row.id, { list_q: query, list_page: page }) }, [svg, node("bdi", { text: row.reference }), node("strong", { text: row.title }), node("small", { text: autopsyLabel(row.status) })]));
-    }
-    const tableView = root.querySelector(".case-table");
-    let selectedView = document.body.classList.contains("window-focused") || innerWidth < 1100 ? "table" : "folders";
-    try { const storedView = sessionStorage.getItem("socify-case-view"); if (["folders", "table"].includes(storedView)) selectedView = storedView; } catch (_) {}
-    const controls = node("div", { class: "case-view-controls", role: "group", "aria-label": SOCifyLocale.text("طريقة عرض القضايا") });
-    const updateView = view => {
-      selectedView = view;
-      folders.hidden = view !== "folders";
-      tableView.hidden = view !== "table";
-      controls.querySelectorAll("button").forEach(control => control.setAttribute("aria-pressed", String(control.dataset.view === view)));
-    };
-    for (const [view, title] of [["folders", SOCifyLocale.text("عرض المجلدات")], ["table", SOCifyLocale.text("عرض الجدول")]]) {
-      const control = button(title, () => { updateView(view); try { sessionStorage.setItem("socify-case-view", view); } catch (_) {} }, "ghost compact");
-      control.dataset.view = view;
-      controls.append(control);
-    }
-    root.insertBefore(controls, tableView);
-    root.insertBefore(folders, tableView);
-    updateView(selectedView);
-  }
   const pages = node("div", { class: "action-row pagination" }, node("p", { text: SOCifyLocale.template`${data.total} قضية · الصفحة ${page}` }));
   if (page > 1) pages.append(button(SOCifyLocale.text("السابق"), () => autopsyCases(page - 1, query).catch(handleError)));
   if (page * 25 < data.total) pages.append(button(SOCifyLocale.text("التالي"), () => autopsyCases(page + 1, query).catch(handleError)));
@@ -288,7 +258,7 @@ function autopsyRecordCard(record) {
     values.append(node("dt", { text: autopsyLabel(key) }), node("dd", { text: display }));
   });
   const card = node("article", { class: "card record-card" }, [node("h3", { text: record.payload.title || record.payload.name || autopsyLabel(record.kind) }), values, node("small", { text: SOCifyLocale.template`الإصدار ${record.version} · ${formatTime(record.updated_at)}` })]);
-  if (autopsy.current.can_update && autopsy.catalog.record_schemas[record.kind]) card.append(button(SOCifyLocale.text("تعديل"), () => autopsyEditRecord(record.kind, record)));
+  if (autopsy.current.can_update && autopsy.current.status !== "closed" && autopsy.catalog.record_schemas[record.kind]) card.append(button(SOCifyLocale.text("تعديل"), () => autopsyEditRecord(record.kind, record)));
   if (record.kind === "analysis" && record.payload.analysis_type === "local_detection" && record.payload.next_after_id && autopsy.current.can_update && autopsy.current.status !== "closed") card.append(autopsyAction(SOCifyLocale.text("استكمال فحص الدفعة التالية"), async () => { await api(`/api/cases/${autopsy.current.id}/detection`, { method: "POST", body: { version: autopsy.current.version, mode: record.payload.mode, after_id: record.payload.next_after_id } }); await autopsyCase(autopsy.current.id); }));
   return card;
 }
@@ -314,12 +284,21 @@ async function autopsyEditRecord(kind, record = null) {
 }
 
 async function autopsyRecordPanel(kind) {
-  const data = await api(`/api/cases/${autopsy.current.id}/records?kind=${kind}&limit=100`);
+  const base = `/api/cases/${autopsy.current.id}/records?kind=${kind}&limit=25`;
+  const data = await api(base);
   const content = data.items.length ? node("div", { class: "record-grid" }, data.items.map(autopsyRecordCard)) : emptyState(SOCifyLocale.text("لا سجلات بعد"), SOCifyLocale.text("أضف نتيجة موثقة من أدلة القضية، وميّز الحقائق عن الفرضيات."));
-  return panel(autopsyLabel(kind), node("div", { class: "panel-body" }, [autopsy.current.can_update ? button(SOCifyLocale.template`إضافة ${autopsyLabel(kind)}`, () => autopsyEditRecord(kind).catch(handleError), "primary") : null, content]), true);
+  let cursor = data.next_before;
+  const more = button(SOCifyLocale.text("عرض المزيد"), async () => {
+    more.disabled = true;
+    try { const next = await api(`${base}&before=${cursor}`); content.append(...next.items.map(autopsyRecordCard)); cursor = next.next_before; more.hidden = !cursor; }
+    catch (error) { handleError(error); } finally { more.disabled = false; }
+  });
+  more.hidden = !cursor;
+  return panel(autopsyLabel(kind), node("div", { class: "panel-body" }, [autopsy.current.can_update && autopsy.current.status !== "closed" ? button(SOCifyLocale.template`إضافة ${autopsyLabel(kind)}`, () => autopsyEditRecord(kind).catch(handleError), "primary") : null, content, more]), true);
 }
 
 async function autopsyCase(caseId) {
+  if (window.SOCifyWorkbench?.sections.includes(state.section)) { window.location.assign(`/cases/${caseId}?tab=${window.SOCifyWorkbench.tabs[state.section] || "summary"}`); return; }
   begin("case");
   let selected = new URLSearchParams(window.location.search).get("tab") || "summary";
   autopsy.current = await api(`/api/cases/${caseId}`);
@@ -331,7 +310,7 @@ async function autopsyCase(caseId) {
   if (restricted && !["summary", "logs"].includes(selected)) selected = "logs";
   const assetData = restricted ? { items: [] } : await api(`/api/cases/${caseId}/records?kind=asset&limit=100`);
   autopsy.assets = assetData.items;
-  const root = node("div", {}, [pageHead(current.title, SOCifyLocale.text("تجتمع الأدلة والتحليل والمسؤوليات والقرارات والتقرير داخل القضية نفسها."), [linkedButton(SOCifyLocale.text("جميع القضايا"), autopsyCaseListURL())])]);
+  const root = node("div", { class: "case-view" }, [pageHead(current.title, SOCifyLocale.text("تجتمع الأدلة والتحليل والمسؤوليات والقرارات والتقرير داخل القضية نفسها."), [linkedButton(SOCifyLocale.text("جميع القضايا"), autopsyCaseListURL()), ...(!restricted && window.SOCifyWorkbench ? [window.SOCifyWorkbench.reportButton(current)] : [])])]);
   root.append(node("div", { class: "case-context-bar" }, [node("bdi", { class: "case-reference", text: current.reference }), autopsyBadge(current.status), autopsyBadge(current.severity)]));
   if (selected === "summary" && !restricted) {
     const fact = (label, value) => node("div", {}, [node("dt", { text: label }), node("dd", { text: value || "—" })]);
@@ -386,15 +365,23 @@ async function autopsyCase(caseId) {
     root.querySelector(".case-tabs").append(reportsLink);
   }
   root.append(content);
+  window.SOCifyWorkbench?.bindCase(current);
   finish(root);
 }
 
 async function autopsyStart() {
   const role = document.querySelector("[data-user-role]");
   if (role) role.textContent = autopsyLabel(state.user.role);
-  [autopsy.catalog, autopsy.team] = await Promise.all([api("/api/autopsy/catalog"), api("/api/team")]);
+  window.SOCifyWorkbench?.navigation();
+  if (state.section === "profile" && window.SOCifyAutopsy.profile) return window.SOCifyAutopsy.profile();
+  if (!permission("cases.read") && !["profile", "team"].includes(state.section)) {
+    finish(emptyState(SOCifyLocale.text("هذا القسم غير متاح لدورك"), SOCifyLocale.text("تطبق المنصة صلاحيات الخادم حتى عند فتح الرابط مباشرة."), [linkedButton(SOCifyLocale.text("الملف والأمان"), "/profile")])); return;
+  }
+  [autopsy.catalog, autopsy.team] = await Promise.all([permission("cases.read") ? api("/api/autopsy/catalog") : Promise.resolve({}), api("/api/team")]);
+  window.SOCifyWorkbench?.navigation();
   const caseId = document.querySelector('meta[name="case-id"]')?.content;
   if (caseId) return autopsyCase(Number(caseId));
+  if (window.SOCifyWorkbench?.sections.includes(state.section)) return window.SOCifyWorkbench.start(state.section);
   if (state.section === "profile" && window.SOCifyAutopsy.profile) return window.SOCifyAutopsy.profile();
   if (state.section === "analysis-library" && window.SOCifyAutopsy.library) return window.SOCifyAutopsy.library();
   if (state.section === "playbooks" && window.SOCifyAutopsy.procedureLibrary) return window.SOCifyAutopsy.procedureLibrary();

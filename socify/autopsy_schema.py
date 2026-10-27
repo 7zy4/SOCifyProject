@@ -197,6 +197,7 @@ def migrate(connection: sqlite3.Connection) -> None:
         if "owner_case_id" not in columns:
             connection.execute(f"ALTER TABLE {table} ADD COLUMN owner_case_id INTEGER REFERENCES incident_cases(id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_events_case_time ON security_events(owner_case_id, event_time, id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_alerts_case_detected ON alerts(owner_case_id, detected_at DESC, id DESC)")
     for table in (
         "case_notes",
         "case_evidence",

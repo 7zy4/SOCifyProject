@@ -11,12 +11,14 @@ from .autopsy_api import autopsy_api
 from .autopsy_capsules import autopsy_capsules_api
 from .autopsy_chronology import autopsy_chronology_api
 from .autopsy_detection import autopsy_detection_api
+from .autopsy_email import autopsy_email_api
 from .autopsy_ingestion import autopsy_ingestion_api
 from .autopsy_intel import autopsy_intel_api
 from .autopsy_investigation import autopsy_investigation_api
 from .autopsy_procedures import autopsy_procedures_api
 from .autopsy_reports import autopsy_reports_api
 from .autopsy_samples import autopsy_samples_api
+from .autopsy_soc import autopsy_soc_api
 from .autopsy_workflow import autopsy_workflow_api
 from .autopsy_yara import autopsy_yara_api
 from .cases import cases_api
@@ -65,6 +67,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         autopsy_procedures_api,
         autopsy_reports_api,
         autopsy_samples_api,
+        autopsy_soc_api,
+        autopsy_email_api,
         autopsy_intel_api,
         autopsy_capsules_api,
         autopsy_chronology_api,

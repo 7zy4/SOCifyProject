@@ -36,6 +36,13 @@ def test_redirect():
 @ui.get("/admin")
 @ui.get("/profile")
 @ui.get("/team")
+@ui.get("/monitoring")
+@ui.get("/log-management")
+@ui.get("/endpoint-security")
+@ui.get("/threat-intel")
+@ui.get("/email-security")
+@ui.get("/sandbox")
+@ui.get("/reports")
 @ui.get("/cases")
 @ui.get("/my-tasks")
 @ui.get("/analysis-library")
@@ -44,13 +51,43 @@ def test_redirect():
 def dashboard(case_id: int | None = None):
     if operational_mode():
         from .cases import _case_row
-        from .security import error_response
+        from .security import error_response, has_permission
 
+        if request.path in {
+            "/monitoring",
+            "/log-management",
+            "/endpoint-security",
+            "/threat-intel",
+            "/email-security",
+            "/sandbox",
+            "/reports",
+        } and not has_permission(current_user(), "cases.read"):
+            return error_response("PERMISSION_DENIED", "هذا القسم غير متاح لدورك", 403)
         if case_id is not None and not _case_row(case_id):
             return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
         if request.path in {"/lab", "/scores"}:
             return error_response("FEATURE_RETIRED", "وظائف التدريب متقاعدة في النسخة التشغيلية", 410)
-        if request.path not in {"/cases", "/my-tasks", "/team", "/profile", "/playbooks", "/analysis-library", "/audit", "/admin"} and case_id is None:
+        if (
+            request.path
+            not in {
+                "/cases",
+                "/my-tasks",
+                "/team",
+                "/profile",
+                "/playbooks",
+                "/analysis-library",
+                "/audit",
+                "/admin",
+                "/monitoring",
+                "/log-management",
+                "/endpoint-security",
+                "/threat-intel",
+                "/email-security",
+                "/sandbox",
+                "/reports",
+            }
+            and case_id is None
+        ):
             return redirect("/cases")
         return render_template(
             "app.html",

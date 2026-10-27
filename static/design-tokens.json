@@ -1,44 +1,44 @@
 {
   "colors": {
     "bg": [
-      "#DDE2E9",
-      "#0B1120"
+      "#F4F6FA",
+      "#0D101B"
     ],
     "panel": [
-      "#F3F5F9",
-      "#111B2E"
+      "#FFFFFF",
+      "#171E2A"
     ],
     "panel-2": [
-      "#E2E8F0",
-      "#18243A"
+      "#EEF2F7",
+      "#1D2736"
     ],
     "text": [
       "#142B49",
-      "#E8EEF8"
+      "#EFF3FA"
     ],
     "muted": [
-      "#58677B",
-      "#A6B5CD"
+      "#52617A",
+      "#A9B6CB"
     ],
     "line": [
-      "#8795A8",
-      "#58677B"
+      "#7D8AA0",
+      "#596B87"
     ],
     "line-soft": [
-      "#D8DFE9",
-      "#334155"
+      "#D5DCE7",
+      "#344258"
     ],
     "blue": [
       "#255DD9",
-      "#91B3FF"
+      "#98B6FF"
     ],
     "primary-fill": [
       "#255DD9",
-      "#365FC9"
+      "#315CCC"
     ],
     "primary-hover": [
       "#1C49B1",
-      "#2C50AD"
+      "#274EAD"
     ],
     "on-primary": [
       "#FFFFFF",
@@ -49,56 +49,56 @@
       "#91B3FF"
     ],
     "red": [
-      "#973E3E",
-      "#F1B6B2"
+      "#B4232D",
+      "#FFB4B9"
     ],
     "red-bg": [
-      "#F4E4E1",
-      "#3B2628"
+      "#FCEBED",
+      "#39252E"
     ],
     "high": [
-      "#142B49",
-      "#E8EEF8"
+      "#8C5100",
+      "#EFC278"
     ],
     "high-bg": [
-      "#E2E8F0",
-      "#18243A"
+      "#FBF0DD",
+      "#352E22"
     ],
     "amber": [
-      "#58677B",
-      "#A6B5CD"
+      "#52617A",
+      "#A9B6CB"
     ],
     "amber-bg": [
-      "#E2E8F0",
-      "#18243A"
+      "#EEF2F7",
+      "#1D2736"
     ],
     "success": [
-      "#58677B",
-      "#A6B5CD"
+      "#52617A",
+      "#A9B6CB"
     ],
     "success-bg": [
-      "#E2E8F0",
-      "#18243A"
+      "#EEF2F7",
+      "#1D2736"
     ],
     "info-bg": [
-      "#E2E8F0",
-      "#18243A"
+      "#EEF2F7",
+      "#1D2736"
     ],
     "sidebar-bg": [
-      "#D6DEE9",
-      "#142033"
+      "#F4F6FA",
+      "#0D101B"
     ],
     "sidebar-text": [
-      "#334966",
-      "#B7C7DA"
+      "#52617A",
+      "#A9B6CB"
     ],
     "sidebar-active": [
-      "#BCCBE0",
-      "#263B58"
+      "#E4ECFC",
+      "#233757"
     ],
     "hero-bg": [
-      "#D6E0ED",
-      "#142B49"
+      "#E8EEF8",
+      "#14243D"
     ],
     "window-bar": [
       "#CBD5E3",
@@ -144,10 +144,10 @@
     64
   ],
   "radius": {
-    "6": 1,
-    "8": 1,
-    "12": 2,
-    "16": 2
+    "6": 6,
+    "8": 8,
+    "12": 8,
+    "16": 8
   },
   "typography": {
     "ar": {
@@ -182,10 +182,8 @@
     }
   },
   "visualReference": {
-    "type": "user-supplied screenshot",
-    "description": "Front-facing 1600x1200 overlapping security desktop, original SOCify blue/ink palette, text-only wordmark",
-    "sourceUrl": "https://www.figma.com/riffs/93b3f6a2-ae04-4857-9224-1b6b7fac0c49",
-    "sourceUrlAccessible": false,
+    "type": "user-supplied LetsDefend screenshot",
+    "description": "SOC application shell: top navigation, role-aware sidebar, three monitoring channels and expandable alert table; native SOCify text brand and blue palette",
     "screenshotAvailable": true
   }
 }
