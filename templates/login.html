@@ -2,21 +2,25 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="theme-color" content="#F3F5F9">
-  <link rel="icon" href="{{ url_for('static', filename='brand/socify-symbol.svg') }}" type="image/svg+xml">
-  <link rel="preload" href="{{ url_for('static', filename='fonts/IBMPlexSansArabic-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <meta name="theme-color" content="#DDE2E9">
+
+  <link rel="preload" href="{{ url_for('static', filename='fonts/Almarai-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
   <script src="{{ url_for('static', filename='localization.js') }}"></script>
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
   <meta name="description" content="SOCify منصة تحليل الحوادث والتحقيق وإصدار التقارير" data-ui-attributes>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-ui-copy>تسجيل الدخول | {{ product_name }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='design-system.css') }}">
 </head>
 <body class="auth-shell">
-  <button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button>
+  <div class="appearance-tools auth-tools"><div data-theme-control></div><button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button></div>
   <a class="skip-link" href="#auth-form" data-ui-copy>انتقل إلى النموذج</a>
   <main class="auth-layout">
     <section class="auth-panel" aria-labelledby="auth-title">
-      <a class="brand" aria-label="{{ product_name }}" translate="no" href="{{ url_for('ui.index') }}"><img class="brand-logo" src="{{ url_for('static', filename='brand/socify-logo.png') }}" width="180" height="60" alt="SOCify" translate="no"></a>
+      <a class="brand" aria-label="{{ product_name }}" translate="no" href="{{ url_for('ui.index') }}"><span class="brand-wordmark" lang="en" dir="ltr">SOCify</span></a>
       <div><p class="eyebrow">{{ 'DIGITAL INCIDENT INVESTIGATION' if operational else 'SECURE OPERATIONS WORKSPACE' }}</p><h1 id="auth-title" data-ui-copy>من الأدلة إلى تحقيق موثق</h1><p data-ui-copy>{{ 'مساحة عمل داخلية للتحليل والتحقيق والاستجابة والتقارير. استخدم حساب فريقك المصرح به.' if operational else 'سجّل دخولك للوصول إلى مساحة التحقيق المصرّح بها. كل محاولة دخول مسجلة ومحدودة المعدّل.' }}</p></div>
       <ol class="auth-flow" aria-hidden="true"><li data-ui-copy>الأدلة</li><li data-ui-copy>التحقيق</li><li data-ui-copy>التقارير</li></ol>
       <p class="auth-assurance" data-ui-copy>جلسات محمية · MFA متاح · Default deny</p>

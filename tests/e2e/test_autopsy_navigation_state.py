@@ -18,6 +18,7 @@ def operational_browser(app):
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
             page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            page.add_init_script("sessionStorage.setItem('socify-desktop-layout','focus')")
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             root = f"http://127.0.0.1:{server.server_port}"

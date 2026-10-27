@@ -9,21 +9,22 @@ from socify.autopsy_report_render import FORMATS, lines, render_files
 from socify.autopsy_worker import deny_network, run_autopsy_worker_once
 
 
-def test_only_bundled_brand_image_can_be_resolved_in_reports():
+def test_reports_use_text_wordmark_and_reject_image_fetches():
     from weasyprint.urls import URLFetchingError
 
     from socify.autopsy_report_render import bundled_report_asset_fetcher, render_docx, render_html
-    from socify.report_brand import report_logo
 
     payload = {"case": {"title": "Retained case evidence", "reference": "CASE-BRAND"}, "revision": 1}
     document = render_html(payload)
-    assert report_logo() in document
-    assert bundled_report_asset_fetcher(report_logo()).content_type == "image/png"
+    assert 'class="report-wordmark"' in document
+    assert "socify-logo.png" not in document
+    assert "<img" not in document
     for destination in ("https://example.test/logo.png", "file:///etc/passwd", "data:image/png;base64,dW50cnVzdGVk"):
         with pytest.raises(URLFetchingError):
             bundled_report_asset_fetcher(destination)
     with zipfile.ZipFile(io.BytesIO(render_docx(payload))) as archive:
-        assert any(name.startswith("word/media/") for name in archive.namelist())
+        assert not any(name.startswith("word/media/") for name in archive.namelist())
+        assert "SOCify" in archive.read("word/document.xml").decode()
 
 
 def test_rendered_reports_escape_active_content_and_never_resolve_network(monkeypatch, tmp_path):
@@ -50,8 +51,8 @@ def test_rendered_reports_escape_active_content_and_never_resolve_network(monkey
     with zipfile.ZipFile(io.BytesIO(files["docx"])) as archive:
         assert b"&lt;script" in archive.read("word/document.xml")
         assert b'TargetMode="External"' not in archive.read("word/_rels/document.xml.rels")
-        assert b'w:cs="IBM Plex Sans Arabic"' in archive.read("word/styles.xml")
-        assert b'w:cs="IBM Plex Sans Arabic"' in archive.read("word/styles.xml")
+        assert b'w:cs="Almarai"' in archive.read("word/styles.xml")
+        assert b'w:ascii="IBM Plex Sans"' in archive.read("word/styles.xml")
     assert list(lines(None)) == [(0, "غير مسجل")]
     assert list(lines([])) == [(0, "لا توجد عناصر مسجلة")]
     with pytest.raises(PermissionError):

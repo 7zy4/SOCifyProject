@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 from .autopsy_domain import canonical
-from .report_brand import report_logo, report_style
+from .report_brand import report_style
 
 FORMATS = {
     "json": "application/json",
@@ -253,7 +253,7 @@ def render_html(payload) -> str:
         content.append(f'<section id="report-section-{index}" class="report-section"><h2>{html.escape(title)}</h2>{rows}</section>')
     digest = hashlib.sha256(canonical(payload).encode()).hexdigest()
     title_class = ' class="report-title-long"' if len(case["title"]) > 100 else ""
-    cover = f'<header class="report-cover"><img class="report-logo" src="{report_logo()}" width="180" height="60" alt="SOCify"><p dir="ltr">SOCify Digital Autopsy</p><p>تقرير تحليل وتحقيق في حادثة أمنية</p><h1{title_class}><bdi dir="auto">{html.escape(display(case["title"]))}</bdi></h1><p><bdi dir="ltr">{html.escape(case["reference"])}</bdi> · الإصدار {payload["revision"]}</p></header><p class="report-note">نسخة ثابتة من بيانات القضية عند إعدادها. اعتماد هذه النسخة محفوظ منفصلًا في سجل المنصة. البصمة أدناه تخص JSON المعياري، لا بايتات PDF.</p><p dir="ltr">SHA-256: <bdi>{digest}</bdi></p>'
+    cover = f'<header class="report-cover"><p class="report-wordmark" lang="en" dir="ltr">SOCify</p><p dir="ltr">DIGITAL AUTOPSY</p><p>تقرير تحليل وتحقيق في حادثة أمنية</p><h1{title_class}><bdi dir="auto">{html.escape(display(case["title"]))}</bdi></h1><p><bdi dir="ltr">{html.escape(case["reference"])}</bdi> · الإصدار {payload["revision"]}</p></header><p class="report-note">نسخة ثابتة من بيانات القضية عند إعدادها. اعتماد هذه النسخة محفوظ منفصلًا في سجل المنصة. البصمة أدناه تخص JSON المعياري، لا بايتات PDF.</p><p dir="ltr">SHA-256: <bdi>{digest}</bdi></p>'
     navigation = '<nav class="report-outline" aria-label="أقسام التقرير"><h2>محتويات التقرير</h2><ul>' + "".join(outline) + "</ul></nav>"
     style = (
         report_style()
@@ -266,13 +266,18 @@ def bundled_report_asset_fetcher(url, timeout=10, ssl_context=None):
     from weasyprint.urls import URLFetcherResponse, URLFetchingError
 
     root = Path(__file__).resolve().parent.parent / "static" / "fonts"
-    for filename in ("BalooBhaijaan2.woff2", "IBMPlexSansArabic-Regular.woff2", "IBMPlexSansArabic-Bold.woff2"):
+    for filename in (
+        "Almarai-Regular.woff2",
+        "Almarai-Bold.woff2",
+        "IBMPlexSans.woff2",
+        "BalooBhaijaan2.woff2",
+        "IBMPlexSansArabic-Regular.woff2",
+        "IBMPlexSansArabic-Bold.woff2",
+    ):
         content = (root / filename).read_bytes()
         if url == "data:font/woff2;base64," + base64.b64encode(content).decode():
             return URLFetcherResponse(url, body=content, headers={"Content-Type": "font/woff2"})
-    if url == report_logo():
-        return URLFetcherResponse(url, body=base64.b64decode(url.split(",", 1)[1]), headers={"Content-Type": "image/png"})
-    raise URLFetchingError("Only bundled SOCify report fonts and logo are permitted")
+    raise URLFetchingError("Only bundled SOCify report fonts are permitted")
 
 
 def render_docx(payload) -> bytes:
@@ -287,16 +292,19 @@ def render_docx(payload) -> bytes:
     section.top_margin, section.bottom_margin = Pt(42), Pt(40)
     section.left_margin, section.right_margin = Pt(44), Pt(44)
     normal = document.styles["Normal"]
-    normal.font.name, normal.font.size, normal.font.color.rgb = "IBM Plex Sans Arabic", Pt(14), RGBColor.from_string("142B49")
+    normal.font.name, normal.font.size, normal.font.color.rgb = "IBM Plex Sans", Pt(14), RGBColor.from_string("142B49")
     for name in ("Title", "Heading 1", "Heading 2"):
-        document.styles[name].font.name = "IBM Plex Sans Arabic"
+        document.styles[name].font.name = "IBM Plex Sans"
         document.styles[name].font.color.rgb = RGBColor.from_string("255DD9")
         document.styles[name].font.bold = True
         document.styles[name].font.size = Pt({"Title": 28, "Heading 1": 24, "Heading 2": 18}[name])
     for name in ("Normal", "Title", "Heading 1", "Heading 2"):
-        family = "IBM Plex Sans Arabic"
+        family = "Almarai"
         document.styles[name].element.get_or_add_rPr().get_or_add_rFonts().set(qn("w:cs"), family)
-    document.add_picture(io.BytesIO(base64.b64decode(report_logo().split(",", 1)[1])), width=Pt(120))
+    wordmark = document.add_paragraph().add_run("SOCify")
+    wordmark.font.name = "IBM Plex Sans"
+    wordmark.font.size = Pt(26)
+    wordmark.bold = True
     document.add_heading("SOCify Digital Autopsy", 0)
     document.add_heading(display(payload["case"]["title"]), 1)
     document.add_paragraph(f"{payload['case']['reference']} · {payload['revision']}")

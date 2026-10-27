@@ -1,0 +1,23 @@
+[
+  {
+    "file": "Almarai-Regular.woff2",
+    "sha256": "1d8b1201bc48648a658c52331995746b0c4a3a4748ab21fee8ddf89396e36e1f",
+    "bytes": 49352,
+    "source": "https://github.com/google/fonts/tree/main/ofl/almarai",
+    "license": "OFL-1.1"
+  },
+  {
+    "file": "Almarai-Bold.woff2",
+    "sha256": "3bc23d8ebe3f9a7eeb57e2297d3d041e0dc38d76568a03266ad56d8ee026e2d2",
+    "bytes": 50628,
+    "source": "https://github.com/google/fonts/tree/main/ofl/almarai",
+    "license": "OFL-1.1"
+  },
+  {
+    "file": "IBMPlexSans.woff2",
+    "sha256": "3ba9ecb431c594844fec2f71b9b4414e364fd6d3d086fb30e89b9424dfac4e21",
+    "bytes": 153076,
+    "source": "https://github.com/google/fonts/tree/main/ofl/ibmplexsans",
+    "license": "OFL-1.1"
+  }
+]

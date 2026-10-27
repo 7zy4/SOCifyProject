@@ -1,0 +1,191 @@
+{
+  "colors": {
+    "bg": [
+      "#DDE2E9",
+      "#0B1120"
+    ],
+    "panel": [
+      "#F3F5F9",
+      "#111B2E"
+    ],
+    "panel-2": [
+      "#E2E8F0",
+      "#18243A"
+    ],
+    "text": [
+      "#142B49",
+      "#E8EEF8"
+    ],
+    "muted": [
+      "#58677B",
+      "#A6B5CD"
+    ],
+    "line": [
+      "#8795A8",
+      "#58677B"
+    ],
+    "line-soft": [
+      "#D8DFE9",
+      "#334155"
+    ],
+    "blue": [
+      "#255DD9",
+      "#91B3FF"
+    ],
+    "primary-fill": [
+      "#255DD9",
+      "#365FC9"
+    ],
+    "primary-hover": [
+      "#1C49B1",
+      "#2C50AD"
+    ],
+    "on-primary": [
+      "#FFFFFF",
+      "#FFFFFF"
+    ],
+    "focus": [
+      "#255DD9",
+      "#91B3FF"
+    ],
+    "red": [
+      "#973E3E",
+      "#F1B6B2"
+    ],
+    "red-bg": [
+      "#F4E4E1",
+      "#3B2628"
+    ],
+    "high": [
+      "#142B49",
+      "#E8EEF8"
+    ],
+    "high-bg": [
+      "#E2E8F0",
+      "#18243A"
+    ],
+    "amber": [
+      "#58677B",
+      "#A6B5CD"
+    ],
+    "amber-bg": [
+      "#E2E8F0",
+      "#18243A"
+    ],
+    "success": [
+      "#58677B",
+      "#A6B5CD"
+    ],
+    "success-bg": [
+      "#E2E8F0",
+      "#18243A"
+    ],
+    "info-bg": [
+      "#E2E8F0",
+      "#18243A"
+    ],
+    "sidebar-bg": [
+      "#D6DEE9",
+      "#142033"
+    ],
+    "sidebar-text": [
+      "#334966",
+      "#B7C7DA"
+    ],
+    "sidebar-active": [
+      "#BCCBE0",
+      "#263B58"
+    ],
+    "hero-bg": [
+      "#D6E0ED",
+      "#142B49"
+    ],
+    "window-bar": [
+      "#CBD5E3",
+      "#26374E"
+    ],
+    "window-bar-end": [
+      "#E2E8F0",
+      "#344A66"
+    ],
+    "paper": [
+      "#F5F4EF",
+      "#E7E9ED"
+    ],
+    "paper-text": [
+      "#142B49",
+      "#142B49"
+    ],
+    "paper-muted": [
+      "#58677B",
+      "#58677B"
+    ],
+    "grid-line": [
+      "#BFCBDA",
+      "#1E2B40"
+    ],
+    "terminal-bg": [
+      "#182233",
+      "#12161D"
+    ],
+    "terminal-text": [
+      "#D8DEE8",
+      "#D8DEE8"
+    ]
+  },
+  "spacing": [
+    4,
+    8,
+    12,
+    16,
+    24,
+    32,
+    48,
+    64
+  ],
+  "radius": {
+    "6": 1,
+    "8": 1,
+    "12": 2,
+    "16": 2
+  },
+  "typography": {
+    "ar": {
+      "family": "Almarai",
+      "weights": [
+        400,
+        700
+      ],
+      "lineHeight": 1.8,
+      "tracking": 0
+    },
+    "en": {
+      "family": "IBM Plex Sans",
+      "weights": [
+        400,
+        500,
+        600,
+        700
+      ],
+      "lineHeight": 1.6,
+      "tracking": 0
+    },
+    "scale": {
+      "caption": 12,
+      "label": 14,
+      "body": 15,
+      "lead": 18,
+      "h3": 20,
+      "h2": 24,
+      "h1": 32,
+      "display": 56
+    }
+  },
+  "visualReference": {
+    "type": "user-supplied screenshot",
+    "description": "Front-facing 1600x1200 overlapping security desktop, original SOCify blue/ink palette, text-only wordmark",
+    "sourceUrl": "https://www.figma.com/riffs/93b3f6a2-ae04-4857-9224-1b6b7fac0c49",
+    "sourceUrlAccessible": false,
+    "screenshotAvailable": true
+  }
+}

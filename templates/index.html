@@ -2,20 +2,24 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="theme-color" content="#F3F5F9">
-  <link rel="icon" href="{{ url_for('static', filename='brand/socify-symbol.svg') }}" type="image/svg+xml">
-  <link rel="preload" href="{{ url_for('static', filename='fonts/IBMPlexSansArabic-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <meta name="theme-color" content="#DDE2E9">
+
+  <link rel="preload" href="{{ url_for('static', filename='fonts/Almarai-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
   <script src="{{ url_for('static', filename='localization.js') }}"></script>
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="SOCify منصة تحليل الحوادث والتحقيق وإصدار التقارير" data-ui-attributes>
   <title data-ui-copy>SOCify | تحليل الحوادث والتحقيق والتقارير</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='design-system.css') }}">
 </head>
 <body class="landing">
-  <button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button>
   <a class="skip-link" href="#main" data-ui-copy>انتقل إلى المحتوى</a>
   <header class="landing-nav">
-    <a class="brand" href="{{ url_for('ui.index') }}" aria-label="SOCify الرئيسية" data-ui-attributes><img class="brand-logo" src="{{ url_for('static', filename='brand/socify-logo.png') }}" width="180" height="60" alt="SOCify" translate="no"></a>
+    <a class="brand brand-surface" href="{{ url_for('ui.index') }}" aria-label="SOCify الرئيسية" data-ui-attributes><span class="brand-wordmark" lang="en" dir="ltr">SOCify</span></a>
+    <div class="appearance-tools"><div data-theme-control></div><button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button></div>
     <nav aria-label="التنقل الرئيسي" data-ui-attributes>
       {% if user %}
       <a class="button primary" href="{{ url_for('ui.dashboard') }}" data-ui-copy>فتح مركز العمليات</a>
@@ -28,7 +32,7 @@
   <main id="main">
     <section class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">Incident analysis and investigation</p>
+        <p class="eyebrow" data-ui-copy>مساحة واحدة للتحقيق الموثّق</p>
         <h1 data-ui-copy>من السجلات إلى تحقيق موثّق</h1>
         <p class="lead" data-ui-copy>منصة لتحليل الحوادث والتحقيق فيها وإصدار التقارير. اجمع السجلات والأدلة، وثّق النتائج والقرارات، وراجع الاستجابة داخل مساحة فريقك.</p>
         <div class="hero-actions">
@@ -42,7 +46,7 @@
         </ul>
       </div>
       <div class="hero-console" aria-label="مسار تحليل الحادثة" data-ui-attributes>
-        <div class="console-bar"><span></span><strong>مسار التحقيق</strong><small>Case workflow</small></div>
+        <div class="console-bar"><span></span><strong data-ui-copy>مسار التحقيق</strong><small>Case workflow</small></div>
         <ol class="attack-chain">
           <li data-ui-copy><span>01</span><div><strong>سجل أمني</strong><small data-ui-copy>تطبيع وحفظ المصدر الخام</small></div><b>مقبول</b></li>
           <li data-ui-copy><span>02</span><div><strong>قاعدة كشف</strong><small data-ui-copy>تقييم محدد وسبب موثق</small></div><b>مطابقة</b></li>
