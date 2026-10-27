@@ -78,7 +78,7 @@ def test_manager_procedure_library_and_report_worker_browser(app):
             page.get_by_role("button", name="إضافة القوالب الإرشادية للمراجعة").click()
             page.get_by_role("button", name="اعتماد ونشر هذا الإصدار").first.wait_for()
             page.get_by_role("button", name="اعتماد ونشر هذا الإصدار").first.click()
-            page.get_by_role("link", name="القضايا", exact=True).click()
+            page.locator("#primary-nav [data-section=cases]").click()
             page.get_by_role("button", name="إنشاء قضية", exact=True).click()
             dialog = page.get_by_role("dialog")
             dialog.locator("input[name=title]").fill("Browser report review")

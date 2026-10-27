@@ -8,9 +8,9 @@ if ! docker info >/dev/null 2>&1; then
   printf '%s\n' 'Docker is installed but its daemon is unavailable. Finish the container rebuild and verify docker info before starting analysis.' >&2
   exit 1
 fi
-analysis_container=socify-v3-dev-analysis
-analysis_directory=/tmp/socify-v3-dev-analysis-ipc
-analysis_image=socify-v3-verification-analysis
+analysis_container=${SOCIFY_ANALYSIS_CONTAINER_NAME:-socify-v3-dev-analysis}
+analysis_directory=${SOCIFY_ANALYSIS_IPC_DIRECTORY:-/tmp/socify-v3-dev-analysis-ipc}
+analysis_image=${SOCIFY_ANALYSIS_IMAGE:-socify-v3-verification-analysis}
 analysis_expected="$(docker image inspect --format '{{.Id}}' "$analysis_image")"
 if docker container inspect "$analysis_container" >/dev/null 2>&1; then
   analysis_actual="$(docker container inspect --format '{{.Image}}' "$analysis_container")"

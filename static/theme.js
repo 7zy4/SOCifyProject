@@ -5,7 +5,7 @@
   const key = "socify-interface-theme";
   const root = document.documentElement;
   const system = window.matchMedia("(prefers-color-scheme: dark)");
-  let preference = "system";
+  let preference = "dark";
   try {
     const saved = localStorage.getItem(key);
     if (["light", "dark", "system"].includes(saved)) preference = saved;
@@ -16,7 +16,7 @@
     root.dataset.theme = resolved;
     root.dataset.themePreference = preference;
     root.style.colorScheme = resolved;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", resolved === "dark" ? "#0D101B" : "#F4F6FA");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", resolved === "dark" ? "#0C1017" : "#F5F0E4");
   }
 
   apply();
@@ -36,6 +36,7 @@
       const text = document.createElement("span");
       text.textContent = t("المظهر");
       const select = document.createElement("select");
+      select.setAttribute("aria-label", t("المظهر"));
       select.dataset.themeSelect = "";
       [["system", "حسب النظام"], ["light", "فاتح"], ["dark", "داكن"]].forEach(([value, copy]) => {
         const option = document.createElement("option");

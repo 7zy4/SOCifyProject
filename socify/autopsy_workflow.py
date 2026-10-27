@@ -339,8 +339,12 @@ def workflow_view(case_id: int):
 @require_permission("cases.read")
 def team_metrics():
     from .autopsy_pipeline import case_full_access
+    from .autopsy_workspace import selection_scope_sql
 
     scope, args = case_scope(current_user() or {})
+    selected_scope, selected_args = selection_scope_sql()
+    scope += " AND c.archived_at IS NULL" + selected_scope
+    args.extend(selected_args)
     total = get_db().execute(f"SELECT COUNT(*) FROM incident_cases c WHERE c.workspace_id = ?{scope}", (workspace_id(), *args)).fetchone()[0]
     cases = (
         get_db().execute(f"SELECT c.* FROM incident_cases c WHERE c.workspace_id = ?{scope} ORDER BY c.id DESC LIMIT 1000", (workspace_id(), *args)).fetchall()

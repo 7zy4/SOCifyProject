@@ -23,6 +23,8 @@
   {% if operational %}<script src="{{ url_for('static', filename='soc-workbench.js') }}" defer></script>{% endif %}
   {% if operational %}<script src="{{ url_for('static', filename='autopsy.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_data.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_procedures.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_reports.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_analysis.js') }}" defer></script>{% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='design-system.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='comic-workspace.css') }}">
+  {% if operational %}<script src="{{ url_for('static', filename='v4-workspace.js') }}" defer></script>{% endif %}
 </head>
 <body class="app-shell{{ ' autopsy-shell' if operational else '' }}">
   <a class="skip-link" href="#workspace" data-ui-copy>انتقل إلى مساحة العمل</a>
@@ -63,18 +65,16 @@
       <a data-section="team" href="/team" data-ui-copy>{{ nav_icon("team") }}الفريق والمهام</a>
       {% endif %}
     </nav>
-    <a class="sidebar-account" href="/profile" data-ui-copy>الملف والأمان</a>
-    <form class="sidebar-logout" method="post" action="{{ url_for('auth.logout_page') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button ghost" type="submit" data-ui-copy>خروج</button></form>
     <div class="sidebar-foot"><strong translate="no">DIGITAL AUTOPSY</strong><span data-ui-copy>{{ 'تحليل داخلي · إثراء محلي' if operational else 'تحليل الحوادث والتحقيق والتقارير' }}</span></div>
   </aside>
   <div class="app-main">
     <header class="topbar">
       <button id="menu-toggle" aria-controls="workspace-navigation" class="icon-button" type="button" aria-label="فتح القائمة" aria-expanded="false" data-ui-attributes><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
-      <a aria-label="{{ product_name }}" class="brand topbar-brand" href="{{ '/monitoring' if operational else '/dashboard' }}" translate="no"><span class="brand-wordmark" lang="en" dir="ltr">SOCify</span></a>
-      {% if operational %}<nav class="global-nav" aria-label="التنقل الرئيسي" data-ui-attributes><a href="/monitoring" data-global-section="operations" data-nav-permission="cases.read" data-ui-copy>العمليات</a><a href="/cases" data-global-section="cases" data-nav-permission="cases.read" data-ui-copy>القضايا</a><a href="/reports" data-global-section="reports" data-nav-permission="cases.read" data-ui-copy>التقارير</a></nav>{% endif %}
+      <span aria-label="{{ product_name }}" class="brand topbar-brand" translate="no"><span class="brand-wordmark" lang="en" dir="ltr">SOCify<span class="brand-stamp">SOC / 04</span></span></span>
+      {% if operational %}<div class="investigation-context" data-investigation-context></div>{% endif %}
       <div class="section-context sr-only"><p id="section-kicker" class="eyebrow">Incident investigation</p><h1 id="section-title" data-ui-copy>مركز العمليات</h1></div>
       <div class="appearance-tools"><div data-theme-control></div><button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button></div>
-      <div class="user-menu"><span><strong>{{ user.name }}</strong><small><span data-user-role>{{ user.role }}</span> · {{ user.team or '—' }}</small></span><a class="avatar" href="/profile" aria-label="الملف الشخصي" data-ui-attributes>{{ user.name[:1] }}</a><form method="post" action="{{ url_for('auth.logout_page') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button ghost compact" type="submit" data-ui-copy>خروج</button></form></div>
+      <div class="user-menu"><span><strong>{{ user.name }}</strong><small><span data-user-role>{{ user.role }}</span> · {{ user.team or '—' }}</small></span><a class="avatar" href="/profile" aria-label="الملف الشخصي" data-ui-attributes>{{ user.name[:1] }}</a><button type="button" class="icon-button" data-account-switch aria-label="تبديل الحساب" title="تبديل الحساب" data-ui-attributes><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 7h14l-4-4M17 17H3l4 4M21 7l-4 4M3 17l4-4"/></svg></button><form method="post" action="{{ url_for('auth.logout_page') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button ghost compact" type="submit" data-ui-copy>خروج</button></form></div>
     </header>
     <div id="global-message" class="global-message" role="status" aria-live="polite" hidden></div>
     <main id="workspace" tabindex="-1" aria-busy="true"><div class="loading"><span></span><p data-ui-copy>جارٍ تحميل البيانات المصرّح بها…</p></div></main>

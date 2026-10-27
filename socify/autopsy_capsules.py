@@ -410,6 +410,7 @@ def restore_capsule(content, manifest, data, files):
         },
     )
     source_context = data["context"]
+    get_db().execute("INSERT INTO case_approvals(case_id,state,requested_by,source) VALUES (?,'pending',?,'capsule_restore')", (case_id, principal))
     insert_values(
         "autopsy_case_context",
         {

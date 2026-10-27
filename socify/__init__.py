@@ -20,6 +20,7 @@ from .autopsy_reports import autopsy_reports_api
 from .autopsy_samples import autopsy_samples_api
 from .autopsy_soc import autopsy_soc_api
 from .autopsy_workflow import autopsy_workflow_api
+from .autopsy_workspace import autopsy_workspace_api
 from .autopsy_yara import autopsy_yara_api
 from .cases import cases_api
 from .codespaces_proxy import CodespacesProxy
@@ -50,6 +51,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     app.config.update(build_config())
     if test_config:
         app.config.update(test_config)
+    if app.config.get("DEMO_MODE") and app.config["ENV_NAME"] != "development":
+        raise RuntimeError("Demo account switching is restricted to development")
     if app.config["ENV_NAME"] == "development" and app.config.get("CODESPACE_PUBLIC_HOST"):
         app.wsgi_app = CodespacesProxy(app.wsgi_app, app.config["CODESPACE_PUBLIC_HOST"])  # type: ignore[method-assign]
 
@@ -62,6 +65,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     app.teardown_appcontext(close_db)
     for blueprint in (
         ui,
+        autopsy_workspace_api,
         autopsy_api,
         autopsy_ingestion_api,
         autopsy_procedures_api,
@@ -108,8 +112,9 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             return error_response("CASE_CONTEXT_REQUIRED", "استخدم الأداة من داخل قضية مصرح بها؛ مسارات التدريب العامة متقاعدة", 410)
         if operational_mode():
             from .autopsy_pipeline import guard_batch_scope
+            from .autopsy_workspace import guard_workspace
 
-            return guard_batch_scope()
+            return guard_workspace() or guard_batch_scope()
 
     @app.after_request
     def secure_response(response):

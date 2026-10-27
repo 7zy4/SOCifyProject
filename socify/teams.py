@@ -48,6 +48,11 @@ def team_detail():
         membership, parameters = case_scope(current_user() or {})
         scope += membership
         args.extend(parameters)
+        from .autopsy_workspace import selection_scope_sql
+
+        selected_scope, selected_args = selection_scope_sql()
+        scope += selected_scope
+        args.extend(selected_args)
     assignments = [
         dict(row)
         for row in get_db()

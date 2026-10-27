@@ -131,6 +131,10 @@ def claim_job_locked(identity):
 
 
 def job_authorized(job):
+    from .autopsy_workspace import case_approved
+
+    if not case_approved(job["case_id"]):
+        return False
     user = get_db().execute("SELECT id, workspace_id, role FROM users WHERE id = ? AND is_active = 1", (job["created_by"],)).fetchone()
     if not user or not case_visible(job["case_id"], dict(user)):
         return False

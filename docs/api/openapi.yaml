@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "SOCify Digital Autopsy API",
-    "version": "3.0.0",
-    "description": "Internal case-centered investigation. General training and unscoped legacy data endpoints return 410 in operational mode. V3 case creation requires title, reason and objective; structured record contracts are published by /api/autopsy/catalog. All writes require an authenticated session, permission and CSRF token."
+    "version": "4.0.0",
+    "description": "Case-centered investigation with manager intake approval and a server-session selection of one or two related cases. General training and unscoped legacy data endpoints return 410 in operational mode. New cases require title, reason and objective and remain locked until approved. Structured records are published by /api/autopsy/catalog. All writes require an authenticated session, permission and CSRF token."
   },
   "servers": [
     {
@@ -1298,6 +1298,79 @@
             }
           }
         }
+      }
+    },
+    "/api/cases/{case_id}/approval": {
+      "post": {
+        "operationId": "autopsy_workspace_review_case_post__api_cases_case_id_approval",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Resource unavailable within workspace scope"
+          },
+          "409": {
+            "description": "Manager approval required, already decided, or stale version"
+          },
+          "422": {
+            "description": "Invalid fields, bounds or unrelated pair"
+          }
+        },
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "decision",
+                  "version",
+                  "reason"
+                ],
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "approved",
+                      "rejected"
+                    ]
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 1000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "Manager/admin with cases.override only. Each new case, including a restored capsule, starts pending. A versioned decision is atomic, final, audited and recorded in custody. Case work is blocked until approval. Existing V3 cases retain grandfathered access after one-time migration."
       }
     },
     "/api/cases/{case_id}/attack": {
@@ -2886,6 +2959,71 @@
         }
       }
     },
+    "/api/cases/{case_id}/relationships": {
+      "post": {
+        "operationId": "autopsy_workspace_link_cases_post__api_cases_case_id_relationships",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Resource unavailable within workspace scope"
+          },
+          "409": {
+            "description": "Manager approval required, already decided, or stale version"
+          },
+          "422": {
+            "description": "Invalid fields, bounds or unrelated pair"
+          }
+        },
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "related_case_id",
+                  "reason"
+                ],
+                "properties": {
+                  "related_case_id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9223372036854775807
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 1000
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/cases/{case_id}/reports": {
       "post": {
         "operationId": "autopsy_reports_create_report_post__api_cases_case_id_reports",
@@ -3543,6 +3681,76 @@
             "$ref": "#/components/responses/Forbidden"
           }
         }
+      }
+    },
+    "/api/demo/accounts": {
+      "get": {
+        "operationId": "autopsy_workspace_demo_accounts_get__api_demo_accounts",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "Available only with explicit DEMO_MODE in development and a signed-in account in the isolated demo registry. Switching is restricted to registered active accounts in the same workspace without MFA. The previous session is revoked, a new session is created and case selection is cleared. Production refuses demo mode."
+      }
+    },
+    "/api/demo/switch": {
+      "post": {
+        "operationId": "autopsy_workspace_demo_switch_post__api_demo_switch",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Resource unavailable within workspace scope"
+          },
+          "409": {
+            "description": "Manager approval required, already decided, or stale version"
+          },
+          "422": {
+            "description": "Invalid fields, bounds or unrelated pair"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "user_id"
+                ],
+                "properties": {
+                  "user_id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9223372036854775807
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "Available only with explicit DEMO_MODE in development and a signed-in account in the isolated demo registry. Switching is restricted to registered active accounts in the same workspace without MFA. The previous session is revoked, a new session is created and case selection is cleared. Production refuses demo mode."
       }
     },
     "/api/events": {
@@ -4657,6 +4865,80 @@
             }
           }
         }
+      }
+    },
+    "/api/investigation-selection": {
+      "get": {
+        "operationId": "autopsy_workspace_selection_get_get__api_investigation-selection",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "Requires cases.read. Select one approved visible case or two approved visible cases with an explicit manager-created relationship. Selection is revalidated on every request; revoked membership or an invalid relationship clears the entire selection."
+      },
+      "post": {
+        "operationId": "autopsy_workspace_selection_set_post__api_investigation-selection",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Resource unavailable within workspace scope"
+          },
+          "409": {
+            "description": "Manager approval required, already decided, or stale version"
+          },
+          "422": {
+            "description": "Invalid fields, bounds or unrelated pair"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "case_ids"
+                ],
+                "properties": {
+                  "case_ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 2,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9223372036854775807
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "Requires cases.read. Select one approved visible case or two approved visible cases with an explicit manager-created relationship. Selection is revalidated on every request; revoked membership or an invalid relationship clears the entire selection."
       }
     },
     "/api/iocs": {
@@ -5847,7 +6129,7 @@
           }
         },
         "summary": "Authorized SOC monitoring queue",
-        "description": "Counts and rows share case/workspace membership and full batch-scope authorization. Channels derive from linked case status; no alerts are invented. Search matches rule, alert ID or case reference/title.",
+        "description": "Counts and rows are restricted to the server-session investigation selection, approved cases, workspace membership and full batch-scope authorization. No selection yields zero rows. Channels derive from linked case status. Search matches rule, alert ID or case reference/title.",
         "parameters": [
           {
             "name": "channel",

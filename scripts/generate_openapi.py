@@ -38,7 +38,7 @@ def generate() -> dict[str, object]:
             if path == "/api/soc/monitoring":
                 operation["summary"] = "Authorized SOC monitoring queue"
                 operation["description"] = (
-                    "Counts and rows share case/workspace membership and full batch-scope authorization. Channels derive from linked case status; no alerts are invented. Search matches rule, alert ID or case reference/title."
+                    "Counts and rows are restricted to the server-session investigation selection, approved cases, workspace membership and full batch-scope authorization. No selection yields zero rows. Channels derive from linked case status. Search matches rule, alert ID or case reference/title."
                 )
                 query_fields = {
                     "channel": {"type": "string", "enum": ["main", "investigation", "closed"], "default": "main"},
@@ -74,13 +74,29 @@ def generate() -> dict[str, object]:
                 operation["description"] = (
                     "Returns at most 10 analyses and a next_before cursor. Full batch scope is required. No raw sample bytes are returned."
                 )
+            contracts = {
+                "/api/investigation-selection": {"case_ids": {"type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": True, "items": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}}},
+                "/api/cases/{case_id}/approval": {"decision": {"type": "string", "enum": ["approved", "rejected"]}, "version": {"type": "integer", "minimum": 1}, "reason": {"type": "string", "minLength": 3, "maxLength": 1000}},
+                "/api/cases/{case_id}/relationships": {"related_case_id": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}, "reason": {"type": "string", "minLength": 3, "maxLength": 1000}},
+                "/api/demo/switch": {"user_id": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}},
+            }
+            if path in contracts and method == "POST":
+                fields = contracts[path]
+                operation["requestBody"] = {"required": True, "content": {"application/json": {"schema": {"type": "object", "additionalProperties": False, "required": list(fields), "properties": fields}}}}
+                operation["responses"].update({"404": {"description": "Resource unavailable within workspace scope"}, "409": {"description": "Manager approval required, already decided, or stale version"}, "422": {"description": "Invalid fields, bounds or unrelated pair"}})
+            if path == "/api/investigation-selection":
+                operation["description"] = "Requires cases.read. Select one approved visible case or two approved visible cases with an explicit manager-created relationship. Selection is revalidated on every request; revoked membership or an invalid relationship clears the entire selection."
+            elif path.endswith("/approval"):
+                operation["description"] = "Manager/admin with cases.override only. Each new case, including a restored capsule, starts pending. A versioned decision is atomic, final, audited and recorded in custody. Case work is blocked until approval. Existing V3 cases retain grandfathered access after one-time migration."
+            elif path.startswith("/api/demo/"):
+                operation["description"] = "Available only with explicit DEMO_MODE in development and a signed-in account in the isolated demo registry. Switching is restricted to registered active accounts in the same workspace without MFA. The previous session is revoked, a new session is created and case selection is cleared. Production refuses demo mode."
             paths.setdefault(path, {})[method.lower()] = operation
     return {
         "openapi": "3.1.0",
         "info": {
             "title": "SOCify Digital Autopsy API",
-            "version": "3.0.0",
-            "description": "Internal case-centered investigation. General training and unscoped legacy data endpoints return 410 in operational mode. V3 case creation requires title, reason and objective; structured record contracts are published by /api/autopsy/catalog. All writes require an authenticated session, permission and CSRF token.",
+            "version": "4.0.0",
+            "description": "Case-centered investigation with manager intake approval and a server-session selection of one or two related cases. General training and unscoped legacy data endpoints return 410 in operational mode. New cases require title, reason and objective and remain locked until approved. Structured records are published by /api/autopsy/catalog. All writes require an authenticated session, permission and CSRF token.",
         },
         "servers": [{"url": "/"}],
         "paths": paths,

@@ -26,7 +26,7 @@ window.SOCifyAutopsy.team = async () => {
       });
       root.append(panel(SOCifyLocale.template`صلاحيات ${autopsyLabel(role.role)}`, node("div", { class: "panel-body" }, [choices, button(SOCifyLocale.text("حفظ حدود الدور"), async () => { try { await api(`/api/team/roles/${role.role}`, { method: "PUT", body: { permissions: inputs.filter((input) => input.checked).map((input) => input.value) } }); await window.SOCifyAutopsy.team(); } catch (error) { handleError(error); } })])));
     }
-    const cases = (await api("/api/cases?page_size=100")).items.filter((item) => item.status !== "closed");
+    const cases = (await api("/api/cases?page_size=100")).items.filter((item) => item.status !== "closed" && (!window.SOCifyV4?.selection.required || window.SOCifyV4.selection.case_ids.includes(item.id)));
     const selected = autopsyChoice("case_id", cases.map((item) => ({ value: item.id, label: `${item.reference} · ${item.title}` })), "", true);
     const batchHolder = node("div");
     let batchChoice = null;

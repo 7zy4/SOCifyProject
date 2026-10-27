@@ -197,11 +197,16 @@ def _case_view(row: sqlite3.Row | None) -> dict[str, Any]:
     context = get_db().execute("SELECT * FROM autopsy_case_context WHERE case_id = ?", (row["id"],)).fetchone()
     item["context"] = dict(context) if context else None
     if operational_mode():
+        from .autopsy_workspace import approval
+
+        item["approval"] = approval(row["id"])
+        scope, scope_args = case_scope(current_user() or {})
+        item["related_case_ids"] = [related[0] for related in get_db().execute(f"SELECT c.id FROM case_relationships rel JOIN incident_cases c ON c.id=CASE WHEN rel.first_id=? THEN rel.second_id ELSE rel.first_id END WHERE (rel.first_id=? OR rel.second_id=?) AND c.workspace_id=? AND c.archived_at IS NULL{scope}", (row["id"], row["id"], row["id"], workspace_id(), *scope_args))]
         from .autopsy_pipeline import case_full_access
 
         item["full_case_access"] = case_full_access(row["id"])
         if not item["full_case_access"]:
-            allowed = {"id", "reference", "title", "status", "severity", "priority", "created_at", "updated_at", "version", "context", "full_case_access"}
+            allowed = {"id", "reference", "title", "status", "severity", "priority", "created_at", "updated_at", "version", "context", "full_case_access", "approval", "related_case_ids"}
             item = {key: value for key, value in item.items() if key in allowed}
             if item["context"]:
                 item["context"] = {key: value for key, value in item["context"].items() if key in {"case_id", "reason", "objective", "confidentiality"}}
@@ -402,6 +407,7 @@ def _create_case(data: dict[str, Any]):
                 "INSERT INTO autopsy_case_context(case_id, reason, objective, classification, created_at) VALUES (?, ?, ?, ?, ?)",
                 (case_id, str(reason).strip(), str(objective).strip(), classification, now),
             )
+            get_db().execute("INSERT INTO case_approvals(case_id,state,requested_by) VALUES (?,'pending',?)", (case_id, actor_id()))
             for member in {actor_id(), assignee} - {None}:
                 get_db().execute(
                     "INSERT INTO autopsy_case_members(case_id, user_id, responsibility, assigned_by, assigned_at) VALUES (?, ?, 'analyst', ?, ?)",

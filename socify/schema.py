@@ -1070,6 +1070,9 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         _migrate_legacy_incidents(connection)
         _execute_schema(connection, INDEX_SCHEMA)
         migrate(connection)
+        from .autopsy_workspace import migrate as migrate_workspace
+
+        migrate_workspace(connection)
         connection.commit()
     except Exception:
         connection.rollback()

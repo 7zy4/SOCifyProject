@@ -48,6 +48,10 @@ def app(tmp_path: Path, template_database: Path) -> Iterator[Flask]:
             "DATABASE": str(database),
             "TESTING": True,
             "LEGACY_TRAINING_TESTS": True,
+            # Pre-V4 suites exercise the existing tools independently of the new intake/selection policy.
+            # tests/integration/test_v4_workspace.py covers the production-default policy explicitly.
+            "REQUIRE_CASE_APPROVAL": False,
+            "REQUIRE_INVESTIGATION_SELECTION": False,
             "WTF_CSRF_ENABLED": False,
             "SECRET_KEY": "test-session-key",
             "CREDENTIAL_KEY": "test-credential-key",

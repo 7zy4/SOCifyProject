@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 
 from .autopsy_pipeline import full_case_scope_sql
 from .case_counts import consistent_read
@@ -37,9 +37,17 @@ def monitoring():
             raise ValueError
     except ValueError:
         return error_response("INVALID_MONITORING_FILTER", "تحقق من مرشحات المراقبة وقيم الترقيم", 422)
-    user = current_user()
+    user = current_user() or {}
     where = "c.workspace_id=? AND a.workspace_id=c.workspace_id AND c.archived_at IS NULL"
-    args = [workspace_id()]
+    args: list[object] = [workspace_id()]
+    if current_app.config["REQUIRE_INVESTIGATION_SELECTION"]:
+        from .autopsy_workspace import selected_ids
+
+        ids = selected_ids()
+        where += " AND c.id IN (" + (",".join("?" for _ in ids) or "NULL") + ")"
+        args.extend(ids)
+    if current_app.config["REQUIRE_CASE_APPROVAL"]:
+        where += " AND EXISTS(SELECT 1 FROM case_approvals ap WHERE ap.case_id=c.id AND ap.state='approved')"
     for clause, parameters in (case_scope(user), full_case_scope_sql(user), training_scope_sql("c.training_run_id")):
         where += clause
         args.extend(parameters)

@@ -42,7 +42,7 @@
       control.textContent = t("جارٍ إعداد نسخة التقرير…");
       try {
         await api(`/api/cases/${current.id}/reports`, {method:"POST",body:{version:current.version,profile:permission("evidence.download")?"full":"metadata_only_v1"}});
-        location.assign(url(`/cases/${current.id}`, {tab:"reports"}));
+        location.assign(autopsyCaseURL(current.id, {tab:"reports"}));
       } catch (error) { handleError(error); control.disabled = false; control.textContent = t("تقرير فوري"); }
     }, "primary");
     control.dataset.quickReport = "";
@@ -52,6 +52,9 @@
   async function monitoring() {
     const version = ++requestVersion;
     begin("monitoring");
+    if(window.SOCifyV4?.selection.required && !window.SOCifyV4.selection.case_ids.length) {
+      finish(emptyState(t("اختر قضية لبدء العمل"),t("تبقى السجلات والأدلة والإجراءات مرتبطة بقضيتها وصلاحياتها."),[linkedButton(t("اختيار نطاق التحقيق"),"/cases")])); return;
+    }
     const params = new URLSearchParams(location.search);
     const data = await api("/api/soc/monitoring?" + params);
     if (version !== requestVersion) return;
@@ -98,6 +101,12 @@
     surface.append(pages);root.append(surface);finish(root);
   }
   async function chooseCase(section, selected) {
+    if (window.SOCifyV4?.selection.required) {
+      const root = node("section",{class:"case-switcher","aria-label":t("سياق القضية")});
+      root.append(node("p",{class:"scope-note",text:t("تعمل الأدوات على القضية النشطة من النطاق الذي حددته في البداية")}));
+      if (!selected) root.append(linkedButton(t("اختيار نطاق التحقيق"),"/cases"));
+      return root;
+    }
     const params=new URLSearchParams(location.search),page=Math.max(1,Number(params.get("selector_page"))||1),query=params.get("selector_q")||"";
     const root=node("section",{class:"case-switcher","aria-label":t("سياق القضية")});
     const search=node("input",{name:"selector_q",type:"search",maxlength:200,value:query,autocomplete:"off",placeholder:t("اسم القضية أو مرجعها…")});
@@ -197,10 +206,11 @@
     if(section==="monitoring")return monitoring();
     const version=++requestVersion;
     begin(section);
-    const value=new URLSearchParams(location.search).get("case_id");
+    const value=new URLSearchParams(location.search).get("case_id") || window.SOCifyV4?.selection.case_ids[0];
     const current=value?await api(`/api/cases/${encodeURIComponent(value)}`):null;
     if(version!==requestVersion)return;
     const root=node("div",{class:"tool-view"},pageHead(...names[section]));
+    if (current && window.SOCifyV4?.intake(current)) return;
     root.append(await chooseCase(section,current));
     if(!current){root.append(emptyState(t("اختر قضية لبدء العمل"),t("تبقى السجلات والأدلة والإجراءات مرتبطة بقضيتها وصلاحياتها.")));finish(root);return;}
     autopsy.current=current;bindCase(current);
@@ -209,7 +219,10 @@
     }
     autopsy.assets=current.full_case_access===false?[]:(await api(`/api/cases/${current.id}/records?kind=asset&limit=100`)).items;
     const content=node("div",{class:"tool-results"});
-    if(section==="log-management")content.append(await window.SOCifyAutopsy.logs(current.id));
+    if(section==="log-management") {
+      content.append(await window.SOCifyAutopsy.logs(current.id));
+      content.append(panel(t("أدلة القضية"),current.evidence.length ? table([{label:t("الدليل"),value:"title"},{label:t("النوع"),value:"evidence_type"},{label:"SHA-256",value:"sha256"}],current.evidence) : emptyState(t("لا أدلة مرتبطة"),t("احتفظ بالأصل ومصدره واربطه بالقضية قبل استخلاص النتائج."))));
+    }
     else if(section==="endpoint-security") {
       content.append(node("p",{class:"scope-note",text:t("جرد وتحقيق للأصول المسجلة؛ لا اتصال EDR حي ولا عزل تلقائي للأجهزة.")}));
       content.append(await assetInventory(current.id));
@@ -217,9 +230,15 @@
     }else if(section==="threat-intel") {
       content.append(await autopsyRecordPanel("indicator"));
       content.append(await intelligence(current.id));
-    }else if(section==="sandbox")content.append(await window.SOCifyAutopsy.analysis(current.id));
+    }else if(section==="sandbox") {
+      content.append(await window.SOCifyAutopsy.analysis(current.id));
+      if(window.SOCifyAutopsy.localDetection)content.append(await window.SOCifyAutopsy.localDetection(current.id));
+    }
     else if(section==="email-security")content.append(await email(current.id));
-    else if(section==="reports")content.append(reportButton(current),await window.SOCifyAutopsy.reports(current.id));
+    else if(section==="reports") {
+      content.append(reportButton(current),await window.SOCifyAutopsy.reports(current.id));
+      if(window.SOCifyAutopsy.capsules)content.append(await window.SOCifyAutopsy.capsules(current.id));
+    }
     root.append(content);if(version===requestVersion)finish(root);
   }
   async function start(section) {

@@ -717,6 +717,10 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
 
 
 def _import_case_authorized(job: sqlite3.Row) -> bool:
+    from .autopsy_workspace import case_approved
+
+    if not case_approved(job["case_id"]):
+        return False
     case = (
         get_db().execute("SELECT status, archived_at FROM incident_cases WHERE id = ? AND workspace_id = ?", (job["case_id"], job["workspace_id"])).fetchone()
     )

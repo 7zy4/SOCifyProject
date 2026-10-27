@@ -51,7 +51,8 @@ def inspect_email(content: bytes) -> dict:
     headers = {}
     for key in ("From", "To", "Cc", "Reply-To", "Subject", "Date", "Message-ID", "Return-Path", "Authentication-Results", "Received-SPF"):
         headers[key] = "\n".join(str(value) for value in message.get_all(key, []))[:4096]
-    attachments, plain, html_text, links = [], [], [], []
+    attachments: list[dict] = []
+    plain, html_text, links = [], [], []
     part_count, header_count = 0, 0
     for part in message.walk():
         part_count += 1
@@ -61,6 +62,8 @@ def inspect_email(content: bytes) -> dict:
         if part.is_multipart():
             continue
         data = part.get_payload(decode=True) or b""
+        if not isinstance(data, bytes):
+            raise ValueError("محتوى جزء MIME ليس بيانات ثنائية صالحة")
         filename = part.get_filename()
         if filename or part.get_content_disposition() == "attachment" or part.get_content_type() not in {"text/plain", "text/html"}:
             if len(attachments) >= 50:

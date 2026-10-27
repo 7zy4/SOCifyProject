@@ -29,7 +29,8 @@ def test_theme_system_persistence_languages_and_operational_surfaces(app):
             base = f"http://127.0.0.1:{server.server_port}"
             page.goto(base + "/")
             assert page.locator("html").get_attribute("data-theme") == "dark"
-            assert page.locator("[data-theme-select]").input_value() == "system"
+            assert page.locator("[data-theme-select]").input_value() == "dark"
+            page.locator("[data-theme-select]").select_option("system")
             page.emulate_media(color_scheme="light")
             page.wait_for_function("() => document.documentElement.dataset.theme === 'light'")
             page.locator("[data-theme-select]").select_option("dark")
