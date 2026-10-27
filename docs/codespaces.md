@@ -1,4 +1,36 @@
-# تجربة SOCify Digital Autopsy في Codespaces — V3
+# تشغيل SOCify في Codespaces
+
+## V4: إصلاح NO_PUBKEY وتشغيل التجربة
+
+إذا انتهى إنشاء البيئة بـ`docker-in-docker` ورمز `100`، ومعه `NO_PUBKEY 62D54FD4003F6525` و`dl.yarnpkg.com`، فالسبب مصدر Yarn الموروث في صورة التطوير. أصلح V4 ترتيب البناء لإزالة هذا المصدر غير المستخدم قبل تثبيت Docker، مع بقاء فحص توقيعات APT. حاوية Alpine التي تظهر بعد الفشل هي حاوية استرداد وليست بيئة التشغيل المكتملة.
+
+من طرفية **Codespace الموجود نفسه**، حتى لو كانت حاوية استرداد:
+
+```bash
+cd /workspaces/SOCifyProject
+git fetch origin
+git switch V4
+git pull --ff-only origin V4
+```
+
+ثم افتح Ctrl+Shift+P واختر **Codespaces: Rebuild Container**. انتظر اكتمال البناء وتثبيت الاعتماديات. لا تحذف Codespace أو `instance` أو ملفات المفاتيح. إن منع Git التحديث بسبب تعديلات محلية، احتفظ بها ولا تستخدم reset أو clean.
+
+بعد إعادة البناء، افتح Terminal جديدًا ونفّذ:
+
+```bash
+cd /workspaces/SOCifyProject
+bash scripts/try_v4_demo.sh
+```
+
+الأمر يبني خدمة التحليل ويشغّلها، ثم ينشئ بيانات V4 المعزولة إن لم تكن موجودة، أو يعيد تشغيلها دون تغيير الحسابات وكلمات المرور. افتح `instance/v4-demo/accounts.json` داخل محرر VS Code للحصول على حسابات بيئتك الجديدة؛ كلمات مرور بيئة المساعد السابقة لا تنتقل عبر Git.
+
+افتح **Ports → 5000 → Open in Browser** مع **Visibility: Private**، ثم `/login`. ابدأ بـ`manager@demo.socify.test` وكلمة المرور من الملف. اختر القضية 1 أو القضيتين 1 و2؛ الطلب 3 لاختبار اعتماد المدير. أبقِ الطرفية مفتوحة، وCtrl+C يوقف التطبيق. عند التشغيل التالي استخدم الأمر نفسه.
+
+إذا ظهر أن المنفذ مستخدم، أوقف خادم المشروع السابق من طرفيته أو اختر منفذًا آخر: `SOCIFY_PORT=5001 bash scripts/try_v4_demo.sh`. إذا وجدت تهيئة سابقة غير مكتملة، لا تحذفها: استخدم `bash scripts/try_v4_demo.sh instance/v4-demo-retry`، ثم اقرأ `accounts.json` من المجلد الجديد. تشخيص البيئة بعد إعادة البناء: `docker info` و`.venv/bin/python --version`. فحص الخادم بعد تشغيله من طرفية ثانية: `curl -fsS http://127.0.0.1:5000/health/ready`.
+
+راجع [تشغيل V4](operations-v4.md)، و[خطوات التجربة](v4-demo-walkthrough.md)، و[تفاصيل الإصلاح](qa/v4-codespaces-yarn-repair.md).
+
+## تشغيل V3 السابق
 
 لا تحذف Codespace أو قواعد البيانات أو المفاتيح. استخدم البرنش الموجود `socify-version-3`. يحفظ التحديث الحسابات والفريق والأدلة؛ لا يغيّر `main` أو V2.
 

@@ -292,4 +292,5 @@ def test_codespaces_generates_untracked_runtime_secrets() -> None:
     configuration = Path(".devcontainer/devcontainer.json").read_text(encoding="utf-8")
     assert "codespace-development-session-key" not in configuration
     assert "codespace-development-credential-key" not in configuration
-    assert "scripts.prepare_codespace" in configuration
+    assert "scripts/setup_devcontainer.sh" in configuration
+    assert "scripts.prepare_codespace" in Path("scripts/setup_devcontainer.sh").read_text()
