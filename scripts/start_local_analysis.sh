@@ -15,16 +15,25 @@ analysis_expected="$(docker image inspect --format '{{.Id}}' "$analysis_image")"
 if docker container inspect "$analysis_container" >/dev/null 2>&1; then
   analysis_actual="$(docker container inspect --format '{{.Image}}' "$analysis_container")"
   analysis_mount="$(docker container inspect --format '{{range .Mounts}}{{if eq .Destination "/analysis-ipc"}}{{.Source}}{{end}}{{end}}' "$analysis_container")"
-  if [[ "$analysis_actual" != "$analysis_expected" || "$analysis_mount" != "$analysis_directory" ]]; then
+  if [[ "$analysis_mount" != "$analysis_directory" ]]; then
     printf '%s\n' 'Existing development backend differs; inspect it before replacement.' >&2
     exit 1
   fi
-  if [[ "$(docker container inspect --format '{{.State.Running}}' "$analysis_container")" == true ]]; then
+  if [[ "$analysis_actual" != "$analysis_expected" ]]; then
+    if [[ "${SOCIFY_ANALYSIS_REFRESH_IMAGE:-0}" != 1 ]]; then
+      printf '%s\n' 'Existing development backend differs; inspect it before replacement.' >&2
+      exit 1
+    fi
+    printf '%s\n' "Updating development analysis container: $analysis_container (same IPC directory; databases are preserved)." >&2
+    docker stop --time 30 "$analysis_container" >/dev/null
+    docker rm "$analysis_container" >/dev/null
+  elif [[ "$(docker container inspect --format '{{.State.Running}}' "$analysis_container")" == true ]]; then
     test -S "$analysis_directory/analysis.sock"
     printf '%s\n' "$analysis_directory/analysis.sock"
     exit 0
+  else
+    docker rm "$analysis_container" >/dev/null
   fi
-  docker rm "$analysis_container" >/dev/null
 fi
 install -d -m 2770 "$analysis_directory"
 if [[ -e "$analysis_directory/analysis.sock" && ! -S "$analysis_directory/analysis.sock" ]]; then
