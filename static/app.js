@@ -98,7 +98,11 @@ function setHeading(section) {
   document.getElementById("section-title").textContent = title;
   document.getElementById("section-kicker").textContent = kicker;
   document.title = `${title} | SOCify`;
-  document.querySelectorAll("#primary-nav a").forEach((link) => link.classList.toggle("active", link.dataset.section === section));
+  document.querySelectorAll("#primary-nav a").forEach((link) => {
+    const active = link.dataset.section === section || (section === "case" && link.dataset.section === "cases");
+    link.classList.toggle("active", active);
+    if (active) link.setAttribute("aria-current", "page"); else link.removeAttribute("aria-current");
+  });
 }
 
 function begin(section) {

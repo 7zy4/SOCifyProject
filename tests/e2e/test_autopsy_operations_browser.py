@@ -98,6 +98,7 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
             case_id = case["id"]
             page.goto(f"http://127.0.0.1:{server.server_port}/cases/{case_id}")
             handoff = page.locator("section.panel").filter(has=page.get_by_role("heading", name="تسليم المناوبة", exact=True))
+            handoff.locator("summary").click()
             team = page.evaluate("async () => await api('/api/team')")
             manager_name = next(member["name"] for member in team["members"] if member["role"] == "soc_manager")
             analyst_name = next(member["name"] for member in team["members"] if member["role"] == "analyst")

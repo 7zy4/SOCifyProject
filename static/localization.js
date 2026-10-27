@@ -9,6 +9,17 @@
   document.documentElement.lang = language;
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
   const english = {
+    "تعديل التفاصيل": "Edit details",
+    "جارٍ الحفظ…": "Saving…",
+    "المظهر": "Appearance",
+    "حسب النظام": "System",
+    "فاتح": "Light",
+    "داكن": "Dark",
+    "مساحة واحدة للتحقيق الموثّق": "One workspace. Every finding connected.",
+    "نظرة على القضية": "Case overview",
+    "المسؤول عن القضية": "Case owner",
+    "قضايا الفريق": "Team cases",
+    "التصنيف الأمني": "Classification",
     "التقارير": "Reports",
     "القضايا": "Cases",
     "مهامي": "My tasks",

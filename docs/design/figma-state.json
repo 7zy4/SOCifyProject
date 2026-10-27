@@ -1,0 +1,1560 @@
+{
+  "runId": "socify-interface-20261027",
+  "fileKey": "Ytucm3oFTuZRB3SrxVGRCX",
+  "collections": [
+    {
+      "id": "VariableCollectionId:3:2",
+      "name": "SOCify / Primitives",
+      "modes": [
+        {
+          "name": "Value",
+          "modeId": "3:0"
+        }
+      ]
+    },
+    {
+      "id": "VariableCollectionId:3:3",
+      "name": "SOCify / Light",
+      "modes": [
+        {
+          "name": "Value",
+          "modeId": "3:1"
+        }
+      ]
+    },
+    {
+      "id": "VariableCollectionId:3:4",
+      "name": "SOCify / Dark",
+      "modes": [
+        {
+          "name": "Value",
+          "modeId": "3:2"
+        }
+      ]
+    },
+    {
+      "id": "VariableCollectionId:3:5",
+      "name": "SOCify / Geometry",
+      "modes": [
+        {
+          "name": "Value",
+          "modeId": "3:3"
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "Light/color/bg": "VariableID:3:8",
+    "Dark/color/bg": "VariableID:3:9",
+    "Light/color/panel": "VariableID:3:12",
+    "Dark/color/panel": "VariableID:3:13",
+    "Light/color/panel-2": "VariableID:3:16",
+    "Dark/color/panel-2": "VariableID:3:17",
+    "Light/color/text": "VariableID:3:20",
+    "Dark/color/text": "VariableID:3:21",
+    "Light/color/muted": "VariableID:3:24",
+    "Dark/color/muted": "VariableID:3:25",
+    "Light/color/line": "VariableID:3:28",
+    "Dark/color/line": "VariableID:3:29",
+    "Light/color/line-soft": "VariableID:3:32",
+    "Dark/color/line-soft": "VariableID:3:33",
+    "Light/color/blue": "VariableID:3:36",
+    "Dark/color/blue": "VariableID:3:37",
+    "Light/color/primary-fill": "VariableID:3:39",
+    "Dark/color/primary-fill": "VariableID:3:40",
+    "Light/color/primary-hover": "VariableID:3:43",
+    "Dark/color/primary-hover": "VariableID:3:44",
+    "Light/color/on-primary": "VariableID:3:45",
+    "Dark/color/on-primary": "VariableID:3:46",
+    "Light/color/focus": "VariableID:3:48",
+    "Dark/color/focus": "VariableID:3:49",
+    "Light/color/red": "VariableID:3:52",
+    "Dark/color/red": "VariableID:3:53",
+    "Light/color/red-bg": "VariableID:3:56",
+    "Dark/color/red-bg": "VariableID:3:57",
+    "Light/color/high": "VariableID:3:60",
+    "Dark/color/high": "VariableID:3:61",
+    "Light/color/high-bg": "VariableID:3:64",
+    "Dark/color/high-bg": "VariableID:3:65",
+    "Light/color/amber": "VariableID:3:68",
+    "Dark/color/amber": "VariableID:3:69",
+    "Light/color/amber-bg": "VariableID:3:72",
+    "Dark/color/amber-bg": "VariableID:3:73",
+    "Light/color/success": "VariableID:3:76",
+    "Dark/color/success": "VariableID:3:77",
+    "Light/color/success-bg": "VariableID:3:80",
+    "Dark/color/success-bg": "VariableID:3:81",
+    "Light/color/info-bg": "VariableID:3:84",
+    "Dark/color/info-bg": "VariableID:3:85",
+    "Light/color/sidebar-bg": "VariableID:3:88",
+    "Dark/color/sidebar-bg": "VariableID:3:89",
+    "Light/color/sidebar-text": "VariableID:3:91",
+    "Dark/color/sidebar-text": "VariableID:3:92",
+    "Light/color/sidebar-active": "VariableID:3:94",
+    "Dark/color/sidebar-active": "VariableID:3:95",
+    "Light/color/hero-bg": "VariableID:3:98",
+    "Dark/color/hero-bg": "VariableID:3:99",
+    "spacing/4": "VariableID:3:100",
+    "spacing/8": "VariableID:3:101",
+    "spacing/12": "VariableID:3:102",
+    "spacing/16": "VariableID:3:103",
+    "spacing/24": "VariableID:3:104",
+    "spacing/32": "VariableID:3:105",
+    "spacing/48": "VariableID:3:106",
+    "spacing/64": "VariableID:3:107",
+    "radius/6": "VariableID:3:108",
+    "radius/8": "VariableID:3:109",
+    "radius/12": "VariableID:3:110",
+    "radius/16": "VariableID:3:111"
+  },
+  "primitiveCount": 44,
+  "styles": [
+    {
+      "id": "S:1e9dac7332a4fdd593c7cf0b1fed678ab3197ff5,",
+      "name": "AR/caption",
+      "font": "Almarai",
+      "size": 12
+    },
+    {
+      "id": "S:7c44a9ba3325abd91feb4f304257cf28aaebff07,",
+      "name": "AR/label",
+      "font": "Almarai",
+      "size": 14
+    },
+    {
+      "id": "S:1e3689fed7125083d0d830e3df49d3f6bec24534,",
+      "name": "AR/body",
+      "font": "Almarai",
+      "size": 15
+    },
+    {
+      "id": "S:321374f633320dc5dadff519ca28f4e4d4bf74a0,",
+      "name": "AR/lead",
+      "font": "Almarai",
+      "size": 18
+    },
+    {
+      "id": "S:6d1187085af3f90c5e609f28c20da974e365080d,",
+      "name": "AR/h3",
+      "font": "Almarai",
+      "size": 20
+    },
+    {
+      "id": "S:476f0045ea73d64a5f35f9f8e42cca2e0fb4836b,",
+      "name": "AR/h2",
+      "font": "Almarai",
+      "size": 24
+    },
+    {
+      "id": "S:a60dc987ba073b48eedfda1f6b08bf795723a538,",
+      "name": "AR/h1",
+      "font": "Almarai",
+      "size": 32
+    },
+    {
+      "id": "S:e8f6136ffe53fbccad573249542cdad795de219a,",
+      "name": "AR/display",
+      "font": "Almarai",
+      "size": 56
+    },
+    {
+      "id": "S:49ee16e30c5ade888c1a65ced39662a8a617519d,",
+      "name": "EN/caption",
+      "font": "IBM Plex Sans",
+      "size": 12
+    },
+    {
+      "id": "S:d0bb0d0160fb942dde15d83ca973dbb5eae7e722,",
+      "name": "EN/label",
+      "font": "IBM Plex Sans",
+      "size": 14
+    },
+    {
+      "id": "S:6a69c91e8ede738b85bcb9cd0ebd6ddca2c5213f,",
+      "name": "EN/body",
+      "font": "IBM Plex Sans",
+      "size": 15
+    },
+    {
+      "id": "S:fa04319ceecc49cd1418510fdf8dfc05f6c76472,",
+      "name": "EN/lead",
+      "font": "IBM Plex Sans",
+      "size": 18
+    },
+    {
+      "id": "S:cc8e0c04f66c6677b251b6852fd3f37a0dfdfaa7,",
+      "name": "EN/h3",
+      "font": "IBM Plex Sans",
+      "size": 20
+    },
+    {
+      "id": "S:cc1e7d240dce117964aa00b523e61a84b1c8bda5,",
+      "name": "EN/h2",
+      "font": "IBM Plex Sans",
+      "size": 24
+    },
+    {
+      "id": "S:fe6bdb223f5550ed90f76df4815ef488047e2647,",
+      "name": "EN/h1",
+      "font": "IBM Plex Sans",
+      "size": 32
+    },
+    {
+      "id": "S:31fc865281da60cc374cf068354c267d2b50286e,",
+      "name": "EN/display",
+      "font": "IBM Plex Sans",
+      "size": 56
+    }
+  ],
+  "pages": [
+    {
+      "id": "0:1",
+      "name": "01 Foundations & Components"
+    },
+    {
+      "id": "3:128",
+      "name": "02 Product Screens"
+    }
+  ],
+  "components": {
+    "Button / EN": {
+      "id": "4:52",
+      "variants": [
+        {
+          "id": "4:28",
+          "Theme": "Light",
+          "Style": "Primary",
+          "State": "Default"
+        },
+        {
+          "id": "4:29",
+          "Theme": "Light",
+          "Style": "Primary",
+          "State": "Hover"
+        },
+        {
+          "id": "4:30",
+          "Theme": "Light",
+          "Style": "Primary",
+          "State": "Focus"
+        },
+        {
+          "id": "4:31",
+          "Theme": "Light",
+          "Style": "Primary",
+          "State": "Disabled"
+        },
+        {
+          "id": "4:32",
+          "Theme": "Light",
+          "Style": "Primary",
+          "State": "Loading"
+        },
+        {
+          "id": "4:33",
+          "Theme": "Light",
+          "Style": "Primary",
+          "State": "Pressed"
+        },
+        {
+          "id": "4:34",
+          "Theme": "Light",
+          "Style": "Ghost",
+          "State": "Default"
+        },
+        {
+          "id": "4:35",
+          "Theme": "Light",
+          "Style": "Ghost",
+          "State": "Hover"
+        },
+        {
+          "id": "4:36",
+          "Theme": "Light",
+          "Style": "Ghost",
+          "State": "Focus"
+        },
+        {
+          "id": "4:37",
+          "Theme": "Light",
+          "Style": "Ghost",
+          "State": "Disabled"
+        },
+        {
+          "id": "4:38",
+          "Theme": "Light",
+          "Style": "Ghost",
+          "State": "Loading"
+        },
+        {
+          "id": "4:39",
+          "Theme": "Light",
+          "Style": "Ghost",
+          "State": "Pressed"
+        },
+        {
+          "id": "4:40",
+          "Theme": "Dark",
+          "Style": "Primary",
+          "State": "Default"
+        },
+        {
+          "id": "4:41",
+          "Theme": "Dark",
+          "Style": "Primary",
+          "State": "Hover"
+        },
+        {
+          "id": "4:42",
+          "Theme": "Dark",
+          "Style": "Primary",
+          "State": "Focus"
+        },
+        {
+          "id": "4:43",
+          "Theme": "Dark",
+          "Style": "Primary",
+          "State": "Disabled"
+        },
+        {
+          "id": "4:44",
+          "Theme": "Dark",
+          "Style": "Primary",
+          "State": "Loading"
+        },
+        {
+          "id": "4:45",
+          "Theme": "Dark",
+          "Style": "Primary",
+          "State": "Pressed"
+        },
+        {
+          "id": "4:46",
+          "Theme": "Dark",
+          "Style": "Ghost",
+          "State": "Default"
+        },
+        {
+          "id": "4:47",
+          "Theme": "Dark",
+          "Style": "Ghost",
+          "State": "Hover"
+        },
+        {
+          "id": "4:48",
+          "Theme": "Dark",
+          "Style": "Ghost",
+          "State": "Focus"
+        },
+        {
+          "id": "4:49",
+          "Theme": "Dark",
+          "Style": "Ghost",
+          "State": "Disabled"
+        },
+        {
+          "id": "4:50",
+          "Theme": "Dark",
+          "Style": "Ghost",
+          "State": "Loading"
+        },
+        {
+          "id": "4:51",
+          "Theme": "Dark",
+          "Style": "Ghost",
+          "State": "Pressed"
+        }
+      ]
+    },
+    "Button / AR": {
+      "id": "4:101",
+      "variants": [
+        {
+          "id": "4:77",
+          "Theme": "Light",
+          "Style": "Primary",
+          "State": "Default"
+        },
+        {
+          "id": "4:78",
+          "Theme": "Light",
+          "Style": "Primary",
+          "State": "Hover"
+        },
+        {
+          "id": "4:79",
+          "Theme": "Light",
+          "Style": "Primary",
+          "State": "Focus"
+        },
+        {
+          "id": "4:80",
+          "Theme": "Light",
+          "Style": "Primary",
+          "State": "Disabled"
+        },
+        {
+          "id": "4:81",
+          "Theme": "Light",
+          "Style": "Primary",
+          "State": "Loading"
+        },
+        {
+          "id": "4:82",
+          "Theme": "Light",
+          "Style": "Primary",
+          "State": "Pressed"
+        },
+        {
+          "id": "4:83",
+          "Theme": "Light",
+          "Style": "Ghost",
+          "State": "Default"
+        },
+        {
+          "id": "4:84",
+          "Theme": "Light",
+          "Style": "Ghost",
+          "State": "Hover"
+        },
+        {
+          "id": "4:85",
+          "Theme": "Light",
+          "Style": "Ghost",
+          "State": "Focus"
+        },
+        {
+          "id": "4:86",
+          "Theme": "Light",
+          "Style": "Ghost",
+          "State": "Disabled"
+        },
+        {
+          "id": "4:87",
+          "Theme": "Light",
+          "Style": "Ghost",
+          "State": "Loading"
+        },
+        {
+          "id": "4:88",
+          "Theme": "Light",
+          "Style": "Ghost",
+          "State": "Pressed"
+        },
+        {
+          "id": "4:89",
+          "Theme": "Dark",
+          "Style": "Primary",
+          "State": "Default"
+        },
+        {
+          "id": "4:90",
+          "Theme": "Dark",
+          "Style": "Primary",
+          "State": "Hover"
+        },
+        {
+          "id": "4:91",
+          "Theme": "Dark",
+          "Style": "Primary",
+          "State": "Focus"
+        },
+        {
+          "id": "4:92",
+          "Theme": "Dark",
+          "Style": "Primary",
+          "State": "Disabled"
+        },
+        {
+          "id": "4:93",
+          "Theme": "Dark",
+          "Style": "Primary",
+          "State": "Loading"
+        },
+        {
+          "id": "4:94",
+          "Theme": "Dark",
+          "Style": "Primary",
+          "State": "Pressed"
+        },
+        {
+          "id": "4:95",
+          "Theme": "Dark",
+          "Style": "Ghost",
+          "State": "Default"
+        },
+        {
+          "id": "4:96",
+          "Theme": "Dark",
+          "Style": "Ghost",
+          "State": "Hover"
+        },
+        {
+          "id": "4:97",
+          "Theme": "Dark",
+          "Style": "Ghost",
+          "State": "Focus"
+        },
+        {
+          "id": "4:98",
+          "Theme": "Dark",
+          "Style": "Ghost",
+          "State": "Disabled"
+        },
+        {
+          "id": "4:99",
+          "Theme": "Dark",
+          "Style": "Ghost",
+          "State": "Loading"
+        },
+        {
+          "id": "4:100",
+          "Theme": "Dark",
+          "Style": "Ghost",
+          "State": "Pressed"
+        }
+      ]
+    },
+    "Field": {
+      "id": "4:142",
+      "variants": [
+        {
+          "id": "4:126",
+          "Theme": "Light",
+          "Locale": "AR",
+          "State": "Default"
+        },
+        {
+          "id": "4:127",
+          "Theme": "Light",
+          "Locale": "AR",
+          "State": "Focus"
+        },
+        {
+          "id": "4:128",
+          "Theme": "Light",
+          "Locale": "AR",
+          "State": "Error"
+        },
+        {
+          "id": "4:129",
+          "Theme": "Light",
+          "Locale": "AR",
+          "State": "Disabled"
+        },
+        {
+          "id": "4:130",
+          "Theme": "Light",
+          "Locale": "EN",
+          "State": "Default"
+        },
+        {
+          "id": "4:131",
+          "Theme": "Light",
+          "Locale": "EN",
+          "State": "Focus"
+        },
+        {
+          "id": "4:132",
+          "Theme": "Light",
+          "Locale": "EN",
+          "State": "Error"
+        },
+        {
+          "id": "4:133",
+          "Theme": "Light",
+          "Locale": "EN",
+          "State": "Disabled"
+        },
+        {
+          "id": "4:134",
+          "Theme": "Dark",
+          "Locale": "AR",
+          "State": "Default"
+        },
+        {
+          "id": "4:135",
+          "Theme": "Dark",
+          "Locale": "AR",
+          "State": "Focus"
+        },
+        {
+          "id": "4:136",
+          "Theme": "Dark",
+          "Locale": "AR",
+          "State": "Error"
+        },
+        {
+          "id": "4:137",
+          "Theme": "Dark",
+          "Locale": "AR",
+          "State": "Disabled"
+        },
+        {
+          "id": "4:138",
+          "Theme": "Dark",
+          "Locale": "EN",
+          "State": "Default"
+        },
+        {
+          "id": "4:139",
+          "Theme": "Dark",
+          "Locale": "EN",
+          "State": "Focus"
+        },
+        {
+          "id": "4:140",
+          "Theme": "Dark",
+          "Locale": "EN",
+          "State": "Error"
+        },
+        {
+          "id": "4:141",
+          "Theme": "Dark",
+          "Locale": "EN",
+          "State": "Disabled"
+        }
+      ]
+    },
+    "Navigation": {
+      "id": "4:167",
+      "variants": [
+        {
+          "id": "4:159",
+          "Theme": "Light",
+          "Locale": "AR",
+          "State": "Default"
+        },
+        {
+          "id": "4:160",
+          "Theme": "Light",
+          "Locale": "AR",
+          "State": "Selected"
+        },
+        {
+          "id": "4:161",
+          "Theme": "Light",
+          "Locale": "EN",
+          "State": "Default"
+        },
+        {
+          "id": "4:162",
+          "Theme": "Light",
+          "Locale": "EN",
+          "State": "Selected"
+        },
+        {
+          "id": "4:163",
+          "Theme": "Dark",
+          "Locale": "AR",
+          "State": "Default"
+        },
+        {
+          "id": "4:164",
+          "Theme": "Dark",
+          "Locale": "AR",
+          "State": "Selected"
+        },
+        {
+          "id": "4:165",
+          "Theme": "Dark",
+          "Locale": "EN",
+          "State": "Default"
+        },
+        {
+          "id": "4:166",
+          "Theme": "Dark",
+          "Locale": "EN",
+          "State": "Selected"
+        }
+      ]
+    },
+    "Tab": {
+      "id": "4:184",
+      "variants": [
+        {
+          "id": "4:176",
+          "Theme": "Light",
+          "Locale": "AR",
+          "State": "Default"
+        },
+        {
+          "id": "4:177",
+          "Theme": "Light",
+          "Locale": "AR",
+          "State": "Selected"
+        },
+        {
+          "id": "4:178",
+          "Theme": "Light",
+          "Locale": "EN",
+          "State": "Default"
+        },
+        {
+          "id": "4:179",
+          "Theme": "Light",
+          "Locale": "EN",
+          "State": "Selected"
+        },
+        {
+          "id": "4:180",
+          "Theme": "Dark",
+          "Locale": "AR",
+          "State": "Default"
+        },
+        {
+          "id": "4:181",
+          "Theme": "Dark",
+          "Locale": "AR",
+          "State": "Selected"
+        },
+        {
+          "id": "4:182",
+          "Theme": "Dark",
+          "Locale": "EN",
+          "State": "Default"
+        },
+        {
+          "id": "4:183",
+          "Theme": "Dark",
+          "Locale": "EN",
+          "State": "Selected"
+        }
+      ]
+    },
+    "Badge": {
+      "id": "4:217",
+      "variants": [
+        {
+          "id": "4:193",
+          "Theme": "Light",
+          "Locale": "AR",
+          "Tone": "Critical"
+        },
+        {
+          "id": "4:194",
+          "Theme": "Light",
+          "Locale": "AR",
+          "Tone": "High"
+        },
+        {
+          "id": "4:195",
+          "Theme": "Light",
+          "Locale": "AR",
+          "Tone": "Medium"
+        },
+        {
+          "id": "4:196",
+          "Theme": "Light",
+          "Locale": "AR",
+          "Tone": "Low"
+        },
+        {
+          "id": "4:197",
+          "Theme": "Light",
+          "Locale": "AR",
+          "Tone": "Info"
+        },
+        {
+          "id": "4:198",
+          "Theme": "Light",
+          "Locale": "AR",
+          "Tone": "Neutral"
+        },
+        {
+          "id": "4:199",
+          "Theme": "Light",
+          "Locale": "EN",
+          "Tone": "Critical"
+        },
+        {
+          "id": "4:200",
+          "Theme": "Light",
+          "Locale": "EN",
+          "Tone": "High"
+        },
+        {
+          "id": "4:201",
+          "Theme": "Light",
+          "Locale": "EN",
+          "Tone": "Medium"
+        },
+        {
+          "id": "4:202",
+          "Theme": "Light",
+          "Locale": "EN",
+          "Tone": "Low"
+        },
+        {
+          "id": "4:203",
+          "Theme": "Light",
+          "Locale": "EN",
+          "Tone": "Info"
+        },
+        {
+          "id": "4:204",
+          "Theme": "Light",
+          "Locale": "EN",
+          "Tone": "Neutral"
+        },
+        {
+          "id": "4:205",
+          "Theme": "Dark",
+          "Locale": "AR",
+          "Tone": "Critical"
+        },
+        {
+          "id": "4:206",
+          "Theme": "Dark",
+          "Locale": "AR",
+          "Tone": "High"
+        },
+        {
+          "id": "4:207",
+          "Theme": "Dark",
+          "Locale": "AR",
+          "Tone": "Medium"
+        },
+        {
+          "id": "4:208",
+          "Theme": "Dark",
+          "Locale": "AR",
+          "Tone": "Low"
+        },
+        {
+          "id": "4:209",
+          "Theme": "Dark",
+          "Locale": "AR",
+          "Tone": "Info"
+        },
+        {
+          "id": "4:210",
+          "Theme": "Dark",
+          "Locale": "AR",
+          "Tone": "Neutral"
+        },
+        {
+          "id": "4:211",
+          "Theme": "Dark",
+          "Locale": "EN",
+          "Tone": "Critical"
+        },
+        {
+          "id": "4:212",
+          "Theme": "Dark",
+          "Locale": "EN",
+          "Tone": "High"
+        },
+        {
+          "id": "4:213",
+          "Theme": "Dark",
+          "Locale": "EN",
+          "Tone": "Medium"
+        },
+        {
+          "id": "4:214",
+          "Theme": "Dark",
+          "Locale": "EN",
+          "Tone": "Low"
+        },
+        {
+          "id": "4:215",
+          "Theme": "Dark",
+          "Locale": "EN",
+          "Tone": "Info"
+        },
+        {
+          "id": "4:216",
+          "Theme": "Dark",
+          "Locale": "EN",
+          "Tone": "Neutral"
+        }
+      ]
+    }
+  },
+  "logo": {
+    "id": "5:2",
+    "imageId": "5:3"
+  },
+  "specimen": {
+    "id": "5:4"
+  },
+  "sets": [
+    {
+      "id": "4:52",
+      "name": "Button / EN",
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 1168,
+        "height": 304
+      }
+    },
+    {
+      "id": "4:101",
+      "name": "Button / AR",
+      "bounds": {
+        "x": 0,
+        "y": 384,
+        "width": 1168,
+        "height": 304
+      }
+    },
+    {
+      "id": "4:142",
+      "name": "Field",
+      "bounds": {
+        "x": 0,
+        "y": 768,
+        "width": 1328,
+        "height": 320
+      }
+    },
+    {
+      "id": "4:167",
+      "name": "Navigation",
+      "bounds": {
+        "x": 0,
+        "y": 1168,
+        "width": 512,
+        "height": 312
+      }
+    },
+    {
+      "id": "4:184",
+      "name": "Tab",
+      "bounds": {
+        "x": 0,
+        "y": 1560,
+        "width": 416,
+        "height": 320
+      }
+    },
+    {
+      "id": "4:217",
+      "name": "Badge",
+      "bounds": {
+        "x": 0,
+        "y": 1960,
+        "width": 976,
+        "height": 256
+      }
+    }
+  ],
+  "wrappers": [
+    {
+      "id": "6:6",
+      "name": "AR / Light / cases",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "cases",
+      "width": 1440
+    },
+    {
+      "id": "6:7",
+      "name": "AR / Light / summary",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "summary",
+      "width": 1440
+    },
+    {
+      "id": "6:8",
+      "name": "AR / Light / logs",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "logs",
+      "width": 1440
+    },
+    {
+      "id": "6:9",
+      "name": "AR / Light / analysis",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "analysis",
+      "width": 1440
+    },
+    {
+      "id": "6:10",
+      "name": "AR / Light / investigation",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "investigation",
+      "width": 1440
+    },
+    {
+      "id": "6:11",
+      "name": "AR / Light / response",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "response",
+      "width": 1440
+    },
+    {
+      "id": "6:12",
+      "name": "AR / Light / activity",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "activity",
+      "width": 1440
+    },
+    {
+      "id": "6:13",
+      "name": "AR / Light / reports",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "reports",
+      "width": 1440
+    },
+    {
+      "id": "6:14",
+      "name": "AR / Light / my-tasks",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "my-tasks",
+      "width": 1440
+    },
+    {
+      "id": "6:15",
+      "name": "AR / Light / team",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "team",
+      "width": 1440
+    },
+    {
+      "id": "6:16",
+      "name": "AR / Light / playbooks",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "playbooks",
+      "width": 1440
+    },
+    {
+      "id": "6:17",
+      "name": "AR / Light / analysis-library",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "analysis-library",
+      "width": 1440
+    },
+    {
+      "id": "6:18",
+      "name": "AR / Light / profile",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "profile",
+      "width": 1440
+    },
+    {
+      "id": "6:19",
+      "name": "AR / Light / landing",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "landing",
+      "width": 1440
+    },
+    {
+      "id": "6:20",
+      "name": "AR / Light / login",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "login",
+      "width": 1440
+    },
+    {
+      "id": "6:21",
+      "name": "AR / Light / register",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "register",
+      "width": 1440
+    },
+    {
+      "id": "6:22",
+      "name": "AR / Light / cases / Mobile",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "cases",
+      "width": 390
+    },
+    {
+      "id": "6:23",
+      "name": "AR / Light / summary / Mobile",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "summary",
+      "width": 390
+    },
+    {
+      "id": "6:24",
+      "name": "AR / Light / login / Mobile",
+      "locale": "AR",
+      "theme": "Light",
+      "route": "login",
+      "width": 390
+    },
+    {
+      "id": "6:25",
+      "name": "AR / Dark / cases",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "cases",
+      "width": 1440
+    },
+    {
+      "id": "6:26",
+      "name": "AR / Dark / summary",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "summary",
+      "width": 1440
+    },
+    {
+      "id": "6:27",
+      "name": "AR / Dark / logs",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "logs",
+      "width": 1440
+    },
+    {
+      "id": "6:28",
+      "name": "AR / Dark / analysis",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "analysis",
+      "width": 1440
+    },
+    {
+      "id": "6:29",
+      "name": "AR / Dark / investigation",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "investigation",
+      "width": 1440
+    },
+    {
+      "id": "6:30",
+      "name": "AR / Dark / response",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "response",
+      "width": 1440
+    },
+    {
+      "id": "6:31",
+      "name": "AR / Dark / activity",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "activity",
+      "width": 1440
+    },
+    {
+      "id": "6:32",
+      "name": "AR / Dark / reports",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "reports",
+      "width": 1440
+    },
+    {
+      "id": "6:33",
+      "name": "AR / Dark / my-tasks",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "my-tasks",
+      "width": 1440
+    },
+    {
+      "id": "6:34",
+      "name": "AR / Dark / team",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "team",
+      "width": 1440
+    },
+    {
+      "id": "6:35",
+      "name": "AR / Dark / playbooks",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "playbooks",
+      "width": 1440
+    },
+    {
+      "id": "6:36",
+      "name": "AR / Dark / analysis-library",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "analysis-library",
+      "width": 1440
+    },
+    {
+      "id": "6:37",
+      "name": "AR / Dark / profile",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "profile",
+      "width": 1440
+    },
+    {
+      "id": "6:38",
+      "name": "AR / Dark / landing",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "landing",
+      "width": 1440
+    },
+    {
+      "id": "6:39",
+      "name": "AR / Dark / login",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "login",
+      "width": 1440
+    },
+    {
+      "id": "6:40",
+      "name": "AR / Dark / register",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "register",
+      "width": 1440
+    },
+    {
+      "id": "6:41",
+      "name": "AR / Dark / cases / Mobile",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "cases",
+      "width": 390
+    },
+    {
+      "id": "6:42",
+      "name": "AR / Dark / summary / Mobile",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "summary",
+      "width": 390
+    },
+    {
+      "id": "6:43",
+      "name": "AR / Dark / login / Mobile",
+      "locale": "AR",
+      "theme": "Dark",
+      "route": "login",
+      "width": 390
+    },
+    {
+      "id": "6:44",
+      "name": "EN / Light / cases",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "cases",
+      "width": 1440
+    },
+    {
+      "id": "6:45",
+      "name": "EN / Light / summary",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "summary",
+      "width": 1440
+    },
+    {
+      "id": "6:46",
+      "name": "EN / Light / logs",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "logs",
+      "width": 1440
+    },
+    {
+      "id": "6:47",
+      "name": "EN / Light / analysis",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "analysis",
+      "width": 1440
+    },
+    {
+      "id": "6:48",
+      "name": "EN / Light / investigation",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "investigation",
+      "width": 1440
+    },
+    {
+      "id": "6:49",
+      "name": "EN / Light / response",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "response",
+      "width": 1440
+    },
+    {
+      "id": "6:50",
+      "name": "EN / Light / activity",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "activity",
+      "width": 1440
+    },
+    {
+      "id": "6:51",
+      "name": "EN / Light / reports",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "reports",
+      "width": 1440
+    },
+    {
+      "id": "6:52",
+      "name": "EN / Light / my-tasks",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "my-tasks",
+      "width": 1440
+    },
+    {
+      "id": "6:53",
+      "name": "EN / Light / team",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "team",
+      "width": 1440
+    },
+    {
+      "id": "6:54",
+      "name": "EN / Light / playbooks",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "playbooks",
+      "width": 1440
+    },
+    {
+      "id": "6:55",
+      "name": "EN / Light / analysis-library",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "analysis-library",
+      "width": 1440
+    },
+    {
+      "id": "6:56",
+      "name": "EN / Light / profile",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "profile",
+      "width": 1440
+    },
+    {
+      "id": "6:57",
+      "name": "EN / Light / landing",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "landing",
+      "width": 1440
+    },
+    {
+      "id": "6:58",
+      "name": "EN / Light / login",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "login",
+      "width": 1440
+    },
+    {
+      "id": "6:59",
+      "name": "EN / Light / register",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "register",
+      "width": 1440
+    },
+    {
+      "id": "6:60",
+      "name": "EN / Light / cases / Mobile",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "cases",
+      "width": 390
+    },
+    {
+      "id": "6:61",
+      "name": "EN / Light / summary / Mobile",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "summary",
+      "width": 390
+    },
+    {
+      "id": "6:62",
+      "name": "EN / Light / login / Mobile",
+      "locale": "EN",
+      "theme": "Light",
+      "route": "login",
+      "width": 390
+    },
+    {
+      "id": "6:63",
+      "name": "EN / Dark / cases",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "cases",
+      "width": 1440
+    },
+    {
+      "id": "6:64",
+      "name": "EN / Dark / summary",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "summary",
+      "width": 1440
+    },
+    {
+      "id": "6:65",
+      "name": "EN / Dark / logs",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "logs",
+      "width": 1440
+    },
+    {
+      "id": "6:66",
+      "name": "EN / Dark / analysis",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "analysis",
+      "width": 1440
+    },
+    {
+      "id": "6:67",
+      "name": "EN / Dark / investigation",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "investigation",
+      "width": 1440
+    },
+    {
+      "id": "6:68",
+      "name": "EN / Dark / response",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "response",
+      "width": 1440
+    },
+    {
+      "id": "6:69",
+      "name": "EN / Dark / activity",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "activity",
+      "width": 1440
+    },
+    {
+      "id": "6:70",
+      "name": "EN / Dark / reports",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "reports",
+      "width": 1440
+    },
+    {
+      "id": "6:71",
+      "name": "EN / Dark / my-tasks",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "my-tasks",
+      "width": 1440
+    },
+    {
+      "id": "6:72",
+      "name": "EN / Dark / team",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "team",
+      "width": 1440
+    },
+    {
+      "id": "6:73",
+      "name": "EN / Dark / playbooks",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "playbooks",
+      "width": 1440
+    },
+    {
+      "id": "6:74",
+      "name": "EN / Dark / analysis-library",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "analysis-library",
+      "width": 1440
+    },
+    {
+      "id": "6:75",
+      "name": "EN / Dark / profile",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "profile",
+      "width": 1440
+    },
+    {
+      "id": "6:76",
+      "name": "EN / Dark / landing",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "landing",
+      "width": 1440
+    },
+    {
+      "id": "6:77",
+      "name": "EN / Dark / login",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "login",
+      "width": 1440
+    },
+    {
+      "id": "6:78",
+      "name": "EN / Dark / register",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "register",
+      "width": 1440
+    },
+    {
+      "id": "6:79",
+      "name": "EN / Dark / cases / Mobile",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "cases",
+      "width": 390
+    },
+    {
+      "id": "6:80",
+      "name": "EN / Dark / summary / Mobile",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "summary",
+      "width": 390
+    },
+    {
+      "id": "6:81",
+      "name": "EN / Dark / login / Mobile",
+      "locale": "EN",
+      "theme": "Dark",
+      "route": "login",
+      "width": 390
+    }
+  ],
+  "status": "Screens created; prototype finalization blocked by Figma Starter MCP quota",
+  "limitations": [
+    "Starter permits one variable mode per collection; Light and Dark are separate collections.",
+    "Brand lockup uses the source SVG symbol and editable wordmark; website retains PNG.",
+    "Screens are representative compositions, not exhaustive copies of every backend form."
+  ]
+}

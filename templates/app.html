@@ -1,11 +1,15 @@
+{% from "_nav_icon.html" import nav_icon %}
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="theme-color" content="#F3F5F9">
+  <meta name="theme-color" content="#F5F7FB">
   <link rel="icon" href="{{ url_for('static', filename='brand/socify-symbol.svg') }}" type="image/svg+xml">
-  <link rel="preload" href="{{ url_for('static', filename='fonts/IBMPlexSansArabic-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{{ url_for('static', filename='fonts/Almarai-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
   <script src="{{ url_for('static', filename='localization.js') }}"></script>
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
   <meta name="description" content="SOCify منصة تحليل الحوادث والتحقيق وإصدار التقارير" data-ui-attributes>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token }}">
@@ -17,6 +21,7 @@
   {% if operational %}<link rel="stylesheet" href="{{ url_for('static', filename='autopsy.css') }}">{% endif %}
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
   {% if operational %}<script src="{{ url_for('static', filename='autopsy.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_data.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_procedures.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_reports.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_analysis.js') }}" defer></script>{% endif %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='design-system.css') }}">
 </head>
 <body class="app-shell{{ ' autopsy-shell' if operational else '' }}">
   <a class="skip-link" href="#workspace" data-ui-copy>انتقل إلى مساحة العمل</a>
@@ -25,11 +30,11 @@
     <a class="brand" aria-label="{{ product_name }}" translate="no" href="{{ '/cases' if operational else '/dashboard' }}"><img class="brand-logo" src="{{ url_for('static', filename='brand/socify-logo.png') }}" width="180" height="60" alt="SOCify" translate="no"></a>
     <nav id="primary-nav">
       {% if operational %}
-      <a data-section="cases" href="/cases" data-ui-copy>القضايا</a>
-      <a data-section="my-tasks" href="/my-tasks" data-ui-copy>مهامي</a>
-      <a data-section="team" href="/team" data-ui-copy>الفريق</a>
-      <a data-section="playbooks" href="/playbooks" data-ui-copy>كتيبات الاستجابة</a>
-      <a data-section="analysis-library" href="/analysis-library" data-ui-copy>مكتبة التحليل المحلي</a>
+      <a data-section="cases" href="/cases" data-ui-copy>{{ nav_icon("cases") }}القضايا</a>
+      <a data-section="my-tasks" href="/my-tasks" data-ui-copy>{{ nav_icon("my-tasks") }}مهامي</a>
+      <a data-section="team" href="/team" data-ui-copy>{{ nav_icon("team") }}الفريق</a>
+      <a data-section="playbooks" href="/playbooks" data-ui-copy>{{ nav_icon("playbooks") }}كتيبات الاستجابة</a>
+      <a data-section="analysis-library" href="/analysis-library" data-ui-copy>{{ nav_icon("analysis-library") }}مكتبة التحليل المحلي</a>
       {% else %}
       <a data-section="dashboard" href="/dashboard" data-ui-copy><span aria-hidden="true">⌂</span>نظرة عامة</a>
       <a data-section="events" href="/events" data-ui-copy><span aria-hidden="true">≋</span>مستكشف السجلات</a>
@@ -46,17 +51,17 @@
       <a data-section="scores" href="/scores" data-ui-copy><span aria-hidden="true">⌁</span>التقييم</a>
       <a data-section="audit" href="/audit" data-ui-copy>التدقيق</a>
       <a data-section="admin" href="/admin" data-ui-copy>الإدارة</a>
-      <a data-section="team" href="/team" data-ui-copy>الفريق والمهام</a>
+      <a data-section="team" href="/team" data-ui-copy>{{ nav_icon("team") }}الفريق والمهام</a>
       {% endif %}
     </nav>
-    <div class="sidebar-foot"><span class="status-dot" aria-hidden="true"></span><span data-ui-copy>{{ 'تحليل داخلي · إثراء محلي' if operational else 'تحليل الحوادث والتحقيق والتقارير' }}</span></div>
+    <div class="sidebar-foot"><strong translate="no">DIGITAL AUTOPSY</strong><span data-ui-copy>{{ 'تحليل داخلي · إثراء محلي' if operational else 'تحليل الحوادث والتحقيق والتقارير' }}</span></div>
   </aside>
   <div class="app-main">
     <header class="topbar">
       <button id="menu-toggle" aria-controls="workspace-navigation" class="icon-button" type="button" aria-label="فتح القائمة" aria-expanded="false" data-ui-attributes><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
       <div><p id="section-kicker" class="eyebrow">Incident investigation</p><h1 id="section-title" data-ui-copy>مركز العمليات</h1></div>
-      <button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button>
-      <div class="user-menu"><span><strong>{{ user.name }}</strong><small>{{ user.role }} · {{ user.team or '—' }}</small></span><a class="avatar" href="/profile" aria-label="الملف الشخصي" data-ui-attributes>{{ user.name[:1] }}</a><form method="post" action="{{ url_for('auth.logout_page') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button ghost compact" type="submit" data-ui-copy>خروج</button></form></div>
+      <div class="appearance-tools"><div data-theme-control></div><button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button></div>
+      <div class="user-menu"><span><strong>{{ user.name }}</strong><small><span data-user-role>{{ user.role }}</span> · {{ user.team or '—' }}</small></span><a class="avatar" href="/profile" aria-label="الملف الشخصي" data-ui-attributes>{{ user.name[:1] }}</a><form method="post" action="{{ url_for('auth.logout_page') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button ghost compact" type="submit" data-ui-copy>خروج</button></form></div>
     </header>
     <div id="global-message" class="global-message" role="status" aria-live="polite" hidden></div>
     <main id="workspace" tabindex="-1" aria-busy="true"><div class="loading"><span></span><p data-ui-copy>جارٍ تحميل البيانات المصرّح بها…</p></div></main>

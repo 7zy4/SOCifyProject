@@ -1,9 +1,9 @@
-@page { size: 595pt 842pt; margin: 42pt 44pt 40pt; background: #FFFFFF; @bottom-right { content: counter(page); font: 400 11pt "IBM Plex Sans Arabic"; color: #4A5A7A; } }
+@page { size: 595pt 842pt; margin: 42pt 44pt 40pt; background: #FFFFFF; @bottom-right { content: counter(page); font: 400 11pt "Almarai", "IBM Plex Sans", sans-serif; color: #4A5A7A; } }
 @page:first { @bottom-right { content: none; } }
 * { box-sizing: border-box; }
-html { background: #C9D1DE; color: #142B49; font: 400 17pt/1.6 "IBM Plex Sans Arabic"; }
+html { background: #C9D1DE; color: #142B49; font: 400 17pt/1.6 "Almarai", "IBM Plex Sans", sans-serif; }
 body { max-width: 595pt; margin: 24pt auto; padding: 42pt 44pt 40pt; background: #FFFFFF; overflow-wrap: anywhere; }
-h1, h2, h3 { font-family: "IBM Plex Sans Arabic"; font-weight: 700; line-height: 1.6; color: #142B49; margin: 0 0 17pt; }
+h1, h2, h3 { font-family: "Almarai", "IBM Plex Sans", sans-serif; font-weight: 700; line-height: 1.6; color: #142B49; margin: 0 0 17pt; }
 h1 { font-size: 28pt; } h2 { font-size: 24pt; margin-block-start: 24pt; break-after: avoid; } h3 { font-size: 20pt; }
 p { margin: 0 0 17pt; }
 strong, dt { font-weight: 700; }
@@ -24,7 +24,7 @@ tr { break-inside: avoid; }
 .report-cover h1, .report-cover h2 { color: #FFFFFF; }
 .report-cover h1 { font-size: 30pt; line-height: 1.5; }
 .report-note { background: #EDF1F7; color: #142B49; border: 3pt solid #142B49; border-radius: 16pt; padding: 12pt; font-size: 14pt; }
-pre, code { font: 400 14pt/1.6 "IBM Plex Sans Arabic"; white-space: pre-wrap; overflow-wrap: anywhere; }
+pre, code { font: 400 14pt/1.6 "Almarai", "IBM Plex Sans", sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; }
 [dir="ltr"] h1, [dir="ltr"] h2 { letter-spacing: -.005em; }
 @media (max-width: 700px) { body { margin: 0; padding: 24pt 12pt; } }
 @media print { html, body { background: #FFFFFF; } body { width: auto; max-width: none; padding: 0; margin: 0; } }
@@ -39,3 +39,9 @@ pre, code { font: 400 14pt/1.6 "IBM Plex Sans Arabic"; white-space: pre-wrap; ov
 @media print { .report-outline { display: none; } }
 
 .report-logo { display: block; width: 150pt; height: 50pt; object-fit: contain; padding: 5pt; background: #FFFFFF; border-radius: 6pt; margin-block-end: 16pt; }
+
+/* New report exports share the two interface font families. Print stays light. */
+:root { color-scheme: light; font-synthesis: none; }
+.report-record, table, .report-note, .report-outline { border-width: 1pt; border-radius: 6pt; }
+html[lang="en"] { font-family: "IBM Plex Sans", "Almarai", sans-serif; }
+pre, code { font-family: "IBM Plex Sans", "Almarai", sans-serif; direction: ltr; unicode-bidi: isolate; }

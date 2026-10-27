@@ -86,13 +86,13 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
     const from = positions.get(edge.source), to = positions.get(edge.target);
     if (!from || !to) continue;
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    for (const [key, value] of Object.entries({ x1: from.x, y1: from.y, x2: to.x, y2: to.y, stroke: "#1C4286" })) line.setAttribute(key, String(value));
+    for (const [key, value] of Object.entries({ x1: from.x, y1: from.y, x2: to.x, y2: to.y, stroke: "var(--blue)" })) line.setAttribute(key, String(value));
     svg.append(line);
   }
   for (const item of graphNodes) {
     const position = positions.get(item.id);
     const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    text.setAttribute("x", position.x); text.setAttribute("y", position.y); text.setAttribute("text-anchor", "middle"); text.setAttribute("fill", "#1C4286");
+    text.setAttribute("x", position.x); text.setAttribute("y", position.y); text.setAttribute("text-anchor", "middle"); text.setAttribute("fill", "var(--blue)");
     text.textContent = displayText(`${item.type}: ${item.label}`).slice(0, 30);
     const title = document.createElementNS("http://www.w3.org/2000/svg", "title"); title.textContent = displayText(item.label); text.append(title); svg.append(text);
   }

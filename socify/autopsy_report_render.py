@@ -266,7 +266,14 @@ def bundled_report_asset_fetcher(url, timeout=10, ssl_context=None):
     from weasyprint.urls import URLFetcherResponse, URLFetchingError
 
     root = Path(__file__).resolve().parent.parent / "static" / "fonts"
-    for filename in ("BalooBhaijaan2.woff2", "IBMPlexSansArabic-Regular.woff2", "IBMPlexSansArabic-Bold.woff2"):
+    for filename in (
+        "Almarai-Regular.woff2",
+        "Almarai-Bold.woff2",
+        "IBMPlexSans.woff2",
+        "BalooBhaijaan2.woff2",
+        "IBMPlexSansArabic-Regular.woff2",
+        "IBMPlexSansArabic-Bold.woff2",
+    ):
         content = (root / filename).read_bytes()
         if url == "data:font/woff2;base64," + base64.b64encode(content).decode():
             return URLFetcherResponse(url, body=content, headers={"Content-Type": "font/woff2"})
@@ -287,14 +294,14 @@ def render_docx(payload) -> bytes:
     section.top_margin, section.bottom_margin = Pt(42), Pt(40)
     section.left_margin, section.right_margin = Pt(44), Pt(44)
     normal = document.styles["Normal"]
-    normal.font.name, normal.font.size, normal.font.color.rgb = "IBM Plex Sans Arabic", Pt(14), RGBColor.from_string("142B49")
+    normal.font.name, normal.font.size, normal.font.color.rgb = "IBM Plex Sans", Pt(14), RGBColor.from_string("142B49")
     for name in ("Title", "Heading 1", "Heading 2"):
-        document.styles[name].font.name = "IBM Plex Sans Arabic"
+        document.styles[name].font.name = "IBM Plex Sans"
         document.styles[name].font.color.rgb = RGBColor.from_string("255DD9")
         document.styles[name].font.bold = True
         document.styles[name].font.size = Pt({"Title": 28, "Heading 1": 24, "Heading 2": 18}[name])
     for name in ("Normal", "Title", "Heading 1", "Heading 2"):
-        family = "IBM Plex Sans Arabic"
+        family = "Almarai"
         document.styles[name].element.get_or_add_rPr().get_or_add_rFonts().set(qn("w:cs"), family)
     document.add_picture(io.BytesIO(base64.b64decode(report_logo().split(",", 1)[1])), width=Pt(120))
     document.add_heading("SOCify Digital Autopsy", 0)

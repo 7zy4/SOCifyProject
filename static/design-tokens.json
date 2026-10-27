@@ -1,0 +1,36 @@
+{
+  "colors": {
+    "bg": ["#F5F7FB", "#0B1120"],
+    "panel": ["#FFFFFF", "#111B2E"],
+    "panel-2": ["#EEF2F8", "#18243A"],
+    "text": ["#17243B", "#E8EEF8"],
+    "muted": ["#55657D", "#A6B5CD"],
+    "line": ["#D9E1ED", "#2A3B55"],
+    "line-soft": ["#E8EDF5", "#21314A"],
+    "blue": ["#255DD9", "#91B3FF"],
+    "primary-fill": ["#255DD9", "#3464D4"],
+    "primary-hover": ["#1C49B1", "#2858C8"],
+    "on-primary": ["#FFFFFF", "#FFFFFF"],
+    "focus": ["#255DD9", "#ACC6FF"],
+    "red": ["#B42336", "#FFAFB9"],
+    "red-bg": ["#FFF0F2", "#3C1D2D"],
+    "high": ["#9B3A12", "#FFC0A1"],
+    "high-bg": ["#FFF2EB", "#39251F"],
+    "amber": ["#805800", "#F4CF7B"],
+    "amber-bg": ["#FFF7DF", "#332D1B"],
+    "success": ["#216442", "#8DE0B3"],
+    "success-bg": ["#EBF7EF", "#14332D"],
+    "info-bg": ["#ECF2FF", "#1A2B4D"],
+    "sidebar-bg": ["#12243E", "#0F1B2E"],
+    "sidebar-text": ["#D0DCEF", "#D0DCEF"],
+    "sidebar-active": ["#214E97", "#214E97"],
+    "hero-bg": ["#142B49", "#0F1D35"]
+  },
+  "spacing": [4, 8, 12, 16, 24, 32, 48, 64],
+  "radius": [6, 8, 12, 16],
+  "typography": {
+    "ar": {"family": "Almarai", "weights": [400, 700], "lineHeight": 1.8, "tracking": 0},
+    "en": {"family": "IBM Plex Sans", "weights": [400, 500, 600, 700], "lineHeight": 1.6, "tracking": 0},
+    "scale": {"caption": 12, "label": 14, "body": 15, "lead": 18, "h3": 20, "h2": 24, "h1": 32, "display": 56}
+  }
+}

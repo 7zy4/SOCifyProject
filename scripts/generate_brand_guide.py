@@ -22,7 +22,7 @@ def generate(output: Path) -> Path:
         (
             "rtl",
             "",
-            """<p class="kicker">02 · الخطوط والمقاسات</p><h2>مقروءة في كل سياق</h2><div class="type-samples"><div class="size64">SOCify</div><div class="size48">عنوان قسم</div><div class="size36">ابدأ التحقيق</div><div class="size30">سجلات القضية</div><div class="size20">عنوان فرعي · 20pt</div><div class="size17">نص أساسي واضح · 17pt</div><div class="size14">تسمية وجدول وملاحظة · 14pt</div></div><div class="note">العناوين: Baloo Bhaijaan 2 · 800<br>النص: IBM Plex Sans Arabic · 400 / 700<br>ارتفاع السطر: العنوان 1.2، والنص 1.6. لا تُصغّر البيانات لملء الصفحة.</div>""",
+            """<p class="kicker">02 · الخطوط والمقاسات</p><h2>مقروءة في كل سياق</h2><div class="type-samples"><div class="size64">SOCify</div><div class="size48">عنوان قسم</div><div class="size36">ابدأ التحقيق</div><div class="size30">سجلات القضية</div><div class="size20">عنوان فرعي · 20pt</div><div class="size17">نص أساسي واضح · 17pt</div><div class="size14">تسمية وجدول وملاحظة · 14pt</div></div><div class="note">العناوين: Almarai · 700<br>النص: IBM Plex Sans · 400 / 700<br>ارتفاع السطر: العنوان 1.2، والنص 1.6. لا تُصغّر البيانات لملء الصفحة.</div>""",
         ),
         (
             "rtl",
@@ -37,7 +37,7 @@ def generate(output: Path) -> Path:
         (
             "ltr",
             "",
-            """<p class="kicker">05 · Direction and language</p><h2>One identity.<br>Both directions.</h2><div class="plate bordered"><h3>Incident evidence</h3><p>Headings use Baloo Bhaijaan 2. Body text uses IBM Plex Sans Arabic.</p><span class="button-example">Open investigation</span></div><ul><li>Mirror layout with logical spacing.</li><li>Keep IDs, timestamps and hashes readable.</li><li>Use 14pt or larger for interface labels.</li><li>Use explicit status text beside color.</li></ul><div class="note">Arabic example: تحليل السجلات · ATT&amp;CK T1110<br>Do not force uppercase or stretch Arabic letters.</div>""",
+            """<p class="kicker">05 · Direction and language</p><h2>One identity.<br>Both directions.</h2><div class="plate bordered"><h3>Incident evidence</h3><p>Headings use Almarai. Body text uses IBM Plex Sans.</p><span class="button-example">Open investigation</span></div><ul><li>Mirror layout with logical spacing.</li><li>Keep IDs, timestamps and hashes readable.</li><li>Use 14pt or larger for interface labels.</li><li>Use explicit status text beside color.</li></ul><div class="note">Arabic example: تحليل السجلات · ATT&amp;CK T1110<br>Do not force uppercase or stretch Arabic letters.</div>""",
         ),
         (
             "rtl",
@@ -73,12 +73,12 @@ body {max-width:none;padding:0;margin:0;}
 .swatch {min-height:92pt;padding:12pt;border:3pt solid #1C4286;border-radius:18pt;background:#FBF7F0;font-size:14pt;display:grid;align-content:center;}
 .swatch code {display:block;direction:ltr;text-align:start;}
 .blue {background:#1C4286;color:#FFFFFF;}.red {background:#CB3B24;color:#FFFFFF;}.gold {background:#F3A257;color:#1C4286;}.pale {background:#E4ECF8;}.white {background:#FFFFFF;}
-.size64 {font:800 64pt/1.2 "Baloo Bhaijaan 2";}.size48 {font:800 48pt/1.2 "Baloo Bhaijaan 2";}.size36 {font:800 36pt/1.2 "Baloo Bhaijaan 2";}.size30 {font:800 30pt/1.2 "Baloo Bhaijaan 2";}.size20 {font-size:20pt;font-weight:700;}.size17 {font-size:17pt;}.size14 {font-size:14pt;}
+.size64 {font:700 64pt/1.2 "Almarai";}.size48 {font:700 48pt/1.2 "Almarai";}.size36 {font:700 36pt/1.2 "Almarai";}.size30 {font:700 30pt/1.2 "Almarai";}.size20 {font-size:20pt;font-weight:700;}.size17 {font-size:17pt;}.size14 {font-size:14pt;}
 .type-samples {display:grid;gap:10pt;}
 .steps {display:flex;align-items:center;gap:12pt;margin-block:17pt;}.steps h3 {margin:0;font-size:30pt;}
-.step {display:grid;place-items:center;width:44pt;height:44pt;border-radius:50%;font:800 20pt "Baloo Bhaijaan 2";}
+.step {display:grid;place-items:center;width:44pt;height:44pt;border-radius:50%;font:700 20pt "Almarai";}
 .button-example {display:inline-block;border:3pt solid #1C4286;border-radius:18pt;background:#1C4286;color:#FFFFFF;font-size:14pt;font-weight:700;padding:10pt 16pt;}
-.stats {display:grid;grid-template-columns:1fr 1fr;gap:12pt;margin-block:17pt;}.stats>div {border:3pt solid #1C4286;border-radius:18pt;padding:12pt;}.stats strong {display:block;font:800 48pt/1.2 "Baloo Bhaijaan 2";color:#1C4286;}.stats span {font-size:14pt;}
+.stats {display:grid;grid-template-columns:1fr 1fr;gap:12pt;margin-block:17pt;}.stats>div {border:3pt solid #1C4286;border-radius:18pt;padding:12pt;}.stats strong {display:block;font:700 48pt/1.2 "Almarai";color:#1C4286;}.stats span {font-size:14pt;}
 .page-number {position:absolute;bottom:20pt;inset-inline-start:44pt;font-size:11pt;color:#4A5A7A;}
 @media print {.guide-page {margin:0;print-color-adjust:exact;-webkit-print-color-adjust:exact;}}
 """
