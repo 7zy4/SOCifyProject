@@ -2,33 +2,36 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
+  <script src="{{ url_for('static', filename='localization.js') }}"></script>
+  <meta name="description" content="SOCify منصة تحليل الحوادث والتحقيق وإصدار التقارير" data-ui-attributes>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ 'انضمام بدعوة' if operational else 'حساب تدريبي' }} | {{ product_name }}</title>
+  <title data-ui-copy>{{ 'انضمام بدعوة' if operational else 'حساب الفريق' }} | {{ product_name }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
   <script src="{{ url_for('static', filename='register.js') }}" defer></script>
 </head>
 <body class="auth-shell">
-  <a class="skip-link" href="#register-form">انتقل إلى النموذج</a>
+  <button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button>
+  <a class="skip-link" href="#register-form" data-ui-copy>انتقل إلى النموذج</a>
   <main class="auth-layout">
     <section class="auth-panel" aria-labelledby="register-title">
       <a class="brand" href="{{ url_for('ui.index') }}"><span class="brand-mark" aria-hidden="true">S</span><span dir="ltr">{{ product_name }}</span></a>
-      <div><p class="eyebrow">SOC TEAM</p><h1 id="register-title">{{ 'انضم إلى فريق التحقيق' if operational else 'ابدأ رحلة فريق الأمن' }}</h1><p>{{ 'استخدم الدعوة التي أصدرها مدير فريقك للبريد نفسه. التسجيل العام مغلق.' if operational else 'سجّل حسابًا فرديًا أو أنشئ مساحة فريق مستقلة أو انضم بدعوة مديرك.' }}</p></div>
-      <p class="auth-assurance">عزل مساحة العمل · سياسة كلمة مرور · سجل تدقيق</p>
+      <div><p class="eyebrow">SOC TEAM</p><h1 id="register-title" data-ui-copy>{{ 'انضم إلى فريق التحقيق' if operational else 'ابدأ رحلة فريق الأمن' }}</h1><p data-ui-copy>{{ 'استخدم الدعوة التي أصدرها مدير فريقك للبريد نفسه. التسجيل العام مغلق.' if operational else 'سجّل حسابًا فرديًا أو أنشئ مساحة فريق مستقلة أو انضم بدعوة مديرك.' }}</p></div>
+      <p class="auth-assurance" data-ui-copy>عزل مساحة العمل · سياسة كلمة مرور · سجل تدقيق</p>
     </section>
     <section class="auth-card">
       <form id="register-form" method="post" action="{{ url_for('auth.register_form') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <header><p class="eyebrow">حساب جديد</p><h2>{{ 'بيانات عضو الفريق' if operational else 'بيانات المتدرب' }}</h2></header>
+        <header><p class="eyebrow" data-ui-copy>حساب جديد</p><h2 data-ui-copy>{{ 'بيانات عضو الفريق' if operational else 'بيانات عضو الفريق' }}</h2></header>
         {% if csrf_error %}<div class="notice" role="alert">{{ csrf_error }}<p dir="ltr">CSRF: {{ csrf_reason }} · {{ csrf_correlation_id }}</p></div>{% endif %}
-        {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="notice {{ category }}" role="alert">{{ message }}</div>{% endfor %}{% endwith %}
-        <label for="name">الاسم</label><input id="name" name="name" required minlength="2" maxlength="120" autocomplete="name">
-        <label for="email">البريد الإلكتروني</label><input id="email" name="email" type="email" required maxlength="254" autocomplete="email">
-        {% if not operational %}<label for="team_name">إنشاء فريق مستقل (اختياري)</label><input id="team_name" name="team_name" maxlength="120">{% endif %}
-        <label for="invitation_token">{{ 'رمز دعوة الفريق' if operational else 'رمز دعوة الفريق (اختياري)' }}</label><input id="invitation_token" name="invitation_token" maxlength="200" autocomplete="off" {% if operational %}required minlength="32"{% endif %}>
-        {% if not operational %}<p>إنشاء فريق جديد يجعلك مدير مساحته المستقلة. الانضمام بدعوة يمنحك الدور المحدد فيها. اختر إنشاء فريق أو رمز دعوة فقط.</p>{% endif %}
-        <label for="password">كلمة المرور <small>عبارة غير شائعة من 12 إلى 128 محرفًا</small></label><input id="password" name="password" type="password" required minlength="12" maxlength="128" autocomplete="new-password">
-        <button class="button primary full" type="submit">إنشاء الحساب</button>
-        <p class="form-foot">لديك حساب؟ <a href="{{ url_for('auth.login_page') }}">سجّل الدخول</a></p>
+        {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="notice {{ category }}" role="alert" data-ui-copy>{{ message }}</div>{% endfor %}{% endwith %}
+        <label for="name" data-ui-copy>الاسم</label><input id="name" name="name" required minlength="2" maxlength="120" autocomplete="name">
+        <label for="email" data-ui-copy>البريد الإلكتروني</label><input id="email" name="email" type="email" required maxlength="254" autocomplete="email">
+        {% if not operational %}<label for="team_name" data-ui-copy>إنشاء فريق مستقل (اختياري)</label><input id="team_name" name="team_name" maxlength="120">{% endif %}
+        <label for="invitation_token" data-ui-copy>{{ 'رمز دعوة الفريق' if operational else 'رمز دعوة الفريق (اختياري)' }}</label><input id="invitation_token" name="invitation_token" maxlength="200" autocomplete="off" {% if operational %}required minlength="32"{% endif %}>
+        {% if not operational %}<p data-ui-copy>إنشاء فريق جديد يجعلك مدير مساحته المستقلة. الانضمام بدعوة يمنحك الدور المحدد فيها. اختر إنشاء فريق أو رمز دعوة فقط.</p>{% endif %}
+        <label for="password" data-ui-copy>كلمة المرور <small>عبارة غير شائعة من 12 إلى 128 محرفًا</small></label><input id="password" name="password" type="password" required minlength="12" maxlength="128" autocomplete="new-password">
+        <button class="button primary full" type="submit" data-ui-copy>إنشاء الحساب</button>
+        <p class="form-foot" data-ui-copy>لديك حساب؟ <a href="{{ url_for('auth.login_page') }}">سجّل الدخول</a></p>
       </form>
     </section>
   </main>

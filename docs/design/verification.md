@@ -1,6 +1,6 @@
 # Visual identity verification — 2026-10-24
 
-The user's printed-booklet brief was adapted, with their explicit authorization, for a responsive website plus A4 incident and assessment reports. The revised reusable prompt is [visual-identity-prompt.md](visual-identity-prompt.md). The standalone guide is [visual-identity-v2.pdf](visual-identity-v2.pdf), with an offline [HTML edition](visual-identity-v2.html).
+The user's printed-booklet brief was adapted, with their explicit authorization, for a responsive website plus A4 incident and assessment reports. The historical design brief was removed during repository cleanup; the rendered identity guide remains as a reference. The standalone guide is [visual-identity-v2.pdf](visual-identity-v2.pdf), with an offline [HTML edition](visual-identity-v2.html).
 
 The identity now uses self-hosted Baloo Bhaijaan 2 and IBM Plex Sans Arabic, the agreed blue/ivory palette, thick rounded outlines, and no animation, gradients or shadows. Fonts are served as WOFF2: 250,052 bytes total compared with 768,424 bytes for the original TTF files. Both source fonts and their OFL licenses remain available. Downloaded reports embed the WOFF2 fonts, increasing their base HTML size to approximately 340KB to support offline rendering.
 

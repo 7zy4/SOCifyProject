@@ -2,61 +2,63 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
+  <script src="{{ url_for('static', filename='localization.js') }}"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="SOCify منصة تدريب ومحاكاة عمليات الأمن السيبراني">
-  <title>SOCify | منصة تدريب عمليات الأمن</title>
+  <meta name="description" content="SOCify منصة تحليل الحوادث والتحقيق وإصدار التقارير" data-ui-attributes>
+  <title data-ui-copy>SOCify | تحليل الحوادث والتحقيق والتقارير</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 </head>
 <body class="landing">
-  <a class="skip-link" href="#main">انتقل إلى المحتوى</a>
+  <button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button>
+  <a class="skip-link" href="#main" data-ui-copy>انتقل إلى المحتوى</a>
   <header class="landing-nav">
-    <a class="brand" href="{{ url_for('ui.index') }}" aria-label="SOCify الرئيسية"><span class="brand-mark" aria-hidden="true">S</span><span>SOCify</span></a>
-    <nav aria-label="التنقل الرئيسي">
+    <a class="brand" href="{{ url_for('ui.index') }}" aria-label="SOCify الرئيسية" data-ui-attributes><span class="brand-mark" aria-hidden="true">S</span><span>SOCify</span></a>
+    <nav aria-label="التنقل الرئيسي" data-ui-attributes>
       {% if user %}
-      <a class="button primary" href="{{ url_for('ui.dashboard') }}">فتح مركز العمليات</a>
+      <a class="button primary" href="{{ url_for('ui.dashboard') }}" data-ui-copy>فتح مركز العمليات</a>
       {% else %}
-      <a class="button ghost" href="{{ url_for('auth.login_page') }}">تسجيل الدخول</a>
-      <a class="button primary" href="{{ url_for('auth.register_page') }}">إنشاء حساب تدريبي</a>
+      <a class="button ghost" href="{{ url_for('auth.login_page') }}" data-ui-copy>تسجيل الدخول</a>
+      <a class="button primary" href="{{ url_for('auth.register_page') }}" data-ui-copy>الانضمام إلى الفريق</a>
       {% endif %}
     </nav>
   </header>
   <main id="main">
     <section class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">SOC TRAINING · SAFE SIMULATION · EVIDENCE FIRST</p>
-        <h1>من السجلات إلى تحقيق موثّق</h1>
-        <p class="lead">منصة عربية مترابطة تجمع السجلات، الكشف، التنبيهات، التحقيقات، ATT&amp;CK، الصيد، والاستجابة المحاكية في رحلة قابلة للتدقيق والقياس.</p>
+        <p class="eyebrow">Incident analysis and investigation</p>
+        <h1 data-ui-copy>من السجلات إلى تحقيق موثّق</h1>
+        <p class="lead" data-ui-copy>منصة لتحليل الحوادث والتحقيق فيها وإصدار التقارير. اجمع السجلات والأدلة، وثّق النتائج والقرارات، وراجع الاستجابة داخل مساحة فريقك.</p>
         <div class="hero-actions">
-          <a class="button primary large" href="{{ url_for('auth.login_page') }}">ابدأ التدريب الآمن</a>
-          <a class="button ghost large" href="#capabilities">استكشف القدرات</a>
+          <a class="button primary large" href="{{ url_for('auth.login_page') }}" data-ui-copy>افتح مساحة التحقيق</a>
+          <a class="button ghost large" href="#capabilities" data-ui-copy>استكشف القدرات</a>
         </div>
-        <ul class="trust-list" aria-label="ضمانات المنصة">
-          <li>محاكاة معزولة بلا هجمات فعلية</li>
-          <li>بيانات وأدلة قابلة للتتبع</li>
-          <li>صلاحيات دقيقة وسجل تدقيق</li>
+        <ul class="trust-list" aria-label="ضمانات المنصة" data-ui-attributes>
+          <li data-ui-copy>تحليل محلي مع حفظ أصل الدليل</li>
+          <li data-ui-copy>بيانات وأدلة قابلة للتتبع</li>
+          <li data-ui-copy>صلاحيات دقيقة وسجل تدقيق</li>
         </ul>
       </div>
-      <div class="hero-console" aria-label="ملخص رحلة التدريب">
-        <div class="console-bar"><span></span><strong>مسار التحقيق</strong><small>LIVE LAB</small></div>
+      <div class="hero-console" aria-label="مسار تحليل الحادثة" data-ui-attributes>
+        <div class="console-bar"><span></span><strong>مسار التحقيق</strong><small>Case workflow</small></div>
         <ol class="attack-chain">
-          <li><span>01</span><div><strong>سجل أمني</strong><small>تطبيع وحفظ المصدر الخام</small></div><b>مقبول</b></li>
-          <li><span>02</span><div><strong>قاعدة كشف</strong><small>تقييم محدد وسبب موثق</small></div><b>مطابقة</b></li>
-          <li><span>03</span><div><strong>تنبيه</strong><small>Evidence + ATT&amp;CK</small></div><b>حرج</b></li>
-          <li><span>04</span><div><strong>تحقيق</strong><small>Timeline + Playbook + Report</small></div><b>نشط</b></li>
+          <li data-ui-copy><span>01</span><div><strong>سجل أمني</strong><small data-ui-copy>تطبيع وحفظ المصدر الخام</small></div><b>مقبول</b></li>
+          <li data-ui-copy><span>02</span><div><strong>قاعدة كشف</strong><small data-ui-copy>تقييم محدد وسبب موثق</small></div><b>مطابقة</b></li>
+          <li data-ui-copy><span>03</span><div><strong>تنبيه</strong><small>Evidence + ATT&amp;CK</small></div><b>حرج</b></li>
+          <li data-ui-copy><span>04</span><div><strong>تحقيق</strong><small>Timeline + Playbook + Report</small></div><b>نشط</b></li>
         </ol>
       </div>
     </section>
     <section id="capabilities" class="capabilities" aria-labelledby="capabilities-title">
-      <p class="eyebrow">منصة واحدة، دورة عمل كاملة</p>
-      <h2 id="capabilities-title">كل قرار يعود إلى دليل</h2>
+      <p class="eyebrow" data-ui-copy>منصة واحدة، دورة عمل كاملة</p>
+      <h2 id="capabilities-title" data-ui-copy>كل قرار يعود إلى دليل</h2>
       <div class="feature-grid">
-        <article><span>01</span><h3>كشف قابل للتفسير</h3><p>قواعد آمنة بإصدارات، معاينة، منع تكرار، وقياس صحة حقيقي.</p></article>
-        <article><span>02</span><h3>سيناريوهات حية</h3><p>سلاسل هجوم حتمية بثلاث درجات صعوبة وتلميحات محسوبة.</p></article>
-        <article><span>03</span><h3>تحقيقات مترابطة</h3><p>أدلة وملحوظات ومهام وسجل زمني وتقارير بإصدارات.</p></article>
-        <article><span>04</span><h3>استجابة آمنة</h3><p>Playbooks تؤثر في المختبر المحاكى فقط مع موافقة وتراجع.</p></article>
+        <article><span>01</span><h3 data-ui-copy>كشف قابل للتفسير</h3><p data-ui-copy>قواعد آمنة بإصدارات، معاينة، منع تكرار، وقياس صحة حقيقي.</p></article>
+        <article><span>02</span><h3 data-ui-copy>تحليل الحوادث</h3><p data-ui-copy>فحص السجلات والمؤشرات والأصول لتحديد نطاق الحادثة ونتائجها.</p></article>
+        <article><span>03</span><h3 data-ui-copy>تحقيقات مترابطة</h3><p data-ui-copy>أدلة وملحوظات ومهام وسجل زمني وتقارير بإصدارات.</p></article>
+        <article><span>04</span><h3 data-ui-copy>تقارير موثقة</h3><p data-ui-copy>تقارير ثابتة بإصدارات وصيغ متعددة، مع مراجعة واعتماد وصلاحيات مشاركة.</p></article>
       </div>
     </section>
   </main>
-  <footer><span>SOCify</span><span>بيئة تدريب دفاعية معزولة</span></footer>
+  <footer><span>SOCify</span><span data-ui-copy>تحليل الحوادث والتحقيق وإصدار التقارير</span></footer>
 </body>
 </html>

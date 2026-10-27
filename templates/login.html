@@ -2,32 +2,35 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
+  <script src="{{ url_for('static', filename='localization.js') }}"></script>
+  <meta name="description" content="SOCify منصة تحليل الحوادث والتحقيق وإصدار التقارير" data-ui-attributes>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>تسجيل الدخول | {{ product_name }}</title>
+  <title data-ui-copy>تسجيل الدخول | {{ product_name }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 </head>
 <body class="auth-shell">
-  <a class="skip-link" href="#auth-form">انتقل إلى النموذج</a>
+  <button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button>
+  <a class="skip-link" href="#auth-form" data-ui-copy>انتقل إلى النموذج</a>
   <main class="auth-layout">
     <section class="auth-panel" aria-labelledby="auth-title">
       <a class="brand" href="{{ url_for('ui.index') }}"><span class="brand-mark" aria-hidden="true">S</span><span dir="ltr">{{ product_name }}</span></a>
-      <div><p class="eyebrow">{{ 'DIGITAL INCIDENT INVESTIGATION' if operational else 'SECURE OPERATIONS WORKSPACE' }}</p><h1 id="auth-title">{{ 'من الأدلة إلى تحقيق موثق' if operational else 'مرحبًا بعودتك إلى مركز العمليات' }}</h1><p>{{ 'مساحة عمل داخلية للتحليل والتحقيق والاستجابة والتقارير. استخدم حساب فريقك المصرح به.' if operational else 'سجّل دخولك للوصول إلى مساحة التدريب المصرّح بها. كل محاولة دخول مسجلة ومحدودة المعدّل.' }}</p></div>
-      <p class="auth-assurance">جلسات محمية · MFA متاح · Default deny</p>
+      <div><p class="eyebrow">{{ 'DIGITAL INCIDENT INVESTIGATION' if operational else 'SECURE OPERATIONS WORKSPACE' }}</p><h1 id="auth-title" data-ui-copy>من الأدلة إلى تحقيق موثق</h1><p data-ui-copy>{{ 'مساحة عمل داخلية للتحليل والتحقيق والاستجابة والتقارير. استخدم حساب فريقك المصرح به.' if operational else 'سجّل دخولك للوصول إلى مساحة التحقيق المصرّح بها. كل محاولة دخول مسجلة ومحدودة المعدّل.' }}</p></div>
+      <p class="auth-assurance" data-ui-copy>جلسات محمية · MFA متاح · Default deny</p>
     </section>
     <section class="auth-card">
       <form id="auth-form" method="post" action="{{ url_for('auth.login_form') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <header><p class="eyebrow">دخول آمن</p><h2>بيانات الحساب</h2></header>
+        <header><p class="eyebrow" data-ui-copy>دخول آمن</p><h2 data-ui-copy>بيانات الحساب</h2></header>
         {% if csrf_error %}<div class="notice" role="alert">{{ csrf_error }}<p dir="ltr">CSRF: {{ csrf_reason }} · {{ csrf_correlation_id }}</p></div>{% endif %}
-        {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="notice {{ category }}" role="alert">{{ message }}</div>{% endfor %}{% endwith %}
-        <label for="email">البريد الإلكتروني</label>
+        {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="notice {{ category }}" role="alert" data-ui-copy>{{ message }}</div>{% endfor %}{% endwith %}
+        <label for="email" data-ui-copy>البريد الإلكتروني</label>
         <input id="email" name="email" type="email" autocomplete="username" required maxlength="254" autofocus>
-        <label for="password">كلمة المرور</label>
+        <label for="password" data-ui-copy>كلمة المرور</label>
         <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="128">
-        <label for="mfa_code">رمز MFA أو الاسترداد <small>اختياري إن لم يكن مفعّلًا</small></label>
+        <label for="mfa_code" data-ui-copy>رمز MFA أو الاسترداد <small>اختياري إن لم يكن مفعّلًا</small></label>
         <input id="mfa_code" name="mfa_code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="20">
-        <button class="button primary full" type="submit">دخول إلى المنصة</button>
-        <p class="form-foot">{{ 'لديك دعوة من مدير الفريق؟' if operational else 'لا تملك حسابًا؟' }} <a href="{{ url_for('auth.register_page') }}">{{ 'انضم إلى الفريق' if operational else 'أنشئ حساب متدرب' }}</a></p>
+        <button class="button primary full" type="submit" data-ui-copy>دخول إلى المنصة</button>
+        <p class="form-foot" data-ui-copy>{{ 'لديك دعوة من مدير الفريق؟' if operational else 'لا تملك حسابًا؟' }} <a href="{{ url_for('auth.register_page') }}">انضم إلى الفريق</a></p>
       </form>
     </section>
   </main>

@@ -3,7 +3,7 @@
 .autopsy-shell .sidebar > .brand { font-size: 20pt; max-width: 100%; min-width: 0; }
 .autopsy-shell .brand span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .autopsy-shell .sidebar nav { flex-direction: row; flex-wrap: wrap; overflow: visible; }
-.autopsy-shell .sidebar-foot { margin: 0; }
+.autopsy-shell .sidebar-foot { display: none; }
 .autopsy-shell #menu-toggle { display: none; }
 .autopsy-shell #workspace { max-width: 1680px; margin-inline: auto; }
 .autopsy-shell .topbar > div { min-width: 0; overflow-wrap: anywhere; }
@@ -37,3 +37,23 @@
 .autopsy-timeline > li { border-inline-start: 4px solid #1C4286; padding: 1rem; margin-block: 1rem; background: #FBF7F0; overflow-wrap: anywhere; }
 .autopsy-timeline > li.timeline-mark-orange { border-color: #DD4027; }
 .autopsy-timeline > li.timeline-mark-gold { border-color: #F3A257; }
+
+/* Investigation choices and immutable report review share the workspace palette. */
+.choice-control { display: block; position: relative; min-width: 0; }
+.choice-control .search-choice { padding-inline-end: 3.2rem; }
+.choice-toggle { position: absolute; inset-inline-end: .5rem; inset-block-start: .45rem; width: 2.5rem; height: 2.7rem; border: 0; border-radius: 10px; background: var(--panel-2); color: var(--blue); cursor: pointer; }
+.choice-menu { position: absolute; inset-inline: 0; inset-block-start: 100%; z-index: 5; max-height: 17rem; overflow: auto; background: var(--panel); border: 2px solid var(--blue); border-radius: 14px; margin-block-start: .4rem; padding: .35rem; }
+.choice-menu [role="option"] { display: block; width: 100%; border: 0; border-radius: 8px; padding: .65rem .8rem; color: var(--text); background: var(--panel); text-align: start; cursor: pointer; overflow-wrap: anywhere; }
+.choice-menu [role="option"]:hover, .choice-menu [aria-selected="true"] { background: var(--panel-2); color: var(--blue); }
+.answer-control { display: grid; gap: .6rem; }
+.answer-control small { color: var(--muted); font-weight: 400; }
+.report-preview { margin-block-start: 1rem; border-block-start: 1px solid var(--line-soft); padding-block-start: 1rem; }
+.report-data { display: grid; grid-template-columns: minmax(7rem, 1fr) minmax(0, 3fr); gap: .5rem 1rem; }
+.report-data > dt, .report-data > dd { margin: 0; padding-block: .5rem; border-block-end: 1px solid var(--line-soft); }
+.report-data details > summary { cursor: pointer; color: var(--blue); }
+.report-data .report-data { margin-block-start: .8rem; display: block; }
+.report-downloads { padding-block: .8rem; }
+.report-downloads label { margin: 0; min-width: min(100%, 12rem); }
+.report-revision > p:last-of-type { overflow-wrap: anywhere; }
+@media (max-width: 600px) { .report-data { display: block; } .report-data > dd { padding-inline-start: .6rem; } .report-downloads > * { flex: 1 1 100%; } }
+.choice-control .search-choice::-webkit-calendar-picker-indicator { opacity: 0; }

@@ -11,7 +11,7 @@
 
 ## إعادة التحقق
 
-شغّل backend المحلي المعزول وفق `docs/operations/v3-cloud-resume.md` وثبت Poppler في بيئة الاختبار، ثم:
+شغّل backend المحلي المعزول وفق `docs/operations-v3.md` وثبت Poppler في بيئة الاختبار، ثم:
 
 ```bash
 export SOCIFY_ANALYSIS_SOCKET=/tmp/socify-v3-dev-analysis-ipc/analysis.sock

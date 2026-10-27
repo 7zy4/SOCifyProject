@@ -6,7 +6,7 @@ from socify import auth
 
 
 def test_recovery_code_can_only_be_consumed_once_after_concurrent_reads(app, database, user_ids, monkeypatch):
-    code = "A1B2C3D4E5"
+    code = "AB" * 5
     user_id = user_ids["analyst"]
     database.execute(
         "INSERT INTO mfa_backup_codes(user_id, code_hash, created_at) VALUES (?, ?, ?)",
