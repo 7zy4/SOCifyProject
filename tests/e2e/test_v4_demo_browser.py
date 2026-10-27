@@ -20,7 +20,15 @@ def test_v4_real_demo_scope_review_roles_and_visual_matrix(tmp_path):
     manifest = provision(directory)
     accounts = json.loads((directory / "accounts.json").read_text())
     keys = dict(line.split("=", 1) for line in (directory / "runtime.env").read_text().splitlines())
-    app = create_app({"DATABASE": str(directory / "socify.db"), "ENV_NAME": "development", "DEMO_MODE": True, "SECRET_KEY": keys["SOCIFY_SECRET_KEY"], "CREDENTIAL_KEY": keys["SOCIFY_CREDENTIAL_KEY"]})
+    app = create_app(
+        {
+            "DATABASE": str(directory / "socify.db"),
+            "ENV_NAME": "development",
+            "DEMO_MODE": True,
+            "SECRET_KEY": keys["SOCIFY_SECRET_KEY"],
+            "CREDENTIAL_KEY": keys["SOCIFY_CREDENTIAL_KEY"],
+        }
+    )
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -61,7 +69,11 @@ def test_v4_real_demo_scope_review_roles_and_visual_matrix(tmp_path):
             hrefs = page.locator("#primary-nav a").evaluate_all("items => items.map(item => item.getAttribute('href'))")
             assert len(hrefs) == len(set(hrefs))
             assert page.locator(".case-tabs a[href*='tab=logs'],.case-tabs a[href*='tab=reports'],.case-tabs a[href*='tab=analysis']").count() == 0
-            routes = [f"/cases/{primary}", "/monitoring", *[f"/{tool}?case_id={primary}" for tool in ("log-management", "endpoint-security", "threat-intel", "email-security", "sandbox", "reports")]]
+            routes = [
+                f"/cases/{primary}",
+                "/monitoring",
+                *[f"/{tool}?case_id={primary}" for tool in ("log-management", "endpoint-security", "threat-intel", "email-security", "sandbox", "reports")],
+            ]
             for language in ("ar", "en"):
                 page.evaluate("value => localStorage.setItem('socify-interface-language', value)", language)
                 for theme in ("dark", "light"):

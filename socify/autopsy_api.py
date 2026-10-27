@@ -96,7 +96,9 @@ def case_summary(case_id: int):
     result["approval_enforced"] = current_app.config["REQUIRE_CASE_APPROVAL"]
     result["selection_required"] = current_app.config["REQUIRE_INVESTIGATION_SELECTION"] and case_id not in selected_ids()
     if not case_approved(case_id) or result["selection_required"]:
-        result.update(counts={}, members=[], tasks=[], history=[], evidence=[], reports=[], archived_reports=[], can_manage=False, can_update=False, can_approve=False)
+        result.update(
+            counts={}, members=[], tasks=[], history=[], evidence=[], reports=[], archived_reports=[], can_manage=False, can_update=False, can_approve=False
+        )
         return jsonify(result)
     if not result.get("full_case_access", True):
         from .autopsy_pipeline import visibility_sql

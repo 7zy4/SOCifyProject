@@ -33,7 +33,18 @@ def local_worker_services(configuration):
     stop = context.Event()
     selected = {
         key: configuration[key]
-        for key in ("DATABASE", "SECRET_KEY", "CREDENTIAL_KEY", "TESTING", "LEGACY_TRAINING_TESTS", "MAX_CONTENT_LENGTH", "MAX_IMPORT_ROWS", "TRUSTED_HOSTS", "REQUIRE_CASE_APPROVAL", "REQUIRE_INVESTIGATION_SELECTION")
+        for key in (
+            "DATABASE",
+            "SECRET_KEY",
+            "CREDENTIAL_KEY",
+            "TESTING",
+            "LEGACY_TRAINING_TESTS",
+            "MAX_CONTENT_LENGTH",
+            "MAX_IMPORT_ROWS",
+            "TRUSTED_HOSTS",
+            "REQUIRE_CASE_APPROVAL",
+            "REQUIRE_INVESTIGATION_SELECTION",
+        )
     }
     workers = [context.Process(target=worker_loop, args=(selected, stop, os.getpid(), kind), name=f"socify-local-{kind}") for kind in ("import", "autopsy")]
     for worker in workers:

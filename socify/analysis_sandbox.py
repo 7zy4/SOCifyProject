@@ -230,23 +230,33 @@ def main() -> int:
     if len(sys.argv) != 1 or operation not in {"report", "sample", "probe", "yara_validation"} or not output:
         return 2
     directory = Path(output).resolve()
+    phase = "imports"
     try:
         import tempfile
 
-        from docx import Document
-        from weasyprint import HTML
-
         from .autopsy_domain import canonical
-        from .autopsy_report_render import render_files
-        from .autopsy_static_analysis import analyze_sample, validate_yara
 
-        _ = Document, HTML
+        # Load only the selected engine before installing its OS boundary.
+        # A YARA request must not depend on native PDF/font initialization.
+        if operation == "report":
+            from docx import Document
+            from weasyprint import HTML
+
+            from .autopsy_report_render import render_files
+
+            _ = Document, HTML
+        elif operation in {"sample", "yara_validation"}:
+            from .autopsy_static_analysis import analyze_sample, validate_yara
+
         tempfile.tempdir = str(directory)
+        phase = "input"
         body = sys.stdin.buffer.read(MAX_INPUT + 1)
         if len(body) > MAX_INPUT:
             raise ValueError("Analysis request exceeds limit")
         payload = json.loads(body)
+        phase = "boundary"
         boundary = harden(directory)
+        phase = "compute"
         if operation == "sample":
             result = analyze_sample(payload)
             result["isolation"] = boundary
@@ -259,6 +269,7 @@ def main() -> int:
             files = render_files(payload)
         else:
             files = {"probe": canonical(probe(payload, boundary)).encode()}
+        phase = "output"
         for name, content in files.items():
             if len(content) > MAX_OUTPUT:
                 raise ValueError("Analysis artifact exceeds limit")
@@ -267,6 +278,10 @@ def main() -> int:
         return 0
     except Exception as exc:
         (directory / "error").write_text(type(exc).__name__)
+        # Never include source rules, evidence, exception messages, or secrets.
+        (directory / "diagnostic.json").write_text(
+            json.dumps({"phase": phase, "error_type": type(exc).__name__, "errno": exc.errno if isinstance(exc, OSError) else None})
+        )
         return 1
 
 

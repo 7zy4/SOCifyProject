@@ -1,4 +1,5 @@
 import base64
+import builtins
 import ctypes
 import errno
 import hashlib
@@ -11,6 +12,29 @@ from types import SimpleNamespace
 import pytest
 
 from socify import analysis_sandbox
+
+
+def test_yara_validation_does_not_initialize_native_report_engines(tmp_path, monkeypatch):
+    original = builtins.__import__
+
+    def no_report_engine(name, *args, **kwargs):
+        if name.split(".")[0] in {"weasyprint", "docx"}:
+            raise ImportError("Synthetic unavailable report renderer")
+        return original(name, *args, **kwargs)
+
+    payload = {
+        "rules": 'rule Startup { strings: $a = "SOCIFY" condition: $a }',
+        "fixtures": {"positive": [base64.b64encode(b"SOCIFY").decode()], "negative": [base64.b64encode(b"normal").decode()]},
+    }
+    monkeypatch.setenv("SOCIFY_ANALYSIS_OPERATION", "yara_validation")
+    monkeypatch.setenv("SOCIFY_ANALYSIS_OUTPUT", str(tmp_path))
+    monkeypatch.setattr(analysis_sandbox.sys, "argv", ["analysis"])
+    monkeypatch.setattr(analysis_sandbox.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(json.dumps(payload).encode())))
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    monkeypatch.setattr(analysis_sandbox, "harden", lambda _: {"scope": "dispatch test; real boundary tested independently"})
+    monkeypatch.setattr(builtins, "__import__", no_report_engine)
+    assert analysis_sandbox.main() == 0
+    assert json.loads((tmp_path / "validation").read_text())["valid"]
 
 
 @pytest.mark.parametrize("operation,invalid", [("sample", False), ("sample", True), ("report", False), ("probe", False)])

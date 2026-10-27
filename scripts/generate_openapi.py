@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any
 
 from socify import create_app
 
@@ -22,7 +23,7 @@ def generate() -> dict[str, object]:
             for argument in sorted(rule.arguments)
         ]
         for method in sorted(set(rule.methods or ()) - {"HEAD", "OPTIONS"}):
-            operation: dict[str, object] = {
+            operation: dict[str, Any] = {
                 "operationId": rule.endpoint.replace(".", "_") + "_" + method.lower() + "_" + path.replace("/", "_").replace("{", "").replace("}", ""),
                 "responses": {
                     "200": {"description": "Successful response"},
@@ -74,22 +75,54 @@ def generate() -> dict[str, object]:
                 operation["description"] = (
                     "Returns at most 10 analyses and a next_before cursor. Full batch scope is required. No raw sample bytes are returned."
                 )
-            contracts = {
-                "/api/investigation-selection": {"case_ids": {"type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": True, "items": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}}},
-                "/api/cases/{case_id}/approval": {"decision": {"type": "string", "enum": ["approved", "rejected"]}, "version": {"type": "integer", "minimum": 1}, "reason": {"type": "string", "minLength": 3, "maxLength": 1000}},
-                "/api/cases/{case_id}/relationships": {"related_case_id": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}, "reason": {"type": "string", "minLength": 3, "maxLength": 1000}},
+            contracts: dict[str, dict[str, Any]] = {
+                "/api/investigation-selection": {
+                    "case_ids": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 2,
+                        "uniqueItems": True,
+                        "items": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+                    }
+                },
+                "/api/cases/{case_id}/approval": {
+                    "decision": {"type": "string", "enum": ["approved", "rejected"]},
+                    "version": {"type": "integer", "minimum": 1},
+                    "reason": {"type": "string", "minLength": 3, "maxLength": 1000},
+                },
+                "/api/cases/{case_id}/relationships": {
+                    "related_case_id": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+                    "reason": {"type": "string", "minLength": 3, "maxLength": 1000},
+                },
                 "/api/demo/switch": {"user_id": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}},
             }
             if path in contracts and method == "POST":
                 fields = contracts[path]
-                operation["requestBody"] = {"required": True, "content": {"application/json": {"schema": {"type": "object", "additionalProperties": False, "required": list(fields), "properties": fields}}}}
-                operation["responses"].update({"404": {"description": "Resource unavailable within workspace scope"}, "409": {"description": "Manager approval required, already decided, or stale version"}, "422": {"description": "Invalid fields, bounds or unrelated pair"}})
+                operation["requestBody"] = {
+                    "required": True,
+                    "content": {
+                        "application/json": {"schema": {"type": "object", "additionalProperties": False, "required": list(fields), "properties": fields}}
+                    },
+                }
+                operation["responses"].update(
+                    {
+                        "404": {"description": "Resource unavailable within workspace scope"},
+                        "409": {"description": "Manager approval required, already decided, or stale version"},
+                        "422": {"description": "Invalid fields, bounds or unrelated pair"},
+                    }
+                )
             if path == "/api/investigation-selection":
-                operation["description"] = "Requires cases.read. Select one approved visible case or two approved visible cases with an explicit manager-created relationship. Selection is revalidated on every request; revoked membership or an invalid relationship clears the entire selection."
+                operation["description"] = (
+                    "Requires cases.read. Select one approved visible case or two approved visible cases with an explicit manager-created relationship. Selection is revalidated on every request; revoked membership or an invalid relationship clears the entire selection."
+                )
             elif path.endswith("/approval"):
-                operation["description"] = "Manager/admin with cases.override only. Each new case, including a restored capsule, starts pending. A versioned decision is atomic, final, audited and recorded in custody. Case work is blocked until approval. Existing V3 cases retain grandfathered access after one-time migration."
+                operation["description"] = (
+                    "Manager/admin with cases.override only. Each new case, including a restored capsule, starts pending. A versioned decision is atomic, final, audited and recorded in custody. Case work is blocked until approval. Existing V3 cases retain grandfathered access after one-time migration."
+                )
             elif path.startswith("/api/demo/"):
-                operation["description"] = "Available only with explicit DEMO_MODE in development and a signed-in account in the isolated demo registry. Switching is restricted to registered active accounts in the same workspace without MFA. The previous session is revoked, a new session is created and case selection is cleared. Production refuses demo mode."
+                operation["description"] = (
+                    "Available only with explicit DEMO_MODE in development and a signed-in account in the isolated demo registry. Switching is restricted to registered active accounts in the same workspace without MFA. The previous session is revoked, a new session is created and case selection is cleared. Production refuses demo mode."
+                )
             paths.setdefault(path, {})[method.lower()] = operation
     return {
         "openapi": "3.1.0",

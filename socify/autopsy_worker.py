@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import os
 import sqlite3
 import stat
@@ -85,6 +86,19 @@ def compute_artifacts(payload, operation, formats, timeout, isolated_container=F
         except subprocess.TimeoutExpired as exc:
             raise TimeoutError("Local analysis exceeded its time limit") from exc
         if process.returncode != 0 or not (Path(directory) / "done").exists():
+            diagnostic = Path(directory) / "diagnostic.json"
+            if diagnostic.exists():
+                try:
+                    safe = json.loads(read_artifact(diagnostic, 1024))
+                    logging.getLogger(__name__).error(
+                        "analysis_child_failed operation=%s phase=%s error_type=%s errno=%s",
+                        operation,
+                        safe.get("phase"),
+                        safe.get("error_type"),
+                        safe.get("errno"),
+                    )
+                except (ValueError, OSError):
+                    pass
             raise ValueError("Local analysis failed to enforce its operating-system boundary or compute the result")
         return {kind: read_artifact(Path(directory) / kind) for kind in formats}
 

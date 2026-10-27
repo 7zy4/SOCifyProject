@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 from scripts.environment import load_environment
@@ -7,6 +8,11 @@ from socify import create_app
 
 
 def main() -> None:
+    if "--demo" in sys.argv[1:]:
+        from scripts.start_v4_demo import main as start_demo
+
+        start_demo([argument for argument in sys.argv[1:] if argument != "--demo"])
+        return
     if os.environ.get("SOCIFY_ENV", "development").strip().lower() == "production":
         raise RuntimeError("Use Gunicorn and the independently supervised workers for production")
     load_environment(Path(__file__).resolve().parent)

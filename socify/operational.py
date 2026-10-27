@@ -19,6 +19,10 @@ def case_scope(user: dict, alias: str = "c") -> tuple[str, list[object]]:
 def case_visible(case_id: int, user: dict) -> bool:
     scope, args = case_scope(user)
     return (
-        get_db().execute(f"SELECT 1 FROM incident_cases c WHERE c.id = ? AND c.workspace_id = ? AND c.archived_at IS NULL{scope}", (case_id, user["workspace_id"], *args)).fetchone()
+        get_db()
+        .execute(
+            f"SELECT 1 FROM incident_cases c WHERE c.id = ? AND c.workspace_id = ? AND c.archived_at IS NULL{scope}", (case_id, user["workspace_id"], *args)
+        )
+        .fetchone()
         is not None
     )

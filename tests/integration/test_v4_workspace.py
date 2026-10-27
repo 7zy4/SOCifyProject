@@ -27,14 +27,20 @@ def select(client, ids):
     return client.post("/api/investigation-selection", json={"case_ids": ids})
 
 
-@pytest.mark.parametrize("suffix,method,body", [
-    ("/logs", "get", None), ("/records", "get", None), ("/samples", "get", None),
-    ("/custody", "get", None), ("/chronology", "get", None),
-    ("/records/asset", "post", {"name": "Premature work"}),
-    ("/reports", "post", {"version": 1, "profile": "full"}),
-    ("/imports", "post", {"filename": "test.json", "content": "[]"}),
-    ("/transitions", "post", {"version": 1, "status": "open", "reason": "too early"}),
-])
+@pytest.mark.parametrize(
+    "suffix,method,body",
+    [
+        ("/logs", "get", None),
+        ("/records", "get", None),
+        ("/samples", "get", None),
+        ("/custody", "get", None),
+        ("/chronology", "get", None),
+        ("/records/asset", "post", {"name": "Premature work"}),
+        ("/reports", "post", {"version": 1, "profile": "full"}),
+        ("/imports", "post", {"filename": "test.json", "content": "[]"}),
+        ("/transitions", "post", {"version": 1, "status": "open", "reason": "too early"}),
+    ],
+)
 def test_unapproved_cases_cannot_be_worked_even_by_manager(v4, client, login_as, suffix, method, body):
     login_as("soc_manager")
     case = request_case(client)
@@ -54,7 +60,9 @@ def test_review_permissions_conflict_rejection_and_scope(v4, client, login_as, d
     approve(client, case)
     assert client.post(f"/api/cases/{case}/approval", json={"decision": "rejected", "version": 1, "reason": "stale request"}).status_code == 409
     pending = request_case(client, "Rejected request")
-    assert client.post(f"/api/cases/{pending}/approval", json={"decision": "rejected", "version": 1, "reason": "Insufficient intake details"}).status_code == 200
+    assert (
+        client.post(f"/api/cases/{pending}/approval", json={"decision": "rejected", "version": 1, "reason": "Insufficient intake details"}).status_code == 200
+    )
     assert select(client, [pending]).status_code == 409
     assert client.get(f"/api/cases/{case}/logs").status_code == 403
     assert select(client, [case]).status_code == 200
@@ -135,11 +143,27 @@ def test_csrf_is_required_for_selection_review_and_demo(v4, client, login_as):
     login_as("soc_manager")
     case = request_case(client)
     v4.config["WTF_CSRF_ENABLED"] = True
-    for path, body in [("/api/investigation-selection", {"case_ids": [case]}), (f"/api/cases/{case}/approval", {"decision": "approved", "version": 1, "reason": "reviewed"}), ("/api/demo/switch", {"user_id": 1})]:
+    for path, body in [
+        ("/api/investigation-selection", {"case_ids": [case]}),
+        (f"/api/cases/{case}/approval", {"decision": "approved", "version": 1, "reason": "reviewed"}),
+        ("/api/demo/switch", {"user_id": 1}),
+    ]:
         assert client.post(path, json=body).status_code == 400
 
 
-@pytest.mark.parametrize("change", [{"decision": []}, {"decision": None}, {"version": True}, {"reason": 0}, {"reason": "x" * 1001}, {"reason": "bad\ud800text"}, {"reason": "bad\x00text"}, {"extra": "unsupported"}])
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"decision": []},
+        {"decision": None},
+        {"version": True},
+        {"reason": 0},
+        {"reason": "x" * 1001},
+        {"reason": "bad\ud800text"},
+        {"reason": "bad\x00text"},
+        {"extra": "unsupported"},
+    ],
+)
 def test_review_input_errors_do_not_change_request(v4, client, login_as, change):
     login_as("soc_manager")
     case = request_case(client)
@@ -203,7 +227,9 @@ def test_relationship_and_selection_cannot_cross_tenants(v4, client, login_as, d
     first, other = request_case(client, "Tenant one"), request_case(client, "Other tenant")
     approve(client, first)
     approve(client, other)
-    tenant = database.execute("INSERT INTO training_workspaces(public_id,name,created_at) VALUES ('v4-private-tenant','Other workspace','2026-10-27T00:00:00Z')").lastrowid
+    tenant = database.execute(
+        "INSERT INTO training_workspaces(public_id,name,created_at) VALUES ('v4-private-tenant','Other workspace','2026-10-27T00:00:00Z')"
+    ).lastrowid
     database.execute("UPDATE incident_cases SET workspace_id=? WHERE id=?", (tenant, other))
     assert client.post(f"/api/cases/{first}/relationships", json={"related_case_id": other, "reason": "Cannot connect workspaces"}).status_code == 404
     assert select(client, [first, other]).status_code == 404
@@ -217,7 +243,9 @@ def test_selected_case_still_respects_restricted_imports(v4, client, login_as, d
     login_as("soc_manager")
     approve(client, case)
     assert select(client, [case]).status_code == 200
-    job = client.post(f"/api/cases/{case}/imports", json={"filename": "private.json", "content": '[{"title":"RESTRICTED-V4-LOG","source_ip":"192.0.2.77"}]'}).json["id"]
+    job = client.post(
+        f"/api/cases/{case}/imports", json={"filename": "private.json", "content": '[{"title":"RESTRICTED-V4-LOG","source_ip":"192.0.2.77"}]'}
+    ).json["id"]
     assert client.put(f"/api/cases/{case}/imports/{job}/access", json={"restricted": True, "members": [], "reason": "Restricted subset"}).status_code == 200
     alert(database, case, "PRIVATE-BATCH-ALERT")
     login_as("analyst")

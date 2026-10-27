@@ -11,10 +11,15 @@
       "installDockerBuildx": true
     }
   },
-  "forwardPorts": [5000],
+  "forwardPorts": [5000, 5001],
   "portsAttributes": {
     "5000": {
       "label": "SOCify",
+      "onAutoForward": "openBrowser",
+      "visibility": "private"
+    },
+    "5001": {
+      "label": "SOCify V4 Demo",
       "onAutoForward": "openBrowser",
       "visibility": "private"
     }

@@ -50,7 +50,9 @@ def selected_ids():
     user = current_user()
     if not user or not isinstance(identifiers, list) or not 1 <= len(identifiers) <= 2:
         return []
-    if any(type(value) is not int or not 1 <= value <= 9223372036854775807 or not case_visible(value, user) or not case_approved(value) for value in identifiers):
+    if any(
+        type(value) is not int or not 1 <= value <= 9223372036854775807 or not case_visible(value, user) or not case_approved(value) for value in identifiers
+    ):
         session.pop("investigation_cases", None)
         return []
     if len(identifiers) == 2 and not related(*identifiers):
@@ -80,7 +82,11 @@ def guard_workspace():
         if type(candidate) is int and 1 <= candidate <= 9223372036854775807:
             case_id = candidate
     elif request.endpoint == "teams.update_assignment":
-        row = get_db().execute("SELECT case_id FROM team_log_assignments WHERE id=? AND workspace_id=?", ((request.view_args or {})["assignment_id"], workspace_id())).fetchone()
+        row = (
+            get_db()
+            .execute("SELECT case_id FROM team_log_assignments WHERE id=? AND workspace_id=?", ((request.view_args or {})["assignment_id"], workspace_id()))
+            .fetchone()
+        )
         if row:
             case_id = row["case_id"]
     if not case_id or not current_user() or not _case_row(case_id):
@@ -115,7 +121,12 @@ def selection_set():
     if not isinstance(data, dict) or set(data) != {"case_ids"}:
         return error_response("INVALID_SELECTION", "حدد قائمة القضايا فقط", 422)
     ids = data["case_ids"]
-    if not isinstance(ids, list) or not 1 <= len(ids) <= 2 or any(type(value) is not int or not 1 <= value <= 9223372036854775807 for value in ids) or len(set(ids)) != len(ids):
+    if (
+        not isinstance(ids, list)
+        or not 1 <= len(ids) <= 2
+        or any(type(value) is not int or not 1 <= value <= 9223372036854775807 for value in ids)
+        or len(set(ids)) != len(ids)
+    ):
         return error_response("INVALID_SELECTION", "اختر قضية واحدة أو قضيتين مرتبطتين فقط", 422)
     if any(not _case_row(value) for value in ids):
         return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
@@ -137,7 +148,12 @@ def review_case(case_id):
     if not can_review():
         return error_response("PERMISSION_DENIED", "اعتماد القضية مخصص للمدير", 403)
     data = request.get_json(silent=True)
-    if not isinstance(data, dict) or set(data) != {"decision", "version", "reason"} or not isinstance(data.get("decision"), str) or data["decision"] not in {"approved", "rejected"}:
+    if (
+        not isinstance(data, dict)
+        or set(data) != {"decision", "version", "reason"}
+        or not isinstance(data.get("decision"), str)
+        or data["decision"] not in {"approved", "rejected"}
+    ):
         return error_response("INVALID_REVIEW", "حدد قرار الاعتماد وإصداره وسببه", 422)
     if type(data["version"]) is not int or not isinstance(data["reason"], str) or not 3 <= len(data["reason"].strip()) <= 1000:
         return error_response("INVALID_REVIEW", "سبب القرار مطلوب مع إصدار صحيح", 422)
@@ -151,7 +167,10 @@ def review_case(case_id):
         row = approval(case_id)
         if row["source"] == "missing_review" or row["state"] != "pending" or row["version"] != data["version"]:
             return error_response("REVIEW_CONFLICT", "سبق اتخاذ القرار أو تغير إصدار الطلب", 409)
-        get_db().execute("UPDATE case_approvals SET state=?,version=version+1,reviewed_by=?,reviewed_at=?,reason=? WHERE case_id=? AND version=?", (data["decision"], actor_id(), iso_now(), data["reason"].strip(), case_id, data["version"]))
+        get_db().execute(
+            "UPDATE case_approvals SET state=?,version=version+1,reviewed_by=?,reviewed_at=?,reason=? WHERE case_id=? AND version=?",
+            (data["decision"], actor_id(), iso_now(), data["reason"].strip(), case_id, data["version"]),
+        )
         _history(get_db(), case_id, "case_" + data["decision"], "pending", data["decision"], data["reason"].strip())
         custody(case_id, "case_" + data["decision"], {"reason": data["reason"].strip()})
         record_audit(get_db(), "review", "case", case_id, details={"decision": data["decision"]})
@@ -181,7 +200,10 @@ def link_cases(case_id):
             return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
         if not case_approved(case_id) or not case_approved(target):
             return error_response("CASE_APPROVAL_REQUIRED", "اعتمد القضيتين قبل الربط", 409)
-        get_db().execute("INSERT OR IGNORE INTO case_relationships(first_id,second_id,reason,created_by,created_at) VALUES (?,?,?,?,?)", (*sorted((case_id, target)), data["reason"].strip(), actor_id(), iso_now()))
+        get_db().execute(
+            "INSERT OR IGNORE INTO case_relationships(first_id,second_id,reason,created_by,created_at) VALUES (?,?,?,?,?)",
+            (*sorted((case_id, target)), data["reason"].strip(), actor_id(), iso_now()),
+        )
         record_audit(get_db(), "case_linked", "case", case_id, details={"related_case_id": target, "reason": data["reason"].strip()})
     return jsonify({"linked": True})
 
@@ -195,7 +217,10 @@ def demo_enabled():
 def demo_accounts():
     if not demo_enabled() or not get_db().execute("SELECT 1 FROM demo_accounts WHERE user_id=?", (actor_id(),)).fetchone():
         return jsonify({"enabled": False, "items": []})
-    rows = get_db().execute("SELECT u.id,u.name,u.role FROM users u JOIN demo_accounts d ON d.user_id=u.id WHERE u.workspace_id=? AND u.is_active=1 ORDER BY u.id", (workspace_id(),))
+    rows = get_db().execute(
+        "SELECT u.id,u.name,u.role FROM users u JOIN demo_accounts d ON d.user_id=u.id WHERE u.workspace_id=? AND u.is_active=1 ORDER BY u.id",
+        (workspace_id(),),
+    )
     return jsonify({"enabled": True, "items": [dict(row) for row in rows]})
 
 
@@ -212,7 +237,14 @@ def demo_switch():
     if not isinstance(data, dict) or set(data) != {"user_id"} or type(data["user_id"]) is not int or not 1 <= data["user_id"] <= 9223372036854775807:
         return error_response("INVALID_ACCOUNT", "حدد حساب تجربة صالح", 422)
     with transaction():
-        user = get_db().execute("SELECT u.* FROM users u JOIN demo_accounts d ON d.user_id=u.id WHERE u.id=? AND u.workspace_id=? AND u.is_active=1 AND NOT EXISTS(SELECT 1 FROM mfa_enrollments m WHERE m.user_id=u.id AND m.enabled=1)", (data["user_id"], workspace_id())).fetchone()
+        user = (
+            get_db()
+            .execute(
+                "SELECT u.* FROM users u JOIN demo_accounts d ON d.user_id=u.id WHERE u.id=? AND u.workspace_id=? AND u.is_active=1 AND NOT EXISTS(SELECT 1 FROM mfa_enrollments m WHERE m.user_id=u.id AND m.enabled=1)",
+                (data["user_id"], workspace_id()),
+            )
+            .fetchone()
+        )
         if not user:
             return error_response("ACCOUNT_UNAVAILABLE", "حساب التجربة غير متاح", 404)
         record_audit(get_db(), "demo_account_switch", "auth", data["user_id"])

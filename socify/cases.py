@@ -201,12 +201,32 @@ def _case_view(row: sqlite3.Row | None) -> dict[str, Any]:
 
         item["approval"] = approval(row["id"])
         scope, scope_args = case_scope(current_user() or {})
-        item["related_case_ids"] = [related[0] for related in get_db().execute(f"SELECT c.id FROM case_relationships rel JOIN incident_cases c ON c.id=CASE WHEN rel.first_id=? THEN rel.second_id ELSE rel.first_id END WHERE (rel.first_id=? OR rel.second_id=?) AND c.workspace_id=? AND c.archived_at IS NULL{scope}", (row["id"], row["id"], row["id"], workspace_id(), *scope_args))]
+        item["related_case_ids"] = [
+            related[0]
+            for related in get_db().execute(
+                f"SELECT c.id FROM case_relationships rel JOIN incident_cases c ON c.id=CASE WHEN rel.first_id=? THEN rel.second_id ELSE rel.first_id END WHERE (rel.first_id=? OR rel.second_id=?) AND c.workspace_id=? AND c.archived_at IS NULL{scope}",
+                (row["id"], row["id"], row["id"], workspace_id(), *scope_args),
+            )
+        ]
         from .autopsy_pipeline import case_full_access
 
         item["full_case_access"] = case_full_access(row["id"])
         if not item["full_case_access"]:
-            allowed = {"id", "reference", "title", "status", "severity", "priority", "created_at", "updated_at", "version", "context", "full_case_access", "approval", "related_case_ids"}
+            allowed = {
+                "id",
+                "reference",
+                "title",
+                "status",
+                "severity",
+                "priority",
+                "created_at",
+                "updated_at",
+                "version",
+                "context",
+                "full_case_access",
+                "approval",
+                "related_case_ids",
+            }
             item = {key: value for key, value in item.items() if key in allowed}
             if item["context"]:
                 item["context"] = {key: value for key, value in item["context"].items() if key in {"case_id", "reason", "objective", "confidentiality"}}

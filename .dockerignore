@@ -11,6 +11,8 @@ __pycache__
 **/*.env
 **/*.db*
 instance
+**/accounts.json
+**/.accounts-*
 .coverage*
 .mypy_cache
 .venv
