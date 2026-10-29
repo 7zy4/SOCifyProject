@@ -3,9 +3,9 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="theme-color" content="#F4F6FA">
+  <meta name="theme-color" content="#0C101A">
 
-  <link rel="preload" href="{{ url_for('static', filename='fonts/Almarai-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{{ url_for('static', filename='fonts/IBMPlexSansArabic-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
   <script src="{{ url_for('static', filename='localization.js') }}"></script>
   <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
@@ -27,6 +27,7 @@
   {% if operational %}<script src="{{ url_for('static', filename='v4-workspace.js') }}" defer></script>{% endif %}
 </head>
 <body class="app-shell{{ ' autopsy-shell' if operational else '' }}">
+  {% include "_ink_filters.html" %}
   <a class="skip-link" href="#workspace" data-ui-copy>انتقل إلى مساحة العمل</a>
   {% if operational %}<script src="{{ url_for('static', filename='autopsy_team.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_investigation.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_profile.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_operations.js') }}" defer></script>{% endif %}
   <aside id="workspace-navigation" class="sidebar" aria-label="تنقل المنصة" data-ui-attributes>
@@ -46,6 +47,8 @@
       <a data-section="playbooks" data-nav-permission="cases.read" href="/playbooks" data-ui-copy>{{ nav_icon("playbooks") }}كتيبات الاستجابة</a>
       <a data-section="analysis-library" data-nav-permission="cases.read" href="/analysis-library" data-ui-copy>{{ nav_icon("analysis-library") }}مكتبة التحليل المحلي</a>
       <a data-section="team" data-nav-permission="cases.read" href="/team" data-ui-copy>{{ nav_icon("team") }}الفريق</a>
+      <a data-section="audit" data-nav-permission="audit.read" href="/audit" data-ui-copy><span aria-hidden="true">≋</span>سجل التدقيق</a>
+      <a data-section="admin" data-nav-permission="users.read" href="/admin" data-ui-copy><span aria-hidden="true">▦</span>الإدارة</a>
       {% else %}
       <a data-section="dashboard" href="/dashboard" data-ui-copy><span aria-hidden="true">⌂</span>نظرة عامة</a>
       <a data-section="events" href="/events" data-ui-copy><span aria-hidden="true">≋</span>مستكشف السجلات</a>
@@ -54,12 +57,10 @@
       <a data-section="sources" href="/sources" data-ui-copy><span aria-hidden="true">⇣</span>المصادر</a>
       <a data-section="imports" href="/imports" data-ui-copy><span aria-hidden="true">↥</span>مركز الاستيراد</a>
       <a data-section="incidents" href="/incidents" data-ui-copy><span aria-hidden="true">◇</span>التحقيقات</a>
-      <a data-section="lab" href="/lab" data-ui-copy><span aria-hidden="true">▶</span>المختبر</a>
       <a data-section="attack" href="/attack"><span aria-hidden="true">▦</span>MITRE ATT&amp;CK</a>
       <a data-section="hunt" href="/hunt" data-ui-copy><span aria-hidden="true">⌕</span>الصيد</a>
       <a data-section="graph" href="/graph" data-ui-copy><span aria-hidden="true">⌘</span>الرسم الزمني</a>
       <a data-section="playbooks" href="/playbooks"><span aria-hidden="true">▷</span>Playbooks</a>
-      <a data-section="scores" href="/scores" data-ui-copy><span aria-hidden="true">⌁</span>التقييم</a>
       <a data-section="audit" href="/audit" data-ui-copy>التدقيق</a>
       <a data-section="admin" href="/admin" data-ui-copy>الإدارة</a>
       <a data-section="team" href="/team" data-ui-copy>{{ nav_icon("team") }}الفريق والمهام</a>

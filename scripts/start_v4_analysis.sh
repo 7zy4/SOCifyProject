@@ -1,9 +1,56 @@
 #!/usr/bin/env bash
 set -euo pipefail
-export SOCIFY_ANALYSIS_CONTAINER_NAME=socify-v4-dev-analysis
-export SOCIFY_ANALYSIS_IPC_DIRECTORY=/tmp/socify-v4-dev-analysis-ipc
-export SOCIFY_ANALYSIS_IMAGE=socify-v4-analysis
-# The V4 development backend is disposable; refresh it after an image rebuild.
-# start_local_analysis.sh still rejects a container bound to another directory.
-export SOCIFY_ANALYSIS_REFRESH_IMAGE=1
-exec bash "$(dirname "$0")/start_local_analysis.sh"
+if ! command -v docker >/dev/null 2>&1; then
+  printf '%s\n' 'Docker is not installed. In Codespaces, update V4 and run Codespaces: Rebuild Container on the existing Codespace.' >&2
+  exit 1
+fi
+if ! docker info >/dev/null 2>&1; then
+  printf '%s\n' 'Docker is installed but its daemon is unavailable. Finish the container rebuild and verify docker info before starting analysis.' >&2
+  exit 1
+fi
+analysis_container=${SOCIFY_ANALYSIS_CONTAINER_NAME:-socify-v4-dev-analysis}
+analysis_directory=${SOCIFY_ANALYSIS_IPC_DIRECTORY:-/tmp/socify-v4-dev-analysis-ipc}
+analysis_image=${SOCIFY_ANALYSIS_IMAGE:-socify-v4-analysis}
+# Refresh a rebuilt backend only when its existing IPC directory matches.
+export SOCIFY_ANALYSIS_REFRESH_IMAGE=${SOCIFY_ANALYSIS_REFRESH_IMAGE:-1}
+analysis_expected="$(docker image inspect --format '{{.Id}}' "$analysis_image")"
+if docker container inspect "$analysis_container" >/dev/null 2>&1; then
+  analysis_actual="$(docker container inspect --format '{{.Image}}' "$analysis_container")"
+  analysis_mount="$(docker container inspect --format '{{range .Mounts}}{{if eq .Destination "/analysis-ipc"}}{{.Source}}{{end}}{{end}}' "$analysis_container")"
+  if [[ "$analysis_mount" != "$analysis_directory" ]]; then
+    printf '%s\n' 'Existing development backend differs; inspect it before replacement.' >&2
+    exit 1
+  fi
+  if [[ "$analysis_actual" != "$analysis_expected" ]]; then
+    if [[ "${SOCIFY_ANALYSIS_REFRESH_IMAGE:-0}" != 1 ]]; then
+      printf '%s\n' 'Existing development backend differs; inspect it before replacement.' >&2
+      exit 1
+    fi
+    printf '%s\n' "Updating development analysis container: $analysis_container (same IPC directory; databases are preserved)." >&2
+    docker stop --time 30 "$analysis_container" >/dev/null
+    docker rm "$analysis_container" >/dev/null
+  elif [[ "$(docker container inspect --format '{{.State.Running}}' "$analysis_container")" == true ]]; then
+    test -S "$analysis_directory/analysis.sock"
+    printf '%s\n' "$analysis_directory/analysis.sock"
+    exit 0
+  else
+    docker rm "$analysis_container" >/dev/null
+  fi
+fi
+install -d -m 2770 "$analysis_directory"
+if [[ -e "$analysis_directory/analysis.sock" && ! -S "$analysis_directory/analysis.sock" ]]; then
+  printf '%s\n' 'Unexpected IPC entry; inspect before startup.' >&2
+  exit 1
+fi
+rm -f "$analysis_directory/analysis.sock"
+docker run --detach --init --name "$analysis_container" --no-healthcheck --network none --read-only --cap-drop ALL --security-opt no-new-privileges --group-add "$(id -g)" --memory 2g --pids-limit 32 --tmpfs /tmp:size=128m,noexec,nosuid,nodev --mount "type=bind,source=${analysis_directory},target=/analysis-ipc" "$analysis_image" >/dev/null
+for attempt in $(seq 1 30); do
+  if test -S "$analysis_directory/analysis.sock" && test -f "$analysis_directory/analysis.lock"; then
+    chmod 555 "$analysis_directory"
+    printf '%s\n' "$analysis_directory/analysis.sock"
+    exit 0
+  fi
+  sleep 1
+done
+docker logs --tail 20 "$analysis_container" >&2
+exit 1

@@ -22,6 +22,10 @@ V3 adds local defensive processing/reporting dependencies: WeasyPrint (BSD, `htt
 
 Baloo Bhaijaan 2 and IBM Plex Sans Arabic are self-hosted from the Google Fonts repository under the SIL Open Font License 1.1. Copyright notices and complete license terms are retained beside the original fonts in `static/fonts/`. WOFF2 files are lossless format conversions using fonttools 4.60.1 and Brotli 1.2.1; glyph content is unchanged. Printable HTML embeds the WOFF2 fonts for offline use.
 
-## Interface fonts (2026 redesign)
+## Interface fonts (previous 2026 redesign)
 
-The active interface and newly generated reports use Almarai (Arabic, Regular/Bold) and IBM Plex Sans (Latin, variable weights). Sources: https://github.com/google/fonts/tree/main/ofl/almarai and https://github.com/google/fonts/tree/main/ofl/ibmplexsans. Both are distributed under SIL OFL 1.1; licenses are in `static/fonts/Almarai-OFL.txt` and `static/fonts/IBMPlexSans-OFL.txt`. WOFF2 builds, byte sizes and digests are recorded in `static/fonts/interface-manifest.json`. IBM Plex Sans fixes the width axis at 100 and retains the variable weight axis. Earlier font assets remain for historical report compatibility and are not loaded by the active interface.
+The previous interface used Almarai and IBM Plex Sans. Sources: https://github.com/google/fonts/tree/main/ofl/almarai and https://github.com/google/fonts/tree/main/ofl/ibmplexsans. Both are distributed under SIL OFL 1.1; licenses are in `static/fonts/Almarai-OFL.txt` and `static/fonts/IBMPlexSans-OFL.txt`. Original WOFF2 builds are recorded in `static/fonts/interface-manifest.json`. IBM Plex Sans fixes the width axis at 100 and retains the variable weight axis. Earlier font assets remain for historical report compatibility.
+
+## V4 noir interface and reports
+
+The current type system uses Bangers, Comic Neue, Cairo, Tajawal, IBM Plex Sans Arabic, IBM Plex Sans and JetBrains Mono. Fonts are bundled locally under SIL OFL 1.1 with the corresponding license beside each family. The added upstream sources, input hashes and converted WOFF2 hashes are recorded in `static/fonts/sources.json`; the retained IBM Plex Sans face uses the preceding interface manifest. The new faces were converted with fontTools without changing glyph designs. `static/design-tokens.json` selects the active families. No runtime request to a font provider is required.

@@ -5,7 +5,6 @@ from pathlib import Path
 
 from gunicorn.app.wsgiapp import WSGIApplication
 
-from create_db import create_database
 from scripts.environment import load_environment
 
 
@@ -19,7 +18,6 @@ def main() -> None:
         print("Codespaces configuration ready; existing keys and database preserved")
         return
     os.chdir(root)
-    create_database()
     sys.argv = ["gunicorn", "--config", str(root / "gunicorn.conf.py"), "app:app"]
     from scripts.local_services import local_worker_services
     from socify import create_app

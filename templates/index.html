@@ -2,9 +2,9 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="theme-color" content="#F4F6FA">
+  <meta name="theme-color" content="#0C101A">
 
-  <link rel="preload" href="{{ url_for('static', filename='fonts/Almarai-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{{ url_for('static', filename='fonts/IBMPlexSansArabic-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
   <script src="{{ url_for('static', filename='localization.js') }}"></script>
   <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='design-system.css') }}">
 </head>
 <body class="landing">
+  {% include "_ink_filters.html" %}
   <a class="skip-link" href="#main" data-ui-copy>انتقل إلى المحتوى</a>
   <header class="landing-nav">
     <a class="brand brand-surface" href="{{ url_for('ui.index') }}" aria-label="SOCify الرئيسية" data-ui-attributes><span class="brand-wordmark" lang="en" dir="ltr">SOCify</span></a>

@@ -1,0 +1,92 @@
+[
+  {
+    "file": "Bangers-Regular.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/bangers/Bangers-Regular.ttf",
+    "source_sha256": "4160a7311de9342674cce9160cde9fcbb30f48190397d86ff1b70b455af65824",
+    "sha256": "87626bd4bc7522715354c6e1f6b8ad0bebf05ed76f061cda8d4bf401db256a91"
+  },
+  {
+    "file": "bangers-OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/bangers/OFL.txt",
+    "source_sha256": "630dd5a307c0657b094d324e069b390edf90182fe5003639e06c02a0e5769af7",
+    "sha256": "630dd5a307c0657b094d324e069b390edf90182fe5003639e06c02a0e5769af7"
+  },
+  {
+    "file": "ComicNeue-Regular.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/comicneue/ComicNeue-Regular.ttf",
+    "source_sha256": "a0ee5a37c8b27c4db0700137d928598b1e23b0089e1546a8961909176b779360",
+    "sha256": "b731bf2b534876285b813257fa345af4ceb2dfd59ea885a399a5a3db31c2387e"
+  },
+  {
+    "file": "ComicNeue-Bold.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/comicneue/ComicNeue-Bold.ttf",
+    "source_sha256": "3e7e5fccfd7e0788f317b43312151c1bd5cf058c9697a8d83eac3939050bd61e",
+    "sha256": "05a7da343e4668292ca06a3a23707970e5eb73925622a943e91a5d5933ba209d"
+  },
+  {
+    "file": "comicneue-OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/comicneue/OFL.txt",
+    "source_sha256": "7c38a22e5878e60fe423360553e63dd7be23d29f1f60336034935dbfc96e8320",
+    "sha256": "7c38a22e5878e60fe423360553e63dd7be23d29f1f60336034935dbfc96e8320"
+  },
+  {
+    "file": "Cairo.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/cairo/Cairo%5Bslnt%2Cwght%5D.ttf",
+    "source_sha256": "667c987182391c91f4e57a2f455b1794fb5e3ee6ca4ef3383e86bb690fa9c964",
+    "sha256": "71887d8046ee925baa3834255a5bb95267218a8c6fb09398bb7da626a766dbe0"
+  },
+  {
+    "file": "cairo-OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/cairo/OFL.txt",
+    "source_sha256": "a4554e1799d42e1405924b61eb0e0722ae1623b1f1f07f995348f96c496362a9",
+    "sha256": "a4554e1799d42e1405924b61eb0e0722ae1623b1f1f07f995348f96c496362a9"
+  },
+  {
+    "file": "Tajawal-Regular.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/Tajawal-Regular.ttf",
+    "source_sha256": "6882892da3e03527d5db2bbab3b48bde6ef2e878a43f522d1a4eebda90010a19",
+    "sha256": "312c6cb199d6b5ad6821653ef13bfe0173fad24607b90455ad248f86259ce0bc"
+  },
+  {
+    "file": "Tajawal-Bold.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/Tajawal-Bold.ttf",
+    "source_sha256": "0342ab6b74b6bd1b4b5bf7beda45a9734a2b3147a31e8a3a45b6a3417a52d9d7",
+    "sha256": "0ebf17016cc6543ee4d4f2745873bb5f56b0c2ec1a125ff79addf6b821e500d0"
+  },
+  {
+    "file": "tajawal-OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/OFL.txt",
+    "source_sha256": "9b584984f9db0ee30347391a76eff9c0a6b03dc450c3c6afe3757a2cb3a4db87",
+    "sha256": "9b584984f9db0ee30347391a76eff9c0a6b03dc450c3c6afe3757a2cb3a4db87"
+  },
+  {
+    "file": "IBMPlexSansArabic-Regular.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/ibmplexsansarabic/IBMPlexSansArabic-Regular.ttf",
+    "source_sha256": "6f611412270a132bbac838da9259d4c68569b4175f3b3b8fa3fa36a30b56dab9",
+    "sha256": "f9954569d8698b5cbfc01fa75e149fba9a035952e53b5c1cf9eba29233dfed53"
+  },
+  {
+    "file": "IBMPlexSansArabic-Bold.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/ibmplexsansarabic/IBMPlexSansArabic-Bold.ttf",
+    "source_sha256": "691e0c891a38637ae6bbdb69700f8042cb0724a137bee615068ffdb92244f61f",
+    "sha256": "c0095af81488b6d3cd6a96999ed67cef44dd1c2c70a37ef237fcc8c45ecd35d6"
+  },
+  {
+    "file": "ibmplexsansarabic-OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/ibmplexsansarabic/OFL.txt",
+    "source_sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da",
+    "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da"
+  },
+  {
+    "file": "JetBrainsMono.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf",
+    "source_sha256": "48715a42ec242c21e9f02692891e147d022299a52e48d5e413e1a942193ffeda",
+    "sha256": "72d1babdd83abf736b9c9f16e79b6f9f9e0c8ff96847013feab18cb7af6a1d45"
+  },
+  {
+    "file": "jetbrainsmono-OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/jetbrainsmono/OFL.txt",
+    "source_sha256": "b2fe5e8987594e9ffd1d2ca52a2f5d73eb8335243893c5d6254b5ad69269591d",
+    "sha256": "b2fe5e8987594e9ffd1d2ca52a2f5d73eb8335243893c5d6254b5ad69269591d"
+  }
+]

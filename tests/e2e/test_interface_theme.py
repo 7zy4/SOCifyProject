@@ -80,7 +80,7 @@ def test_theme_system_persistence_languages_and_operational_surfaces(app):
                         assert page.locator("html").get_attribute("data-theme") == theme
                         assert page.locator("html").get_attribute("lang") == language
                         assert page.locator("html").get_attribute("dir") == ("rtl" if language == "ar" else "ltr")
-                        assert page.evaluate("document.fonts.check('15px Almarai', 'تحقيق')")
+                        assert page.evaluate("document.fonts.check('15px \"IBM Plex Sans Arabic\"', 'تحقيق')")
                         assert page.evaluate("document.fonts.check('15px \"IBM Plex Sans\"', 'Investigation')")
                         assert_accessible(page)
                         name = route.strip("/").replace("/", "-").replace("?tab=", "-") or "landing"
@@ -150,6 +150,34 @@ def test_public_pages_theme_typography_and_responsive_layout(app):
                         page.set_viewport_size({"width": 390, "height": 844})
                         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), (route, language, theme)
                         page.screenshot(path=str(screenshots / f"{name}-{language}-{theme}-mobile.png"), full_page=True)
+            browser.close()
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+@pytest.mark.e2e
+def test_operational_governance_routes_render_their_authorized_content(app):
+    app.config.update(LEGACY_TRAINING_TESTS=False, WTF_CSRF_ENABLED=True)
+    server = make_server("127.0.0.1", 0, app)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as playwright:
+            browser = launch_browser(playwright)
+            page = browser.new_page()
+            base = f"http://127.0.0.1:{server.server_port}"
+            page.goto(base + "/login")
+            page.get_by_label("البريد الإلكتروني", exact=True).fill("admin@socify.local")
+            page.get_by_label("كلمة المرور", exact=True).fill(DEMO_LOGIN_VALUE)
+            page.get_by_role("button", name="دخول إلى المنصة", exact=True).click()
+            page.wait_for_url("**/cases")
+            for route, heading in (("audit", "سجل التدقيق"), ("admin", "الحوكمة والصلاحيات")):
+                page.goto(base + "/" + route)
+                page.locator('#workspace[aria-busy="false"]').wait_for()
+                assert page.locator("#workspace .workspace-head h2").inner_text() == heading
+                assert page.locator("#workspace table").count() >= 1
+                assert page.locator(f'#primary-nav [data-section="{route}"]').is_visible()
             browser.close()
     finally:
         server.shutdown()

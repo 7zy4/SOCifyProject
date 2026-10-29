@@ -380,6 +380,15 @@ async function autopsyStart() {
   const role = document.querySelector("[data-user-role]");
   if (role) role.textContent = autopsyLabel(state.user.role);
   window.SOCifyWorkbench?.navigation();
+  if (["audit", "admin"].includes(state.section)) {
+    const allowed = permission(state.section === "audit" ? "audit.read" : "users.read");
+    if (!allowed) {
+      begin(state.section);
+      finish(emptyState(SOCifyLocale.text("هذا القسم غير متاح لدورك"), SOCifyLocale.text("تطبق المنصة صلاحيات الخادم حتى عند فتح الرابط مباشرة."), [linkedButton(SOCifyLocale.text("الملف والأمان"), "/profile")]));
+      return;
+    }
+    return state.section === "audit" ? renderAudit() : renderAdmin();
+  }
   if (state.section === "profile" && window.SOCifyAutopsy.profile) {
     if(permission("cases.read")) await window.SOCifyV4?.initialize();
     return window.SOCifyAutopsy.profile();

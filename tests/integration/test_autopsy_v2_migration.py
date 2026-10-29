@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from socify import create_app
-from socify.db import connect_path
+from socify.db import connect_path, connect_readonly
 from socify.operations import backup_database, migration_dry_run, restore_database, verify_database
 from socify.schema import ensure_schema
 from socify.security import cipher
@@ -36,7 +36,9 @@ def test_actual_v2_database_migration_preserves_evidence_reports_relations_and_b
     assert hashlib.sha256(content).hexdigest() == metadata["sha256"]
     original, migrated, backup, restored = [tmp_path / name for name in ("original-v2.db", "upgrade.db", "backup-v2.db", "rollback.db")]
     original.write_bytes(content)
-    connection = connect_path(str(original), True)
+    # Inspect the immutable source without changing its journal mode. Normal
+    # writable test connections now enable WAL just like production ones.
+    connection = connect_readonly(str(original))
     tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert "autopsy_case_context" not in tables
     snapshots = {}

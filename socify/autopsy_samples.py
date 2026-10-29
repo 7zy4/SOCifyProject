@@ -9,6 +9,7 @@ from .autopsy_api import insert_record
 from .autopsy_domain import canonical, custody, text_value
 from .cases import _case_row
 from .db import get_db, inserted_id, transaction
+from .file_names import evidence_filename
 from .security import actor_id, cipher, encrypt_secret, error_response, require_permission
 from .timeutils import iso_now
 
@@ -45,6 +46,8 @@ def upload_sample(case_id: int):
         content = upload.stream.read(maximum + 1)
         if not content or len(content) > maximum:
             raise ValueError("العينة فارغة أو تتجاوز الحد المسموح")
+        original_name = name
+        name = evidence_filename(name, content, "sample")
     except ValueError as exc:
         return error_response("INVALID_SAMPLE", str(exc), 422)
     digest = hashlib.sha256(content).hexdigest()
@@ -65,7 +68,7 @@ def upload_sample(case_id: int):
                     digest,
                     name,
                     digest,
-                    canonical({"source": "manual_sample_upload", "bytes": len(content), "download_route": "samples"}),
+                    canonical({"source": "manual_sample_upload", "bytes": len(content), "download_route": "samples", "original_filename": original_name}),
                     actor_id(),
                     iso_now(),
                 ),

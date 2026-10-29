@@ -1,47 +1,53 @@
-@page { size: 595pt 842pt; margin: 42pt 44pt 40pt; background: #FFFFFF; @bottom-right { content: counter(page); font: 400 11pt "Almarai", "IBM Plex Sans", sans-serif; color: #4A5A7A; } }
+@page { size: 595pt 842pt; margin: 42pt 44pt 40pt; background: var(--pulp-paper); @bottom-right { content: counter(page); font: 400 11pt "IBM Plex Sans Arabic", "IBM Plex Sans", sans-serif; color: var(--paper-muted); } }
 @page:first { @bottom-right { content: none; } }
 * { box-sizing: border-box; }
-html { background: #C9D1DE; color: #142B49; font: 400 17pt/1.6 "Almarai", "IBM Plex Sans", sans-serif; }
-body { max-width: 595pt; margin: 24pt auto; padding: 42pt 44pt 40pt; background: #FFFFFF; overflow-wrap: anywhere; }
-h1, h2, h3 { font-family: "Almarai", "IBM Plex Sans", sans-serif; font-weight: 700; line-height: 1.6; color: #142B49; margin: 0 0 17pt; }
+html { background: var(--bg); color: var(--paper-text); font: 400 17pt/1.6 "IBM Plex Sans Arabic", "IBM Plex Sans", sans-serif; }
+body { max-width: 595pt; margin: 24pt auto; padding: 42pt 44pt 40pt; background: var(--pulp-paper); overflow-wrap: anywhere; }
+h1, h2, h3 { font-family: "IBM Plex Sans Arabic", "IBM Plex Sans", sans-serif; font-weight: 700; line-height: 1.6; color: var(--paper-text); margin: 0 0 17pt; }
 h1 { font-size: 28pt; } h2 { font-size: 24pt; margin-block-start: 24pt; break-after: avoid; } h3 { font-size: 20pt; }
 p { margin: 0 0 17pt; }
 strong, dt { font-weight: 700; }
-a { color: #142B49; }
-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; border: 3pt solid #142B49; border-radius: 18pt; margin-block: 17pt; font-size: 14pt; }
-th, td { padding: 12pt; border-bottom: 1pt solid #B9C8E4; text-align: start; overflow-wrap: anywhere; vertical-align: top; font-size: 14pt; }
-th { font-weight: 700; background: #EDF1F7; }
+a { color: var(--paper-text); }
+table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; border: 3pt solid var(--paper-text); border-radius: 18pt; margin-block: 17pt; font-size: 14pt; }
+th, td { padding: 12pt; border-bottom: 1pt solid var(--line-soft); text-align: start; overflow-wrap: anywhere; vertical-align: top; font-size: 14pt; }
+th { font-weight: 700; background: var(--panel-2); }
 tr:last-child td, tr:last-child th { border-bottom: 0; }
 thead { display: table-header-group; }
 tr { break-inside: avoid; }
-.report-record { border: 3pt solid #142B49; border-radius: 18pt; padding: 12pt; margin-block: 17pt; break-inside: avoid-page; }
+.report-record { border: 3pt solid var(--paper-text); border-radius: 18pt; padding: 12pt; margin-block: 17pt; break-inside: avoid-page; }
 .report-record dl { margin: 0; font-size: 14pt; }
-.report-record dt { color: #142B49; margin-block-start: 10pt; break-after: avoid; }
+.report-record dt { color: var(--paper-text); margin-block-start: 10pt; break-after: avoid; }
 .report-record dd { margin: 0 0 10pt; white-space: pre-wrap; overflow-wrap: anywhere; }
 .report-section { break-before: page; }
 .report-section h2 { margin-block-start: 0; }
-.report-cover { background: #142B49; color: #FFFFFF; padding: 24pt; border-radius: 26pt; margin-block-end: 17pt; }
-.report-cover h1, .report-cover h2 { color: #FFFFFF; }
+.report-cover { background: var(--paper-text); color: var(--pulp-paper); padding: 24pt; border-radius: 26pt; margin-block-end: 17pt; }
+.report-cover h1, .report-cover h2 { color: var(--pulp-paper); }
 .report-cover h1 { font-size: 30pt; line-height: 1.5; }
-.report-note { background: #EDF1F7; color: #142B49; border: 3pt solid #142B49; border-radius: 16pt; padding: 12pt; font-size: 14pt; }
-pre, code { font: 400 14pt/1.6 "Almarai", "IBM Plex Sans", sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; }
+.report-note { background: var(--panel-2); color: var(--paper-text); border: 3pt solid var(--paper-text); border-radius: 16pt; padding: 12pt; font-size: 14pt; }
+pre, code { font: 400 14pt/1.6 "IBM Plex Sans Arabic", "IBM Plex Sans", sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; }
 [dir="ltr"] h1, [dir="ltr"] h2 { letter-spacing: -.005em; }
 @media (max-width: 700px) { body { margin: 0; padding: 24pt 12pt; } }
-@media print { html, body { background: #FFFFFF; } body { width: auto; max-width: none; padding: 0; margin: 0; } }
+@media print { html, body { background: var(--pulp-paper); } body { width: auto; max-width: none; padding: 0; margin: 0; } }
 
-.report-outline { border: 2pt solid #142B49; border-radius: 18pt; padding: 17pt; margin-block: 24pt; background: #FFFFFF; }
+.report-outline { border: 2pt solid var(--paper-text); border-radius: 18pt; padding: 17pt; margin-block: 24pt; background: var(--pulp-paper); }
 .report-outline h2 { font-size: 20pt; margin: 0 0 12pt; }
 .report-outline ul { padding-inline-start: 20pt; columns: 2; column-gap: 24pt; }
 .report-outline li { margin-block: 6pt; break-inside: avoid; font-size: 14pt; }
-.report-section h2 { padding-block-start: 10pt; border-block-end: 2pt solid #142B49; padding-block-end: 10pt; }
+.report-section h2 { padding-block-start: 10pt; border-block-end: 2pt solid var(--paper-text); padding-block-end: 10pt; }
 .report-section { scroll-margin-block-start: 17pt; }
 @media (max-width: 600px) { .report-outline ul { columns: 1; } }
 @media print { .report-outline { display: none; } }
 
 
-/* New report exports share the two interface font families. Print stays light. */
+/* New report exports share the interface token palette and hosted fonts. Print stays light. */
 :root { color-scheme: light; font-synthesis: none; }
 .report-record, table, .report-note, .report-outline { border-width: 1pt; border-radius: 6pt; }
-html[lang="en"] { font-family: "IBM Plex Sans", "Almarai", sans-serif; }
-pre, code { font-family: "IBM Plex Sans", "Almarai", sans-serif; direction: ltr; unicode-bidi: isolate; }
+html[lang="en"] { font-family: "IBM Plex Sans", "IBM Plex Sans Arabic", sans-serif; }
+pre, code { font-family: "IBM Plex Sans", "IBM Plex Sans Arabic", sans-serif; direction: ltr; unicode-bidi: isolate; }
 .report-wordmark { font: 700 30pt/1.2 "IBM Plex Sans", sans-serif; margin-block-end: 12pt; letter-spacing: -.02em; }
+
+h1,h2,h3{font-family:"Cairo","IBM Plex Sans",sans-serif;color:var(--paper-text)}
+.report-cover{background:var(--terminal-bg);color:var(--pulp-paper);border-radius:2pt;border-bottom:5pt solid var(--caption-yellow)}
+.report-record,table,.report-note,.report-outline{border-radius:2pt;border-color:var(--ink-black)}
+.report-wordmark{font:400 36pt/1.2 "Bangers",sans-serif}
+pre,code{font-family:"JetBrains Mono","IBM Plex Sans Arabic",monospace}

@@ -16,7 +16,7 @@
     root.dataset.theme = resolved;
     root.dataset.themePreference = preference;
     root.style.colorScheme = resolved;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", resolved === "dark" ? "#0C1017" : "#F5F0E4");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", resolved === "dark" ? "#0C101A" : "#E5D8B8");
   }
 
   apply();

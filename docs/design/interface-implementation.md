@@ -1,8 +1,8 @@
-# SOCify V3 — SOC workbench implementation
+# SOCify — SOC workbench implementation baseline
 
-The latest user direction replaces the retro desktop with a LetsDefend-inspired SOC application. A stable top bar, sidebar, three monitoring channels and an expandable alert table now organize the product. There are no draggable windows, taskbar or folder view. SOCify remains a text wordmark with the same two local font families and a unified blue/navy identity across operational pages, public templates and new reports.
+This historical implementation replaced the retro desktop with a LetsDefend-inspired SOC application. A stable top bar, sidebar, three monitoring channels and an expandable alert table now organize the product. There are no draggable windows, taskbar or folder view. V4 updates the type, palette and component styling across these surfaces; current design and verification are recorded below.
 
-- [Corrective implementation prompt, written before application changes](soc-workbench-corrective-prompt.md)
+- [V4 design atlas and current implementation record](../qa/v4-noir-acceptance.md)
 - [Research and design rationale](soc-workbench-research.md)
 
 ## Navigation and role boundaries
@@ -21,7 +21,7 @@ L1, L2 and investigator retain their existing permission sets and differ by assi
 
 `static/soc-workbench.js` composes the retained case tools. Endpoint Security presents a paginated inventory of retained asset records, their address, OS, assessment and importance, with an accessible detail dialog and links to response documentation. Threat Intel separates authored indicators from paginated log observables and local enrichment sources. Record panels can load further pages. These views do not claim a live EDR connection or automatic device isolation. Sample Analysis reuses encrypted quarantine and the existing isolated static-analysis workflow; dynamic malware execution is not introduced.
 
-Email Security uploads EML through the existing encrypted sample/evidence API. `POST /api/cases/{case_id}/samples/{sample_id}/email-review` checks the case, effective permissions, scope, state, sample type, size and SHA-256 before static MIME inspection. Limits are 2 MiB, 100 MIME parts, 200 headers, 50 attachments, 100 displayed URLs and 16 KiB of displayed body text. The original remains unchanged and encrypted. HTML-only bodies become text; scripts and styles are excluded, remote resources are not fetched, and URLs are shown as inert text. Attachment bytes are hashed without execution or archive extraction. Authentication-Results and SPF/DKIM claims are explicitly untrusted header text, not independent verification.
+Email Security uploads EML through the existing encrypted sample/evidence API. `POST /api/cases/{case_id}/samples/{sample_id}/email-review` checks the case, effective permissions, scope, state, sample type, size and SHA-256 before static MIME inspection. Limits are 2 MiB, 100 MIME parts, maximum depth 5, 200 headers, 25 attachments, 100 displayed URLs and 16 KiB of displayed body text. The original remains unchanged and encrypted. HTML-only bodies become text; scripts and styles are excluded, remote resources are not fetched, and URLs are shown as inert text. Attachment bytes are hashed without execution or archive extraction. Authentication-Results and SPF/DKIM claims are explicitly untrusted header text, not independent verification.
 
 The result is a retained `analysis` record linked to the original evidence and included in subsequent report snapshots. Repeating inspection returns the existing result without duplication. Closed cases reject new analysis. `GET /api/cases/{case_id}/email-reviews` provides ten records per cursor page, under the same case/batch guard. OpenAPI documents the new routes and bounds.
 

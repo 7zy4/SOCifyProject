@@ -12,10 +12,14 @@ from .autopsy_api import insert_record
 from .autopsy_pipeline import case_full_access
 from .cases import _case_row
 from .db import get_db, transaction
+from .file_names import evidence_filename
 from .security import cipher, error_response, require_permission
 
 autopsy_email_api = Blueprint("autopsy_email", __name__)
 MAXIMUM = 2 * 1024 * 1024
+MAX_MIME_DEPTH = 5
+MAX_ATTACHMENTS = 25
+MAX_MIME_PARTS = 100
 LIMITATION = "Static MIME inspection only. Headers, including Authentication-Results, are untrusted source text; SPF/DKIM are not independently verified. URLs are not visited, attachments are not executed, and absence of findings does not establish safety."
 
 
@@ -45,7 +49,10 @@ class MailText(HTMLParser):
 def inspect_email(content: bytes) -> dict:
     if not content or len(content) > MAXIMUM:
         raise ValueError("حجم رسالة EML يجب ألا يتجاوز 2MiB")
-    message = BytesParser(policy=policy.default).parsebytes(content)
+    try:
+        message = BytesParser(policy=policy.default).parsebytes(content)
+    except RecursionError as exc:
+        raise ValueError("تداخل أجزاء MIME يتجاوز الحد المسموح") from exc
     if not any(message.get(key) for key in ("From", "To", "Subject", "Message-ID")):
         raise ValueError("الملف لا يحتوي رؤوس رسالة EML معروفة")
     headers = {}
@@ -54,26 +61,49 @@ def inspect_email(content: bytes) -> dict:
     attachments: list[dict] = []
     plain, html_text, links = [], [], []
     part_count, header_count = 0, 0
-    for part in message.walk():
+    pending = [(message, 0)]
+    leaves = []
+    attachment_count = 0
+    while pending:
+        part, depth = pending.pop()
+        if depth > MAX_MIME_DEPTH:
+            raise ValueError("تداخل أجزاء MIME يتجاوز الحد المسموح")
         part_count += 1
         header_count += len(part.keys())
-        if part_count > 100 or header_count > 200:
+        if part_count > MAX_MIME_PARTS or header_count > 200:
             raise ValueError("عدد أجزاء MIME أو رؤوس الرسالة يتجاوز الحد المسموح")
+        is_attachment = (
+            bool(part.get_filename())
+            or part.get_content_disposition() == "attachment"
+            or (not part.is_multipart() and part.get_content_type() not in {"text/plain", "text/html"})
+        )
+        if is_attachment:
+            attachment_count += 1
+            if attachment_count > MAX_ATTACHMENTS:
+                raise ValueError("عدد المرفقات يتجاوز الحد المسموح")
         if part.is_multipart():
+            children = part.get_payload()
+            if not isinstance(children, list):
+                raise ValueError("بنية MIME غير صالحة")
+            if len(children) + len(pending) + part_count > MAX_MIME_PARTS:
+                raise ValueError("عدد أجزاء MIME أو رؤوس الرسالة يتجاوز الحد المسموح")
+            pending.extend((child, depth + 1) for child in reversed(children))
             continue
+        leaves.append((part, is_attachment))
+    # Validate the entire MIME tree before decoding any body or attachment.
+    for part, is_attachment in leaves:
         data = part.get_payload(decode=True) or b""
         if not isinstance(data, bytes):
             raise ValueError("محتوى جزء MIME ليس بيانات ثنائية صالحة")
         filename = part.get_filename()
-        if filename or part.get_content_disposition() == "attachment" or part.get_content_type() not in {"text/plain", "text/html"}:
-            if len(attachments) >= 50:
-                raise ValueError("عدد المرفقات يتجاوز الحد المسموح")
+        if is_attachment:
+            digest = hashlib.sha256(data).hexdigest()
             attachments.append(
                 {
-                    "filename": str(filename or "unnamed")[:255],
+                    "filename": evidence_filename(str(filename or ""), data, "attachment"),
                     "content_type": part.get_content_type()[:100],
                     "size": len(data),
-                    "sha256": hashlib.sha256(data).hexdigest(),
+                    "sha256": digest,
                 }
             )
             continue

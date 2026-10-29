@@ -23,6 +23,9 @@ services:
     pids_limit: 64
     restart: unless-stopped
   socify:
+    depends_on:
+      analysis:
+        condition: service_started
     build:
       context: .
       target: runtime
@@ -51,6 +54,9 @@ services:
       - ALL
     restart: unless-stopped
   autopsy-worker:
+    depends_on:
+      socify:
+        condition: service_healthy
     init: true
     stop_grace_period: 60s
     healthcheck:
@@ -105,6 +111,9 @@ services:
       - ALL
     restart: unless-stopped
   import-worker:
+    depends_on:
+      socify:
+        condition: service_healthy
     init: true
     healthcheck:
       disable: true
@@ -121,6 +130,39 @@ services:
       SOCIFY_SECRET_KEY: ${SOCIFY_SECRET_KEY:?Set SOCIFY_SECRET_KEY to a random value of at least 32 bytes}
       SOCIFY_CREDENTIAL_KEY: ${SOCIFY_CREDENTIAL_KEY:?Set SOCIFY_CREDENTIAL_KEY to a separate random value}
       SOCIFY_DATABASE: /data/socify.db
+    volumes:
+      - socify-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+  playbook-worker:
+    init: true
+    stop_grace_period: 60s
+    depends_on:
+      socify:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    build:
+      context: .
+      target: runtime
+    command: ["python", "-m", "scripts.run_playbook_worker"]
+    environment:
+      SOCIFY_ENV: production
+      SOCIFY_SECRET_KEY: ${SOCIFY_SECRET_KEY:?Set SOCIFY_SECRET_KEY to a random value of at least 32 bytes}
+      SOCIFY_CREDENTIAL_KEY: ${SOCIFY_CREDENTIAL_KEY:?Set SOCIFY_CREDENTIAL_KEY to a separate random value}
+      SOCIFY_DATABASE: /data/socify.db
+      SOCIFY_PLAYBOOK_INLINE_EXECUTION: "0"
+    network_mode: none
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 64
     volumes:
       - socify-data:/data
     read_only: true

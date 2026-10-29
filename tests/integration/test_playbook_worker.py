@@ -1,6 +1,9 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
+from threading import Barrier
 
+from socify.db import connect_path
 from socify.playbook_worker import claim_playbook_run, process_playbook_run, run_worker_once
 
 
@@ -106,6 +109,26 @@ def test_workers_claim_distinct_runs(client, app, login_as, database):
     assert claim_playbook_run(database, "worker-c", lease_seconds=10) is None
     assert process_playbook_run(database, int(claimed_a), "worker-a", lease_seconds=10) == "succeeded"
     assert process_playbook_run(database, int(claimed_b), "worker-b", lease_seconds=10) == "succeeded"
+
+
+def test_simultaneous_connections_claim_one_owner_in_wal_mode(client, app, login_as, database):
+    login_as("admin")
+    run_id = _queued_run(client, app, [{"action": "notify_training_team"}], "concurrent-wal-claim")
+    gate = Barrier(4)
+
+    def claim(index):
+        connection = connect_path(app.config["DATABASE"], testing=True)
+        try:
+            assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+            gate.wait(timeout=10)
+            return claim_playbook_run(connection, f"concurrent-{index}", lease_seconds=10)
+        finally:
+            connection.close()
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        claimed = list(executor.map(claim, range(4)))
+    assert claimed.count(run_id) == 1 and claimed.count(None) == 3
+    assert database.execute("SELECT state FROM playbook_runs WHERE id=?", (run_id,)).fetchone()[0] == "running"
 
 
 def test_worker_retries_with_backoff_then_stops_at_limit(client, app, login_as, database):

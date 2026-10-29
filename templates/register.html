@@ -2,9 +2,9 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="theme-color" content="#F4F6FA">
+  <meta name="theme-color" content="#0C101A">
 
-  <link rel="preload" href="{{ url_for('static', filename='fonts/Almarai-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{{ url_for('static', filename='fonts/IBMPlexSansArabic-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
   <script src="{{ url_for('static', filename='localization.js') }}"></script>
   <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='design-system.css') }}">
 </head>
 <body class="auth-shell">
+  {% include "_ink_filters.html" %}
   <div class="appearance-tools auth-tools"><div data-theme-control></div><button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button></div>
   <a class="skip-link" href="#register-form" data-ui-copy>انتقل إلى النموذج</a>
   <main class="auth-layout">

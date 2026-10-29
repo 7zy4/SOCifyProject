@@ -5,6 +5,7 @@ import os
 import sqlite3
 import stat
 import subprocess  # nosec B404
+import sys
 import sysconfig
 import tempfile
 from datetime import timedelta
@@ -55,6 +56,8 @@ def compute_artifacts(payload, operation, formats, timeout, isolated_container=F
     encoded = canonical(payload).encode()
     if len(encoded) > 24 * 1024 * 1024:
         raise ValueError("Analysis request exceeds the configured limit")
+    if sys.platform != "linux":
+        raise AnalysisUnavailableError("Local analysis requires Linux isolation; start the Docker analysis service and set SOCIFY_ANALYSIS_SOCKET")
     with tempfile.TemporaryDirectory(prefix="socify-local-report-") as directory:
         root = str(Path(__file__).resolve().parent.parent)
         environment = {
@@ -85,6 +88,8 @@ def compute_artifacts(payload, operation, formats, timeout, isolated_container=F
             )
         except subprocess.TimeoutExpired as exc:
             raise TimeoutError("Local analysis exceeded its time limit") from exc
+        except OSError as exc:
+            raise AnalysisUnavailableError("The Linux analysis process could not start; verify procfs or use the isolated Docker analysis service") from exc
         if process.returncode != 0 or not (Path(directory) / "done").exists():
             diagnostic = Path(directory) / "diagnostic.json"
             if diagnostic.exists():

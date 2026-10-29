@@ -58,11 +58,11 @@ if ! docker info >/dev/null 2>&1; then
   printf '%s\n' 'Docker is not ready. Finish rebuilding the container and verify docker info, then retry.' >&2
   exit 1
 fi
-if ! docker image inspect socify-v3-verification-analysis >/dev/null 2>&1; then
-  docker build --target analysis --tag socify-v3-verification-analysis "$repository_root"
+if ! docker image inspect socify-v4-analysis >/dev/null 2>&1; then
+  docker build --target analysis --tag socify-v4-analysis "$repository_root"
 fi
-bash scripts/start_local_analysis.sh
-export SOCIFY_ANALYSIS_SOCKET=/tmp/socify-v3-dev-analysis-ipc/analysis.sock
+bash scripts/start_v4_analysis.sh
+export SOCIFY_ANALYSIS_SOCKET=/tmp/socify-v4-dev-analysis-ipc/analysis.sock
 
 if [[ "${2:-}" == --create-manager ]]; then
   "$python_command" -m scripts.bootstrap_team --email "$account_email" --name 'مالك المنصة' --team 'فريق التحقيق الداخلي' --generate-password-file

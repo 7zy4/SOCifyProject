@@ -1,0 +1,779 @@
+{
+  "baseCommit": "53f739c3372b85fff3fd9682ddbffcc2f40868d3",
+  "figma": {
+    "fileKey": "AMxY6mcybMcfG2M4YiZHvD",
+    "status": "blocked_by_starter_mcp_limit",
+    "screensUploaded": 0
+  },
+  "views": [
+    {
+      "id": "dashboard",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#dashboard"
+    },
+    {
+      "id": "monitoring",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#monitoring"
+    },
+    {
+      "id": "log-management",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#log-management"
+    },
+    {
+      "id": "cases",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#cases"
+    },
+    {
+      "id": "endpoint-security",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#endpoint-security"
+    },
+    {
+      "id": "threat-intel",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#threat-intel"
+    },
+    {
+      "id": "email-security",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#email-security"
+    },
+    {
+      "id": "sandbox",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#sandbox"
+    },
+    {
+      "id": "reports",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#reports"
+    },
+    {
+      "id": "my-tasks",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#my-tasks"
+    },
+    {
+      "id": "playbooks",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#playbooks"
+    },
+    {
+      "id": "analysis-library",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#analysis-library"
+    },
+    {
+      "id": "team",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#team"
+    },
+    {
+      "id": "profile",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#profile"
+    },
+    {
+      "id": "audit",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#audit"
+    },
+    {
+      "id": "admin",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#admin"
+    },
+    {
+      "id": "case-detail",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#case-detail"
+    },
+    {
+      "id": "login",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#login"
+    },
+    {
+      "id": "register",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#register"
+    },
+    {
+      "id": "landing",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#landing"
+    },
+    {
+      "id": "report-print",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#report-print"
+    },
+    {
+      "id": "states",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#states"
+    },
+    {
+      "id": "dialogs",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#dialogs"
+    },
+    {
+      "id": "import-dialog",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#import-dialog"
+    },
+    {
+      "id": "approval-dialog",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#approval-dialog"
+    },
+    {
+      "id": "account-dialog",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#account-dialog"
+    },
+    {
+      "id": "confirm-dialog",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#confirm-dialog"
+    },
+    {
+      "id": "case-investigation",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#case-investigation"
+    },
+    {
+      "id": "case-response",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#case-response"
+    },
+    {
+      "id": "case-activity",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#case-activity"
+    },
+    {
+      "id": "scope-selection",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#scope-selection"
+    },
+    {
+      "id": "foundations",
+      "language": "en",
+      "theme": "dark",
+      "entry": "index.html#foundations"
+    },
+    {
+      "id": "dashboard",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#dashboard"
+    },
+    {
+      "id": "monitoring",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#monitoring"
+    },
+    {
+      "id": "log-management",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#log-management"
+    },
+    {
+      "id": "cases",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#cases"
+    },
+    {
+      "id": "endpoint-security",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#endpoint-security"
+    },
+    {
+      "id": "threat-intel",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#threat-intel"
+    },
+    {
+      "id": "email-security",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#email-security"
+    },
+    {
+      "id": "sandbox",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#sandbox"
+    },
+    {
+      "id": "reports",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#reports"
+    },
+    {
+      "id": "my-tasks",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#my-tasks"
+    },
+    {
+      "id": "playbooks",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#playbooks"
+    },
+    {
+      "id": "analysis-library",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#analysis-library"
+    },
+    {
+      "id": "team",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#team"
+    },
+    {
+      "id": "profile",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#profile"
+    },
+    {
+      "id": "audit",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#audit"
+    },
+    {
+      "id": "admin",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#admin"
+    },
+    {
+      "id": "case-detail",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#case-detail"
+    },
+    {
+      "id": "login",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#login"
+    },
+    {
+      "id": "register",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#register"
+    },
+    {
+      "id": "landing",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#landing"
+    },
+    {
+      "id": "report-print",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#report-print"
+    },
+    {
+      "id": "states",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#states"
+    },
+    {
+      "id": "dialogs",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#dialogs"
+    },
+    {
+      "id": "import-dialog",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#import-dialog"
+    },
+    {
+      "id": "approval-dialog",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#approval-dialog"
+    },
+    {
+      "id": "account-dialog",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#account-dialog"
+    },
+    {
+      "id": "confirm-dialog",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#confirm-dialog"
+    },
+    {
+      "id": "case-investigation",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#case-investigation"
+    },
+    {
+      "id": "case-response",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#case-response"
+    },
+    {
+      "id": "case-activity",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#case-activity"
+    },
+    {
+      "id": "scope-selection",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#scope-selection"
+    },
+    {
+      "id": "foundations",
+      "language": "en",
+      "theme": "light",
+      "entry": "index.html#foundations"
+    },
+    {
+      "id": "dashboard",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#dashboard"
+    },
+    {
+      "id": "monitoring",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#monitoring"
+    },
+    {
+      "id": "log-management",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#log-management"
+    },
+    {
+      "id": "cases",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#cases"
+    },
+    {
+      "id": "endpoint-security",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#endpoint-security"
+    },
+    {
+      "id": "threat-intel",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#threat-intel"
+    },
+    {
+      "id": "email-security",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#email-security"
+    },
+    {
+      "id": "sandbox",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#sandbox"
+    },
+    {
+      "id": "reports",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#reports"
+    },
+    {
+      "id": "my-tasks",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#my-tasks"
+    },
+    {
+      "id": "playbooks",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#playbooks"
+    },
+    {
+      "id": "analysis-library",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#analysis-library"
+    },
+    {
+      "id": "team",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#team"
+    },
+    {
+      "id": "profile",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#profile"
+    },
+    {
+      "id": "audit",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#audit"
+    },
+    {
+      "id": "admin",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#admin"
+    },
+    {
+      "id": "case-detail",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#case-detail"
+    },
+    {
+      "id": "login",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#login"
+    },
+    {
+      "id": "register",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#register"
+    },
+    {
+      "id": "landing",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#landing"
+    },
+    {
+      "id": "report-print",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#report-print"
+    },
+    {
+      "id": "states",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#states"
+    },
+    {
+      "id": "dialogs",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#dialogs"
+    },
+    {
+      "id": "import-dialog",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#import-dialog"
+    },
+    {
+      "id": "approval-dialog",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#approval-dialog"
+    },
+    {
+      "id": "account-dialog",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#account-dialog"
+    },
+    {
+      "id": "confirm-dialog",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#confirm-dialog"
+    },
+    {
+      "id": "case-investigation",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#case-investigation"
+    },
+    {
+      "id": "case-response",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#case-response"
+    },
+    {
+      "id": "case-activity",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#case-activity"
+    },
+    {
+      "id": "scope-selection",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#scope-selection"
+    },
+    {
+      "id": "foundations",
+      "language": "ar",
+      "theme": "dark",
+      "entry": "index.html#foundations"
+    },
+    {
+      "id": "dashboard",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#dashboard"
+    },
+    {
+      "id": "monitoring",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#monitoring"
+    },
+    {
+      "id": "log-management",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#log-management"
+    },
+    {
+      "id": "cases",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#cases"
+    },
+    {
+      "id": "endpoint-security",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#endpoint-security"
+    },
+    {
+      "id": "threat-intel",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#threat-intel"
+    },
+    {
+      "id": "email-security",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#email-security"
+    },
+    {
+      "id": "sandbox",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#sandbox"
+    },
+    {
+      "id": "reports",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#reports"
+    },
+    {
+      "id": "my-tasks",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#my-tasks"
+    },
+    {
+      "id": "playbooks",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#playbooks"
+    },
+    {
+      "id": "analysis-library",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#analysis-library"
+    },
+    {
+      "id": "team",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#team"
+    },
+    {
+      "id": "profile",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#profile"
+    },
+    {
+      "id": "audit",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#audit"
+    },
+    {
+      "id": "admin",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#admin"
+    },
+    {
+      "id": "case-detail",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#case-detail"
+    },
+    {
+      "id": "login",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#login"
+    },
+    {
+      "id": "register",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#register"
+    },
+    {
+      "id": "landing",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#landing"
+    },
+    {
+      "id": "report-print",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#report-print"
+    },
+    {
+      "id": "states",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#states"
+    },
+    {
+      "id": "dialogs",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#dialogs"
+    },
+    {
+      "id": "import-dialog",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#import-dialog"
+    },
+    {
+      "id": "approval-dialog",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#approval-dialog"
+    },
+    {
+      "id": "account-dialog",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#account-dialog"
+    },
+    {
+      "id": "confirm-dialog",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#confirm-dialog"
+    },
+    {
+      "id": "case-investigation",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#case-investigation"
+    },
+    {
+      "id": "case-response",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#case-response"
+    },
+    {
+      "id": "case-activity",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#case-activity"
+    },
+    {
+      "id": "scope-selection",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#scope-selection"
+    },
+    {
+      "id": "foundations",
+      "language": "ar",
+      "theme": "light",
+      "entry": "index.html#foundations"
+    }
+  ],
+  "note": "Select language and edition in the review bar; every view is responsive. Exported snapshots are generated QA artifacts, not operational data."
+}

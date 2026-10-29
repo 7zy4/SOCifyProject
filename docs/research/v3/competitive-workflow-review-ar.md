@@ -1,5 +1,7 @@
 # بحث V3: من الأدلة إلى متطلبات SOCify Digital Autopsy
 
+> Historical review evidence. The REA launcher referenced below was retired during V4 cleanup; these commands describe the reviewed revision.
+
 التاريخ: 2026-10-24. الحالة: بحث مرجعي وتأسيس مواصفة قبل تعديل التطبيق. النتيجة ليست اعتماد إصدار V3 أو اختبار تكامل مع منتجات الموردين.
 
 ## المنهج وحدود الوصول

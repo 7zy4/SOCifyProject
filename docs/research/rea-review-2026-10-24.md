@@ -1,5 +1,7 @@
 # REA review of the current browser artifact
 
+> Historical review evidence. The REA launcher referenced below was retired during V4 cleanup; these commands describe the reviewed revision.
+
 The installed `rea-agents@6.7.0` CLI was executed again using `scripts/run_rea_analysis.sh` on the updated `static/app.js` and `templates/app.html`. This is a review of the current development artifact, not a final release approval. No third-party service was probed or authenticated to during this run.
 
 - Evidence: `ev_65c46c6cc398604ba3f4b72d15444f3b49f10ebc94137e95e850dc589016cd20`

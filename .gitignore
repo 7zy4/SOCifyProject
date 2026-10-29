@@ -30,6 +30,7 @@ artifacts/
 tmp*/
 node_modules/
 work/
+weasyprint-*/
 # Private generated demo credentials, including custom demo directories.
 **/accounts.json
 **/.accounts-*

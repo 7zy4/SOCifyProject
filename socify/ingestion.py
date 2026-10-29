@@ -15,12 +15,12 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from defusedxml import ElementTree
 from flask import Blueprint, Response, current_app, jsonify, request
-from werkzeug.utils import secure_filename
 
 from .audit import record_audit
 from .autopsy_pipeline import activate_import, job_visible
 from .db import get_db, inserted_id, transaction
 from .events import ingest_event
+from .file_names import evidence_filename
 from .operational import case_visible, operational_mode
 from .schema import public_id
 from .security import (
@@ -314,7 +314,7 @@ def _sysmon_xml_records(content: bytes, source_name: str, content_hash: str) -> 
     upper = content[:8192].upper()
     if b"<!DOCTYPE" in upper or b"<!ENTITY" in upper:
         raise ValueError("XML document types and entities are not allowed")
-    root = ElementTree.fromstring(content)
+    root = ElementTree.fromstring(content, forbid_dtd=True, forbid_entities=True, forbid_external=True)
     events = [root] if root.tag.endswith("Event") else [item for item in root.iter() if item.tag.endswith("Event")]
     for row_number, event in enumerate(events, 1):
         system: dict[str, str] = {}
@@ -758,12 +758,8 @@ def _attach_import_result(job: sqlite3.Row, event_id: int, alert_ids: list[int])
     enrich_imported_event(job, event_id)
 
 
-def _safe_import_filename(value: str) -> str:
-    name = secure_filename(value) or "import.log"
-    suffix = Path(value).suffix.lower()
-    if suffix in {".csv", ".json", ".jsonl", ".ndjson", ".log", ".txt", ".xml", ".evtx", ".pcap", ".pcapng"} and not name.lower().endswith(suffix):
-        return "import" + suffix
-    return name
+def _safe_import_filename(value: str, content: bytes = b"") -> str:
+    return evidence_filename(value, content, "import")
 
 
 def _upload_payload() -> tuple[str, bytes, str | None, int | None, int | None]:
@@ -771,8 +767,8 @@ def _upload_payload() -> tuple[str, bytes, str | None, int | None, int | None]:
         uploaded = request.files.get("file")
         if not uploaded or not uploaded.filename:
             raise ValueError("file is required")
-        filename = _safe_import_filename(uploaded.filename)
         content = uploaded.stream.read(int(current_app.config["MAX_CONTENT_LENGTH"]) + 1)
+        filename = _safe_import_filename(uploaded.filename, content)
         selected_format = request.form.get("format", "auto")
         source_id = int(request.form["source_id"]) if request.form.get("source_id") else None
         training_run_id = int(request.form["training_run_id"]) if request.form.get("training_run_id") else None
@@ -780,10 +776,11 @@ def _upload_payload() -> tuple[str, bytes, str | None, int | None, int | None]:
     data = request.get_json(silent=True)
     if not isinstance(data, dict) or not isinstance(data.get("content"), str):
         raise ValueError("multipart file or textual content is required")
-    filename = _safe_import_filename(str(data.get("filename") or "import.log"))
+    content = data["content"].encode()
+    filename = _safe_import_filename(str(data.get("filename") or "import.log"), content)
     return (
         filename,
-        data["content"].encode(),
+        content,
         str(data.get("format") or "auto"),
         data.get("source_id") if isinstance(data.get("source_id"), int) else None,
         data.get("training_run_id") if isinstance(data.get("training_run_id"), int) else None,

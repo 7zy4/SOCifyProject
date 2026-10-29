@@ -24,23 +24,24 @@ An incident analysis, investigation, and reporting platform. SOCify connects cas
 
 للنسخة الرابعة راجع [تشغيل V4](docs/operations-v4.md) و[سيناريو التجربة](docs/v4-demo-walkthrough.md). تبدأ القضايا الجديدة بطلب اعتماد مدير، ثم يحدد المستخدم قضية واحدة أو قضيتين مرتبطتين للعمل. بيانات التجربة تُنشأ بأمر صريح في قاعدة منفصلة مع كلمات مرور مولدة، ولا تُفعّل في الإنتاج.
 
-يتطلب التشغيل Python 3.12 أو أحدث وDocker لخدمة التحليل المعزولة. لا توجد حسابات أو كلمات مرور افتراضية. يُجهّز مسؤول المنصة المفاتيح والحسابات وبيئة النشر وفق [دليل تشغيل V3](docs/operations-v3.md).
+يتطلب التشغيل Python 3.12 أو أحدث وDocker لخدمة التحليل المعزولة. لا توجد حسابات أو كلمات مرور افتراضية. يُجهّز مسؤول المنصة المفاتيح والحسابات وبيئة النشر وفق [دليل تشغيل V4](docs/operations-v4.md).
 
-للتشغيل المحلي بحساب وبيانات مصرح بها بعد تثبيت الاعتماديات:
+لتجربة V4 ببيانات اصطناعية في قاعدة منفصلة:
 
 ```bash
 python -m venv .venv
 . .venv/bin/activate
 python -m pip install -r requirements.txt
-docker build --target analysis -t socify-v3-verification-analysis .
-bash scripts/start_local_analysis.sh
-export SOCIFY_ANALYSIS_SOCKET=/tmp/socify-v3-dev-analysis-ipc/analysis.sock
-python run.py
+docker build --target analysis -t socify-v4-analysis .
+bash scripts/start_v4_analysis.sh
+export SOCIFY_ANALYSIS_SOCKET=/tmp/socify-v4-dev-analysis-ipc/analysis.sock
+python -m scripts.prepare_v4_demo --directory instance/v4-demo
+python -m scripts.run_v4_demo --directory instance/v4-demo --port 5000
 ```
 
-تُحفظ مفاتيح التشغيل المحلي في `instance/codespaces.env` وقاعدة البيانات في `instance/socify.db` افتراضيًا. حافظ على المفاتيح عند إعادة التشغيل أو استعادة قاعدة موجودة. إدارة الحساب الأول والدعوات واستعادة الوصول موضحة في [دليل التشغيل](docs/operations-v3.md) و[دليل Codespaces](docs/codespaces.md).
+تُحفظ حسابات التجربة ومفاتيحها في `instance/v4-demo`؛ لا ترفع هذا المجلد إلى Git. للتشغيل المحلي المعتاد بـ `python run.py` تُحفظ مفاتيح التشغيل المحلي في `instance/codespaces.env` وقاعدة البيانات في `instance/socify.db` افتراضيًا. حافظ على المفاتيح عند إعادة التشغيل أو استعادة قاعدة موجودة. إدارة الحساب الأول والدعوات واستعادة الوصول موضحة في [دليل التشغيل](docs/operations-v4.md) و[دليل Codespaces](docs/codespaces.md).
 
-خادم `run.py` للتشغيل المحلي فقط. النشر المؤسسي يستخدم Gunicorn والعمّال المستقلين وTLS، مع عزل خدمة التحليل. راجع [ضوابط الأمان](docs/security-guide.md) و[النسخ والاستعادة](docs/operations.md).
+خادم `run.py` للتشغيل المحلي فقط. النشر المؤسسي يستخدم Gunicorn والعمّال المستقلين وTLS، مع عزل خدمة التحليل. راجع [ضوابط الأمان](docs/security-guide.md) و[النسخ والاستعادة](docs/operations-v4.md).
 
 ## بنية المشروع
 
@@ -58,16 +59,16 @@ python run.py
 
 ## المراجع
 
-- [تشغيل المنصة](docs/operations-v3.md)
+- [تشغيل المنصة](docs/operations-v4.md)
 - [الهندسة](docs/architecture.md) و[نموذج البيانات](docs/data-model.md)
 - [عقد التكامل](docs/api/openapi.yaml)
 - [دليل المحلل](docs/analyst-guide.md)
 - [الأمان](docs/security-guide.md) و[نموذج التهديد](docs/threat-model.md)
-- [النسخ الاحتياطي والاستعادة](docs/operations.md)
+- [النسخ الاحتياطي والاستعادة](docs/operations-v4.md)
 - [التحقق التاريخي](docs/qa/v3-final-acceptance-2026-10-26.md)
 
 ## الترخيص والإفصاح الأمني
 
 الكود تحت رخصة MIT. تراخيص البيانات والخطوط موضحة في [إشعارات الأطراف الثالثة](THIRD_PARTY_NOTICES.md). للإفصاح عن الثغرات راجع [SECURITY.md](SECURITY.md)، ولا تنشر بيانات اعتماد أو أدلة حساسة في بلاغ عام.
 
-- [مواصفات تصميم مركز العمليات وخريطة الأدوار](docs/design/soc-workbench-corrective-prompt.md) و[التنفيذ والتحقق](docs/design/interface-implementation.md).
+- [كتالوج تصميم V4](docs/design/noir-atlas/index.html) و[سجل التنفيذ والتحقق](docs/qa/v4-noir-acceptance.md).

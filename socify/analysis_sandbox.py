@@ -70,6 +70,7 @@ def restrict_filesystem(directory: Path) -> int:
         Path("/usr/share/zoneinfo"),
         root / "static" / "fonts",
         root / "static" / "report.css",
+        root / "static" / "design-tokens.json",
         Path("/dev/urandom"),
         Path("/dev/random"),
     ]

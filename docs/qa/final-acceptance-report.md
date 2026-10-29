@@ -60,11 +60,11 @@ Security، Functional Correctness، UX/Accessibility، Performance، Reliability
 ```bash
 python -m ruff check .
 python -m ruff format --check .
-python -m mypy socify scripts app.py create_db.py init_db.py run.py
+python -m mypy socify scripts app.py run.py
 python -m scripts.generate_openapi
 git diff --exit-code docs/api/openapi.yaml
 python -m pytest -q --cov=socify --cov-branch --cov-report=xml --cov-fail-under=90
-python -m bandit -c pyproject.toml -r socify scripts app.py create_db.py init_db.py run.py
+python -m bandit -c pyproject.toml -r socify scripts app.py run.py
 python -m pip_audit -r requirements.txt
 git ls-files -z | xargs -0 detect-secrets-hook -c 1 --baseline .secrets.baseline --exclude-files '^(data/enterprise-attack-v20.0.json|fixtures/windows/sysmon-sample.evtx.b64)$'
 cyclonedx-py requirements requirements.txt --output-reproducible --of JSON -o sbom.json

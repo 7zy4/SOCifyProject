@@ -2,6 +2,7 @@ import time
 
 from scripts.environment import load_environment
 from scripts.local_services import local_worker_services
+from tests.integration.test_playbook_worker import _queued_run
 
 
 def test_local_worker_process_shares_case_database_and_encryption_keys(autopsy_case, app, client):
@@ -35,3 +36,20 @@ def test_environment_loader_preserves_existing_root_database_and_saved_keys(monk
     load_environment(tmp_path)
     assert (tmp_path / "instance" / "codespaces.env").read_bytes() == saved
     assert database.read_bytes() == b"Existing database marker"
+
+
+def test_local_supervisor_processes_pending_playbooks_without_duplicate_effects(app, client, login_as, database):
+    login_as("admin")
+    identifier = _queued_run(client, app, [{"action": "notify_training_team"}], "local-supervised-playbook")
+    with local_worker_services(app.config) as processes:
+        assert {process.name for process in processes} == {"socify-local-import", "socify-local-autopsy", "socify-local-playbook"}
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            run = client.get(f"/api/playbook-runs/{identifier}").json
+            if run["state"] in {"succeeded", "failed"}:
+                break
+            time.sleep(0.05)
+        assert run["state"] == "succeeded", run
+        assert run["steps"][0]["attempt"] == 1
+    assert all(not process.is_alive() for process in processes)
+    assert database.execute("SELECT COUNT(*) FROM outbox_events WHERE event_type='training.notification'").fetchone()[0] == 1

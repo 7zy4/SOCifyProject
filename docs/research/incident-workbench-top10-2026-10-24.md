@@ -1,5 +1,7 @@
 # Incident workbench: ten reference platforms and executed REA
 
+> Historical review evidence. The REA launcher referenced below was retired during V4 cleanup; these commands describe the reviewed revision.
+
 This is a deliberately selected comparison of ten SIEM, SOAR and incident-response platforms, not an independently measured market ranking. Public publisher repositories were fetched on 24 October 2026; URLs, response sizes and SHA-256 digests are retained in [the source manifest](top10-source-manifest-2026-10-24.json). Commercial services were not logged into or probed. No external detection content or application code was copied into SOCify.
 
 | Platform / publisher source | Observed public capability | SOCify design consequence |

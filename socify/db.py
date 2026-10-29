@@ -8,21 +8,22 @@ from flask import current_app, g
 
 def connect_path(path: str, testing: bool = False) -> sqlite3.Connection:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(path, timeout=10, isolation_level=None)
+    connection = sqlite3.connect(path, timeout=15, isolation_level=None)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
-    connection.execute("PRAGMA busy_timeout = 10000")
-    if not testing:
-        connection.execute("PRAGMA journal_mode = WAL")
-        connection.execute("PRAGMA synchronous = NORMAL")
+    connection.execute("PRAGMA busy_timeout = 15000")
+    connection.execute("PRAGMA journal_mode = WAL")
+    connection.execute("PRAGMA synchronous = NORMAL")
+    connection.execute("PRAGMA temp_store = MEMORY")
+    connection.execute("PRAGMA mmap_size = 67108864")
     return connection
 
 
 def connect_readonly(path: str) -> sqlite3.Connection:
-    connection = sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True, timeout=10)
+    connection = sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True, timeout=15)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA query_only = ON")
-    connection.execute("PRAGMA busy_timeout = 10000")
+    connection.execute("PRAGMA busy_timeout = 15000")
     return connection
 
 

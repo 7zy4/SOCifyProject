@@ -25,11 +25,12 @@ jobs:
       - run: python -m ruff check .
       - name: Validate Bash launchers
         run: |
-          bash -n scripts/start_local_analysis.sh
-          bash -n scripts/try_codespace.sh
           bash -n scripts/start_v4_analysis.sh
+          bash -n scripts/try_codespace.sh
           bash -n scripts/try_v4_demo.sh
-      - run: python -m mypy socify scripts app.py create_db.py init_db.py run.py
+      - run: python -m mypy socify scripts app.py run.py
+      - run: python -m scripts.generate_interface_tokens --check
+      - run: python -m scripts.audit_brand --tokens-only
       - run: python -m scripts.generate_openapi
       - run: git diff --exit-code docs/api/openapi.yaml
       - uses: ./.github/actions/analysis-backend
@@ -55,7 +56,7 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: python -m pip install -r requirements.txt -r requirements-dev.txt
-      - run: python -m bandit -c pyproject.toml -r socify scripts app.py create_db.py init_db.py run.py
+      - run: python -m bandit -c pyproject.toml -r socify scripts app.py run.py
       - run: python -m pip_audit -r requirements.txt
       - run: git ls-files -z | xargs -0 detect-secrets-hook -c 1 --baseline .secrets.baseline --exclude-files '^(data/enterprise-attack-v20.0.json|fixtures/windows/sysmon-sample.evtx.b64)$'
       - run: cyclonedx-py requirements requirements.txt --output-reproducible --of JSON -o sbom.json
@@ -85,6 +86,8 @@ jobs:
       - run: npm install --no-save --ignore-scripts axe-core@4.14.0
       - uses: ./.github/actions/analysis-backend
       - run: xvfb-run --auto-servernum --server-args="-screen 0 1600x1200x24" python -m pytest -m e2e tests/e2e --junitxml=artifacts/browser-junit.xml
+      - name: Audit real V4 pages in both languages, editions and viewport sizes
+        run: python -m scripts.audit_brand
       - name: Publish browser failure details in the job summary
         if: always()
         run: |
@@ -117,7 +120,10 @@ jobs:
         if: always()
         with:
           name: browser-results
-          path: artifacts/browser-junit.xml
+          path: |
+            artifacts/browser-junit.xml
+            artifacts/brand/
+            work/interface-review/
       - if: always()
         run: docker rm --force socify-ci-analysis
   container:
@@ -141,6 +147,7 @@ jobs:
       - run: docker compose exec -T -e SOCIFY_CONTAINER_ACCEPTANCE=synthetic socify python - < tests/container/verify_autopsy.py
       - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp autopsy-worker
       - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp import-worker
+      - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp playbook-worker
       - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp analysis
       - if: always()
         run: docker compose logs

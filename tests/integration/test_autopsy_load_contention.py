@@ -19,7 +19,7 @@ def test_worker_claims_back_off_without_claiming_or_crashing_while_another_write
         with app.app_context():
             assert autopsy_worker.claim_job("must-back-off") is None
             assert import_worker.claim_import_job(get_db(), "must-back-off") is None
-            assert get_db().execute("PRAGMA busy_timeout").fetchone()[0] == 10000
+            assert get_db().execute("PRAGMA busy_timeout").fetchone()[0] == 15000
         assert time.monotonic() - started < 1
         assert database.execute("SELECT attempts FROM autopsy_jobs WHERE id=?", (queued["job_id"],)).fetchone()[0] == 0
         assert database.execute("SELECT status FROM ingestion_jobs WHERE id=?", (imported["id"],)).fetchone()[0] == "queued"

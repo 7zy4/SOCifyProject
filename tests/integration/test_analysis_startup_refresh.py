@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = Path(__file__).resolve().parents[2] / "scripts/start_local_analysis.sh"
+SCRIPT = Path(__file__).resolve().parents[2] / "scripts/start_v4_analysis.sh"
 
 
 @pytest.mark.parametrize(

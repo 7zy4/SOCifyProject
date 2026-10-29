@@ -69,6 +69,7 @@ def main():
             path.parent.chmod(0o770)
         path.unlink(missing_ok=True)
         server.bind(str(path))
+        path.chmod(0o660)
         server.listen(8)
         with suppress(PermissionError):
             path.parent.chmod(0o555)

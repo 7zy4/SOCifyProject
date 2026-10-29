@@ -11,10 +11,10 @@
 
 ## إعادة التحقق
 
-شغّل backend المحلي المعزول وفق `docs/operations-v3.md` وثبت Poppler في بيئة الاختبار، ثم:
+شغّل backend المحلي المعزول وفق `docs/operations-v4.md` وثبت Poppler في بيئة الاختبار، ثم:
 
 ```bash
-export SOCIFY_ANALYSIS_SOCKET=/tmp/socify-v3-dev-analysis-ipc/analysis.sock
+export SOCIFY_ANALYSIS_SOCKET=/tmp/socify-v4-dev-analysis-ipc/analysis.sock
 python -m tests.container.verify_report_layout --output /tmp/socify-report-layout
 pdftotext -bbox-layout /tmp/socify-report-layout/long-report.pdf /tmp/socify-report-layout/bbox.xml
 python -m tests.container.verify_report_layout --output /tmp/socify-report-layout --bbox /tmp/socify-report-layout/bbox.xml

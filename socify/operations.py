@@ -3,12 +3,12 @@ import sqlite3
 import tempfile
 from pathlib import Path
 
-from .db import connect_path
+from .db import connect_path, connect_readonly
 from .schema import ensure_schema
 
 
 def verify_database(path: str) -> dict[str, object]:
-    connection = connect_path(path, True)
+    connection = connect_readonly(path)
     try:
         integrity = str(connection.execute("PRAGMA integrity_check").fetchone()[0])
         foreign_keys = list(connection.execute("PRAGMA foreign_key_check").fetchall())
@@ -24,7 +24,7 @@ def backup_database(source: str, destination: str) -> dict[str, object]:
     if not source_path.is_file() or source_path == destination_path:
         raise ValueError("source must be an existing database distinct from destination")
     destination_path.parent.mkdir(parents=True, exist_ok=True)
-    source_connection = connect_path(str(source_path), True)
+    source_connection = connect_readonly(str(source_path))
     destination_connection = sqlite3.connect(str(destination_path))
     try:
         source_connection.backup(destination_connection)
@@ -50,7 +50,7 @@ def restore_database(backup: str, destination: str) -> dict[str, object]:
     descriptor, temporary_name = tempfile.mkstemp(prefix="socify-restore-", suffix=".db", dir=destination_path.parent)
     os.close(descriptor)
     try:
-        backup_connection = connect_path(str(backup_path), True)
+        backup_connection = connect_readonly(str(backup_path))
         restored_connection = sqlite3.connect(temporary_name)
         try:
             backup_connection.backup(restored_connection)
