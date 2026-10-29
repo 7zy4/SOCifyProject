@@ -178,6 +178,19 @@ def test_operational_governance_routes_render_their_authorized_content(app):
                 assert page.locator("#workspace .workspace-head h2").inner_text() == heading
                 assert page.locator("#workspace table").count() >= 1
                 assert page.locator(f'#primary-nav [data-section="{route}"]').is_visible()
+            page.route(
+                "**/api/audit?*",
+                lambda route: route.fulfill(
+                    status=503, content_type="application/json", body='{"error":{"code":"TEMPORARY_UNAVAILABLE","message":"Synthetic temporary outage"}}'
+                ),
+            )
+            page.goto(base + "/audit")
+            page.locator('#workspace[aria-busy="false"]').wait_for()
+            page.get_by_text("تعذر تحميل مساحة العمل", exact=True).wait_for()
+            page.unroute("**/api/audit?*")
+            page.get_by_role("button", name="إعادة المحاولة", exact=True).click()
+            page.locator("#workspace table").wait_for()
+            assert page.locator("#workspace .workspace-head h2").inner_text() == "سجل التدقيق"
             browser.close()
     finally:
         server.shutdown()

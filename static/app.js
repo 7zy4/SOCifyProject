@@ -883,4 +883,7 @@ document.addEventListener("click", (event) => {
 });
 
 
-document.addEventListener("DOMContentLoaded", () => initialize().catch(handleError), { once: true });
+document.addEventListener("DOMContentLoaded", () => initialize().catch((error) => {
+  handleError(error);
+  finish(emptyState(SOCifyLocale.text("تعذر تحميل مساحة العمل"), error.message || SOCifyLocale.text("حدث خطأ غير متوقع"), [button(SOCifyLocale.text("إعادة المحاولة"), () => window.location.reload(), "primary")]));
+}), { once: true });
