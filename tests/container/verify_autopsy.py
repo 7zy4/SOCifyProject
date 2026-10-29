@@ -63,6 +63,8 @@ def main():
         },
     )
     base = "/api/cases/" + str(case["id"])
+    call(base + "/approval", {"decision": "approved", "version": case["approval"]["version"], "reason": "Synthetic container acceptance scope"})
+    call("/api/investigation-selection", {"case_ids": [case["id"]]})
     imported = call(
         base + "/imports", {"filename": "synthetic.jsonl", "content": '{"title":"Synthetic incident evidence","event_time":"2026-10-24T10:00:00Z"}\n'}
     )
@@ -108,7 +110,12 @@ def main():
     )
     restored = call("/api/cases/import-capsule", restore_body, "multipart/form-data; boundary=" + restore_boundary)
     assert restored["case_id"] != case["id"]
+    restored_base = "/api/cases/" + str(restored["case_id"])
+    restored_case = call(restored_base)
+    call(restored_base + "/approval", {"decision": "approved", "version": restored_case["approval"]["version"], "reason": "Review restored synthetic evidence"})
+    call("/api/investigation-selection", {"case_ids": [restored["case_id"]]})
     assert call("/api/cases/" + str(restored["case_id"]) + "/logs")["total"] == 1
+    call("/api/investigation-selection", {"case_ids": [case["id"]]})
     report = call(base + "/reports", {"version": call(base)["version"]})
     state = wait(base + "/jobs/" + str(report["job_id"]), "state", {"queued", "processing"})
     assert state["state"] == "completed", state

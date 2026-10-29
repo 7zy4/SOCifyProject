@@ -65,9 +65,9 @@ python -m scripts.run_v4_demo --directory instance/v4-demo --port 5000
 
 ## هوية العرض
 
-التصميم يستخدم لوحات حبر داكنة وأصفر إشارة وحدودًا واضحة وظلالًا قصيرة وتكتشر نقاط في التنقل، مع أسطح نظيفة للقراءة والتحقيق. مصدر الألوان هو `static/design-tokens.json` وتُولد منه `static/tokens.css`. CSS الخاص بالهوية في `comic-workspace.css`، وخطوط Almarai وIBM Plex Sans محلية. الوضع الابتدائي داكن مع استمرار خيارات الفاتح وحسب النظام. لا توجد أسماء شخصيات أو رسومها داخل المنتج.
+التصميم يستخدم لوحات حبر داكنة وأصفر إشارة وحدودًا واضحة وظلالًا قصيرة ونقاطًا زخرفية في التنقل، مع أسطح نظيفة للقراءة والتحقيق. مصدر الألوان هو `static/design-tokens.json` وتُولد منه `static/tokens.css`. CSS الخاص بالهوية في `comic-workspace.css`. الخطوط المحلية هي Cairo وIBM Plex Sans Arabic وTajawal للعربية، وBangers وIBM Plex Sans وComic Neue للإنجليزية، وJetBrains Mono للشيفرة. الوضع الابتدائي داكن مع استمرار خيارات الفاتح وحسب النظام. لا توجد أسماء شخصيات أو رسومها داخل المنتج.
 
-مراجع استلهام: [مفهوم واجهة داكنة منشور](https://dribbble.com/shots/26289631-The-Batman-Comic-website)، [واجهة dashboard منشورة](https://github.com/tatrong/batpanel-dashboard)، [مكونات الطباعة المصورة](https://kaboom-ui-kit.pages.dev/). مراجع سير العمل: [LetsDefend](https://help.letsdefend.io/en/articles/8742685-what-is-letsdefend)، [توثيق الاستجابة](https://letsdefend.io/blog/incident-response-edition-documentation)، [تحقيق Elastic](https://www.elastic.co/docs/solutions/security/investigate). استُخلصت مبادئ عرض وتشغيل، دون نسخ أصول أو إضافة اعتمادية تصميمية خارجية.
+مراجع استلهام: [واجهة dashboard منشورة](https://github.com/tatrong/batpanel-dashboard)، [مكونات الطباعة المصورة](https://kaboom-ui-kit.pages.dev/). مراجع سير العمل: [LetsDefend](https://help.letsdefend.io/en/articles/8742685-what-is-letsdefend)، [توثيق الاستجابة](https://letsdefend.io/blog/incident-response-edition-documentation)، [تحقيق Elastic](https://www.elastic.co/docs/solutions/security/investigate). استُخلصت مبادئ عرض وتشغيل، دون نسخ أصول أو إضافة اعتمادية تصميمية خارجية.
 
 
 ## إدارة التشغيل المستمر

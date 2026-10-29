@@ -9,7 +9,8 @@
     "file": "bangers-OFL.txt",
     "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/bangers/OFL.txt",
     "source_sha256": "630dd5a307c0657b094d324e069b390edf90182fe5003639e06c02a0e5769af7",
-    "sha256": "630dd5a307c0657b094d324e069b390edf90182fe5003639e06c02a0e5769af7"
+    "sha256": "01f0dea3bc499f7fcc471577fe3a8d7df6e74e6b456d2228b767a239740811ae",
+    "conversion": "License text preserved; normalized LF line endings and trailing whitespace"
   },
   {
     "file": "ComicNeue-Regular.woff2",
@@ -27,7 +28,8 @@
     "file": "comicneue-OFL.txt",
     "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/comicneue/OFL.txt",
     "source_sha256": "7c38a22e5878e60fe423360553e63dd7be23d29f1f60336034935dbfc96e8320",
-    "sha256": "7c38a22e5878e60fe423360553e63dd7be23d29f1f60336034935dbfc96e8320"
+    "sha256": "dab6444770eae001bddf7501a2b3b90c93d44d47faf45369c814a5ad61b524d2",
+    "conversion": "License text preserved; normalized LF line endings and trailing whitespace"
   },
   {
     "file": "Cairo.woff2",
@@ -39,7 +41,8 @@
     "file": "cairo-OFL.txt",
     "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/cairo/OFL.txt",
     "source_sha256": "a4554e1799d42e1405924b61eb0e0722ae1623b1f1f07f995348f96c496362a9",
-    "sha256": "a4554e1799d42e1405924b61eb0e0722ae1623b1f1f07f995348f96c496362a9"
+    "sha256": "aa2b13bf0770c59a7fb7a3b793a7df5162c9cb5ad540ec81b0c0c1385946845d",
+    "conversion": "License text preserved; normalized LF line endings and trailing whitespace"
   },
   {
     "file": "Tajawal-Regular.woff2",
@@ -57,7 +60,8 @@
     "file": "tajawal-OFL.txt",
     "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/OFL.txt",
     "source_sha256": "9b584984f9db0ee30347391a76eff9c0a6b03dc450c3c6afe3757a2cb3a4db87",
-    "sha256": "9b584984f9db0ee30347391a76eff9c0a6b03dc450c3c6afe3757a2cb3a4db87"
+    "sha256": "c504e4e70d0e8048c69bc5330c8ca3d388533758c747f28f79b4de640210e630",
+    "conversion": "License text preserved; normalized LF line endings and trailing whitespace"
   },
   {
     "file": "IBMPlexSansArabic-Regular.woff2",
@@ -75,7 +79,8 @@
     "file": "ibmplexsansarabic-OFL.txt",
     "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/ibmplexsansarabic/OFL.txt",
     "source_sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da",
-    "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da"
+    "sha256": "d741e57d5f865e294df801f96b7b5161a88b211df65887e4358d271c9fc5fb4f",
+    "conversion": "License text preserved; normalized LF line endings and trailing whitespace"
   },
   {
     "file": "JetBrainsMono.woff2",
@@ -87,6 +92,7 @@
     "file": "jetbrainsmono-OFL.txt",
     "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/jetbrainsmono/OFL.txt",
     "source_sha256": "b2fe5e8987594e9ffd1d2ca52a2f5d73eb8335243893c5d6254b5ad69269591d",
-    "sha256": "b2fe5e8987594e9ffd1d2ca52a2f5d73eb8335243893c5d6254b5ad69269591d"
+    "sha256": "b2fe5e8987594e9ffd1d2ca52a2f5d73eb8335243893c5d6254b5ad69269591d",
+    "conversion": "License text preserved; normalized LF line endings and trailing whitespace"
   }
 ]

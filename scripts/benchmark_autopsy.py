@@ -72,11 +72,14 @@ def main():
         connection = connect_path(str(path))
         seed_demo_data(connection, secrets.token_urlsafe(28) + "Aa9!")
         actor = connection.execute("SELECT id FROM users WHERE role='soc_manager'").fetchone()[0]
+        case_id = None
 
         def client_for_actor():
             client = app.test_client()
             with client.session_transaction() as session:
                 session.update(user_id=actor, workspace_id=1, user_role="soc_manager")
+            if case_id is not None:
+                ensure(client.post("/api/investigation-selection", json={"case_ids": [case_id]}).status_code == 200, "reader scope selection")
             return client
 
         client = client_for_actor()
@@ -86,6 +89,11 @@ def main():
         )
         ensure(case.status_code == 201, "case creation")
         case_id, base = case.json["id"], f"/api/cases/{case.json['id']}"
+        approval = client.post(
+            base + "/approval", json={"decision": "approved", "version": case.json["approval"]["version"], "reason": "Synthetic capacity scope"}
+        )
+        ensure(approval.status_code == 200, "case approval")
+        ensure(client.post("/api/investigation-selection", json={"case_ids": [case_id]}).status_code == 200, "case scope selection")
         original = "\n".join(
             json.dumps(
                 {
