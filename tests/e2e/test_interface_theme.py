@@ -191,6 +191,14 @@ def test_operational_governance_routes_render_their_authorized_content(app):
             page.get_by_role("button", name="إعادة المحاولة", exact=True).click()
             page.locator("#workspace table").wait_for()
             assert page.locator("#workspace .workspace-head h2").inner_text() == "سجل التدقيق"
+            page.evaluate("localStorage.setItem('socify-interface-language', 'en')")
+            for route, heading in (("audit", "Audit log"), ("admin", "Governance and permissions")):
+                page.goto(base + "/" + route)
+                page.locator('#workspace[aria-busy="false"]').wait_for()
+                assert page.locator("#workspace .workspace-head h2").inner_text() == heading
+                if route == "audit":
+                    page.get_by_text("Activity", exact=True).wait_for()
+                    assert "Sensitive data is redacted" in page.locator(".workspace-head").inner_text()
             browser.close()
     finally:
         server.shutdown()

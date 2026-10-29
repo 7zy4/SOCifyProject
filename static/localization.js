@@ -9,6 +9,11 @@
   document.documentElement.lang = language;
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
   const english = {
+  "النشاط": "Activity",
+  "ستظهر عمليات المصادقة والقواعد والمصادر والتحقيقات هنا.": "Authentication, rule, source and investigation activity will appear here.",
+  "الحوكمة والصلاحيات": "Governance and permissions",
+  "Default deny ومصفوفة أدوار معلنة": "Default deny with an explicit role matrix",
+  "{0} عملية ضمن مساحة العمل · البيانات الحساسة محجوبة": "{0} workspace actions · Sensitive data is redacted",
   "طريقة عرض القضايا": "Case display mode",
   "عرض المجلدات": "Folder view",
   "عرض الجدول": "Table view",
