@@ -48,6 +48,7 @@ def validate_tokens() -> list[dict]:
             ("success", "success-bg"),
             ("on-primary", "primary-fill"),
             ("on-primary", "primary-hover"),
+            ("terminal-text", "terminal-bg"),
         ]:
             ratio = contrast(tokens["colors"][foreground][index], tokens["colors"][background][index])
             checks.append({"mode": mode, "foreground": foreground, "background": background, "contrast": round(ratio, 3)})

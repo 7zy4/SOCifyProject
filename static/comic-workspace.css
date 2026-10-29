@@ -105,7 +105,7 @@ input,select,textarea{border-radius:2px;background:var(--panel);border-color:var
 .badge,.severity,.approval-state{border-radius:1px;font-family:var(--font-comic-voice);font-weight:700;border:1px solid currentColor}
 .severity.critical{color:var(--red);background:var(--red-bg)}.severity.high{color:var(--high);background:var(--high-bg)}.severity.medium{color:var(--amber);background:var(--amber-bg)}
 .empty-state,.notice,.scope-note{border-radius:2px;border-color:var(--line);background:var(--panel-2);color:var(--text)}.empty-state{border:2px solid var(--line)}
-.table-wrap{max-width:100%;overflow:auto}pre,.email-body,.code-box{background:var(--terminal-bg);color:var(--terminal-text);border:2px solid var(--ink-black)}
+.table-wrap{max-width:100%;overflow:auto}pre,.email-body,.email-review .email-body,.code-box{background:var(--terminal-bg);color:var(--terminal-text);border:2px solid var(--ink-black)}
 th{font-family:var(--font-comic-voice);font-weight:700;color:var(--muted);background:var(--panel-2)}
 .auth-shell{background-color:var(--bg);background-image:radial-gradient(var(--halftone) 1px,var(--transparent) 1px);background-size:7px 7px}
 .auth-layout{border:4px solid var(--ink-black);border-radius:2px;box-shadow:var(--hero-shadow);background:var(--panel)}

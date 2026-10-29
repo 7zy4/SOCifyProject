@@ -107,6 +107,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             and request.path.startswith("/api/")
             and (request.blueprint is not None or request.path.split("/", 3)[2] in {"training", "scores", "scenarios", "lab"})
             and request.blueprint not in {"auth", "cases", "teams"}
+            and request.endpoint not in {"platform.audit_logs", "platform.role_matrix"}
             and not str(request.blueprint or "").startswith("autopsy")
         ):
             return error_response("CASE_CONTEXT_REQUIRED", "استخدم الأداة من داخل قضية مصرح بها؛ مسارات التدريب العامة متقاعدة", 410)
