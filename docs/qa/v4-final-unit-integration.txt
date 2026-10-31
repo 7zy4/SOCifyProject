@@ -13,7 +13,7 @@
 ...                                                                      [100%]
 =============================== warnings summary ===============================
 tests/integration/test_autopsy_capsules_pipeline.py::test_capsule_rejects_tampering_traversal_and_invalid_schema_without_partial_restore[duplicate_member]
-  /opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/zipfile/__init__.py:1625: UserWarning: Duplicate name: 'manifest.json'
+  <test-runtime>/python/lib/python3.12/zipfile/__init__.py:1625: UserWarning: Duplicate name: 'manifest.json'
     return self._open_to_write(zinfo, force_zip64=force_zip64)
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html

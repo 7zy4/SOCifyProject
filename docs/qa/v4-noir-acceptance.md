@@ -1,6 +1,6 @@
 # V4 noir workspace implementation and verification
 
-Base: `V4@53f739c3372b85fff3fd9682ddbffcc2f40868d3`. Implementation branch: `codex/v4-noir-workspace`. This record distinguishes design review, implementation and verified execution. It does not certify a production deployment.
+Base: `V4@53f739c3372b85fff3fd9682ddbffcc2f40868d3`. Implementation branch: `V5`. This record distinguishes design review, implementation and verified execution. It does not certify a production deployment.
 
 ## Design and implementation
 

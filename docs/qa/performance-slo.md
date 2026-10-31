@@ -1,6 +1,6 @@
 # Performance SLO and measured baseline
 
-The reference profile is the isolated Codex Linux container, Python 3.12, SQLite, one client, and synthetic training data. Results are not claims about production infrastructure.
+The reference profile is the isolated Linux test container, Python 3.12, SQLite, one client, and synthetic training data. Results are not claims about production infrastructure.
 
 | Measure | Target | Latest measured result | Status |
 |---|---:|---:|---|
