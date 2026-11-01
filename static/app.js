@@ -118,7 +118,7 @@ function finish(content) {
 }
 
 function pageHead(title, description, actions = []) {
-  return node("div", { class: "workspace-head" }, [node("div", {}, [node("h2", { text: title }), node("p", { text: description })]), node("div", { class: "action-row" }, actions)]);
+  return node("div", { class: "workspace-head" }, [node("div", {}, [node("h2", { text: title }), ...(description ? [node("p", { text: description })] : [])]), node("div", { class: "action-row" }, actions)]);
 }
 
 function emptyState(title, description, actions = []) {
@@ -221,7 +221,7 @@ async function renderEvents() {
     body.replaceChildren(data.items.length ? table(columns, data.items) : emptyState(SOCifyLocale.text("لا توجد سجلات مطابقة"), SOCifyLocale.text("جرّب تغيير المرشح أو استورد ملفًا مصرحًا."), [linkedButton(SOCifyLocale.text("مركز الاستيراد"), "/imports", "primary")]));
   }
   const filter = node("div", { class: "filter-row" }, [search, severity, button(SOCifyLocale.text("تطبيق"), () => load().catch(handleError), "primary"), linkedButton(SOCifyLocale.text("تصدير CSV آمن"), "/api/events/export")]);
-  root.append(pageHead(SOCifyLocale.text("السجلات الموحّدة"), SOCifyLocale.text("بيانات فعلية محفوظة مع المصدر الخام وأثر التطبيع"), [linkedButton(SOCifyLocale.text("استيراد جديد"), "/imports", "primary")]), filter, panel(SOCifyLocale.text("النتائج"), body, true));
+  root.append(pageHead(SOCifyLocale.text("السجلات الموحّدة"), null, [linkedButton(SOCifyLocale.text("استيراد جديد"), "/imports", "primary")]), filter, panel(SOCifyLocale.text("النتائج"), body, true));
   finish(root);
   await load();
 }
@@ -252,7 +252,7 @@ async function renderRules() {
     { label: SOCifyLocale.text("إجراء"), value: (row) => permission("rules.manage") ? button(row.is_active ? SOCifyLocale.text("تعطيل") : SOCifyLocale.text("تفعيل"), async () => { try { await api(`/api/rules/${row.id}/toggle`, { method: "POST", body: { active: !Boolean(row.is_active) } }); await renderRules(); } catch (error) { handleError(error); } }, "compact") : SOCifyLocale.text("قراءة فقط") }
   ];
   const actions = permission("rules.manage") ? [button(SOCifyLocale.text("قاعدة جديدة"), () => { drawer.hidden = false; drawer.querySelector("input").focus(); }, "primary")] : [];
-  root.append(pageHead(SOCifyLocale.text("منضدة قواعد الكشف"), SOCifyLocale.text("DSL typed بلا eval أو SQL من المستخدم، مع إصدارات وصحة قابلة للقياس"), actions), drawer, panel(SOCifyLocale.text("القواعد"), data.items.length ? table(columns, data.items) : emptyState(SOCifyLocale.text("لا توجد قواعد كشف"), SOCifyLocale.text("أنشئ قاعدة من DSL الصارم أو فعّل بيانات التطوير الصريحة.")), true));
+  root.append(pageHead(SOCifyLocale.text("منضدة قواعد الكشف"), null, actions), drawer, panel(SOCifyLocale.text("القواعد"), data.items.length ? table(columns, data.items) : emptyState(SOCifyLocale.text("لا توجد قواعد كشف"), SOCifyLocale.text("أنشئ قاعدة من DSL الصارم أو فعّل بيانات التطوير الصريحة.")), true));
   finish(root);
   const form = document.getElementById("rule-form");
   if (form) {
@@ -513,7 +513,7 @@ async function renderIncidents(selectedId = null) {
   const drawer = node("section", { class: "drawer", hidden: true });
   drawer.innerHTML = SOCifyLocale.text('<h3>تحقيق جديد</h3><form id="case-form" class="form-grid"><label class="span-2">العنوان<input name="title" required minlength="3" maxlength="255"></label><label>الخطورة<select name="severity"><option>medium</option><option>critical</option><option>high</option><option>low</option></select></label><label>الأولوية<select name="priority"><option>medium</option><option>urgent</option><option>high</option><option>low</option></select></label><label class="span-2">الوصف<textarea name="description" maxlength="10000"></textarea></label><div class="action-row"><button class="button primary" type="submit">إنشاء التحقيق</button><button id="cancel-case" class="button ghost" type="button">إلغاء</button></div></form>');
   const columns = [{ label: SOCifyLocale.text("المرجع"), value: (row) => button(row.reference, async () => { window.history.replaceState({}, "", `/incidents?selected=${row.id}`); await renderIncidents(row.id); }, "compact") }, { label: SOCifyLocale.text("التحقيق"), value: (row) => node("div", { class: "cell-title" }, [node("strong", { text: row.title }), node("small", { text: row.description })]) }, { label: SOCifyLocale.text("الخطورة"), value: (row) => badge(row.severity) }, { label: SOCifyLocale.text("الأولوية"), value: (row) => badge(row.priority) }, { label: SOCifyLocale.text("الحالة"), value: (row) => badge(row.status) }, { label: SOCifyLocale.text("المسؤول"), value: "assignee_name" }, { label: SOCifyLocale.text("أدلة"), value: "evidence_count" }, { label: "SLA", value: (row) => row.overdue ? badge("overdue") : formatTime(row.sla_due_at) }];
-  root.append(pageHead(SOCifyLocale.text("مساحة التحقيقات"), SOCifyLocale.text("حالات مضبوطة، أدلة محمية، قفل تفاؤلي، وتقارير بإصدارات"), [button(SOCifyLocale.text("تحقيق جديد"), () => { drawer.hidden = false; drawer.querySelector("input").focus(); }, "primary"), linkedButton(SOCifyLocale.text("ابدأ Guided Demo"), "/lab")]), drawer, panel(SOCifyLocale.text("التحقيقات"), data.items.length ? table(columns, data.items) : emptyState(SOCifyLocale.text("لا توجد تحقيقات بعد"), SOCifyLocale.text("أنشئ تحقيقًا أو شغّل سيناريو لتوليد تنبيه ثم اربطه بقضية."), [button(SOCifyLocale.text("إنشاء تحقيق"), () => { drawer.hidden = false; }, "primary"), linkedButton(SOCifyLocale.text("تشغيل سيناريو"), "/lab")]), true));
+  root.append(pageHead(SOCifyLocale.text("مساحة التحقيقات"), null, [button(SOCifyLocale.text("تحقيق جديد"), () => { drawer.hidden = false; drawer.querySelector("input").focus(); }, "primary"), linkedButton(SOCifyLocale.text("ابدأ Guided Demo"), "/lab")]), drawer, panel(SOCifyLocale.text("التحقيقات"), data.items.length ? table(columns, data.items) : emptyState(SOCifyLocale.text("لا توجد تحقيقات بعد"), SOCifyLocale.text("أنشئ تحقيقًا أو شغّل سيناريو لتوليد تنبيه ثم اربطه بقضية."), [button(SOCifyLocale.text("إنشاء تحقيق"), () => { drawer.hidden = false; }, "primary"), linkedButton(SOCifyLocale.text("تشغيل سيناريو"), "/lab")]), true));
   finish(root);
   document.getElementById("cancel-case").addEventListener("click", () => { drawer.hidden = true; });
   document.getElementById("case-form").addEventListener("submit", async (event) => { event.preventDefault(); const values = new FormData(event.currentTarget); try { const created = await api("/api/incidents", { method: "POST", body: Object.fromEntries(values.entries()) }); showMessage(SOCifyLocale.template`تم إنشاء ${created.reference}`, "success"); await renderIncidents(); } catch (error) { handleError(error); } });
@@ -793,14 +793,14 @@ async function renderAdmin() {
   const root = node("div");
   const userColumns = [{ label: SOCifyLocale.text("المستخدم"), value: (row) => node("div", { class: "cell-title" }, [node("strong", { text: row.name }), node("small", { text: row.email })]) }, { label: SOCifyLocale.text("الدور"), value: (row) => badge(row.role) }, { label: SOCifyLocale.text("الفريق"), value: "team" }, { label: SOCifyLocale.text("نشط"), value: (row) => row.is_active ? SOCifyLocale.text("نعم") : SOCifyLocale.text("لا") }, { label: SOCifyLocale.text("آخر دخول"), value: (row) => formatTime(row.last_login) }];
   const roleColumns = [{ label: SOCifyLocale.text("الدور"), value: (row) => badge(row.role) }, { label: SOCifyLocale.text("الصلاحيات"), value: (row) => node("span", { text: row.permissions.join(" · ") }) }];
-  root.append(pageHead(SOCifyLocale.text("الحوكمة والصلاحيات"), SOCifyLocale.text("Default deny ومصفوفة أدوار معلنة")), node("div", { class: "panel-grid" }, [panel(SOCifyLocale.text("المستخدمون"), table(userColumns, users.items)), panel(SOCifyLocale.text("مصفوفة الصلاحيات"), table(roleColumns, roles.items))]));
+  root.append(pageHead(SOCifyLocale.text("الحوكمة والصلاحيات"), null), node("div", { class: "panel-grid" }, [panel(SOCifyLocale.text("المستخدمون"), table(userColumns, users.items)), panel(SOCifyLocale.text("مصفوفة الصلاحيات"), table(roleColumns, roles.items))]));
   finish(root);
 }
 
 async function renderTeam() {
   begin("team");
   const data = await api("/api/team");
-  const root = node("div", {}, pageHead(SOCifyLocale.text("الفريق وتوزيع التحقيقات"), SOCifyLocale.text("الإسناد مرتبط بالاستيراد والقضية والتقرير؛ السجلات المشتركة تعاونية داخل الفريق")));
+  const root = node("div", {}, pageHead(SOCifyLocale.text("الفريق وتوزيع التحقيقات"), null));
   const save = async (path, method, body) => { try { await api(path, { method, body }); await renderTeam(); } catch (error) { handleError(error); } };
   const memberColumns = [{ label: SOCifyLocale.text("العضو"), value: "name" }, { label: SOCifyLocale.text("البريد"), value: "email" }, { label: SOCifyLocale.text("الدور"), value: "role" }];
   if (data.can_manage) memberColumns.push({ label: SOCifyLocale.text("تغيير الدور"), value: (member) => {
@@ -877,9 +877,12 @@ function closeNavigation() {
 }
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && document.querySelector(".sidebar.open")) { closeNavigation(); menu.focus(); }
+  const account = document.querySelector(".account-menu[open]");
+  if (event.key === "Escape" && account) { account.open = false; account.querySelector("summary").focus(); }
 });
 document.addEventListener("click", (event) => {
   if (!event.target.closest(".sidebar, #menu-toggle")) closeNavigation();
+  if (!event.target.closest(".account-menu")) document.querySelector(".account-menu")?.removeAttribute("open");
 });
 
 

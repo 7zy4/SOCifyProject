@@ -29,13 +29,6 @@ def test_theme_system_persistence_languages_and_operational_surfaces(app):
             base = f"http://127.0.0.1:{server.server_port}"
             page.goto(base + "/")
             assert page.locator("html").get_attribute("data-theme") == "dark"
-            assert page.locator("[data-theme-select]").input_value() == "dark"
-            page.locator("[data-theme-select]").select_option("system")
-            page.emulate_media(color_scheme="light")
-            page.wait_for_function("() => document.documentElement.dataset.theme === 'light'")
-            page.locator("[data-theme-select]").select_option("dark")
-            page.reload()
-            assert page.locator("html").get_attribute("data-theme") == "dark"
             page.goto(base + "/login")
             assert page.locator("html").get_attribute("data-theme") == "dark"
             page.get_by_label("البريد الإلكتروني", exact=True).fill("manager@socify.local")
@@ -43,6 +36,13 @@ def test_theme_system_persistence_languages_and_operational_surfaces(app):
             page.get_by_role("button", name="دخول إلى المنصة", exact=True).click()
             page.wait_for_url("**/cases")
             page.wait_for_function("() => document.querySelector('#workspace').getAttribute('aria-busy') === 'false'")
+            assert page.locator('[data-theme-option="dark"]').get_attribute("aria-pressed") == "true"
+            page.locator('[data-theme-option="system"]').click()
+            page.emulate_media(color_scheme="light")
+            page.wait_for_function("() => document.documentElement.dataset.theme === 'light'")
+            page.locator('[data-theme-option="dark"]').click()
+            page.reload()
+            assert page.locator("html").get_attribute("data-theme") == "dark"
             case = page.evaluate("""async () => {
                 const c = await api('/api/cases', {method:'POST', body:{
                     title:'تحقيق في نشاط تسجيل دخول مشتبه به', reason:'alert_review',
@@ -70,7 +70,7 @@ def test_theme_system_persistence_languages_and_operational_surfaces(app):
             for language in ("ar", "en"):
                 page.evaluate("language => localStorage.setItem('socify-interface-language', language)", language)
                 for theme in ("light", "dark"):
-                    page.locator("[data-theme-select]").select_option(theme)
+                    page.evaluate("theme => localStorage.setItem('socify-interface-theme', theme)", theme)
                     for route in routes:
                         page.set_viewport_size({"width": 1440, "height": 1000})
                         page.goto(base + route)
@@ -80,8 +80,10 @@ def test_theme_system_persistence_languages_and_operational_surfaces(app):
                         assert page.locator("html").get_attribute("data-theme") == theme
                         assert page.locator("html").get_attribute("lang") == language
                         assert page.locator("html").get_attribute("dir") == ("rtl" if language == "ar" else "ltr")
-                        assert page.evaluate("document.fonts.check('15px \"IBM Plex Sans Arabic\"', 'تحقيق')")
-                        assert page.evaluate("document.fonts.check('15px \"IBM Plex Sans\"', 'Investigation')")
+                        font = "Cairo" if language == "ar" else "IBM Plex Sans"
+                        assert font in page.evaluate("getComputedStyle(document.body).fontFamily")
+                        assert page.evaluate('font => document.fonts.check(`600 15px "${font}"`)', font)
+                        assert page.evaluate("document.fonts.check('34px Bangers', 'SOCify')")
                         assert_accessible(page)
                         name = route.strip("/").replace("/", "-").replace("?tab=", "-") or "landing"
                         if route in ("/", "/login", "/cases") or "tab=summary" in route:
@@ -101,6 +103,7 @@ def test_theme_system_persistence_languages_and_operational_surfaces(app):
 
 @pytest.mark.e2e
 def test_theme_control_works_when_browser_storage_is_unavailable(app):
+    app.config["LEGACY_TRAINING_TESTS"] = True
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -109,9 +112,9 @@ def test_theme_control_works_when_browser_storage_is_unavailable(app):
             browser = launch_browser(playwright)
             page = browser.new_page(color_scheme="dark")
             page.add_init_script("Storage.prototype.getItem = Storage.prototype.setItem = () => { throw new Error('Storage unavailable'); };")
-            page.goto(f"http://127.0.0.1:{server.server_port}/login")
+            page.goto(f"http://127.0.0.1:{server.server_port}/")
             assert page.locator("html").get_attribute("data-theme") == "dark"
-            page.locator("[data-theme-select]").select_option("light")
+            page.locator('[data-theme-option="light"]').click()
             assert page.locator("html").get_attribute("data-theme") == "light"
             browser.close()
     finally:
@@ -136,7 +139,7 @@ def test_public_pages_theme_typography_and_responsive_layout(app):
             for language in ("ar", "en"):
                 page.evaluate("language => localStorage.setItem('socify-interface-language', language)", language)
                 for theme in ("light", "dark"):
-                    page.locator("[data-theme-select]").select_option(theme)
+                    page.evaluate("theme => localStorage.setItem('socify-interface-theme', theme)", theme)
                     for route, name in (("/", "landing"), ("/login", "login"), ("/register", "register")):
                         # The operational root intentionally redirects to sign-in/cases.
                         # Render the retained landing template in its supported legacy mode.

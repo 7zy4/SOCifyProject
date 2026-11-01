@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" fill="none">
+<defs><pattern id="hatch" width="11" height="11" patternUnits="userSpaceOnUse" patternTransform="rotate(27)"><path d="M0 0v11M4 0v11" stroke="#69706B" stroke-width=".7"/></pattern><pattern id="dots" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#8D9183"/></pattern><linearGradient id="shade"><stop stop-color="#101416"/><stop offset="1" stop-color="#303A40"/></linearGradient></defs>
+<path d="M0 0h450L0 800Z" fill="url(#hatch)"/><path d="M1600 0h-390l390 720Z" fill="url(#dots)"/>
+<g stroke="#111719" stroke-width="4" stroke-linejoin="miter">
+<path d="M0 1000V420l55-20V270l95-40 74 47v190l70-25v-95l79-34 68 42v645Z" fill="#303A40"/>
+<path d="M0 1000V730l92-42v-90l65-29 60 38v110l53-24v-90l60 27v370Z" fill="#1C2226"/>
+<path d="m55 270 95-40v770M224 277l-74-47M55 400l95-34 74 33M0 420l150-54M150 366v634M294 442l79-37v595M373 313v92l68 36"/>
+<path d="M1600 1000V320l-80-34v-94l-85-41-90 42v340l-60-27V370l-85-43-66 34v639Z" fill="#303A40"/>
+<path d="M1600 1000V680l-102-45v-104l-69-29-59 27v211l-67-29v-97l-50 22v364Z" fill="#1C2226"/>
+<path d="M1435 151v849m0-714 165 73M1345 193l90-42m-235 176v673m-66-573 66-30 85 33"/>
+</g>
+<g stroke="#879087" stroke-width="2" opacity=".6">
+<path d="m69 305 64-25m-64 48 64-25m-64 48 64-25m-64 48 64-25m-64 48 64-25m-64 48 64-25m-64 48 64-25m-64 48 64-25M171 283l35 13m-35 21 35 13m-35 21 35 13m-35 57 35 13m-35 21 35 13m-35 21 35 13M309 470l49-22m-49 47 49-22m-49 47 49-22m-49 47 49-22m-49 47 49-22m-49 47 49-22m-49 47 49-22m-49 47 49-22"/>
+<path d="m1453 211 48 21m-48 4 48 21m-48 4 48 21m-48 31 48 21m-48 4 48 21m-48 4 48 21m-48 4 48 21m-48 4 48 21m-48 4 48 21M1365 232l50-22m-50 47 50-22m-50 47 50-22m-50 47 50-22m-50 47 50-22m-50 47 50-22m-50 47 50-22m-50 47 50-22M1218 383l50 23m-50 4 50 23m-50 4 50 23m-50 4 50 23m-50 4 50 23m-50 4 50 23m-50 4 50 23"/>
+</g>
+<g stroke="#8C9283" stroke-width="1" opacity=".35"><path d="m0 120 390 880M0 210l370 790M1600 140l-380 860M1600 250l-340 750M350 0l95 180M1230 0l-90 190"/><path d="m0 980 440-36m-440 3 440-31m720 64 440-33m-440 0 440-24"/></g>
+<path d="M0 0h1600v1000H0Z" stroke="#101416" stroke-width="18"/>
+</svg>

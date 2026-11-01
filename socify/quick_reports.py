@@ -584,7 +584,7 @@ def print_quick_report(case_id: int):
   <div class="print-toolbar">
     <div class="toolbar-brand">
       <img src="/static/brand-mark.svg" width="22" height="22" alt="">
-      <span><strong dir="ltr">SOCify · SOC / V6</strong> — تقرير فرز وتحقيق جاهز للطباعة والتصعيد</span>
+      <span><strong dir="ltr">SOCify</strong></span>
     </div>
     <div class="toolbar-actions">
       <button type="button" id="trigger-print-btn">طباعة التقرير / حفظ PDF</button>
@@ -594,7 +594,7 @@ def print_quick_report(case_id: int):
   <main class="report-sheet">
     <header class="report-header">
       <div class="header-main">
-        <div class="brand-kicker"><img src="/static/brand-mark.svg" width="20" height="20" alt=""><span dir="ltr">SOCify Tactical Workbench · SOC / V6 · Instant Triage Report</span></div>
+        <div class="brand-kicker"><img src="/static/brand-mark.svg" width="20" height="20" alt=""><span dir="ltr">SOCify</span></div>
         <h1 class="report-title"><span class="mono" dir="ltr">{_esc(cmeta["reference"])}</span> — {_esc(cmeta["title"])}</h1>
       </div>
       <div><span class="badge {status_tone}" dir="ltr">{_esc(status_label)}</span></div>
@@ -606,32 +606,32 @@ def print_quick_report(case_id: int):
       <div class="meta-item"><strong>الخطورة والحالة</strong><span class="mono" dir="ltr">{_esc(cmeta["severity"]).upper()} · {_esc(cmeta["status"])}</span></div>
       <div class="meta-item"><strong>إجمالي السجلات المفحوصة</strong>{_esc(summary["logs_count"])} سجل</div>
       <div class="meta-item"><strong>التنبيهات وتطابقات المراقبة</strong>{_esc(summary["alerts_count"])} تنبيه (<span class="mono" dir="ltr">{_esc(summary["watchlist_hits_count"])} Watchlist</span>)</div>
-      <div class="meta-item"><strong>وقت التوليد (UTC)</strong><span class="mono" dir="ltr">{_esc(iso_now())}</span></div>
+      <div class="meta-item"><strong>وقت التوليد (UTC)</strong><span class="mono" dir="ltr">{_esc(iso_now()[:19].replace("T", " "))}</span></div>
     </section>
 
     {note_html}
     {manager_html}
 
-    <h2 class="section-title">أولًا: خلاصة التحقيق الموجهة <span class="en-sub" dir="ltr">(Guided Triage Assessment)</span></h2>
+    <h2 class="section-title">أولًا: خلاصة التحقيق الموجهة</h2>
     <table class="qa-table">
       <thead><tr><th class="qa-col-topic">محور التقييم</th><th>النتيجة المعتمدة</th></tr></thead>
       <tbody>{qa_rows_html}</tbody>
     </table>
 
-    <h2 class="section-title">ثانيًا: تنبيهات القواعد المدمجة وقائمة المراقبة <span class="en-sub" dir="ltr">(Triggered Alerts &amp; Watchlist Hits)</span></h2>
+    <h2 class="section-title">ثانيًا: تنبيهات القواعد المدمجة وقائمة المراقبة</h2>
     <table class="evidence-table">
       <thead><tr><th>المعرف</th><th>الخطورة</th><th>القاعدة / سبب التنبيه</th><th>وقت الرصد</th></tr></thead>
       <tbody>{alerts_rows_html}</tbody>
     </table>
 
-    <h2 class="section-title">ثالثًا: نتائج الفحص الساكن الآمن للملفات والبريد <span class="en-sub" dir="ltr">(Static File &amp; Email Triage — Never Executed)</span></h2>
+    <h2 class="section-title">ثالثًا: نتائج الفحص الساكن الآمن للملفات والبريد</h2>
     <table class="evidence-table">
       <thead><tr><th>الملف / الرسالة</th><th>الحكم الأولي</th><th>SHA-256</th><th>الملاحظات الفنية</th></tr></thead>
       <tbody>{triage_rows_html}</tbody>
     </table>
 
     <footer class="report-footer">
-      <span dir="ltr">SOCify Tactical Workbench (SOC / V6) — Structured analyst selections &amp; verified case evidence</span>
+      <span dir="ltr">SOCify</span>
       <span class="mono" dir="ltr">Case #{case_id} · {_esc(cmeta["reference"])}</span>
     </footer>
   </main>

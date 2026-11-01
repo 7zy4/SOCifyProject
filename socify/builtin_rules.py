@@ -1,4 +1,4 @@
-"""Built-in SOCify V6 tactical detection rule pack auto-seeded into every workspace."""
+"""Built-in SOCify tactical detection rule pack auto-seeded into every workspace."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from .timeutils import iso_now
 
 BUILTIN_RULES: tuple[dict[str, Any], ...] = (
     {
-        "name": "[SOCify V6] Brute Force Authentication Burst",
+        "name": "[SOCify] Brute Force Authentication Burst",
         "description": "Detect 5 or more failed authentication attempts from the same source IP within 10 minutes.",
         "severity": "high",
         "confidence": 0.92,
@@ -22,7 +22,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "[SOCify V6] Password Spraying Across Accounts",
+        "name": "[SOCify] Password Spraying Across Accounts",
         "description": "Detect failed logins targeting 4 or more distinct usernames from one source IP within 15 minutes.",
         "severity": "high",
         "confidence": 0.90,
@@ -40,7 +40,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "[SOCify V6] Suspicious Encoded or Download-Cradle PowerShell",
+        "name": "[SOCify] Suspicious Encoded or Download-Cradle PowerShell",
         "description": "Detect PowerShell invocations using encoded commands or remote download cradles.",
         "severity": "high",
         "confidence": 0.91,
@@ -74,7 +74,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "[SOCify V6] Office Application Spawning Shell or Script",
+        "name": "[SOCify] Office Application Spawning Shell or Script",
         "description": "Detect Microsoft Office processes spawning command shells, PowerShell, or script engines.",
         "severity": "critical",
         "confidence": 0.95,
@@ -109,7 +109,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "[SOCify V6] LSASS / Credential Dumping Activity",
+        "name": "[SOCify] LSASS / Credential Dumping Activity",
         "description": "Detect Mimikatz, comsvcs.dll MiniDump, ProcDump, or direct LSASS credential dumping patterns.",
         "severity": "critical",
         "confidence": 0.96,
@@ -131,7 +131,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "[SOCify V6] Security Audit Log Cleared",
+        "name": "[SOCify] Security Audit Log Cleared",
         "description": "Detect Windows Event ID 1102 or explicit audit/event log clearing commands.",
         "severity": "critical",
         "confidence": 0.97,
@@ -150,7 +150,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "[SOCify V6] Local or Domain User Account Created",
+        "name": "[SOCify] Local or Domain User Account Created",
         "description": "Detect Windows Event ID 4720 or command-line account creation (net user /add, useradd).",
         "severity": "medium",
         "confidence": 0.84,
@@ -174,7 +174,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "[SOCify V6] Privileged Group Membership Modification",
+        "name": "[SOCify] Privileged Group Membership Modification",
         "description": "Detect additions to privileged Windows/Linux administrative groups (4728/4732/4756/Administrators/sudo).",
         "severity": "high",
         "confidence": 0.90,
@@ -192,7 +192,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "[SOCify V6] New Service or Scheduled Task Persistence",
+        "name": "[SOCify] New Service or Scheduled Task Persistence",
         "description": "Detect Windows service installation (7045), scheduled task creation (4698), schtasks /create, or sc create.",
         "severity": "high",
         "confidence": 0.88,
@@ -211,7 +211,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "[SOCify V6] Suspicious LOLBin Proxy Execution",
+        "name": "[SOCify] Suspicious LOLBin Proxy Execution",
         "description": "Detect abuse of Windows LOLBins (certutil, bitsadmin, mshta, regsvr32, rundll32 scriptlet execution).",
         "severity": "high",
         "confidence": 0.89,
@@ -232,7 +232,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "[SOCify V6] Web SQL Injection Probe",
+        "name": "[SOCify] Web SQL Injection Probe",
         "description": "Detect SQL injection operators (UNION SELECT, OR 1=1, information_schema) in web/WAF/CEF logs.",
         "severity": "high",
         "confidence": 0.90,
@@ -250,7 +250,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "[SOCify V6] Web Cross-Site Scripting (XSS) Probe",
+        "name": "[SOCify] Web Cross-Site Scripting (XSS) Probe",
         "description": "Detect reflected or stored XSS script payloads in web request paths or WAF logs.",
         "severity": "medium",
         "confidence": 0.85,
@@ -268,7 +268,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "[SOCify V6] Web Directory / Path Traversal Attempt",
+        "name": "[SOCify] Web Directory / Path Traversal Attempt",
         "description": "Detect ../etc/passwd, ..\\windows\\win.ini, and URL-encoded directory traversal sequences.",
         "severity": "high",
         "confidence": 0.89,
@@ -286,7 +286,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "[SOCify V6] Web Reconnaissance / Scanner Error Burst",
+        "name": "[SOCify] Web Reconnaissance / Scanner Error Burst",
         "description": "Detect 10 or more HTTP 401/403/404 responses to a single source IP within 2 minutes.",
         "severity": "medium",
         "confidence": 0.82,
@@ -297,7 +297,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "[SOCify V6] Phishing Interaction Followed by Login",
+        "name": "[SOCify] Phishing Interaction Followed by Login",
         "description": "Detect phishing email interaction followed by an authentication event for the same username within 30 minutes.",
         "severity": "high",
         "confidence": 0.88,
@@ -312,7 +312,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "[SOCify V6] Ransomware Shadow Copy / Recovery Tampering",
+        "name": "[SOCify] Ransomware Shadow Copy / Recovery Tampering",
         "description": "Detect vssadmin shadow deletion, wmic shadowcopy delete, or bcdedit recovery disabling.",
         "severity": "critical",
         "confidence": 0.97,
@@ -332,7 +332,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "[SOCify V6] High Anomaly Score Indicator",
+        "name": "[SOCify] High Anomaly Score Indicator",
         "description": "Detect events tagged with a normalized anomaly score >= 0.85.",
         "severity": "high",
         "confidence": 0.85,
@@ -345,7 +345,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
 
 
 def seed_builtin_rules(connection: sqlite3.Connection) -> int:
-    """Idempotently ensure all built-in V6 detection rules exist in every workspace."""
+    """Idempotently ensure all built-in detection rules exist in every workspace."""
     workspaces = [int(row[0]) for row in connection.execute("SELECT id FROM training_workspaces").fetchall()]
     if not workspaces:
         return 0
@@ -370,6 +370,13 @@ def seed_builtin_rules(connection: sqlite3.Connection) -> int:
             continue
         creator = int(creator_row[0])
         for spec in BUILTIN_RULES:
+            legacy_name = spec["name"].replace("[SOCify]", "[SOCify V6]", 1)
+            if legacy_name in existing_names and spec["name"] not in existing_names:
+                connection.execute(
+                    "UPDATE rules SET name = ? WHERE workspace_id = ? AND name = ? AND archived_at IS NULL",
+                    (spec["name"], ws_id, legacy_name),
+                )
+                existing_names.add(spec["name"])
             if spec["name"] in existing_names:
                 continue
             dsl = dict(spec["dsl"])
@@ -395,7 +402,7 @@ def seed_builtin_rules(connection: sqlite3.Connection) -> int:
             connection.execute(
                 """INSERT INTO rule_versions
                    (rule_id, version, dsl_json, action_json, change_summary, created_by, created_at)
-                   VALUES (?, 1, ?, ?, 'SOCify V6 built-in detection pack', ?, ?)""",
+                   VALUES (?, 1, ?, ?, 'SOCify built-in detection pack', ?, ?)""",
                 (rule_id, dsl_json, action_json, creator, now),
             )
             inserted_total += 1

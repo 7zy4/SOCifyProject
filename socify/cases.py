@@ -433,7 +433,7 @@ def _create_case(data: dict[str, Any]):
                 get_db().execute("INSERT INTO case_approvals(case_id,state,requested_by) VALUES (?,'pending',?)", (case_id, actor_id()))
             else:
                 get_db().execute(
-                    "INSERT INTO case_approvals(case_id,state,requested_by,reviewed_by,reviewed_at,reason,source) VALUES (?,'approved',?,?,?,'V6 direct tactical investigation','v6_direct')",
+                    "INSERT INTO case_approvals(case_id,state,requested_by,reviewed_by,reviewed_at,reason,source) VALUES (?,'approved',?,?,?,'Direct tactical investigation','v6_direct')",
                     (case_id, actor_id(), actor_id(), now),
                 )
             for member in {actor_id(), assignee} - {None}:

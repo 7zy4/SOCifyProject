@@ -34,6 +34,8 @@
   "الحساب والأمان": "Account and security",
   "تعديل التفاصيل": "Edit details",
   "جارٍ الحفظ…": "Saving…",
+  "الحساب": "Account",
+  "رمز التحقق": "Verification code",
   "المظهر": "Appearance",
   "حسب النظام": "System",
   "فاتح": "Light",

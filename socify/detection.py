@@ -418,7 +418,7 @@ def evaluate_rules(connection: sqlite3.Connection, event_id: int) -> list[int]:
         "SELECT * FROM rules WHERE workspace_id = ? AND is_active = 1 AND archived_at IS NULL ORDER BY id LIMIT 500",
         (event["workspace_id"],),
     ).fetchall()
-    if not any(str(r["name"]).startswith("[SOCify V6]") for r in rules):
+    if not any(str(r["name"]).startswith("[SOCify]") for r in rules):
         from .builtin_rules import seed_builtin_rules
 
         if seed_builtin_rules(connection):

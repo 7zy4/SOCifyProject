@@ -4,13 +4,13 @@
   const t = value => SOCifyLocale.text(value);
   const sections = ["monitoring", "log-management", "endpoint-security", "threat-intel", "email-security", "sandbox", "reports"];
   const names = {
-    monitoring: [t("المراقبة"), t("راجع التنبيهات، ثم افتح التحقيق المرتبط بالأدلة.")],
-    "log-management": [t("إدارة السجلات"), t("ابحث في السجلات واستورد الأدلة ضمن قضية مصرح بها.")],
-    "endpoint-security": [t("أمن الأجهزة والأصول"), t("راجع الأصول ونطاق تأثرها ووثّق إجراءات الاستجابة.")],
-    "threat-intel": [t("استخبارات التهديدات"), t("اربط المؤشرات بالأدلة وراجع نتائج الإثراء المحلي ومصادرها.")],
+    monitoring: [t("المراقبة"), null],
+    "log-management": [t("إدارة السجلات"), null],
+    "endpoint-security": [t("أمن الأجهزة والأصول"), null],
+    "threat-intel": [t("استخبارات التهديدات"), null],
     "email-security": [t("أمن البريد الإلكتروني"), t("افحص رؤوس الرسالة وروابطها ومرفقاتها دون تشغيل محتواها.")],
     sandbox: [t("تحليل العينات"), t("حجر مشفر وتحليل ساكن محلي؛ لا تنفيذ ديناميكي للعينات.")],
-    reports: [t("التقارير"), t("أنشئ نسخة فورية من التحقيق، ثم راجع الصيغ والاعتماد.")]
+    reports: [t("التقارير"), null]
   };
   const tabs = {"log-management":"logs", "endpoint-security":"analysis", "threat-intel":"analysis", "email-security":"analysis", sandbox:"analysis", reports:"reports"};
   Object.assign(titles, Object.fromEntries(Object.entries(names).map(([key, value]) => [key, [value[0], "SOCIFY"]])));
@@ -86,10 +86,11 @@
           node("div",{},[node("h3",{text:t("سبب الكشف")}),node("p",{"data-user-content":"true",text:item.reason}),node("p",{class:"cell-meta",text:t("إصدار القاعدة")+": "+item.rule_version})]),
           node("div",{},[node("dl",{},[node("dt",{text:t("السجلات المرتبطة")}),node("dd",{text:number(item.evidence_events)}),node("dt",{text:t("قرار التنبيه")}),node("dd",{text:autopsyLabel(item.verdict||"undetermined")}),node("dt",{text:t("حالة القضية")}),node("dd",{text:autopsyLabel(item.case_status)})]),node("div",{class:"action-row"},[linkedButton(t("مراجعة التنبيه"),url(`/cases/${item.case_id}`,{tab:"analysis"})),linkedButton(t("السجلات والأدلة"),url(`/cases/${item.case_id}`,{tab:"logs"})),linkedButton(t("التقارير"),url("/reports",{case_id:item.case_id}))])])
         ])));
-        const expand=button("⌄",()=>{detail.hidden=!detail.hidden;expand.setAttribute("aria-expanded",String(!detail.hidden));expand.textContent=detail.hidden?"⌄":"⌃";},"row-expand");
+        const expand=button("",()=>{detail.hidden=!detail.hidden;expand.setAttribute("aria-expanded",String(!detail.hidden));},"row-expand");
+        expand.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
         expand.className="row-expand"; expand.setAttribute("aria-label",t("تفاصيل التنبيه")+" "+item.alert_id);expand.setAttribute("aria-expanded","false");expand.setAttribute("aria-controls",detailId);
         const cells=[expand,node("span",{class:`severity ${item.severity}`,text:autopsyLabel(item.severity)}),node("time",{datetime:item.detected_at,text:formatTime(item.detected_at)}),node("div",{class:"rule-cell"},[node("strong",{"data-user-content":"true",text:item.rule_name||item.reason}),node("small",{text:t("إصدار القاعدة")+" "+item.rule_version})]),node("bdi",{dir:"ltr",text:item.alert_id}),node("div",{},[node("a",{class:"case-link",href:`/cases/${item.case_id}`,text:item.reference}),node("span",{class:"cell-meta",text:autopsyLabel(item.case_status)})]),node("span",{"data-user-content":"true",text:item.assignee_name||t("غير مسند")}),linkedButton(t("فتح التحقيق"),`/cases/${item.case_id}`)];
-        body.append(node("tr",{"data-alert-row":item.id},cells.map(value=>node("td",{},value))),detail);
+        body.append(node("tr",{"data-alert-row":item.id},cells.map((value,index)=>node("td",{"data-label":[t("التفاصيل"),t("الخطورة"),t("وقت الاكتشاف"),t("اسم القاعدة"),t("معرف التنبيه"),t("القضية"),t("المسؤول"),t("الإجراء")][index]},value))),detail);
       }
       surface.append(node("div",{class:"table-wrap",role:"region",tabindex:0,"aria-label":t("جدول التنبيهات")},node("table",{class:"monitoring-table"},[head,body])));
     }

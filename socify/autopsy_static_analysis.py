@@ -433,7 +433,7 @@ def inspect_static_bytes(
 
     verdict = "high_risk" if risk_score >= 65 else "suspicious" if risk_score >= 30 else "low_signal_static_only"
     return {
-        "engine": "SOCify V6 Quick Static Triage/1",
+        "engine": "SOCify Quick Static Triage/1",
         "filename": clean_name,
         "declared_extension": declared_ext or None,
         "declared_mime": (declared_mime or "")[:100] or None,

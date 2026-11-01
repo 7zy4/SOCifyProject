@@ -98,6 +98,21 @@ def test_e2e_05_mfa_enrollment_login_backup_code_and_revoke(
     assert disabled.status_code == 204
 
 
+def test_login_form_opens_mfa_after_password_challenge(client, login_as):
+    login_as("analyst")
+    enrollment = client.post("/api/auth/mfa/enroll", json={})
+    code = totp_code(enrollment.json["secret"], int(time.time()))
+    verified = client.post("/api/auth/mfa/verify", json={"code": code})
+    recovery = verified.json["backup_codes"][0]
+    client.post("/api/auth/logout", json={})
+    response = client.post("/login", data={"email": "analyst@socify.local", "password": DEMO_LOGIN_VALUE})
+    assert response.status_code == 302 and "mfa=1" in response.location
+    assert b'class="auth-mfa" open' in client.get(response.location).data
+    authenticated = client.post("/login", data={"email": "analyst@socify.local", "password": DEMO_LOGIN_VALUE, "mfa_code": recovery})
+    assert authenticated.status_code == 302 and "mfa=1" not in authenticated.location
+    assert client.get("/api/auth/me").status_code == 200
+
+
 def test_login_rate_limit_is_deterministic(client: FlaskClient) -> None:
     for _ in range(3):
         assert client.post("/api/auth/login", json={"email": "analyst@socify.local", "password": "Invalid-Training-Value"}).status_code == 401

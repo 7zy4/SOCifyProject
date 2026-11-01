@@ -1,216 +1,216 @@
 {
   "colors": {
     "bg": [
-      "#F4F6F9",
-      "#0B0E14"
+      "#E4DFD1",
+      "#15191C"
     ],
     "panel": [
-      "#FFFFFF",
-      "#111620"
+      "#F5F0E4",
+      "#242B30"
     ],
     "panel-2": [
-      "#EDF1F6",
-      "#19202E"
+      "#DED8C8",
+      "#303A40"
     ],
     "text": [
-      "#111827",
-      "#ECF0F6"
+      "#191D20",
+      "#F4EEDF"
     ],
     "muted": [
-      "#4B5565",
-      "#9AA6BA"
+      "#414944",
+      "#CFD0C3"
     ],
     "line": [
-      "#CBD5E1",
-      "#2A3447"
+      "#444941",
+      "#879087"
     ],
     "line-soft": [
-      "#E2E8F0",
-      "#1E2636"
+      "#B3B1A2",
+      "#58625E"
     ],
     "blue": [
-      "#1854B8",
-      "#6EA8FE"
+      "#5D491C",
+      "#D5B663"
     ],
     "primary-fill": [
-      "#1854B8",
-      "#589BFF"
+      "#D0AE53",
+      "#D0AE53"
     ],
     "primary-hover": [
-      "#134394",
-      "#7BB2FF"
+      "#DDC274",
+      "#DDC274"
     ],
     "on-primary": [
-      "#FFFFFF",
-      "#080B10"
+      "#191D20",
+      "#191D20"
     ],
     "focus": [
-      "#1854B8",
-      "#6EA8FE"
+      "#6B4D00",
+      "#E6C879"
     ],
     "red": [
-      "#A61B29",
-      "#FF9AA4"
+      "#8B3029",
+      "#FFD0C3"
     ],
     "red-bg": [
-      "#FCE8EA",
-      "#33161D"
+      "#F2D8CC",
+      "#492A29"
     ],
     "high": [
-      "#8A3800",
-      "#FFB37B"
+      "#713B11",
+      "#F0CBA2"
     ],
     "high-bg": [
-      "#FDECE1",
-      "#332015"
+      "#EAD8B8",
+      "#483523"
     ],
     "amber": [
-      "#734F00",
-      "#F3C64F"
+      "#635016",
+      "#E7D699"
     ],
     "amber-bg": [
-      "#FBF1D4",
-      "#2E2612"
+      "#EAE0BA",
+      "#403D28"
     ],
     "success": [
-      "#146632",
-      "#6FD89C"
+      "#354D32",
+      "#CEDDB6"
     ],
     "success-bg": [
-      "#E3F5E9",
-      "#122B1E"
+      "#DFE4CC",
+      "#303F31"
     ],
     "info-bg": [
-      "#E8EFFA",
-      "#162238"
+      "#DCE2DD",
+      "#2D3B42"
     ],
     "sidebar-bg": [
-      "#EDF1F6",
-      "#080B10"
+      "#D2CEBF",
+      "#1C2226"
     ],
     "sidebar-text": [
-      "#334155",
-      "#9AA6BA"
+      "#303A35",
+      "#E6E5D8"
     ],
     "sidebar-active": [
-      "#E2E8F0",
-      "#19202E"
+      "#E2CD8F",
+      "#D0AE53"
     ],
     "hero-bg": [
-      "#FFFFFF",
-      "#111620"
+      "#EEE7D6",
+      "#242B30"
     ],
     "window-bar": [
-      "#EDF1F6",
-      "#19202E"
+      "#DED8C8",
+      "#303A40"
     ],
     "window-bar-end": [
-      "#E2E8F0",
-      "#1E2636"
+      "#C8C1AE",
+      "#242B30"
     ],
     "paper": [
-      "#FFFFFF",
-      "#FFFFFF"
+      "#F5F0E4",
+      "#F5F0E4"
     ],
     "paper-text": [
-      "#111827",
-      "#111827"
+      "#191D20",
+      "#191D20"
     ],
     "paper-muted": [
-      "#4B5565",
-      "#4B5565"
+      "#414944",
+      "#414944"
     ],
     "grid-line": [
-      "#E2E8F0",
-      "#1E2636"
+      "#B3B1A2",
+      "#58625E"
     ],
     "terminal-bg": [
-      "#090C12",
-      "#090C12"
+      "#1C2226",
+      "#1C2226"
     ],
     "terminal-text": [
-      "#E6ECF5",
-      "#E6ECF5"
+      "#F4EEDF",
+      "#F4EEDF"
     ],
     "ink-black": [
-      "#080B10",
-      "#080B10"
+      "#101416",
+      "#101416"
     ],
     "border-ink": [
-      "#CBD5E1",
-      "#1E2636"
+      "#252A26",
+      "#111516"
     ],
     "bg-stone": [
-      "#E2E8F0",
-      "#19202E"
+      "#C8C1AE",
+      "#303A40"
     ],
     "border-rim": [
-      "#CBD5E1",
-      "#263042"
+      "#444941",
+      "#879087"
     ],
     "cobalt-highlight": [
-      "#1854B8",
-      "#589BFF"
+      "#5D491C",
+      "#D5B663"
     ],
     "pulp-paper": [
-      "#FFFFFF",
-      "#FFFFFF"
+      "#F5F0E4",
+      "#F5F0E4"
     ],
     "pulp-aged": [
-      "#EDF1F6",
-      "#EDF1F6"
+      "#DED8C8",
+      "#DED8C8"
     ],
     "caption-yellow": [
-      "#1854B8",
-      "#589BFF"
+      "#D0AE53",
+      "#D0AE53"
     ],
     "severity-critical": [
-      "#C81E2B",
-      "#E5484D"
+      "#8B3029",
+      "#8B3029"
     ],
     "severity-high": [
-      "#C2410C",
-      "#F76B15"
+      "#8E5128",
+      "#8E5128"
     ],
     "severity-medium": [
-      "#A16207",
-      "#F5A623"
+      "#D0AE53",
+      "#D0AE53"
     ],
     "severity-low": [
-      "#1854B8",
-      "#589BFF"
+      "#45606A",
+      "#45606A"
     ],
     "status-resolved": [
-      "#15803D",
-      "#4CC38A"
+      "#4E6045",
+      "#4E6045"
     ],
     "white": [
       "#FFFFFF",
       "#FFFFFF"
     ],
     "text-muted": [
-      "#64748B",
-      "#7E8B9F"
+      "#414944",
+      "#CFD0C3"
     ],
     "halftone": [
-      "transparent",
-      "transparent"
+      "#292D251C",
+      "#D6D4C20C"
     ],
     "hatch": [
-      "transparent",
-      "transparent"
+      "#292D2524",
+      "#D6D4C212"
     ],
     "spotlight": [
       "transparent",
       "transparent"
     ],
     "cobalt-wash": [
-      "#1854B814",
-      "#589BFF1A"
+      "#D0AE5320",
+      "#D0AE5320"
     ],
     "critical-wash": [
-      "#C81E2B12",
-      "#E5484D1C"
+      "#8B30291C",
+      "#8B30292B"
     ],
     "transparent": [
       "transparent",
@@ -257,54 +257,55 @@
     64
   ],
   "radius": {
-    "6": 6,
-    "8": 8,
-    "12": 12,
-    "16": 16
+    "6": 2,
+    "8": 3,
+    "12": 4,
+    "16": 6
   },
   "typography": {
     "ar": {
-      "family": "IBM Plex Sans Arabic",
+      "family": "Cairo",
       "weights": [
-        400,
-        700
+        600,
+        700,
+        900
       ],
-      "lineHeight": 1.65,
+      "lineHeight": 1.7,
       "tracking": 0
     },
     "en": {
       "family": "IBM Plex Sans",
       "weights": [
-        400,
         500,
-        600
+        600,
+        700
       ],
-      "lineHeight": 1.5,
+      "lineHeight": 1.55,
       "tracking": 0
     },
     "scale": {
-      "caption": 12,
-      "label": 13,
-      "body": 14,
+      "caption": 14,
+      "label": 14,
+      "body": 15,
       "lead": 18,
-      "h3": 16,
+      "h3": 18,
       "h2": 24,
-      "h1": 36,
-      "display": 52
+      "h1": 30,
+      "display": 40
     },
     "display": {
-      "en": "IBM Plex Sans",
-      "ar": "IBM Plex Sans Arabic"
+      "ar": "Cairo",
+      "en": "Bangers"
     },
     "voice": {
-      "en": "IBM Plex Sans",
-      "ar": "IBM Plex Sans Arabic"
+      "ar": "Cairo",
+      "en": "IBM Plex Sans"
     },
     "mono": "JetBrains Mono"
   },
   "visualReference": {
-    "type": "SOCify Tactical Workbench V6 — Swiss Security Instrument System",
-    "description": "Calm ink-slate neutral surfaces, precision 4px spacing scale, single tactical cobalt accent, semantic severity tokens, and JetBrains Mono tabular telemetry."
+    "type": "SOCify Ink & Stone",
+    "description": "Hand-inked contours, crosshatching, restrained print halftones, aged brass, graphite and mineral pigments. Bold compact bilingual typography; decoration never reduces evidence readability."
   },
   "aliases": {
     "bg-canvas": "bg",
@@ -320,28 +321,38 @@
     "accent-info": "severity-low"
   },
   "css": {
-    "font-ar": "\"IBM Plex Sans Arabic\"",
+    "font-ar": "\"Cairo\"",
     "font-en": "\"IBM Plex Sans\"",
     "font-ui": "var(--font-ar),var(--font-en),sans-serif",
     "font-body": "var(--font-ui)",
-    "font-display": "var(--font-ui)",
+    "font-display": "\"Cairo\",var(--font-en),sans-serif",
     "font-comic-voice": "var(--font-ui)",
     "font-mono": "\"JetBrains Mono\",monospace",
-    "font-display-en": "\"IBM Plex Sans\",var(--font-ar),sans-serif",
+    "font-display-en": "\"Bangers\",var(--font-ar),sans-serif",
     "font-voice-en": "\"IBM Plex Sans\",var(--font-ar),sans-serif",
-    "radius": "12px",
+    "radius": "3px",
     "sidebar-width": "248px",
-    "header-height": "60px",
+    "header-height": "72px",
     "panel-gutter": "16px",
-    "ink-shadow": "none",
-    "control-shadow": "none",
-    "hero-shadow": "none",
+    "ink-shadow": "5px 5px 0 var(--ink-black)",
+    "control-shadow": "3px 3px 0 var(--ink-black)",
+    "hero-shadow": "8px 8px 0 var(--ink-black)",
     "text-shadow": "none",
     "panel-inset": "none",
     "motion-fast": "140ms",
     "ease-out": "cubic-bezier(0.22, 1, 0.36, 1)"
   },
   "fonts": [
+    {
+      "family": "Cairo",
+      "file": "Cairo.woff2",
+      "weight": "200 1000"
+    },
+    {
+      "family": "Bangers",
+      "file": "Bangers-Regular.woff2",
+      "weight": "400"
+    },
     {
       "family": "IBM Plex Sans",
       "file": "IBMPlexSans.woff2",

@@ -3,9 +3,9 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="theme-color" content="#0B0E14">
+  <meta name="theme-color" content="#15191C">
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand-mark.svg') }}">
-  <link rel="preload" href="{{ url_for('static', filename='fonts/IBMPlexSansArabic-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{{ url_for('static', filename='fonts/Cairo.woff2') }}" as="font" type="font/woff2" crossorigin>
   <script src="{{ url_for('static', filename='localization.js') }}"></script>
   <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
@@ -65,18 +65,25 @@
       <a data-section="team" href="/team" data-ui-copy>{{ nav_icon("team") }}الفريق والمهام</a>
       {% endif %}
     </nav>
-    <div class="sidebar-foot"><strong translate="no">SOC / V6 · Tactical</strong><span data-ui-copy>{{ 'فرز سريع · كشف مدمج · فحص آمن' if operational else 'فرز السجلات والفحص السريع والتقارير' }}</span></div>
   </aside>
   <div class="app-main">
     <header class="topbar">
       <button id="menu-toggle" aria-controls="workspace-navigation" class="icon-button" type="button" aria-label="فتح القائمة" aria-expanded="false" data-ui-attributes><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
-      <span aria-label="{{ product_name }}" class="brand topbar-brand" translate="no">{{ brand_mark() }}<span class="brand-wordmark" lang="en" dir="ltr">SOCify<span class="brand-stamp" aria-hidden="true">SOC / V6</span></span></span>
-      {% if operational %}<div class="investigation-context" data-investigation-context></div>{% endif %}
+      <span aria-label="{{ product_name }}" class="brand topbar-brand" translate="no">{{ brand_mark() }}<span class="brand-wordmark" lang="en" dir="ltr">SOCify</span></span>
       <div class="section-context sr-only"><p id="section-kicker" class="eyebrow">Incident investigation</p><h1 id="section-title" data-ui-copy>مركز العمليات</h1></div>
       <div class="appearance-tools"><div data-theme-control></div><button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button></div>
-      <div class="user-menu"><span><strong>{{ user.name }}</strong><small><span data-user-role>{{ user.role }}</span> · {{ user.team or '—' }}</small></span><a class="avatar" href="/profile" aria-label="الملف الشخصي" data-ui-attributes>{{ user.name[:1] }}</a><button type="button" class="icon-button" data-account-switch aria-label="تبديل الحساب" title="تبديل الحساب" data-ui-attributes><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h14l-4-4M17 17H3l4 4M21 7l-4 4M3 17l4-4"/></svg></button><form method="post" action="{{ url_for('auth.logout_page') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button ghost compact" type="submit" data-ui-copy>خروج</button></form></div>
+      <details class="account-menu">
+        <summary class="avatar" aria-label="الحساب" data-ui-attributes>{{ user.name[:1] }}</summary>
+        <div class="account-popover">
+          <strong>{{ user.name }}</strong>
+          <a class="button ghost" href="/profile" data-ui-copy>الملف الشخصي</a>
+          <button type="button" class="button ghost" data-account-switch data-ui-copy>تبديل الحساب</button>
+          <form method="post" action="{{ url_for('auth.logout_page') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button ghost full" type="submit" data-ui-copy>خروج</button></form>
+        </div>
+      </details>
     </header>
     <div id="global-message" class="global-message" role="status" aria-live="polite" hidden></div>
+    {% if operational %}<div class="investigation-context" data-investigation-context hidden></div>{% endif %}
     <main id="workspace" tabindex="-1" aria-busy="true"><div class="loading"><span></span><p data-ui-copy>جارٍ تحميل البيانات المصرّح بها…</p></div></main>
   </div>
 </body>

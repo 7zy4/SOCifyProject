@@ -10,6 +10,7 @@ window.SOCifyV4 = (() => {
     const active = selection.items.find(item => item.id === current) || selection.items[0];
     const header = document.querySelector("[data-investigation-context]");
     if (header) {
+      header.hidden = !selection.required;
       header.replaceChildren(node("span", {class:"scope-caption",text:t("نطاق التحقيق")}));
       if (selection.items.length) {
         const control = node("select", {"aria-label":t("القضية النشطة")}, selection.items.map(item => node("option", {value:item.id,selected:item.id === active.id,text:`${item.reference} · ${item.title}`})));

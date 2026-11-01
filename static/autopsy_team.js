@@ -4,7 +4,7 @@ window.SOCifyAutopsy.team = async () => {
   begin("team");
   const data = await api("/api/team");
   autopsy.team = data;
-  const root = node("div", {}, pageHead(SOCifyLocale.text("فريق التحقيق الداخلي"), SOCifyLocale.text("دعوات مرتبطة بالبريد، وصلاحيات الأدوار، وإسناد دفعات السجلات داخل قضاياها.")));
+  const root = node("div", {}, pageHead(SOCifyLocale.text("فريق التحقيق الداخلي"), null));
   root.append(panel(SOCifyLocale.text("أعضاء الفريق"), table([{ label: SOCifyLocale.text("الاسم"), value: "name" }, { label: SOCifyLocale.text("البريد"), value: "email" }, { label: SOCifyLocale.text("الدور"), value: (row) => autopsyLabel(row.role) }, { label: SOCifyLocale.text("الحالة"), value: (row) => row.is_active ? SOCifyLocale.text("نشط") : SOCifyLocale.text("موقوف") }, { label: SOCifyLocale.text("إدارة"), value: (row) => data.can_manage && row.is_active && row.role !== "admin" ? button(SOCifyLocale.text("إدارة العضو"), () => {
     const roleForm = autopsyForm({ role: { required: true, choices: data.roles.map((role) => role.role) } }, async (body) => { await api(`/api/team/members/${row.id}`, { method: "PATCH", body }); dialog.close(); await window.SOCifyAutopsy.team(); }, row);
     const handoff = autopsyForm({ handoff_to: { user: true }, reason: { required: true, max: 1000 } }, async (body) => { await api(`/api/team/members/${row.id}/deactivate`, { method: "POST", body }); dialog.close(); await window.SOCifyAutopsy.team(); });

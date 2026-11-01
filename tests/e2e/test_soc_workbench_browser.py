@@ -43,7 +43,7 @@ def test_soc_triage_case_tools_email_and_immediate_report_permissions(app, datab
             page.goto(base + "/monitoring")
             expect(page.locator("[data-alert-row]")).to_have_count(25)
             assert page.locator(".desktop-window,.desktop-taskbar,.case-folder-grid").count() == 0
-            page.locator("[data-theme-select]").select_option("dark")
+            page.locator('[data-theme-option="dark"]').click()
             page.screenshot(path=str(output / "monitoring-en-dark.png"), full_page=False)
             assert_accessible(page)
             expand = page.locator(".row-expand").first
@@ -85,12 +85,12 @@ def test_soc_triage_case_tools_email_and_immediate_report_permissions(app, datab
             report = database.execute("SELECT payload FROM autopsy_reports WHERE case_id=?", (case["id"],)).fetchone()[0]
             assert "v6_email_static_triage" in report
             assert database.execute("SELECT COUNT(*) FROM autopsy_reports WHERE case_id=?", (case["id"],)).fetchone()[0] == 1
-            page.locator("[data-theme-select]").select_option("light")
+            page.locator('[data-theme-option="light"]').click()
             page.goto(base + "/monitoring")
             page.screenshot(path=str(output / "monitoring-en-light.png"), full_page=False)
             page.locator("[data-language-toggle]").click()
             page.wait_for_function("() => document.documentElement.lang === 'ar' && document.querySelector('#workspace').getAttribute('aria-busy') === 'false'")
-            page.locator("[data-theme-select]").select_option("dark")
+            page.locator('[data-theme-option="dark"]').click()
             assert_accessible(page)
             page.screenshot(path=str(output / "monitoring-ar-dark.png"), full_page=False)
             page.set_viewport_size({"width": 390, "height": 844})
@@ -106,6 +106,7 @@ def test_soc_triage_case_tools_email_and_immediate_report_permissions(app, datab
                 "INSERT INTO autopsy_case_members(case_id,user_id,responsibility,assigned_by,assigned_at) VALUES (?,?,'reviewer',?,'2026-10-27T00:00:00Z')",
                 (case["id"], user_ids["auditor"], user_ids["soc_manager"]),
             )
+            page.locator(".account-menu summary").click()
             page.get_by_role("button", name="خروج", exact=True).click()
             page.wait_for_url("**/login")
             page.get_by_label("البريد الإلكتروني", exact=True).fill("auditor@socify.local")

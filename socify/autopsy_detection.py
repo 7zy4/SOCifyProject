@@ -38,7 +38,7 @@ def builtin_rules_list():
     rows = (
         get_db()
         .execute(
-            "SELECT id, name, description, version, is_active, deployment_state, action_value, match_count, last_triggered_at FROM rules WHERE workspace_id = ? AND archived_at IS NULL AND name LIKE '[SOCify V6]%' ORDER BY id",
+            "SELECT id, name, description, version, is_active, deployment_state, action_value, match_count, last_triggered_at FROM rules WHERE workspace_id = ? AND archived_at IS NULL AND name LIKE '[SOCify]%' ORDER BY id",
             (workspace_id(),),
         )
         .fetchall()

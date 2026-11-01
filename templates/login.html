@@ -3,9 +3,9 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="theme-color" content="#0B0E14">
+  <meta name="theme-color" content="#15191C">
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand-mark.svg') }}">
-  <link rel="preload" href="{{ url_for('static', filename='fonts/IBMPlexSansArabic-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{{ url_for('static', filename='fonts/Cairo.woff2') }}" as="font" type="font/woff2" crossorigin>
   <script src="{{ url_for('static', filename='localization.js') }}"></script>
   <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
@@ -18,38 +18,22 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='comic-workspace.css') }}">
 </head>
 <body class="auth-shell">
-  <div class="appearance-tools auth-tools"><div data-theme-control></div><button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button></div>
   <a class="skip-link" href="#auth-form" data-ui-copy>انتقل إلى النموذج</a>
-  <main class="auth-layout">
-    <section class="auth-panel" aria-labelledby="auth-title">
-      <a class="brand" translate="no" href="{{ url_for('ui.index') }}">{{ brand_mark() }}<span class="brand-wordmark" lang="en" dir="ltr">SOCify<span class="brand-stamp" aria-hidden="true">SOC / V6</span></span></a>
-      <div class="auth-copy">
-        <p class="eyebrow" data-ui-copy>{{ 'السكين السويسرية لمحلل العمليات الأمنية' if operational else 'مساحة التحقيق الأمني' }}</p>
-        <h1 id="auth-title" data-ui-copy>من اللوقز والمرفقات إلى تقرير فوري</h1>
-        <p data-ui-copy>{{ 'مساحة فرز وتحقيق سريع للسجلات والمرفقات وقوائم المراقبة وإصدار التقارير الفورية. استخدم حساب فريقك المصرح به.' if operational else 'سجّل دخولك للوصول إلى مساحة التحقيق المصرّح بها. كل محاولة دخول مسجلة ومحدودة المعدّل.' }}</p>
-      </div>
-      <div class="auth-telemetry" aria-hidden="true">
-        <div class="telemetry-row"><span class="mono" dir="ltr">SIEM + Rules</span><span class="telemetry-detail" data-ui-copy>قواعد كشف مدمجة تعمل فور دخول السجلات</span></div>
-        <div class="telemetry-row"><span class="mono" dir="ltr">Static .eml / PE</span><span class="telemetry-detail" data-ui-copy>فحص ساكن آمن للملفات ومرفقات البريد بضغطة زر</span></div>
-        <div class="telemetry-row"><span class="mono" dir="ltr">A4 Report</span><span class="telemetry-detail" data-ui-copy>قوائم مراقبة للإيميلات والـ IPs المشبوهة وتقرير منسدل فوري</span></div>
-      </div>
-      <ol class="auth-flow" aria-hidden="true"><li data-ui-copy>الأدلة</li><li data-ui-copy>التحقيق</li><li data-ui-copy>التقارير</li></ol>
-      <p class="auth-assurance" data-ui-copy>جلسات محمية · MFA متاح · Default deny</p>
-    </section>
-    <section class="auth-card">
+  <main class="auth-layout auth-focused">
+    <a class="brand auth-logo" translate="no" href="{{ url_for('ui.index') }}">{{ brand_mark() }}<span class="brand-wordmark" lang="en" dir="ltr">SOCify</span></a>
+    <section class="auth-card" aria-labelledby="auth-title">
+      <nav class="auth-tabs" aria-label="الحساب" data-ui-attributes><a href="{{ url_for('auth.login_page') }}" aria-current="page" data-ui-copy>تسجيل الدخول</a><a href="{{ url_for('auth.register_page') }}" data-ui-copy>حساب جديد</a></nav>
       <form id="auth-form" method="post" action="{{ url_for('auth.login_form') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <header><p class="eyebrow" data-ui-copy>دخول آمن</p><h2 data-ui-copy>بيانات الحساب</h2></header>
+        <h1 id="auth-title" class="sr-only" data-ui-copy>تسجيل الدخول</h1>
         {% if csrf_error %}<div class="notice" role="alert">{{ csrf_error }}<p dir="ltr">CSRF: {{ csrf_reason }} · {{ csrf_correlation_id }}</p></div>{% endif %}
         {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="notice {{ category }}" role="alert" data-ui-copy>{{ message }}</div>{% endfor %}{% endwith %}
         <label for="email" data-ui-copy>البريد الإلكتروني</label>
-        <input id="email" name="email" type="email" autocomplete="username" required maxlength="254" spellcheck="false">
+        <input id="email" name="email" type="email" autocomplete="username" required maxlength="254" spellcheck="false" dir="ltr">
         <label for="password" data-ui-copy>كلمة المرور</label>
         <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="128">
-        <label for="mfa_code" data-ui-copy>رمز MFA أو الاسترداد <small>اختياري إن لم يكن مفعّلًا</small></label>
-        <input id="mfa_code" name="mfa_code" type="text" inputmode="text" spellcheck="false" autocomplete="one-time-code" maxlength="20">
+        <details class="auth-mfa" {% if request.args.get('mfa') == '1' %}open{% endif %}><summary data-ui-copy>رمز التحقق</summary><label for="mfa_code" data-ui-copy>رمز MFA أو الاسترداد</label><input id="mfa_code" name="mfa_code" type="text" inputmode="text" spellcheck="false" autocomplete="one-time-code" maxlength="20" dir="ltr"></details>
         <button class="button primary full" type="submit" data-ui-copy>دخول إلى المنصة</button>
-        <p class="form-foot" data-ui-copy>{{ 'لديك دعوة من مدير الفريق؟' if operational else 'لا تملك حسابًا؟' }} <a href="{{ url_for('auth.register_page') }}">انضم إلى الفريق</a></p>
       </form>
     </section>
   </main>

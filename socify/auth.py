@@ -215,6 +215,8 @@ def login_form():
         }
         body = response[0].get_json(silent=True) or {}
         flash(messages.get(body.get("error", {}).get("code"), "تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور."), "error")
+        if body.get("error", {}).get("code") in {"MFA_REQUIRED", "INVALID_MFA_CODE"}:
+            return redirect(url_for("auth.login_page", mfa=1))
         return redirect(url_for("auth.login_page"))
     return redirect("/dashboard")
 

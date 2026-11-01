@@ -116,6 +116,7 @@ def test_v4_real_demo_scope_review_roles_and_visual_matrix(tmp_path):
             page.locator("textarea[name=review_reason]").fill("مراجعة المدير اكتملت؛ اعتماد طلب التجربة")
             page.get_by_role("button", name="حفظ قرار المدير", exact=True).click()
             page.get_by_role("button", name="بدء التحقيق في هذه القضية", exact=True).wait_for()
+            page.locator(".account-menu summary").click()
             page.locator("[data-account-switch]").click()
             page.get_by_role("dialog").get_by_role("button", name="عمر · محلل التجربة · محلل L1", exact=True).click()
             page.wait_for_url("**/cases")
@@ -127,6 +128,7 @@ def test_v4_real_demo_scope_review_roles_and_visual_matrix(tmp_path):
             assert page.locator("body").inner_text().find("CASE_NOT_FOUND") >= 0
             page.goto(root + "/cases")
             loaded()
+            page.locator(".account-menu summary").click()
             page.locator("[data-account-switch]").click()
             page.get_by_role("dialog").get_by_role("button", name="سلمان · مراجع التجربة · مراجع", exact=True).click()
             page.wait_for_url("**/cases")

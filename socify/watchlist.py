@@ -135,7 +135,7 @@ def _ensure_watchlist_rule_id(connection: sqlite3.Connection, ws_id: int, fallba
     rule_id = inserted_id(cursor)
     connection.execute(
         """INSERT INTO rule_versions (rule_id, version, dsl_json, action_json, change_summary, created_by, created_at)
-           VALUES (?, 1, ?, ?, 'Seed SOCify V6 Watchlist correlation sentinel rule', ?, ?)""",
+           VALUES (?, 1, ?, ?, 'Seed SOCify Watchlist correlation sentinel rule', ?, ?)""",
         (rule_id, json.dumps(dsl), json.dumps(action), creator, now),
     )
     return rule_id

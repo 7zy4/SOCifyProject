@@ -3,6 +3,20 @@ import json
 from socify.schema import ensure_schema
 
 
+def test_builtin_brand_refresh_preserves_rule_identity_and_history(database):
+    from socify.builtin_rules import BUILTIN_RULES, seed_builtin_rules
+
+    name = BUILTIN_RULES[0]["name"]
+    before = dict(database.execute("SELECT * FROM rules WHERE workspace_id = 1 AND name = ?", (name,)).fetchone())
+    history = [dict(row) for row in database.execute("SELECT * FROM rule_versions WHERE rule_id = ?", (before["id"],))]
+    legacy_name = name.replace("[SOCify]", "[SOCify V6]", 1)
+    database.execute("UPDATE rules SET name = ? WHERE id = ?", (legacy_name, before["id"]))
+    assert seed_builtin_rules(database) == 0
+    assert dict(database.execute("SELECT * FROM rules WHERE id = ?", (before["id"],)).fetchone()) == before
+    assert [dict(row) for row in database.execute("SELECT * FROM rule_versions WHERE rule_id = ?", (before["id"],))] == history
+    assert seed_builtin_rules(database) == 0
+
+
 def test_builtin_rules_auto_seeded_into_every_workspace(app, client, database, login_as):
     app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
     new_ws = database.execute(
@@ -12,7 +26,7 @@ def test_builtin_rules_auto_seeded_into_every_workspace(app, client, database, l
 
     for ws_id in (1, new_ws):
         count = database.execute(
-            "SELECT COUNT(*) FROM rules WHERE workspace_id = ? AND is_active = 1 AND name LIKE '[SOCify V6]%'",
+            "SELECT COUNT(*) FROM rules WHERE workspace_id = ? AND is_active = 1 AND name LIKE '[SOCify]%'",
             (ws_id,),
         ).fetchone()[0]
         assert count >= 16, f"Expected >=16 built-in V6 rules in workspace {ws_id}, got {count}"
