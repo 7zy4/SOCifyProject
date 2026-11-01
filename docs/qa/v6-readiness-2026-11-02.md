@@ -25,8 +25,10 @@ Kept the existing IBM Plex/JetBrains fonts, neutral surfaces, cobalt accent, fea
 - Corrected `high_risk` static-triage results using the low-severity report colour. The existing report workflow test now checks the high-severity badge.
 - Corrected optional-value narrowing in SIEM ingestion and formatted the files rejected by the repository's formatter.
 - Restricted the escalated-report inbox to cases visible to the current user, preventing disclosure of other investigators' case summaries.
+- Editing or resubmitting a quick report clears its prior manager acknowledgement, so revised content cannot display an approval of an earlier version.
+- Restored the established PDF print margins after the long bilingual fixture exposed text inside the minimum safe margin.
 - Updated container/performance acceptance for V6 direct case creation, retained explicit approval/selection in the V4 demo, and aligned browser/font assertions with the current interface.
-- Removed two obsolete synthetic-fixture entries from the secret baseline; no new secrets were accepted into the baseline.
+- Refreshed the location of an existing synthetic-file hash in the secret baseline against the Linux scan; no new secrets were accepted into the baseline.
 
 ## Local verification
 

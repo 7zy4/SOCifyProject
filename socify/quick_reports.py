@@ -325,7 +325,8 @@ def save_quick_report(case_id: int):
         if prior:
             next_status = prior["status"] if prior["status"] == "escalated" else "draft"
             get_db().execute(
-                "UPDATE case_quick_reports SET answers_json = ?, executive_note = ?, status = ?, prepared_by = ?, updated_at = ? WHERE case_id = ?",
+                """UPDATE case_quick_reports SET answers_json = ?, executive_note = ?, status = ?, prepared_by = ?, updated_at = ?,
+                   acknowledged_by = NULL, acknowledged_at = NULL, manager_decision = NULL, manager_comment = '' WHERE case_id = ?""",
                 (json.dumps(answers, ensure_ascii=False), note, next_status, user_id, now, case_id),
             )
         else:
@@ -369,7 +370,8 @@ def escalate_quick_report(case_id: int):
             if existing:
                 get_db().execute(
                     """UPDATE case_quick_reports
-                       SET answers_json = ?, executive_note = ?, status = 'escalated', prepared_by = ?, escalated_by = ?, escalated_at = ?, updated_at = ?
+                       SET answers_json = ?, executive_note = ?, status = 'escalated', prepared_by = ?, escalated_by = ?, escalated_at = ?, updated_at = ?,
+                           acknowledged_by = NULL, acknowledged_at = NULL, manager_decision = NULL, manager_comment = ''
                        WHERE case_id = ?""",
                     (json.dumps(answers, ensure_ascii=False), note, user_id, user_id, now, now, case_id),
                 )
@@ -384,7 +386,8 @@ def escalate_quick_report(case_id: int):
             if not existing:
                 return error_response("QUICK_REPORT_MISSING", "احفظ إجابات التقرير المنسدلة أولًا قبل التصعيد للمدير", 422)
             get_db().execute(
-                "UPDATE case_quick_reports SET status = 'escalated', escalated_by = ?, escalated_at = ?, updated_at = ? WHERE case_id = ?",
+                """UPDATE case_quick_reports SET status = 'escalated', escalated_by = ?, escalated_at = ?, updated_at = ?,
+                   acknowledged_by = NULL, acknowledged_at = NULL, manager_decision = NULL, manager_comment = '' WHERE case_id = ?""",
                 (user_id, now, now, case_id),
             )
 

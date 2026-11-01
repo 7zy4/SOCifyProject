@@ -47,7 +47,15 @@ def test_report_validation_and_manager_decision(case_base, client, login_as, dat
     assert client.get(case_base).json["status"] == "resolved"
     printed = client.get(case_base.replace("/api", "") + "/quick-report/print").get_data(as_text=True)
     assert "Reviewed retained evidence" in printed
-    assert client.put(path, json={"answers": DEFAULT_ANSWERS}).json["report"]["status"] == "draft"
+    revised = client.put(path, json={"answers": DEFAULT_ANSWERS}).json["report"]
+    assert revised["status"] == "draft"
+    assert revised["manager_decision"] is None and revised["acknowledged_at"] is None
+    assert "Reviewed retained evidence" not in client.get(case_base.replace("/api", "") + "/quick-report/print").get_data(as_text=True)
+    for payload in ({}, {"answers": DEFAULT_ANSWERS}):
+        assert client.post(path + "/acknowledge", json={"decision": "approved"}).status_code == 200
+        resubmitted = client.post(path + "/escalate", json=payload).json["report"]
+        assert resubmitted["status"] == "escalated"
+        assert resubmitted["manager_decision"] is None and resubmitted["acknowledged_by"] is None
     case_id = int(case_base.rsplit("/", 1)[1])
     database.execute("UPDATE incident_cases SET status='closed' WHERE id=?", (case_id,))
     assert client.put(path, json={"answers": DEFAULT_ANSWERS}).status_code == 409

@@ -1,4 +1,4 @@
-@page { size: 595pt 842pt; margin: 36pt 40pt; background: #FFFFFF; @bottom-right { content: counter(page); font: 400 10pt "IBM Plex Sans Arabic", "IBM Plex Sans", sans-serif; color: var(--paper-muted); } }
+@page { size: 595pt 842pt; margin: 42pt 44pt 40pt; background: #FFFFFF; @bottom-right { content: counter(page); font: 400 10pt "IBM Plex Sans Arabic", "IBM Plex Sans", sans-serif; color: var(--paper-muted); } }
 @page:first { @bottom-right { content: none; } }
 :root { color-scheme: light; font-synthesis: none; }
 * { box-sizing: border-box; }
