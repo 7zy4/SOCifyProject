@@ -1,3 +1,4 @@
+import contextlib
 import hashlib
 import json
 from datetime import UTC, datetime
@@ -279,3 +280,141 @@ def import_virustotal(case_id: int):
     except (ValueError, UnicodeError) as exc:
         return error_response("INVALID_REPUTATION_REPORT", str(exc), 422)
     return jsonify({"id": record, "payload": payload}), 201
+
+
+def quarantine_or_get_sample(case_id: int, original_name: str, content: bytes, source_tag: str = "quick_static_triage") -> tuple[int, int, str, bool]:
+    digest = hashlib.sha256(content).hexdigest()
+    safe_name = evidence_filename(original_name, content, "sample")
+    existing = get_db().execute("SELECT id, evidence_id FROM autopsy_samples WHERE case_id = ? AND sha256 = ?", (case_id, digest)).fetchone()
+    if existing:
+        return int(existing["id"]), int(existing["evidence_id"]), digest, True
+    evidence_id = inserted_id(
+        get_db().execute(
+            "INSERT INTO case_evidence(case_id, evidence_type, reference_id, title, sha256, provenance, added_by, added_at) VALUES (?, 'quarantined_sample', ?, ?, ?, ?, ?, ?)",
+            (
+                case_id,
+                digest,
+                safe_name,
+                digest,
+                canonical({"source": source_tag, "bytes": len(content), "download_route": "samples", "original_filename": original_name}),
+                actor_id(),
+                iso_now(),
+            ),
+        )
+    )
+    sample_id = inserted_id(
+        get_db().execute(
+            "INSERT INTO autopsy_samples(case_id, evidence_id, filename, sha256, size, ciphertext, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (case_id, evidence_id, safe_name, digest, len(content), cipher().encrypt(content), actor_id(), iso_now()),
+        )
+    )
+    custody(case_id, "sample_quarantined", {"sample_id": sample_id, "evidence_id": evidence_id, "sha256": digest, "bytes": len(content), "source": source_tag})
+    return sample_id, evidence_id, digest, False
+
+
+@autopsy_samples_api.post("/api/cases/<int:case_id>/quick-file-triage")
+@require_permission("evidence.add")
+def quick_file_triage(case_id: int):
+    from .autopsy_static_analysis import inspect_static_bytes
+
+    upload = request.files.get("file")
+    try:
+        if not upload:
+            raise ValueError("أرفق الملف المشتبه في حقل file")
+        original_name = text_value(upload.filename or "sample.bin", 255, True)
+        if any(char in original_name for char in ("/", "\\")):
+            raise ValueError("أرسل اسم ملف دون مسار")
+        maximum = min(int(current_app.config["MAX_CONTENT_LENGTH"]), 10 * 1024 * 1024)
+        content = upload.stream.read(maximum + 1)
+        if not content or len(content) > maximum:
+            raise ValueError("الملف فارغ أو يتجاوز الحد المسموح (10 MiB)")
+        yara_source = None
+        raw_pack_id = request.form.get("yara_pack_id")
+        case = _case_row(case_id)
+        if not case:
+            return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+        if case["status"] == "closed":
+            return error_response("CASE_CLOSED", "القضية مغلقة", 409)
+        if raw_pack_id:
+            pack = get_db().execute("SELECT rules FROM autopsy_yara_packs WHERE id = ? AND workspace_id = ?", (int(raw_pack_id), case["workspace_id"])).fetchone()
+            if pack:
+                yara_source = pack["rules"]
+        triage = inspect_static_bytes(original_name, content, upload.mimetype, yara_source=yara_source)
+    except ValueError as exc:
+        return error_response("INVALID_SAMPLE", str(exc), 422)
+
+    with transaction():
+        case = _case_row(case_id)
+        if not case:
+            return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+        if case["status"] == "closed":
+            return error_response("CASE_CLOSED", "القضية مغلقة", 409)
+        sample_id, evidence_id, digest, duplicate_sample = quarantine_or_get_sample(case_id, original_name, content, "v6_quick_file_triage")
+        payload = {
+            "title": f"Quick Static Triage · {original_name[:180]}",
+            "method": "v6_quick_static_triage",
+            "sample_id": sample_id,
+            "evidence_id": evidence_id,
+            **triage,
+        }
+        analysis_id = insert_record(case_id, "analysis", payload)
+        custody(
+            case_id,
+            "quick_static_triage_completed",
+            {"sample_id": sample_id, "analysis_id": analysis_id, "sha256": digest, "verdict": triage["verdict"], "risk_score": triage["risk_score"]},
+        )
+    return (
+        jsonify(
+            {
+                "id": analysis_id,
+                "analysis_id": analysis_id,
+                "sample_id": sample_id,
+                "evidence_id": evidence_id,
+                "duplicate_sample": duplicate_sample,
+                "triage": payload,
+            }
+        ),
+        201,
+    )
+
+
+@autopsy_samples_api.post("/api/cases/<int:case_id>/samples/<int:sample_id>/quick-triage")
+@require_permission("cases.update")
+def quick_triage_existing_sample(case_id: int, sample_id: int):
+    from .autopsy_static_analysis import inspect_static_bytes
+
+    case = _case_row(case_id)
+    if not case:
+        return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+    if case["status"] == "closed":
+        return error_response("CASE_CLOSED", "القضية مغلقة", 409)
+    row = get_db().execute("SELECT * FROM autopsy_samples WHERE case_id = ? AND id = ?", (case_id, sample_id)).fetchone()
+    if not row:
+        return error_response("SAMPLE_NOT_FOUND", "العينة غير متاحة", 404)
+    try:
+        content = cipher().decrypt(row["ciphertext"])
+        if hashlib.sha256(content).hexdigest() != row["sha256"]:
+            raise ValueError("Sample digest mismatch")
+    except (InvalidToken, ValueError):
+        return error_response("SAMPLE_INTEGRITY_FAILED", "تعذر التحقق من سلامة العينة", 409)
+    ev_row = get_db().execute("SELECT provenance FROM case_evidence WHERE id = ?", (row["evidence_id"],)).fetchone()
+    original_name = row["filename"]
+    if ev_row and ev_row["provenance"]:
+        with contextlib.suppress(json.JSONDecodeError):
+            original_name = json.loads(ev_row["provenance"]).get("original_filename") or original_name
+    triage = inspect_static_bytes(original_name, content)
+    with transaction():
+        payload = {
+            "title": f"Quick Static Triage · {original_name[:180]}",
+            "method": "v6_quick_static_triage",
+            "sample_id": sample_id,
+            "evidence_id": row["evidence_id"],
+            **triage,
+        }
+        analysis_id = insert_record(case_id, "analysis", payload)
+        custody(
+            case_id,
+            "quick_static_triage_completed",
+            {"sample_id": sample_id, "analysis_id": analysis_id, "sha256": row["sha256"], "verdict": triage["verdict"], "risk_score": triage["risk_score"]},
+        )
+    return jsonify({"id": analysis_id, "analysis_id": analysis_id, "sample_id": sample_id, "evidence_id": row["evidence_id"], "triage": payload}), 201

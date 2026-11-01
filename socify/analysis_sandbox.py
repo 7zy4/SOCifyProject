@@ -2,10 +2,25 @@ import ctypes
 import errno
 import json
 import os
-import resource
 import sys
 import sysconfig
 from pathlib import Path
+
+try:
+    import resource
+except ImportError:  # pragma: no cover - Windows compatibility stub
+    class _MissingResource:
+        RLIMIT_AS = 9
+        RLIMIT_CPU = 0
+        RLIMIT_FSIZE = 1
+        RLIMIT_NOFILE = 7
+        RLIMIT_NPROC = 6
+
+        @staticmethod
+        def setrlimit(*_args, **_kwargs):
+            raise OSError(errno.ENOSYS, "resource.setrlimit requires POSIX")
+
+    resource = _MissingResource()  # type: ignore[assignment]
 
 MAX_INPUT = 24 * 1024 * 1024
 MAX_OUTPUT = 20 * 1024 * 1024

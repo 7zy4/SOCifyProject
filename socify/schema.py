@@ -787,6 +787,8 @@ COLUMN_MIGRATIONS: dict[str, dict[str, str]] = {
         "rows_ingested": "INTEGER NOT NULL DEFAULT 0",
         "error_rate": "REAL NOT NULL DEFAULT 0",
         "updated_at": "TEXT",
+        "default_case_id": "INTEGER",
+        "ingest_token_hash": "TEXT",
     },
     "ingestion_jobs": {
         "evidence_ciphertext": "TEXT",
@@ -1071,8 +1073,14 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         _execute_schema(connection, INDEX_SCHEMA)
         migrate(connection)
         from .autopsy_workspace import migrate as migrate_workspace
+        from .builtin_rules import seed_builtin_rules
+        from .quick_reports import migrate as migrate_quick_reports
+        from .watchlist import migrate as migrate_watchlist
 
         migrate_workspace(connection)
+        migrate_watchlist(connection)
+        migrate_quick_reports(connection)
+        seed_builtin_rules(connection)
         connection.commit()
     except Exception:
         connection.rollback()

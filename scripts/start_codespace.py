@@ -3,8 +3,6 @@ import os
 import sys
 from pathlib import Path
 
-from gunicorn.app.wsgiapp import WSGIApplication
-
 from scripts.environment import load_environment
 
 
@@ -22,8 +20,14 @@ def main() -> None:
     from scripts.local_services import local_worker_services
     from socify import create_app
 
-    with local_worker_services(create_app().config):
-        WSGIApplication().run()
+    app = create_app()
+    with local_worker_services(app.config):
+        if sys.platform == "win32":
+            app.run(host=os.environ.get("SOCIFY_HOST", "127.0.0.1"), port=int(os.environ.get("SOCIFY_PORT", "5001")))
+        else:
+            from gunicorn.app.wsgiapp import WSGIApplication
+
+            WSGIApplication().run()
 
 
 if __name__ == "__main__":

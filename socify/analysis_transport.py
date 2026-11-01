@@ -40,10 +40,13 @@ def send(stream, payload, maximum):
     stream.sendall(struct.pack("!I", len(encoded)) + encoded)
 
 
+AF_UNIX = getattr(socket, "AF_UNIX", 1)
+
+
 def remote_artifacts(path, payload, operation, formats, timeout):
     try:
         for delay in (0.1, 0.2, 0.4, None):
-            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as stream:
+            with socket.socket(AF_UNIX, socket.SOCK_STREAM) as stream:
                 stream.settimeout(timeout + 5)
                 try:
                     stream.connect(path)

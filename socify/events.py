@@ -79,6 +79,7 @@ def normalize_event(data: dict[str, Any]) -> dict[str, Any]:
         "hostname": ("hostname", "host"),
         "process_name": ("process_name", "process"),
         "parent_process": ("parent_process", "parent_process_name"),
+        "command_line": ("command_line", "CommandLine", "cmd", "process_command_line"),
         "file_hash": ("file_hash", "sha256"),
         "http_status": ("http_status", "status_code"),
         "action": ("action",),
@@ -98,6 +99,8 @@ def normalize_event(data: dict[str, Any]) -> dict[str, Any]:
     for name in ("source_ip", "destination_ip", "username", "hostname", "process_name", "parent_process", "file_hash", "action", "outcome"):
         if extracted[name] is not None:
             extracted[name] = _string(str(extracted[name]), 512)
+    if extracted.get("command_line") is not None:
+        extracted["command_line"] = _string(str(extracted["command_line"]), 2048)
     if extracted["http_status"] is not None:
         try:
             extracted["http_status"] = int(extracted["http_status"])
@@ -239,7 +242,10 @@ def ingest_event(
         connection.execute("UPDATE security_events SET owner_case_id = ? WHERE id = ?", (case_id, event_id))
     if import_job_id is not None:
         connection.execute("UPDATE security_events SET import_job_id = ?, autopsy_active = ? WHERE id = ?", (import_job_id, int(is_active), event_id))
+    from .watchlist import evaluate_watchlist_for_event
+
     alerts = evaluate_rules(connection, event_id)
+    alerts.extend(evaluate_watchlist_for_event(connection, event_id))
     insert_outbox(
         connection, workspace, "event.created", {"id": event_id, "event_id": event_public_id, "severity": normalized["severity"], "alert_ids": alerts}
     )

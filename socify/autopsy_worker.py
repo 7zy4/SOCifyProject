@@ -26,7 +26,10 @@ def deny_network(*args, **kwargs):
 
 
 def read_artifact(path, maximum=20 * 1024 * 1024):
-    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    if sys.platform == "win32" and os.path.islink(path):
+        raise ValueError("Analysis output must be a bounded regular file")
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    descriptor = os.open(path, flags)
     with os.fdopen(descriptor, "rb") as content:
         metadata = os.fstat(content.fileno())
         if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1 or metadata.st_size > maximum:

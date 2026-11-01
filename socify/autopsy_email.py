@@ -3,6 +3,7 @@ import json
 import re
 from email import policy
 from email.parser import BytesParser
+from email.utils import parseaddr
 from html.parser import HTMLParser
 
 from cryptography.fernet import InvalidToken
@@ -201,7 +202,7 @@ def email_reviews(case_id: int):
     rows = (
         get_db()
         .execute(
-            "SELECT id,payload,created_at FROM autopsy_records WHERE case_id=? AND kind='analysis' AND json_extract(payload,'$.method')='eml_static_v1' AND id<? ORDER BY id DESC LIMIT 11",
+            "SELECT id,payload,created_at FROM autopsy_records WHERE case_id=? AND kind='analysis' AND json_extract(payload,'$.method') IN ('eml_static_v1', 'v6_email_static_triage') AND id<? ORDER BY id DESC LIMIT 11",
             (case_id, before),
         )
         .fetchall()
@@ -212,3 +213,211 @@ def email_reviews(case_id: int):
             "next_before": rows[9]["id"] if len(rows) > 10 else None,
         }
     )
+
+
+def _email_domain(addr: str) -> str:
+    return addr.rsplit("@", 1)[-1].strip().lower() if "@" in addr else ""
+
+
+def inspect_email_with_attachment_triage(content: bytes) -> dict:
+    from .autopsy_static_analysis import inspect_static_bytes
+
+    max_v6_eml = 5 * 1024 * 1024
+    if not content or len(content) > max_v6_eml:
+        raise ValueError("حجم رسالة EML يجب ألا يتجاوز 5MiB")
+    try:
+        message = BytesParser(policy=policy.default).parsebytes(content)
+    except RecursionError as exc:
+        raise ValueError("تداخل أجزاء MIME يتجاوز الحد المسموح") from exc
+    if not any(message.get(key) for key in ("From", "To", "Subject", "Message-ID")):
+        raise ValueError("الملف لا يحتوي رؤوس رسالة EML معروفة")
+    headers = {}
+    for key in ("From", "To", "Cc", "Reply-To", "Subject", "Date", "Message-ID", "Return-Path", "Authentication-Results", "Received-SPF"):
+        headers[key] = "\n".join(str(value) for value in message.get_all(key, []))[:4096]
+
+    sender_email = parseaddr(headers.get("From", ""))[1].strip().lower()
+    reply_to_email = parseaddr(headers.get("Reply-To", ""))[1].strip().lower()
+    return_path_email = parseaddr(headers.get("Return-Path", ""))[1].strip().lower()
+
+    header_flags: list[dict] = []
+    email_risk = 0
+
+    def add_header_flag(code: str, severity: str, points: int, detail: str) -> None:
+        nonlocal email_risk
+        if not any(f["code"] == code for f in header_flags):
+            header_flags.append({"code": code, "severity": severity, "detail": detail})
+            email_risk = min(100, email_risk + points)
+
+    sender_dom = _email_domain(sender_email)
+    reply_dom = _email_domain(reply_to_email)
+    return_dom = _email_domain(return_path_email)
+    if sender_dom and reply_dom and sender_dom != reply_dom:
+        add_header_flag("reply_to_domain_mismatch", "high", 35, f"نطاق Reply-To ({reply_dom}) يختلف عن نطاق المرسل From ({sender_dom}).")
+    if sender_dom and return_dom and sender_dom != return_dom:
+        add_header_flag("return_path_domain_mismatch", "medium", 20, f"نطاق Return-Path ({return_dom}) يختلف عن نطاق المرسل ({sender_dom}).")
+
+    auth_blob = f"{headers.get('Authentication-Results', '')}\n{headers.get('Received-SPF', '')}".lower()
+    if any(tok in auth_blob for tok in ("spf=fail", "spf=softfail", "dkim=fail", "dmarc=fail")):
+        add_header_flag("auth_failure_claimed", "high", 35, "رؤوس المصادقة تسجل فشل SPF أو DKIM أو DMARC.")
+
+    subj_lower = headers.get("Subject", "").lower()
+    if any(tok in subj_lower for tok in ("urgent", "wire", "invoice", "password", "suspended", "عاجل", "حوالة", "تحديث كلمة المرور")):
+        add_header_flag("urgent_lure_subject", "low", 10, "عنوان الرسالة يستخدم صياغة استعجال شائعة في التصيد.")
+
+    pending = [(message, 0)]
+    leaves = []
+    part_count, header_count, attachment_count = 0, 0, 0
+    while pending:
+        part, depth = pending.pop()
+        if depth > MAX_MIME_DEPTH:
+            raise ValueError("تداخل أجزاء MIME يتجاوز الحد المسموح")
+        part_count += 1
+        header_count += len(part.keys())
+        if part_count > MAX_MIME_PARTS or header_count > 200:
+            raise ValueError("عدد أجزاء MIME أو رؤوس الرسالة يتجاوز الحد المسموح")
+        is_attachment = (
+            bool(part.get_filename())
+            or part.get_content_disposition() == "attachment"
+            or (not part.is_multipart() and part.get_content_type() not in {"text/plain", "text/html"})
+        )
+        if is_attachment:
+            attachment_count += 1
+            if attachment_count > MAX_ATTACHMENTS:
+                raise ValueError("عدد المرفقات يتجاوز الحد المسموح")
+        if part.is_multipart():
+            children = part.get_payload()
+            if not isinstance(children, list):
+                raise ValueError("بنية MIME غير صالحة")
+            if len(children) + len(pending) + part_count > MAX_MIME_PARTS:
+                raise ValueError("عدد أجزاء MIME أو رؤوس الرسالة يتجاوز الحد المسموح")
+            pending.extend((child, depth + 1) for child in reversed(children))
+            continue
+        leaves.append((part, is_attachment))
+
+    attachments: list[dict] = []
+    plain, html_text, links = [], [], []
+    for part, is_attachment in leaves:
+        data = part.get_payload(decode=True) or b""
+        if not isinstance(data, bytes):
+            raise ValueError("محتوى جزء MIME ليس بيانات ثنائية صالحة")
+        raw_filename = str(part.get_filename() or "")
+        if is_attachment:
+            digest = hashlib.sha256(data).hexdigest()
+            triage = inspect_static_bytes(raw_filename or "attachment.bin", data, part.get_content_type()) if data else {
+                "filename": raw_filename or "empty.bin",
+                "size": 0,
+                "sha256": digest,
+                "verdict": "low_signal_static_only",
+                "risk_score": 0,
+                "flags": [],
+                "execution": "never executed",
+            }
+            email_risk = max(email_risk, min(100, email_risk // 2 + int(triage.get("risk_score", 0))))
+            attachments.append(
+                {
+                    "filename": evidence_filename(raw_filename, data, "attachment"),
+                    "original_filename": raw_filename or "attachment.bin",
+                    "content_type": part.get_content_type()[:100],
+                    "size": len(data),
+                    "sha256": digest,
+                    "triage": triage,
+                }
+            )
+            continue
+        try:
+            text = data.decode(part.get_content_charset() or "utf-8", errors="replace")
+        except LookupError:
+            text = data.decode("utf-8", errors="replace")
+        text = text[:65536]
+        if part.get_content_type() == "text/html":
+            parser = MailText()
+            parser.feed(text)
+            html_text.append("".join(parser.text))
+            links.extend(parser.links)
+        else:
+            plain.append(text)
+        links.extend(re.findall(r"https?://[^\s<>\"']+", text, re.I))
+
+    urls = list(dict.fromkeys(value.rstrip(".,);]")[:2048] for value in links))[:100]
+    if any("xn--" in u.lower() or re.match(r"^https?://(?:\d{1,3}\.){3}\d{1,3}", u) for u in urls):
+        add_header_flag("suspicious_url_host", "high", 30, "تحتوي الرسالة على رابط IP مباشر أو نطاق Punycode.")
+
+    email_verdict = "high_risk" if email_risk >= 65 else "suspicious" if email_risk >= 30 else "low_signal_static_only"
+    body = "\n".join(plain or html_text)
+    return {
+        "headers": headers,
+        "sender_email": sender_email or None,
+        "reply_to_email": reply_to_email or None,
+        "return_path_email": return_path_email or None,
+        "header_flags": header_flags,
+        "email_risk_score": email_risk,
+        "email_verdict": email_verdict,
+        "body": body[:16384],
+        "body_truncated": len(body) > 16384,
+        "urls": urls,
+        "attachments": attachments,
+        "mime_parts": part_count,
+        "execution": "never executed",
+        "limitations": LIMITATION,
+    }
+
+
+@autopsy_email_api.post("/api/cases/<int:case_id>/email-triage")
+@require_permission("evidence.add")
+def quick_email_triage(case_id: int):
+    from .autopsy_domain import custody, text_value
+    from .autopsy_samples import quarantine_or_get_sample
+
+    case = _case_row(case_id)
+    if not case:
+        return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+    if case["status"] == "closed":
+        return error_response("CASE_CLOSED", "القضية مغلقة", 409)
+
+    upload = request.files.get("file")
+    try:
+        if upload:
+            original_name = text_value(upload.filename or "message.eml", 255, True)
+            if any(ch in original_name for ch in ("/", "\\")):
+                raise ValueError("أرسل اسم ملف دون مسار")
+            content = upload.stream.read(5 * 1024 * 1024 + 1)
+        else:
+            body = request.get_json(silent=True) or {}
+            if not isinstance(body, dict) or not isinstance(body.get("raw_eml"), str):
+                raise ValueError("أرفق ملف .eml في حقل file أو أرسل raw_eml نصيًا")
+            original_name = text_value(str(body.get("filename") or "message.eml"), 255, True)
+            content = body["raw_eml"].encode("utf-8")
+        if not original_name.lower().endswith(".eml"):
+            original_name = f"{original_name}.eml"
+        parsed = inspect_email_with_attachment_triage(content)
+    except (ValueError, UnicodeError, RecursionError) as exc:
+        return error_response("INVALID_EMAIL_FILE", str(exc)[:200], 422)
+
+    with transaction():
+        case = _case_row(case_id)
+        if not case or not case_full_access(case_id):
+            return error_response("CASE_NOT_FOUND", "القضية غير متاحة ضمن النطاق الحالي", 404)
+        if case["status"] == "closed":
+            return error_response("CASE_CLOSED", "القضية مغلقة", 409)
+        sample_id, evidence_id, digest, duplicate_sample = quarantine_or_get_sample(case_id, original_name, content, "v6_email_static_triage")
+        payload = {
+            "title": parsed["headers"]["Subject"][:255] or original_name,
+            "method": "v6_email_static_triage",
+            "sample_id": sample_id,
+            "evidence_id": evidence_id,
+            "sha256": digest,
+            **parsed,
+        }
+        analysis_id = insert_record(case_id, "analysis", payload)
+        custody(
+            case_id,
+            "quick_email_triage_completed",
+            {
+                "sample_id": sample_id,
+                "analysis_id": analysis_id,
+                "sha256": digest,
+                "verdict": parsed["email_verdict"],
+                "attachments": len(parsed["attachments"]),
+            },
+        )
+    return jsonify({"id": analysis_id, "sample_id": sample_id, "evidence_id": evidence_id, "duplicate_sample": duplicate_sample, "payload": payload}), 201

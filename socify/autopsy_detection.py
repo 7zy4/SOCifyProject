@@ -29,6 +29,24 @@ def migrate(connection):
         )
 
 
+@autopsy_detection_api.get("/api/autopsy/detection/builtin-rules")
+@require_permission("cases.read")
+def builtin_rules_list():
+    from .builtin_rules import seed_builtin_rules
+
+    seed_builtin_rules(get_db())
+    rows = (
+        get_db()
+        .execute(
+            "SELECT id, name, description, version, is_active, deployment_state, action_value, match_count, last_triggered_at FROM rules WHERE workspace_id = ? AND archived_at IS NULL AND name LIKE '[SOCify V6]%' ORDER BY id",
+            (workspace_id(),),
+        )
+        .fetchall()
+    )
+    items = [{**dict(row), "action": json.loads(row["action_value"] or "{}")} for row in rows]
+    return jsonify({"items": items, "total": len(items)})
+
+
 @autopsy_detection_api.get("/api/autopsy/detection/capabilities")
 @require_permission("cases.read")
 def detection_capabilities():

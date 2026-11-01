@@ -3,7 +3,7 @@
 autopsyLabels.event_id = SOCifyLocale.text("السجل المعتمد كدليل");
 
 function autopsyImportForm(caseId) {
-  const file = node("input", { type: "file", name: "file", required: true, accept: ".csv,.json,.jsonl,.ndjson,.txt,.log,.xml,.evtx,.pcap,.pcapng" });
+  const file = node("input", { type: "file", name: "file", required: true, accept: ".csv,.json,.jsonl,.ndjson,.txt,.log,.xml,.evtx,.pcap,.pcapng,.cef" });
   const source = node("input", { name: "source_label", maxlength: 100, value: "file-import", required: true });
   const format = autopsySelect("format", autopsy.catalog.import_formats, "auto");
   const zone = autopsyChoice("source_timezone", autopsy.catalog.source_timezones, "UTC", true);
@@ -56,7 +56,18 @@ function autopsyImportForm(caseId) {
     } catch (error) { preview.replaceChildren(node("p", { class: "notice", role: "alert", text: error.message })); commit.disabled = true; }
     finally { previewButton.disabled = false; }
   }, "ghost");
-  form.append(node("div", { class: "action-row span-2" }, [previewButton, commit]), mappingView, preview);
+  const quickImportButton = button(SOCifyLocale.text("استيراد وفحص فوري"), async () => {
+    quickImportButton.disabled = true;
+    try {
+      await api(`/api/cases/${caseId}/imports`, { method: "POST", body: body() });
+      await autopsyCase(caseId);
+    } catch (error) {
+      preview.replaceChildren(node("p", { class: "notice", role: "alert", text: error.message }));
+    } finally {
+      quickImportButton.disabled = false;
+    }
+  }, "primary");
+  form.append(node("div", { class: "action-row span-2" }, [quickImportButton, previewButton, commit]), mappingView, preview);
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (confirmed !== identity()) return;
@@ -67,14 +78,80 @@ function autopsyImportForm(caseId) {
   return form;
 }
 
+function autopsySiemConnectorPanel(caseId, connectors) {
+  const body = node("div", { class: "panel-body" });
+  if (autopsy.current.can_update && autopsy.current.status !== "closed") {
+    const nameInput = node("input", { name: "name", required: true, maxlength: 100, placeholder: "Splunk HEC / Elastic / Syslog" });
+    const typeSelect = autopsySelect("type", ["http", "syslog", "cef", "windows", "linux", "web"], "http");
+    const endpointInput = node("input", { name: "endpoint", maxlength: 500, placeholder: "https://siem.example/api/events" });
+    const credInput = node("input", { type: "password", name: "credential", maxlength: 512, autocomplete: "off" });
+    const statusBox = node("div", { class: "span-2", "aria-live": "polite" });
+    const createBtn = node("button", { type: "submit", class: "button ghost", text: SOCifyLocale.text("إنشاء موصل SIEM مباشر") });
+    const form = node("form", { class: "form-grid", "aria-label": SOCifyLocale.text("ربط SIEM مباشر") }, [
+      field(SOCifyLocale.text("اسم مصدر SIEM"), nameInput),
+      field(SOCifyLocale.text("نوع الاتصال"), typeSelect),
+      field(SOCifyLocale.text("رابط السحب المباشر (اختياري)"), endpointInput),
+      field(SOCifyLocale.text("رمز المصادقة للسحب (اختياري)"), credInput),
+      node("div", { class: "action-row span-2" }, [createBtn]),
+      statusBox,
+    ]);
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      createBtn.disabled = true;
+      try {
+        const payload = { name: nameInput.value.trim(), type: typeSelect.value };
+        if (endpointInput.value.trim()) payload.endpoint = endpointInput.value.trim();
+        if (credInput.value.trim()) payload.credential = credInput.value.trim();
+        const created = await api(`/api/cases/${caseId}/siem-connectors`, { method: "POST", body: payload });
+        autopsyModal(SOCifyLocale.text("تم إنشاء موصل SIEM — انسخ مفتاح الإرسال لمرة واحدة"), node("div", {}, [
+          node("p", { text: SOCifyLocale.template`رابط الاستقبال: ${created.ingest_url}` }),
+          node("p", { text: SOCifyLocale.text("أرسل سجلات JSON / NDJSON / CEF / Syslog / Windows XML عبر الترويسة X-SOCify-Source-Key أو Authorization: Splunk <key>:") }),
+          node("pre", { text: `X-SOCify-Source-Key: ${created.ingest_key}` }),
+        ]));
+        await autopsyCase(caseId);
+      } catch (error) {
+        statusBox.replaceChildren(node("p", { class: "notice", role: "alert", text: error.message }));
+      } finally {
+        createBtn.disabled = false;
+      }
+    });
+    body.append(form);
+  }
+  const items = connectors?.items || [];
+  if (items.length) {
+    const cols = [
+      { label: SOCifyLocale.text("المصدر"), value: "name" },
+      { label: SOCifyLocale.text("النوع"), value: "type" },
+      { label: SOCifyLocale.text("السجلات المستقبلة"), value: "rows_ingested" },
+      { label: SOCifyLocale.text("نقطة الاستقبال"), value: (item) => `/api/sources/${item.id}/ingest` },
+      {
+        label: SOCifyLocale.text("سحب فوري"),
+        value: (item) => (item.endpoint && autopsy.current.can_update && autopsy.current.status !== "closed")
+          ? button(SOCifyLocale.text("سحب السجلات الآن"), async () => {
+              try {
+                await api(`/api/cases/${caseId}/siem-connectors/${item.id}/pull`, { method: "POST", body: {} });
+                await autopsyCase(caseId);
+              } catch (error) { handleError(error); }
+            }, "ghost")
+          : "Webhook",
+      },
+    ];
+    body.append(table(cols, items));
+  } else {
+    body.append(emptyState(SOCifyLocale.text("لا توجد موصلات SIEM مرتبطة"), SOCifyLocale.text("اربط Splunk HEC أو Elastic أو جامع CEF/Syslog لتوليد تنبيهات تلقائية فور وصول السجلات.")));
+  }
+  return panel(SOCifyLocale.text("ربط SIEM مباشر بالقضية"), body, Boolean(items.length));
+}
+
 async function autopsyLogsPanel(caseId) {
   const query = new URLSearchParams(window.location.search).get("q") || "";
   const page = Math.max(1, Number(new URLSearchParams(window.location.search).get("page")) || 1);
   const selectedJob = new URLSearchParams(window.location.search).get("job_id") || "";
   const jobFilter = selectedJob ? `&job_id=${encodeURIComponent(selectedJob)}` : "";
-  const [data, imports] = await Promise.all([api(`/api/cases/${caseId}/logs?q=${encodeURIComponent(query)}&page=${page}${jobFilter}`), api(`/api/cases/${caseId}/imports`)]);
+  const [data, imports, connectors] = await Promise.all([api(`/api/cases/${caseId}/logs?q=${encodeURIComponent(query)}&page=${page}${jobFilter}`), api(`/api/cases/${caseId}/imports`), api(`/api/cases/${caseId}/siem-connectors`).catch(() => ({ items: [] }))]);
   const root = node("div", { class: "case-content" });
   if (autopsy.current.can_update && autopsy.current.status !== "closed") root.append(panel(SOCifyLocale.text("استيراد مرتبط بالقضية"), node("div", { class: "panel-body" }, autopsyImportForm(caseId)), true));
+  root.append(autopsySiemConnectorPanel(caseId, connectors));
   const jobColumns = [{ label: SOCifyLocale.text("الملف"), value: (job) => job.original_filename || job.filename }, { label: SOCifyLocale.text("الحالة"), value: "status" }, { label: SOCifyLocale.text("مقبول"), value: "accepted" }, { label: SOCifyLocale.text("مرفوض"), value: "rejected" }, { label: SOCifyLocale.text("متكرر"), value: "skipped" }, { label: SOCifyLocale.text("الأصل"), value: (job) => permission("evidence.download") ? linkedButton(SOCifyLocale.text("تنزيل الأصل"), `/api/cases/${caseId}/imports/${job.id}/original`) : "—" }, { label: SOCifyLocale.text("التفاصيل"), value: (job) => button(SOCifyLocale.text("حالة الاستيراد"), async () => {
     try {
       const result = await api(`/api/cases/${caseId}/imports/${job.id}`);

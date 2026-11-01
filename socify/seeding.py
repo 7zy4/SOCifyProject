@@ -50,6 +50,9 @@ def _rule(connection: sqlite3.Connection, creator: int, name: str, description: 
 
 
 def _seed_rules(connection: sqlite3.Connection, creator: int) -> None:
+    from .builtin_rules import seed_builtin_rules
+
+    seed_builtin_rules(connection)
     _rule(
         connection,
         creator,

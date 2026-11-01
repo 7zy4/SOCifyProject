@@ -2,7 +2,6 @@
 
 import argparse
 import base64
-import fcntl
 import hashlib
 import json
 import os
@@ -14,6 +13,11 @@ import subprocess  # nosec B404
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows compatibility
+    fcntl = None  # type: ignore[assignment]
 
 from scripts.prepare_v4_demo import TEAM, provision
 from socify import create_app
@@ -173,7 +177,8 @@ def main(argv=None):
     os.environ["SOCIFY_PORT"] = str(args.port)
     lock = directory.with_name("." + directory.name + ".startup.lock")
     with lock.open("a") as guard:
-        fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if fcntl is not None:
+            fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
         try:
             ensure_analysis()
         except Exception:

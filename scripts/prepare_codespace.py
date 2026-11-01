@@ -13,16 +13,18 @@ def prepare(destination: Path = Path("instance/codespaces.env")) -> Path:
             "SOCIFY_CREDENTIAL_KEY": secrets.token_urlsafe(48),
         }
         # Publish a complete private file without replacing another startup's keys.
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=destination.parent, delete=False) as pending:
-            temporary = Path(pending.name)
-            try:
+        temporary: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=destination.parent, delete=False) as pending:
+                temporary = Path(pending.name)
                 pending.write("".join(f"{key}={value}\n" for key, value in values.items()))
                 pending.flush()
                 os.fsync(pending.fileno())
-                with suppress(FileExistsError):
-                    os.link(temporary, destination)
-            finally:
-                temporary.unlink()
+            with suppress(FileExistsError):
+                os.link(temporary, destination)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
     return destination
 
 

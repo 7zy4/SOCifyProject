@@ -78,11 +78,14 @@ def _detect_format(filename: str, content: bytes) -> str:
     if suffix == ".json" or sample.startswith((b"[", b"{")):
         return "json"
     text = sample.decode("utf-8", errors="ignore")
-    if WEB_LOG.match(text.splitlines()[0] if text.splitlines() else ""):
+    first_line = text.splitlines()[0] if text.splitlines() else ""
+    if suffix == ".cef" or "CEF:0|" in first_line or "CEF:1|" in first_line:
+        return "cef"
+    if WEB_LOG.match(first_line):
         return "web"
-    if AUTH_LOG.match(text.splitlines()[0] if text.splitlines() else "") and "sshd" in text:
+    if AUTH_LOG.match(first_line) and "sshd" in text:
         return "linux_auth"
-    if suffix == ".csv" and any(value in (text.splitlines()[0] if text.splitlines() else "") for value in (",", ";", "\t", "|")):
+    if suffix == ".csv" and any(value in first_line for value in (",", ";", "\t", "|")):
         return "csv"
     return "syslog"
 
@@ -310,38 +313,148 @@ def _auth_records(text: str, source_name: str, content_hash: str) -> Iterator[di
         )
 
 
+CEF_KV_PATTERN = re.compile(r"(?:^|\s+)([A-Za-z][A-Za-z0-9_.-]*)=(.*?)(?=\s+[A-Za-z][A-Za-z0-9_.-]*=|$)")
+
+
+def _cef_records(text: str, source_name: str, content_hash: str) -> Iterator[dict[str, Any]]:
+    for row_number, raw_line in enumerate(text.splitlines(), 1):
+        line = raw_line.strip()
+        if not line:
+            continue
+        cef_idx = line.find("CEF:")
+        if cef_idx < 0:
+            raise ValueError(f"row {row_number} is not a valid CEF record")
+        cef_body = line[cef_idx:]
+        parts: list[str] = []
+        buf: list[str] = []
+        escaped = False
+        ext_start = len(cef_body)
+        for idx, ch in enumerate(cef_body):
+            if escaped:
+                buf.append(ch)
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == "|" and len(parts) < 7:
+                parts.append("".join(buf))
+                buf = []
+                if len(parts) == 7:
+                    ext_start = idx + 1
+                    break
+            else:
+                buf.append(ch)
+        if len(parts) < 7:
+            raise ValueError(f"row {row_number} has an incomplete CEF header")
+        _, vendor, product, _version, sig_id, name, sev_raw = parts
+        ext_str = cef_body[ext_start:].strip()
+        ext = {match.group(1): match.group(2).replace("\\=", "=").strip() for match in CEF_KV_PATTERN.finditer(ext_str)}
+        try:
+            sev_num = int(sev_raw)
+            severity = "critical" if sev_num >= 9 else "high" if sev_num >= 7 else "medium" if sev_num >= 4 else "low"
+        except ValueError:
+            sev_lower = sev_raw.strip().lower()
+            severity = sev_lower if sev_lower in {"critical", "high", "medium", "low"} else "medium"
+        src_ip = ext.get("src") or ext.get("c6a2")
+        dst_ip = ext.get("dst") or ext.get("c6a3")
+        user = ext.get("suser") or ext.get("duser")
+        host = ext.get("dvchost") or ext.get("shost") or ext.get("dhost")
+        proc = ext.get("sproc") or ext.get("dproc") or ext.get("fname")
+        msg_parts = list(dict.fromkeys(p for p in (ext.get("msg"), ext.get("request"), ext.get("cs1")) if p))
+        msg = " | ".join(msg_parts) if msg_parts else f"{vendor} {product}: {name}"
+        yield _record_from_mapping(
+            {
+                "source": source_name,
+                "source_type": "cef",
+                "event_time": ext.get("rt") or iso_now(),
+                "hostname": host,
+                "source_ip": src_ip,
+                "destination_ip": dst_ip,
+                "username": user,
+                "process_name": proc,
+                "action": ext.get("act"),
+                "outcome": ext.get("outcome"),
+                "severity": severity,
+                "category": ext.get("cat") or "security",
+                "event_type": f"cef_{re.sub(r'[^A-Za-z0-9_.-]+', '_', sig_id)[:60]}",
+                "title": name or f"CEF {sig_id}",
+                "description": msg,
+                "raw_payload": {"vendor": vendor, "product": product, "signature_id": sig_id, **ext},
+            },
+            row_number,
+            source_name,
+            content_hash,
+        )
+
+
 def _sysmon_xml_records(content: bytes, source_name: str, content_hash: str) -> Iterator[dict[str, Any]]:
     upper = content[:8192].upper()
     if b"<!DOCTYPE" in upper or b"<!ENTITY" in upper:
         raise ValueError("XML document types and entities are not allowed")
     root = ElementTree.fromstring(content, forbid_dtd=True, forbid_entities=True, forbid_external=True)
     events = [root] if root.tag.endswith("Event") else [item for item in root.iter() if item.tag.endswith("Event")]
+    windows_map: dict[str, tuple[str, str, str, str | None, str | None]] = {
+        "4625": ("failed_login", "authentication", "high", "login", "failed"),
+        "4624": ("authentication", "authentication", "low", "login", "success"),
+        "4688": ("windows_4688", "windows", "medium", "process_create", None),
+        "1102": ("windows_1102", "windows", "critical", "audit_clear", "success"),
+        "4720": ("windows_4720", "windows", "medium", "user_create", "success"),
+        "4728": ("windows_4728", "windows", "high", "group_add", "success"),
+        "4732": ("windows_4732", "windows", "high", "group_add", "success"),
+        "4756": ("windows_4756", "windows", "high", "group_add", "success"),
+        "4698": ("windows_4698", "windows", "high", "task_create", "success"),
+        "7045": ("windows_7045", "windows", "high", "service_install", "success"),
+    }
     for row_number, event in enumerate(events, 1):
         system: dict[str, str] = {}
         event_data: dict[str, str] = {}
         for item in event.iter():
             local = item.tag.rsplit("}", 1)[-1]
-            if local in {"EventID", "Computer", "TimeCreated"}:
+            if local in {"EventID", "Computer", "TimeCreated", "Channel"}:
                 system[local] = item.attrib.get("SystemTime", item.text or "")
             if local == "Data":
                 event_data[item.attrib.get("Name", f"field_{len(event_data)}")] = item.text or ""
-        event_id = system.get("EventID", "unknown")
+        event_id = (system.get("EventID") or "unknown").strip()
+        channel = (system.get("Channel") or "").strip().lower()
+        is_win_sec = ("security" in channel or "system" in channel) and "sysmon" not in channel
+        cmd_line = event_data.get("CommandLine") or event_data.get("TaskContent") or ""
+        proc_name = event_data.get("Image") or event_data.get("NewProcessName") or event_data.get("ServiceFileName")
+        parent_proc = event_data.get("ParentImage") or event_data.get("ParentProcessName")
+        raw_ip = event_data.get("SourceIp") or event_data.get("IpAddress") or event_data.get("ClientAddress")
+        src_ip = None if raw_ip in (None, "", "-") else raw_ip
+        raw_user = event_data.get("User") or event_data.get("TargetUserName") or event_data.get("SubjectUserName")
+        username = None if raw_user in (None, "", "-") else raw_user
+        if is_win_sec and event_id in windows_map:
+            ev_type, ev_cat, ev_sev, ev_act, ev_out = windows_map[event_id]
+            src_type = "windows"
+            ev_title = f"Windows Event {event_id}"
+        else:
+            ev_type = f"sysmon_{event_id}" if not is_win_sec else f"windows_{event_id}"
+            ev_cat = "windows"
+            ev_sev = "medium"
+            ev_act = None
+            ev_out = None
+            src_type = "windows" if is_win_sec else "sysmon"
+            ev_title = f"Windows Event {event_id}" if is_win_sec else f"Sysmon Event {event_id}"
+        desc_parts = [p for p in (event_data.get("RuleName"), cmd_line, event_data.get("ServiceName"), event_data.get("TaskName")) if p]
         record = {
             "source": source_name,
-            "source_type": "sysmon",
+            "source_type": src_type,
             "event_time": system.get("TimeCreated") or None,
             "hostname": system.get("Computer"),
-            "event_type": f"sysmon_{event_id}",
-            "category": "windows",
-            "severity": "medium",
-            "title": f"Sysmon Event {event_id}",
-            "description": event_data.get("RuleName", "Imported Sysmon event"),
-            "process_name": event_data.get("Image"),
-            "parent_process": event_data.get("ParentImage"),
-            "source_ip": event_data.get("SourceIp"),
+            "event_type": ev_type,
+            "category": ev_cat,
+            "severity": ev_sev,
+            "title": ev_title,
+            "description": " | ".join(desc_parts) if desc_parts else "Imported Windows/Sysmon event",
+            "process_name": proc_name,
+            "parent_process": parent_proc,
+            "command_line": cmd_line or None,
+            "source_ip": src_ip,
             "destination_ip": event_data.get("DestinationIp"),
-            "username": event_data.get("User"),
+            "username": username,
             "file_hash": event_data.get("Hashes"),
+            "action": ev_act,
+            "outcome": ev_out,
             "raw_payload": event_data,
         }
         yield _record_from_mapping(record, row_number, source_name, content_hash)
@@ -352,10 +465,10 @@ def _evtx_records(content: bytes, source_name: str, content_hash: str) -> Iterat
         from Evtx.Evtx import Evtx
     except ImportError as exc:
         raise ValueError("EVTX parser is not installed") from exc
-    with tempfile.NamedTemporaryFile(suffix=".evtx") as temporary:
-        temporary.write(content)
-        temporary.flush()
-        with Evtx(temporary.name) as log:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        evtx_path = Path(tmp_dir) / "import.evtx"
+        evtx_path.write_bytes(content)
+        with Evtx(str(evtx_path)) as log:
             for row_number, record in enumerate(log.records(), 1):
                 xml = record.xml().encode()
                 parsed = list(_sysmon_xml_records(xml, source_name, content_hash))
@@ -401,6 +514,8 @@ def parse_records(
         return format_name, _mapped_records(_json_records(text, source_name, content_hash, False), options, source_name)
     if format_name == "syslog":
         return format_name, _mapped_records(_syslog_records(text, source_name, content_hash), options, source_name)
+    if format_name == "cef":
+        return format_name, _mapped_records(_cef_records(text, source_name, content_hash), options, source_name)
     if format_name == "web":
         return format_name, _mapped_records(_web_records(text, source_name, content_hash), options, source_name)
     if format_name == "linux_auth":
@@ -437,7 +552,7 @@ def _mapped_records(records: Iterable[dict[str, Any]], options: dict[str, Any], 
             if isinstance(value, str):
                 moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
                 if moment.tzinfo is None:
-                    zone = ZoneInfo(options.get("source_timezone", "UTC"))
+                    zone = _resolve_timezone(options.get("source_timezone", "UTC"))
                     if moment.replace(tzinfo=zone, fold=0).utcoffset() != moment.replace(tzinfo=zone, fold=1).utcoffset():
                         raise ValueError("ambiguous or nonexistent local time; supply an explicit UTC offset")
                     moment = moment.replace(tzinfo=zone)
@@ -460,6 +575,15 @@ def _mapped_records(records: Iterable[dict[str, Any]], options: dict[str, Any], 
         except (ValueError, TypeError, ZoneInfoNotFoundError):
             record = {"__parse_error": "invalid, ambiguous or nonexistent source timestamp"}
         yield record
+
+
+def _resolve_timezone(name: str):
+    try:
+        return ZoneInfo(name)
+    except ZoneInfoNotFoundError:
+        if name.upper() in ("UTC", "ETC/UTC", "Z"):
+            return UTC
+        raise
 
 
 def _estimated_rows(format_name: str, content: bytes, options: dict[str, Any] | None = None) -> int:
@@ -839,7 +963,7 @@ def _upload_options() -> tuple[int | None, dict[str, Any]]:
     if not re.fullmatch(r"[A-Za-z0-9_+-]+(?:/[A-Za-z0-9_+-]+)*", zone):
         raise ValueError("invalid source timezone")
     try:
-        ZoneInfo(zone)
+        _resolve_timezone(zone)
     except ZoneInfoNotFoundError as exc:
         raise ValueError("source timezone is not available locally") from exc
     options = {"mapping": mapping, "source_timezone": zone, "encoding": encoding, "delimiter": delimiter}

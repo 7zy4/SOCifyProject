@@ -99,7 +99,8 @@ def validate_calendar(value):
         raise ValueError("تقويم SLA غير صالح")
     name = text_value(value.get("timezone", "UTC"), 100, True)
     try:
-        ZoneInfo(name)
+        if name.upper() not in ("UTC", "ETC/UTC"):
+            ZoneInfo(name)
     except (ZoneInfoNotFoundError, ValueError) as exc:
         raise ValueError("المنطقة الزمنية للتقويم غير صالحة") from exc
     if value["mode"] == "24x7":
@@ -124,7 +125,7 @@ def _windows(start, end, calendar):
     if calendar["mode"] == "24x7":
         yield start, end
         return
-    zone = ZoneInfo(calendar["timezone"])
+    zone = UTC if calendar["timezone"].upper() in ("UTC", "ETC/UTC") else ZoneInfo(calendar["timezone"])
     day, final = start.astimezone(zone).date(), end.astimezone(zone).date()
     if (final - day).days > 3660:
         raise ValueError("الفترة تتجاوز عشر سنوات؛ يلزم مراجعة نطاق SLA")

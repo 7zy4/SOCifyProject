@@ -1,6 +1,5 @@
 import base64
 import ctypes
-import fcntl
 import os
 import shutil
 import socket
@@ -9,6 +8,11 @@ import tempfile
 import time
 from contextlib import contextmanager, suppress
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows compatibility
+    fcntl = None  # type: ignore[assignment]
 
 from socify.analysis_transport import MAX_REQUEST, MAX_RESPONSE, receive, send
 from socify.autopsy_report_render import FORMATS

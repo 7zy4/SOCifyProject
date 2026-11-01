@@ -6,7 +6,7 @@ import sqlite3
 from datetime import timedelta
 from typing import Any
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, current_app, jsonify, request
 
 from .audit import record_audit, record_training_action
 from .autopsy_pipeline import job_visible
@@ -302,7 +302,13 @@ def create_case():
 
 
 def _create_case(data: dict[str, Any]):
-    reason, objective, classification = data.get("reason"), data.get("objective"), data.get("classification", "confidential")
+    reason = data["reason"] if "reason" in data and data["reason"] is not None else "tactical_triage"
+    objective = (
+        data["objective"]
+        if "objective" in data and data["objective"] is not None
+        else "التحقيق الأولي السريع وتحديد المؤشرات والإجراء المناسب"
+    )
+    classification = data.get("classification", "confidential")
     if operational_mode():
         from .autopsy_domain import text_value
 
@@ -427,7 +433,13 @@ def _create_case(data: dict[str, Any]):
                 "INSERT INTO autopsy_case_context(case_id, reason, objective, classification, created_at) VALUES (?, ?, ?, ?, ?)",
                 (case_id, str(reason).strip(), str(objective).strip(), classification, now),
             )
-            get_db().execute("INSERT INTO case_approvals(case_id,state,requested_by) VALUES (?,'pending',?)", (case_id, actor_id()))
+            if current_app.config.get("REQUIRE_CASE_APPROVAL"):
+                get_db().execute("INSERT INTO case_approvals(case_id,state,requested_by) VALUES (?,'pending',?)", (case_id, actor_id()))
+            else:
+                get_db().execute(
+                    "INSERT INTO case_approvals(case_id,state,requested_by,reviewed_by,reviewed_at,reason,source) VALUES (?,'approved',?,?,?,'V6 direct tactical investigation','v6_direct')",
+                    (case_id, actor_id(), actor_id(), now),
+                )
             for member in {actor_id(), assignee} - {None}:
                 get_db().execute(
                     "INSERT INTO autopsy_case_members(case_id, user_id, responsibility, assigned_by, assigned_at) VALUES (?, ?, 'analyst', ?, ?)",

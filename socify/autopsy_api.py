@@ -192,6 +192,81 @@ def cases_create():
     return create_case()
 
 
+@autopsy_api.get("/api/cases/claimable")
+@require_permission("cases.update")
+def cases_claimable():
+    from .autopsy_workspace import case_approved
+
+    rows = (
+        get_db()
+        .execute(
+            """SELECT c.id, c.reference, c.title, c.severity, c.priority, c.status, c.created_at, c.updated_at,
+                      COALESCE(ctx.classification, 'confidential') AS classification, u.name AS creator_name
+               FROM incident_cases c
+               LEFT JOIN autopsy_case_context ctx ON ctx.case_id = c.id
+               LEFT JOIN users u ON u.id = c.creator
+               WHERE c.workspace_id = ?
+                 AND c.archived_at IS NULL
+                 AND c.assignee IS NULL
+                 AND c.status NOT IN ('closed', 'cancelled')
+                 AND COALESCE(ctx.classification, 'confidential') != 'restricted'
+               ORDER BY c.updated_at DESC
+               LIMIT 100""",
+            (workspace_id(),),
+        )
+        .fetchall()
+    )
+    items = [dict(row) for row in rows if case_approved(int(row["id"]))]
+    return jsonify({"items": items, "total": len(items)})
+
+
+@autopsy_api.post("/api/cases/<int:case_id>/claim")
+@require_permission("cases.update")
+def case_claim(case_id: int):
+    from .audit import record_audit
+    from .autopsy_workspace import case_approved
+    from .cases import _history
+
+    with transaction():
+        row = (
+            get_db()
+            .execute(
+                """SELECT c.*, COALESCE(ctx.classification, 'confidential') AS classification
+                   FROM incident_cases c
+                   LEFT JOIN autopsy_case_context ctx ON ctx.case_id = c.id
+                   WHERE c.id = ? AND c.workspace_id = ? AND c.archived_at IS NULL""",
+                (case_id, workspace_id()),
+            )
+            .fetchone()
+        )
+        if not row or (row["classification"] == "restricted" and not _case_row(case_id)):
+            return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+        if not case_approved(case_id):
+            return error_response("CASE_APPROVAL_REQUIRED", "بانتظار اعتماد المدير؛ أعمال القضية مقفلة", 409)
+        if row["status"] in {"closed", "cancelled"}:
+            return error_response("CASE_CLOSED", "لا يمكن استلام ملكية قضية مغلقة أو ملغاة", 409)
+        current_actor = actor_id()
+        if row["assignee"] is not None and int(row["assignee"]) != int(current_actor or 0):
+            return error_response("CASE_ALREADY_CLAIMED", "تم استلام ملكية هذه القضية بالفعل من محلل آخر", 409)
+        now = iso_now()
+        new_status = "investigating" if row["status"] in {"new", "open"} else row["status"]
+        updated = get_db().execute(
+            "UPDATE incident_cases SET assignee = ?, status = ?, updated_at = ?, version = version + 1 WHERE id = ? AND workspace_id = ? AND (assignee IS NULL OR assignee = ?)",
+            (current_actor, new_status, now, case_id, workspace_id(), current_actor),
+        )
+        if updated.rowcount != 1:
+            return error_response("CASE_ALREADY_CLAIMED", "تم استلام ملكية هذه القضية بالفعل من محلل آخر", 409)
+        get_db().execute(
+            "INSERT INTO autopsy_case_members(case_id, user_id, responsibility, assigned_by, assigned_at) VALUES (?, ?, 'owner', ?, ?) ON CONFLICT(case_id, user_id) DO UPDATE SET responsibility = 'owner', assigned_by = excluded.assigned_by, assigned_at = excluded.assigned_at",
+            (case_id, current_actor, current_actor, now),
+        )
+        get_db().execute("UPDATE case_tasks SET assignee = ? WHERE case_id = ? AND assignee IS NULL", (current_actor, case_id))
+        _history(get_db(), case_id, "case_claimed", {"assignee": row["assignee"], "status": row["status"]}, {"assignee": current_actor, "status": new_status}, "Claimed case ownership")
+        custody(case_id, "case_claimed", {"owner": current_actor, "status": new_status})
+        record_audit(get_db(), "claim", "case", case_id, details={"owner": current_actor})
+    return case_summary(case_id)
+
+
 @autopsy_api.get("/api/cases/<int:case_id>")
 @require_permission("cases.read")
 def case_get(case_id: int):
@@ -209,7 +284,7 @@ def catalog():
     return jsonify(
         {
             "product": "SOCify Tactical Workbench",
-            "import_formats": ["auto", "csv", "json", "jsonl", "syslog", "linux_auth", "web", "sysmon_xml", "evtx", "pcap", "pcapng"],
+            "import_formats": ["auto", "csv", "json", "jsonl", "syslog", "cef", "linux_auth", "web", "sysmon_xml", "evtx", "pcap", "pcapng"],
             "source_timezones": sorted(available_timezones()),
             "mapping_fields": [
                 "event_time",

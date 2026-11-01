@@ -101,6 +101,7 @@ def test_unavailable_process_reports_actionable_diagnostic(monkeypatch):
         raise FileNotFoundError(errno.ENOENT, "procfs unavailable")
 
     monkeypatch.delenv("SOCIFY_ANALYSIS_SOCKET", raising=False)
+    monkeypatch.setattr("socify.autopsy_worker.sys.platform", "linux")
     monkeypatch.setattr("socify.autopsy_worker.subprocess.run", unavailable)
     with pytest.raises(AnalysisUnavailableError, match="verify procfs"):
         compute_artifacts({}, "probe", ["probe"], 1)

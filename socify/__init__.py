@@ -43,6 +43,8 @@ from .training import training_api
 from .ui import ui
 from .visualization import visualization_api
 
+csrf = CSRFProtect()
+
 
 def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     root = Path(__file__).parent.parent
@@ -61,7 +63,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         return {"product_name": app.config["PRODUCT_NAME"] if operational_mode() else "SOCify", "operational": operational_mode()}
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    CSRFProtect(app)
+    csrf.init_app(app)
     app.teardown_appcontext(close_db)
     for blueprint in (
         ui,
@@ -96,6 +98,13 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         teams_api,
     ):
         app.register_blueprint(blueprint)
+    from .quick_reports import quick_reports_api
+    from .sources import source_webhook_ingest
+    from .watchlist import watchlist_api
+
+    app.register_blueprint(watchlist_api)
+    app.register_blueprint(quick_reports_api)
+    csrf.exempt(source_webhook_ingest)
 
     @app.before_request
     def prepare_request():
@@ -106,7 +115,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             operational_mode()
             and request.path.startswith("/api/")
             and (request.blueprint is not None or request.path.split("/", 3)[2] in {"training", "scores", "scenarios", "lab"})
-            and request.blueprint not in {"auth", "cases", "teams"}
+            and request.blueprint not in {"auth", "cases", "teams", "sources", "watchlist", "quick_reports"}
             and request.endpoint not in {"platform.audit_logs", "platform.role_matrix"}
             and not str(request.blueprint or "").startswith("autopsy")
         ):

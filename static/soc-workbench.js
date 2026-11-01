@@ -130,20 +130,144 @@
     }
     return root;
   }
+  function quickWatchlistBtn(indicatorType, rawValue, caseId, noteText = "") {
+    if (!rawValue || !permission("cases.update")) return node("span", { text: "" });
+    const btn = button(t("+ قائمة المراقبة"), async () => {
+      btn.disabled = true;
+      try {
+        const body = { indicator_type: indicatorType, value: String(rawValue).trim(), severity: "high", note: noteText };
+        if (caseId) body.source_case_id = Number(caseId);
+        await api("/api/watchlist", { method: "POST", body });
+        btn.textContent = t("✓ في المراقبة");
+      } catch (error) {
+        btn.disabled = false;
+        handleError(error);
+      }
+    }, "ghost");
+    return btn;
+  }
+  async function watchlistPanel(caseId) {
+    const wl = await api("/api/watchlist");
+    const body = node("div", { class: "panel-body" });
+    body.append(node("p", { class: "scope-note", text: t("أضف الإيميلات والعناوين الشبكية (IP / CIDR) والنطاقات والبصمات المشبوهة ليتم مطابقتها تلقائيًا مع أي سجلات واردة أو فحص القضية بأثر رجعي.") }));
+    if (permission("cases.update")) {
+      const typeSel = node("select", { name: "indicator_type" }, [
+        ["email", "Email"],
+        ["ip", "IPv4 / IPv6"],
+        ["cidr", "CIDR Subnet"],
+        ["domain", "Domain"],
+        ["url", "URL"],
+        ["sha256", "SHA-256"],
+      ].map(([v, l]) => node("option", { value: v, text: l })));
+      const valInput = node("input", { name: "value", required: true, maxlength: 512, placeholder: "attacker@evil.example / 203.0.113.0/24" });
+      const sevSel = node("select", { name: "severity" }, ["critical", "high", "medium", "low"].map(v => node("option", { value: v, selected: v === "high", text: autopsyLabel(v) })));
+      const noteInput = node("input", { name: "note", maxlength: 200, placeholder: t("سبب الاشتباه أو مصدر المؤشر…") });
+      const addForm = node("form", { class: "filter-row", "aria-label": t("إضافة مؤشر لقائمة المراقبة") }, [
+        field(t("النوع"), typeSel),
+        field(t("المؤشر المشبوه"), valInput),
+        field(t("الخطورة"), sevSel),
+        field(t("ملاحظة"), noteInput),
+        node("button", { type: "submit", class: "button primary", text: t("إضافة لقائمة المراقبة") }),
+      ]);
+      addForm.addEventListener("submit", async e => {
+        e.preventDefault();
+        try {
+          const payload = { indicator_type: typeSel.value, value: valInput.value.trim(), severity: sevSel.value, note: noteInput.value.trim() };
+          if (caseId) payload.source_case_id = Number(caseId);
+          await api("/api/watchlist", { method: "POST", body: payload });
+          await start("threat-intel");
+        } catch (error) { handleError(error); }
+      });
+      body.append(addForm);
+      if (caseId && autopsy.current?.can_update && autopsy.current?.status !== "closed") {
+        const scanNotice = node("span", { "aria-live": "polite" });
+        const scanBtn = button(t("فحص سجلات القضية مقابل قائمة المراقبة الآن"), async () => {
+          scanBtn.disabled = true;
+          try {
+            const res = await api(`/api/cases/${caseId}/watchlist-scan`, { method: "POST", body: {} });
+            scanNotice.textContent = ` · ${t("تم فحص")} ${number(res.events_scanned)} — ${t("تنبيهات جديدة")}: ${number(res.alerts_created)}`;
+          } catch (error) { handleError(error); }
+          finally { scanBtn.disabled = false; }
+        }, "ghost");
+        body.append(node("div", { class: "action-row" }, [scanBtn, scanNotice]));
+      }
+    }
+    if (wl.items.length) {
+      body.append(table([
+        { label: t("النوع"), value: item => item.indicator_type.toUpperCase() },
+        { label: t("القيمة"), value: item => node("bdi", { dir: "ltr", "data-user-content": "true", text: item.value }) },
+        { label: t("الخطورة"), value: item => autopsyLabel(item.severity) },
+        { label: t("التطابقات"), value: item => number(item.hits_count) },
+        { label: t("ملاحظة"), value: item => item.note || "—" },
+        { label: t("الحالة"), value: item => item.is_active ? t("نشط") : t("متوقف") },
+        {
+          label: t("إدارة"),
+          value: item => permission("cases.update") ? node("div", { class: "action-row" }, [
+            button(item.is_active ? t("إيقاف") : t("تفعيل"), async () => {
+              try { await api(`/api/watchlist/${item.id}`, { method: "PATCH", body: { is_active: !item.is_active } }); await start("threat-intel"); }
+              catch (error) { handleError(error); }
+            }, "ghost"),
+            button(t("حذف"), async () => {
+              try { await api(`/api/watchlist/${item.id}`, { method: "DELETE" }); await start("threat-intel"); }
+              catch (error) { handleError(error); }
+            }, "ghost"),
+          ]) : "—",
+        },
+      ], wl.items));
+    } else {
+      body.append(emptyState(t("قائمة المراقبة فارغة"), t("أضف عناوين IP أو نطاقات CIDR أو إيميلات مشبوهة لتوليد تنبيهات تلقائية عند ظهورها في السجلات.")));
+    }
+    return panel(t("قائمة مراقبة الإيميلات والـ IPs المشبوهة (Watchlist)"), body, true);
+  }
+  async function managerEscalatedReportsPanel() {
+    const inbox = await api("/api/reports/escalated");
+    const body = node("div", { class: "panel-body" });
+    if (!inbox.items.length) {
+      body.append(emptyState(t("لا توجد تقارير مصعّدة حاليًا"), t("عندما يحفظ المحقق تقرير القوائم المنسدلة ويصعّده للمدير سيظهر هنا للمراجعة والطباعة الفورية.")));
+      return panel(t("صندوق التقارير المصعّدة لمدير مركز العمليات"), body, false);
+    }
+    body.append(table([
+      { label: t("القضية"), value: item => node("a", { class: "case-link", href: `/cases/${item.case_id}?tab=reports`, text: `${item.case_reference} · ${item.case_title}` }) },
+      { label: t("المحقق"), value: "investigator_name" },
+      { label: t("التصنيف"), value: "incident_classification_label" },
+      { label: t("حكم الفرز"), value: "triage_verdict_label" },
+      { label: t("الاستعجال"), value: "urgency_level_label" },
+      { label: t("الحالة"), value: item => item.manager_decision ? `${item.status} (${item.manager_decision})` : item.status },
+      {
+        label: t("الطباعة والاعتماد"),
+        value: item => {
+          const printBtn = linkedButton(t("طباعة التقرير"), item.print_url);
+          printBtn.target = "_blank";
+          printBtn.rel = "noopener";
+          const controls = [printBtn];
+          if (inbox.can_acknowledge && item.status === "escalated") {
+            controls.push(button(t("اعتماد المدير"), async () => {
+              try {
+                await api(`/api/cases/${item.case_id}/quick-report/acknowledge`, { method: "POST", body: { decision: "approved", comment: "Approved from Manager Inbox" } });
+                await start("reports");
+              } catch (error) { handleError(error); }
+            }, "primary"));
+          }
+          return node("div", { class: "action-row" }, controls);
+        },
+      },
+    ], inbox.items));
+    return panel(t("صندوق التقارير المصعّدة لمدير مركز العمليات"), body, true);
+  }
   async function email(caseId) {
     const root=node("div",{class:"tool-results email-review"});
-    root.append(node("p",{class:"scope-note",text:t("رؤوس المصادقة بيانات مصدر غير موثوقة؛ لا تتحقق المنصة من SPF أو DKIM عبر الشبكة. الروابط لا تُفتح والمرفقات لا تُشغّل.")}));
-    if(autopsy.current.can_update&&permission("evidence.download")&&permission("evidence.add")&&autopsy.current.status!=="closed") {
+    root.append(node("p",{class:"scope-note",text:t("فحص أولي ساكن وآمن بضغطة زر للرؤوس والروابط والمرفقات دون تشغيل أي محتوى. رؤوس SPF/DKIM نص مصدر غير موثوق شبكيًا.")}));
+    if(autopsy.current.can_update&&permission("evidence.add")&&autopsy.current.status!=="closed") {
       const file=node("input",{type:"file",name:"email",accept:".eml,message/rfc822",required:true});
-      const submit=node("button",{type:"submit",class:"button primary",text:t("حجر الرسالة وتحليلها")});
-      const form=node("form",{class:"filter-row"},[field(t("رسالة EML · حتى 2MiB"),file),submit]);
+      const submit=node("button",{type:"submit",class:"button primary",text:t("فحص البريد ومرفقاته بضغطة زر")});
+      const form=node("form",{class:"filter-row"},[field(t("رسالة EML · حتى 5MiB (شامل فحص المرفقات ساكنًا)"),file),submit]);
       form.addEventListener("submit",async e=>{
-        e.preventDefault();const chosen=file.files[0];if(!chosen||chosen.size>2*1024*1024||!chosen.name.toLowerCase().endsWith(".eml")){showMessage(t("اختر رسالة EML لا تتجاوز 2MiB"));return;}
-        submit.disabled=true;submit.textContent=t("جارٍ فحص الرسالة…");
-        try{const data=new FormData();data.set("file",chosen);const sample=await api(`/api/cases/${caseId}/samples`,{method:"POST",body:data});await api(`/api/cases/${caseId}/samples/${sample.id}/email-review`,{method:"POST",body:{}});await start("email-security");}
-        catch(error){handleError(error);submit.disabled=false;submit.textContent=t("حجر الرسالة وتحليلها");}
+        e.preventDefault();const chosen=file.files[0];if(!chosen||chosen.size>5*1024*1024||!chosen.name.toLowerCase().endsWith(".eml")){showMessage(t("اختر رسالة EML لا تتجاوز 5MiB"));return;}
+        submit.disabled=true;submit.textContent=t("جارٍ فحص الرسالة والمرفقات…");
+        try{const data=new FormData();data.set("file",chosen);await api(`/api/cases/${caseId}/email-triage`,{method:"POST",body:data});await start("email-security");}
+        catch(error){handleError(error);submit.disabled=false;submit.textContent=t("فحص البريد ومرفقاته بضغطة زر");}
       });
-      root.append(panel(t("استيراد رسالة للتحقيق"),node("div",{class:"panel-body"},form),true));
+      root.append(panel(t("فحص رسالة بريد ومرفقاتها بضغطة زر"),node("div",{class:"panel-body"},form),true));
     }
     const samples=(await api(`/api/cases/${caseId}/samples`)).items.filter(sample=>sample.filename.toLowerCase().endsWith(".eml"));
     if(autopsy.current.can_update&&permission("evidence.download")&&autopsy.current.status!=="closed"&&samples.length)root.append(panel(t("رسائل محجورة متاحة للفحص"),table([{label:t("الملف"),value:"filename"},{label:"SHA-256",value:"sha256"},{label:t("الإجراء"),value:item=>autopsyAction(t("تحليل الرسالة"),async()=>{await api(`/api/cases/${caseId}/samples/${item.id}/email-review`,{method:"POST",body:{}});await start("email-security");})}],samples),true));
@@ -153,10 +277,27 @@
     for(const record of mails) {
       const mail=record.payload;
       const headers=node("dl");for(const [key,value] of Object.entries(mail.headers))if(value)headers.append(node("dt",{text:key}),node("dd",{"data-user-content":"true",text:value}));
-      const body=node("div",{class:"panel-body"},[headers,node("p",{class:"cell-meta",text:"SHA-256: "+mail.sha256}),node("h4",{text:t("نص الرسالة")}),node("pre",{class:"email-body",tabindex:0,"data-user-content":"true",text:mail.body||t("لا يوجد نص متاح")})]);
+      const body=node("div",{class:"panel-body"});
+      if (mail.email_verdict) {
+        body.append(node("p", { class: "notice", text: `${t("الحكم الساكن")}: ${mail.email_verdict} (${mail.email_risk_score || 0}/100)` }));
+      }
+      const wlActions = node("div", { class: "action-row" });
+      if (mail.sender_email) wlActions.append(node("span", { text: `From: ${mail.sender_email} ` }), quickWatchlistBtn("email", mail.sender_email, caseId, "Suspicious EML sender"));
+      if (mail.reply_to_email && mail.reply_to_email !== mail.sender_email) wlActions.append(node("span", { text: `Reply-To: ${mail.reply_to_email} ` }), quickWatchlistBtn("email", mail.reply_to_email, caseId, "Mismatched EML Reply-To"));
+      if (wlActions.children.length) body.append(wlActions);
+      if (mail.header_flags?.length) {
+        body.append(node("ul", {}, mail.header_flags.map(f => node("li", { text: `[${f.severity}] ${f.detail}` }))));
+      }
+      body.append(headers,node("p",{class:"cell-meta",text:"SHA-256: "+mail.sha256}),node("h4",{text:t("نص الرسالة")}),node("pre",{class:"email-body",tabindex:0,"data-user-content":"true",text:mail.body||t("لا يوجد نص متاح")}));
       if(mail.body_truncated)body.append(node("p",{class:"notice",text:t("النص المعروض مختصر؛ الأصل محفوظ في الحجر.")}));
-      body.append(node("details",{},[node("summary",{text:t("الروابط المرصودة")+" · "+number(mail.urls.length)}),node("ul",{class:"email-links"},mail.urls.map(value=>node("li",{},node("bdi",{dir:"ltr","data-user-content":"true",text:value}))))]));
-      body.append(table([{label:t("المرفق"),value:"filename"},{label:t("النوع"),value:"content_type"},{label:t("الحجم"),value:"size"},{label:"SHA-256",value:"sha256"}],mail.attachments));
+      body.append(node("details",{},[node("summary",{text:t("الروابط المرصودة")+" · "+number(mail.urls.length)}),node("ul",{class:"email-links"},mail.urls.map(value=>node("li",{},[node("bdi",{dir:"ltr","data-user-content":"true",text:value}), " ", quickWatchlistBtn("url", value, caseId, "Extracted EML URL")])))]));
+      body.append(table([
+        {label:t("المرفق"),value:att=>att.original_filename||att.filename},
+        {label:t("النوع المعلن"),value:"content_type"},
+        {label:t("الفحص الساكن (بدون تشغيل)"),value:att=>att.triage?`${att.triage.verdict} (${att.triage.risk_score}/100) · ${att.triage.detected_magic}${att.triage.extension_mismatch?" [تعارض امتداد!]":""}`:t("بصمة فقط")},
+        {label:t("الحجم"),value:"size"},
+        {label:"SHA-256",value:att=>node("div",{},[node("bdi",{dir:"ltr",text:att.sha256})," ",quickWatchlistBtn("sha256",att.sha256,caseId,`Attachment ${att.original_filename||att.filename}`)])},
+      ],mail.attachments));
       root.append(panel(mail.title,body,true));
     }
     if(!mails.length)root.append(emptyState(t("لا توجد رسائل محللة بعد"),t("أضف رسالة EML إلى هذه القضية، ثم راجع رؤوسها ومرفقاتها.")));
@@ -190,6 +331,7 @@
     if(data.items.length)root.append(table([
       {label:t("القيمة"),value:"value"},{label:t("النوع"),value:"type"},{label:t("السجلات المرتبطة"),value:"occurrences"},
       {label:t("نتيجة الإثراء"),value:item=>autopsyLabel(item.enrichment.verdict||"unknown")},
+      {label:t("مراقبة"),value:item=>["ip","domain","url","email","sha256"].includes(item.type)?quickWatchlistBtn(item.type,item.value,caseId,"Case observable"):"—"},
       {label:t("التفاصيل"),value:item=>button(t("تفاصيل الإثراء"),()=>{
         const content=node("div",{},node("pre",{"data-user-content":"true",text:JSON.stringify(item.enrichment,null,2)}));
         if(autopsy.current.can_update&&autopsy.current.status!=="closed")content.append(autopsyAction(t("إثراء محلي بالإصدارات الحالية"),async()=>{await api(`/api/cases/${caseId}/observables/${item.id}/enrich`,{method:"POST",body:{}});location.reload();}));
@@ -212,6 +354,8 @@
     const root=node("div",{class:"tool-view"},pageHead(...names[section]));
     if (current && window.SOCifyV4?.intake(current)) return;
     root.append(await chooseCase(section,current));
+    if(section==="threat-intel")root.append(await watchlistPanel(current?.id));
+    if(section==="reports")root.append(await managerEscalatedReportsPanel());
     if(!current){root.append(emptyState(t("اختر قضية لبدء العمل"),t("تبقى السجلات والأدلة والإجراءات مرتبطة بقضيتها وصلاحياتها.")));finish(root);return;}
     autopsy.current=current;bindCase(current);
     if(current.full_case_access===false&&section!=="log-management"){
