@@ -9,6 +9,7 @@ from pathlib import Path
 try:
     import resource
 except ImportError:  # pragma: no cover - Windows compatibility stub
+
     class _MissingResource:
         RLIMIT_AS = 9
         RLIMIT_CPU = 0

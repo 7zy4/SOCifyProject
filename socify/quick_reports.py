@@ -126,9 +126,7 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
     },
 ]
 
-QUESTION_OPTION_MAP: dict[str, dict[str, str]] = {
-    q["id"]: {opt["value"]: opt["label"] for opt in q["options"]} for q in QUICK_REPORT_QUESTIONS
-}
+QUESTION_OPTION_MAP: dict[str, dict[str, str]] = {q["id"]: {opt["value"]: opt["label"] for opt in q["options"]} for q in QUICK_REPORT_QUESTIONS}
 DEFAULT_ANSWERS: dict[str, str] = {q["id"]: q["default"] for q in QUICK_REPORT_QUESTIONS}
 MANAGER_DECISIONS = {"approved", "needs_followup", "closed"}
 
@@ -213,9 +211,7 @@ def _report_view(row: sqlite3.Row | None) -> dict[str, Any] | None:
 def _collect_case_auto_summary(case_row: sqlite3.Row) -> dict[str, Any]:
     case_id = int(case_row["id"])
     db = get_db()
-    owner_row = (
-        db.execute("SELECT COALESCE(name, email) AS name, role FROM users WHERE id = ?", (case_row["assignee"] or case_row["creator"],)).fetchone()
-    )
+    owner_row = db.execute("SELECT COALESCE(name, email) AS name, role FROM users WHERE id = ?", (case_row["assignee"] or case_row["creator"],)).fetchone()
     logs_count = int(db.execute("SELECT COUNT(*) FROM case_events WHERE case_id = ? AND active_event = 1", (case_id,)).fetchone()[0])
     alerts_rows = db.execute(
         """SELECT a.id, a.alert_id, a.severity, a.reason, a.status, a.detected_at
@@ -493,6 +489,29 @@ def _esc(value: object) -> str:
     return html.escape(str(value if value is not None else "—"), quote=True)
 
 
+def _fmt_bilingual(value: object) -> str:
+    raw = str(value if value is not None else "—")
+    if raw.endswith(")") and " (" in raw:
+        ar_part, en_inner = raw.rsplit(" (", 1)
+        en_part = "(" + en_inner
+        if all(ch.isascii() and (ch.isalnum() or ch in " ()&/,._:-+") for ch in en_part):
+            return f'{_esc(ar_part)} <span class="en-sub" dir="ltr">{_esc(en_part)}</span>'
+    return _esc(raw)
+
+
+def _badge_tone(raw: object) -> str:
+    token = str(raw or "").strip().lower()
+    if token in {"critical", "malicious", "immediate_p1"}:
+        return "critical"
+    if token in {"high", "high_risk", "suspicious", "escalated"}:
+        return "high"
+    if token in {"medium", "draft", "unsaved preview"}:
+        return "medium"
+    if token in {"clean", "approved", "acknowledged", "resolved"}:
+        return "ok"
+    return "low"
+
+
 @quick_reports_api.get("/cases/<int:case_id>/quick-report/print")
 @require_permission("cases.read")
 def print_quick_report(case_id: int):
@@ -506,32 +525,30 @@ def print_quick_report(case_id: int):
 
     if report:
         qa_rows_html = "".join(
-            f"<tr><th>{_esc(item['question'])}</th><td><strong>{_esc(item['answer_label'])}</strong></td></tr>"
+            f"<tr><th>{_fmt_bilingual(item['question'])}</th><td><strong>{_fmt_bilingual(item['answer_label'])}</strong></td></tr>"
             for item in report["resolved_questions"]
         )
         status_label = report["status"].upper()
-        note_html = (
-            f'<div class="note-box"><strong>ملاحظة المحقق المختصرة:</strong> {_esc(report["executive_note"])}</div>'
-            if report["executive_note"]
-            else ""
-        )
+        status_tone = _badge_tone(report["status"])
+        note_html = f'<div class="note-box"><strong>ملاحظة المحقق المختصرة:</strong> {_esc(report["executive_note"])}</div>' if report["executive_note"] else ""
         manager_html = (
-            f'<div class="note-box"><strong>قرار واعتماد المدير ({_esc(report["manager_decision"])}):</strong> {_esc(report["manager_comment"] or "تم الاعتماد")} · {_esc(report["acknowledged_at"])}</div>'
+            f'<div class="note-box manager-box"><strong>قرار واعتماد المدير (<span class="mono" dir="ltr">{_esc(report["manager_decision"])}</span>):</strong> {_esc(report["manager_comment"] or "تم الاعتماد")} · <span class="mono" dir="ltr">{_esc(report["acknowledged_at"])}</span></div>'
             if report["manager_decision"]
             else ""
         )
     else:
         qa_rows_html = "".join(
-            f"<tr><th>{_esc(q['label'])}</th><td>{_esc(QUESTION_OPTION_MAP[q['id']][q['default']])} <em>(قيمة افتراضية — لم يُعتمد بعد)</em></td></tr>"
+            f"<tr><th>{_fmt_bilingual(q['label'])}</th><td>{_fmt_bilingual(QUESTION_OPTION_MAP[q['id']][q['default']])} <em>(قيمة افتراضية — لم يُعتمد بعد)</em></td></tr>"
             for q in QUICK_REPORT_QUESTIONS
         )
         status_label = "UNSAVED PREVIEW"
+        status_tone = "medium"
         note_html = ""
         manager_html = ""
 
     if summary["alerts"]:
         alerts_rows_html = "".join(
-            f"<tr><td>{_esc(a['alert_id'])}</td><td><span class=\"badge\">{_esc(a['severity'])}</span></td><td>{_esc(a['reason'])}</td><td>{_esc(a['detected_at'])}</td></tr>"
+            f'<tr><td><code dir="ltr">{_esc(a["alert_id"])}</code></td><td><span class="badge {_badge_tone(a["severity"])}" dir="ltr">{_esc(a["severity"])}</span></td><td>{_esc(a["reason"])}</td><td><span class="mono" dir="ltr">{_esc(a["detected_at"])}</span></td></tr>'
             for a in summary["alerts"]
         )
     else:
@@ -539,7 +556,7 @@ def print_quick_report(case_id: int):
 
     if summary["static_triage_items"]:
         triage_rows_html = "".join(
-            f"<tr><td>{_esc(t['name'])}</td><td><span class=\"badge\">{_esc(t['verdict'])} ({_esc(t['risk_score'])}/100)</span></td><td><code>{_esc(t['sha256'][:24])}...</code></td><td>{_esc(t['detail'])}</td></tr>"
+            f'<tr><td><span class="mono" dir="ltr">{_esc(t["name"])}</span></td><td><span class="badge {_badge_tone(t["verdict"])}" dir="ltr">{_esc(t["verdict"])} ({_esc(t["risk_score"])}/100)</span></td><td><code dir="ltr">{_esc(t["sha256"][:24])}...</code></td><td>{_esc(t["detail"])}</td></tr>'
             for t in summary["static_triage_items"]
         )
     else:
@@ -550,60 +567,66 @@ def print_quick_report(case_id: int):
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>تقرير فرز وتحقيق فوري · {_esc(cmeta['reference'])}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/brand-mark.svg">
+  <title>تقرير فرز وتحقيق فوري · {_esc(cmeta["reference"])}</title>
+  <link rel="stylesheet" href="/static/fonts.css">
+  <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/quick-report-print.css">
   <script src="/static/quick-report-print.js" defer></script>
 </head>
 <body>
   <div class="print-toolbar">
-    <div><strong>SOCify Tactical Workbench · SOC / V6</strong> — تقرير فرز وتحقيق جاهز للطباعة والتصعيد</div>
-    <div>
+    <div class="toolbar-brand">
+      <img src="/static/brand-mark.svg" width="22" height="22" alt="">
+      <span><strong dir="ltr">SOCify · SOC / V6</strong> — تقرير فرز وتحقيق جاهز للطباعة والتصعيد</span>
+    </div>
+    <div class="toolbar-actions">
       <button type="button" id="trigger-print-btn">طباعة التقرير / حفظ PDF</button>
       <a class="secondary" href="/cases/{case_id}?tab=reports">العودة للقضية</a>
     </div>
   </div>
   <main class="report-sheet">
     <header class="report-header">
-      <div>
-        <div class="brand-kicker">SOCify Tactical Workbench · Instant Incident Triage Report</div>
-        <h1 class="report-title">{_esc(cmeta['reference'])} — {_esc(cmeta['title'])}</h1>
+      <div class="header-main">
+        <div class="brand-kicker"><img src="/static/brand-mark.svg" width="20" height="20" alt=""><span dir="ltr">SOCify Tactical Workbench · SOC / V6 · Instant Triage Report</span></div>
+        <h1 class="report-title"><span class="mono" dir="ltr">{_esc(cmeta["reference"])}</span> — {_esc(cmeta["title"])}</h1>
       </div>
-      <div><span class="badge">{_esc(status_label)}</span></div>
+      <div><span class="badge {status_tone}" dir="ltr">{_esc(status_label)}</span></div>
     </header>
 
     <section class="meta-grid" aria-label="بيانات القضية الأساسية">
-      <div class="meta-item"><strong>مرجع القضية</strong>{_esc(cmeta['reference'])}</div>
-      <div class="meta-item"><strong>المسؤول عن التحقيق (Owner)</strong>{_esc(cmeta['owner_name'])}</div>
-      <div class="meta-item"><strong>الخطورة والحالة</strong>{_esc(cmeta['severity']).upper()} · {_esc(cmeta['status'])}</div>
-      <div class="meta-item"><strong>إجمالي السجلات المفحوصة</strong>{_esc(summary['logs_count'])} سجل</div>
-      <div class="meta-item"><strong>التنبيهات وتطابقات المراقبة</strong>{_esc(summary['alerts_count'])} تنبيه ({_esc(summary['watchlist_hits_count'])} Watchlist)</div>
-      <div class="meta-item"><strong>وقت التوليد (UTC)</strong>{_esc(iso_now())}</div>
+      <div class="meta-item"><strong>مرجع القضية</strong><span class="mono" dir="ltr">{_esc(cmeta["reference"])}</span></div>
+      <div class="meta-item"><strong>المسؤول عن التحقيق</strong>{_esc(cmeta["owner_name"])}</div>
+      <div class="meta-item"><strong>الخطورة والحالة</strong><span class="mono" dir="ltr">{_esc(cmeta["severity"]).upper()} · {_esc(cmeta["status"])}</span></div>
+      <div class="meta-item"><strong>إجمالي السجلات المفحوصة</strong>{_esc(summary["logs_count"])} سجل</div>
+      <div class="meta-item"><strong>التنبيهات وتطابقات المراقبة</strong>{_esc(summary["alerts_count"])} تنبيه (<span class="mono" dir="ltr">{_esc(summary["watchlist_hits_count"])} Watchlist</span>)</div>
+      <div class="meta-item"><strong>وقت التوليد (UTC)</strong><span class="mono" dir="ltr">{_esc(iso_now())}</span></div>
     </section>
 
     {note_html}
     {manager_html}
 
-    <h2 class="section-title">أولًا: خلاصة التحقيق الموجهة (Guided Triage Assessment)</h2>
+    <h2 class="section-title">أولًا: خلاصة التحقيق الموجهة <span class="en-sub" dir="ltr">(Guided Triage Assessment)</span></h2>
     <table class="qa-table">
-      <thead><tr><th style="width:42%">محور التقييم</th><th>النتيجة المعتمدة</th></tr></thead>
+      <thead><tr><th class="qa-col-topic">محور التقييم</th><th>النتيجة المعتمدة</th></tr></thead>
       <tbody>{qa_rows_html}</tbody>
     </table>
 
-    <h2 class="section-title">ثانيًا: تنبيهات القواعد المدمجة وقائمة المراقبة (Triggered Alerts &amp; Watchlist Hits)</h2>
+    <h2 class="section-title">ثانيًا: تنبيهات القواعد المدمجة وقائمة المراقبة <span class="en-sub" dir="ltr">(Triggered Alerts &amp; Watchlist Hits)</span></h2>
     <table class="evidence-table">
       <thead><tr><th>المعرف</th><th>الخطورة</th><th>القاعدة / سبب التنبيه</th><th>وقت الرصد</th></tr></thead>
       <tbody>{alerts_rows_html}</tbody>
     </table>
 
-    <h2 class="section-title">ثالثًا: نتائج الفحص الساكن الآمن للملفات والبريد (Static File &amp; Email Triage — Never Executed)</h2>
+    <h2 class="section-title">ثالثًا: نتائج الفحص الساكن الآمن للملفات والبريد <span class="en-sub" dir="ltr">(Static File &amp; Email Triage — Never Executed)</span></h2>
     <table class="evidence-table">
       <thead><tr><th>الملف / الرسالة</th><th>الحكم الأولي</th><th>SHA-256</th><th>الملاحظات الفنية</th></tr></thead>
       <tbody>{triage_rows_html}</tbody>
     </table>
 
     <footer class="report-footer">
-      <span>SOCify Tactical Workbench (SOC / V6) — Generated automatically from structured analyst selections &amp; verified case evidence</span>
-      <span>Case #{case_id} · {_esc(cmeta['reference'])}</span>
+      <span dir="ltr">SOCify Tactical Workbench (SOC / V6) — Structured analyst selections &amp; verified case evidence</span>
+      <span class="mono" dir="ltr">Case #{case_id} · {_esc(cmeta["reference"])}</span>
     </footer>
   </main>
 </body>

@@ -349,10 +349,7 @@ def seed_builtin_rules(connection: sqlite3.Connection) -> int:
     workspaces = [int(row[0]) for row in connection.execute("SELECT id FROM training_workspaces").fetchall()]
     if not workspaces:
         return 0
-    known_mitre = {
-        str(row[0])
-        for row in connection.execute("SELECT technique_id FROM attack_techniques WHERE revoked = 0").fetchall()
-    }
+    known_mitre = {str(row[0]) for row in connection.execute("SELECT technique_id FROM attack_techniques WHERE revoked = 0").fetchall()}
     now = iso_now()
     inserted_total = 0
     for ws_id in workspaces:

@@ -141,7 +141,9 @@ def _ensure_watchlist_rule_id(connection: sqlite3.Connection, ws_id: int, fallba
     return rule_id
 
 
-def _event_matches_watchlist_entry(event_row: sqlite3.Row, entry: sqlite3.Row, parsed_ips: list[ipaddress.IPv4Address | ipaddress.IPv6Address], blob_lower: str) -> tuple[bool, str]:
+def _event_matches_watchlist_entry(
+    event_row: sqlite3.Row, entry: sqlite3.Row, parsed_ips: list[ipaddress.IPv4Address | ipaddress.IPv6Address], blob_lower: str
+) -> tuple[bool, str]:
     kind = str(entry["indicator_type"])
     target = str(entry["value"])
     if kind == "ip":
@@ -202,10 +204,7 @@ def evaluate_watchlist_for_event(connection: sqlite3.Connection, event_id: int) 
     for col in ("source_ip", "destination_ip"):
         if row[col]:
             candidate_ip_strs.append(str(row[col]))
-    blob_lower = " \n ".join(
-        str(row[col] or "")
-        for col in ("title", "description", "username", "hostname", "file_hash", "raw_data")
-    ).lower()
+    blob_lower = " \n ".join(str(row[col] or "") for col in ("title", "description", "username", "hostname", "file_hash", "raw_data")).lower()
     candidate_ip_strs.extend(IPV4_IN_TEXT.findall(blob_lower))
 
     parsed_ips: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
@@ -334,10 +333,14 @@ def create_watchlist_entry():
     now = iso_now()
     ws_id = workspace_id()
     with transaction():
-        existing = get_db().execute(
-            "SELECT * FROM watchlist_entries WHERE workspace_id = ? AND indicator_type = ? AND value = ?",
-            (ws_id, kind, normalized_val),
-        ).fetchone()
+        existing = (
+            get_db()
+            .execute(
+                "SELECT * FROM watchlist_entries WHERE workspace_id = ? AND indicator_type = ? AND value = ?",
+                (ws_id, kind, normalized_val),
+            )
+            .fetchone()
+        )
         if existing:
             get_db().execute(
                 "UPDATE watchlist_entries SET is_active = 1, severity = ?, note = COALESCE(NULLIF(?, ''), note), updated_at = ? WHERE id = ?",

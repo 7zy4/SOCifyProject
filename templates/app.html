@@ -1,10 +1,10 @@
-{% from "_nav_icon.html" import nav_icon %}
+{% from "_nav_icon.html" import nav_icon, brand_mark %}
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="theme-color" content="#0C101A">
-
+  <meta name="theme-color" content="#0B0E14">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand-mark.svg') }}">
   <link rel="preload" href="{{ url_for('static', filename='fonts/IBMPlexSansArabic-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
   <script src="{{ url_for('static', filename='localization.js') }}"></script>
   <script src="{{ url_for('static', filename='theme.js') }}"></script>
@@ -27,7 +27,6 @@
   {% if operational %}<script src="{{ url_for('static', filename='v4-workspace.js') }}" defer></script>{% endif %}
 </head>
 <body class="app-shell{{ ' autopsy-shell' if operational else '' }}">
-  {% include "_ink_filters.html" %}
   <a class="skip-link" href="#workspace" data-ui-copy>انتقل إلى مساحة العمل</a>
   {% if operational %}<script src="{{ url_for('static', filename='autopsy_team.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_investigation.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_profile.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_operations.js') }}" defer></script>{% endif %}
   <aside id="workspace-navigation" class="sidebar" aria-label="تنقل المنصة" data-ui-attributes>
@@ -47,35 +46,35 @@
       <a data-section="playbooks" data-nav-permission="cases.read" href="/playbooks" data-ui-copy>{{ nav_icon("playbooks") }}كتيبات الاستجابة</a>
       <a data-section="analysis-library" data-nav-permission="cases.read" href="/analysis-library" data-ui-copy>{{ nav_icon("analysis-library") }}مكتبة التحليل المحلي</a>
       <a data-section="team" data-nav-permission="cases.read" href="/team" data-ui-copy>{{ nav_icon("team") }}الفريق</a>
-      <a data-section="audit" data-nav-permission="audit.read" href="/audit" data-ui-copy><span aria-hidden="true">≋</span>سجل التدقيق</a>
-      <a data-section="admin" data-nav-permission="users.read" href="/admin" data-ui-copy><span aria-hidden="true">▦</span>الإدارة</a>
+      <a data-section="audit" data-nav-permission="audit.read" href="/audit" data-ui-copy>{{ nav_icon("audit") }}سجل التدقيق</a>
+      <a data-section="admin" data-nav-permission="users.read" href="/admin" data-ui-copy>{{ nav_icon("admin") }}الإدارة</a>
       {% else %}
-      <a data-section="dashboard" href="/dashboard" data-ui-copy><span aria-hidden="true">⌂</span>نظرة عامة</a>
-      <a data-section="events" href="/events" data-ui-copy><span aria-hidden="true">≋</span>مستكشف السجلات</a>
-      <a data-section="alerts" href="/alerts" data-ui-copy><span aria-hidden="true">!</span>التنبيهات</a>
-      <a data-section="rules" href="/rules" data-ui-copy><span aria-hidden="true">⟐</span>قواعد الكشف</a>
-      <a data-section="sources" href="/sources" data-ui-copy><span aria-hidden="true">⇣</span>المصادر</a>
-      <a data-section="imports" href="/imports" data-ui-copy><span aria-hidden="true">↥</span>مركز الاستيراد</a>
-      <a data-section="incidents" href="/incidents" data-ui-copy><span aria-hidden="true">◇</span>التحقيقات</a>
-      <a data-section="attack" href="/attack"><span aria-hidden="true">▦</span>MITRE ATT&amp;CK</a>
-      <a data-section="hunt" href="/hunt" data-ui-copy><span aria-hidden="true">⌕</span>الصيد</a>
-      <a data-section="graph" href="/graph" data-ui-copy><span aria-hidden="true">⌘</span>الرسم الزمني</a>
-      <a data-section="playbooks" href="/playbooks"><span aria-hidden="true">▷</span>Playbooks</a>
-      <a data-section="audit" href="/audit" data-ui-copy>التدقيق</a>
-      <a data-section="admin" href="/admin" data-ui-copy>الإدارة</a>
+      <a data-section="dashboard" href="/dashboard" data-ui-copy>{{ nav_icon("dashboard") }}نظرة عامة</a>
+      <a data-section="events" href="/events" data-ui-copy>{{ nav_icon("events") }}مستكشف السجلات</a>
+      <a data-section="alerts" href="/alerts" data-ui-copy>{{ nav_icon("alerts") }}التنبيهات</a>
+      <a data-section="rules" href="/rules" data-ui-copy>{{ nav_icon("rules") }}قواعد الكشف</a>
+      <a data-section="sources" href="/sources" data-ui-copy>{{ nav_icon("sources") }}المصادر</a>
+      <a data-section="imports" href="/imports" data-ui-copy>{{ nav_icon("imports") }}مركز الاستيراد</a>
+      <a data-section="incidents" href="/incidents" data-ui-copy>{{ nav_icon("incidents") }}التحقيقات</a>
+      <a data-section="attack" href="/attack">{{ nav_icon("attack") }}MITRE ATT&amp;CK</a>
+      <a data-section="hunt" href="/hunt" data-ui-copy>{{ nav_icon("hunt") }}الصيد</a>
+      <a data-section="graph" href="/graph" data-ui-copy>{{ nav_icon("graph") }}الرسم الزمني</a>
+      <a data-section="playbooks" href="/playbooks">{{ nav_icon("playbooks") }}Playbooks</a>
+      <a data-section="audit" href="/audit" data-ui-copy>{{ nav_icon("audit") }}التدقيق</a>
+      <a data-section="admin" href="/admin" data-ui-copy>{{ nav_icon("admin") }}الإدارة</a>
       <a data-section="team" href="/team" data-ui-copy>{{ nav_icon("team") }}الفريق والمهام</a>
       {% endif %}
     </nav>
-    <div class="sidebar-foot"><strong translate="no">TACTICAL WORKBENCH</strong><span data-ui-copy>{{ 'فرز سريع · كشف مدمج · فحص آمن' if operational else 'فرز السجلات والفحص السريع والتقارير' }}</span></div>
+    <div class="sidebar-foot"><strong translate="no">SOC / V6 · Tactical</strong><span data-ui-copy>{{ 'فرز سريع · كشف مدمج · فحص آمن' if operational else 'فرز السجلات والفحص السريع والتقارير' }}</span></div>
   </aside>
   <div class="app-main">
     <header class="topbar">
-      <button id="menu-toggle" aria-controls="workspace-navigation" class="icon-button" type="button" aria-label="فتح القائمة" aria-expanded="false" data-ui-attributes><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
-      <span aria-label="{{ product_name }}" class="brand topbar-brand" translate="no"><span class="brand-wordmark" lang="en" dir="ltr">SOCify<span class="brand-stamp">SOC / V6</span></span></span>
+      <button id="menu-toggle" aria-controls="workspace-navigation" class="icon-button" type="button" aria-label="فتح القائمة" aria-expanded="false" data-ui-attributes><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <span aria-label="{{ product_name }}" class="brand topbar-brand" translate="no">{{ brand_mark() }}<span class="brand-wordmark" lang="en" dir="ltr">SOCify<span class="brand-stamp" aria-hidden="true">SOC / V6</span></span></span>
       {% if operational %}<div class="investigation-context" data-investigation-context></div>{% endif %}
       <div class="section-context sr-only"><p id="section-kicker" class="eyebrow">Incident investigation</p><h1 id="section-title" data-ui-copy>مركز العمليات</h1></div>
       <div class="appearance-tools"><div data-theme-control></div><button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button></div>
-      <div class="user-menu"><span><strong>{{ user.name }}</strong><small><span data-user-role>{{ user.role }}</span> · {{ user.team or '—' }}</small></span><a class="avatar" href="/profile" aria-label="الملف الشخصي" data-ui-attributes>{{ user.name[:1] }}</a><button type="button" class="icon-button" data-account-switch aria-label="تبديل الحساب" title="تبديل الحساب" data-ui-attributes><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 7h14l-4-4M17 17H3l4 4M21 7l-4 4M3 17l4-4"/></svg></button><form method="post" action="{{ url_for('auth.logout_page') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button ghost compact" type="submit" data-ui-copy>خروج</button></form></div>
+      <div class="user-menu"><span><strong>{{ user.name }}</strong><small><span data-user-role>{{ user.role }}</span> · {{ user.team or '—' }}</small></span><a class="avatar" href="/profile" aria-label="الملف الشخصي" data-ui-attributes>{{ user.name[:1] }}</a><button type="button" class="icon-button" data-account-switch aria-label="تبديل الحساب" title="تبديل الحساب" data-ui-attributes><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h14l-4-4M17 17H3l4 4M21 7l-4 4M3 17l4-4"/></svg></button><form method="post" action="{{ url_for('auth.logout_page') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button ghost compact" type="submit" data-ui-copy>خروج</button></form></div>
     </header>
     <div id="global-message" class="global-message" role="status" aria-live="polite" hidden></div>
     <main id="workspace" tabindex="-1" aria-busy="true"><div class="loading"><span></span><p data-ui-copy>جارٍ تحميل البيانات المصرّح بها…</p></div></main>

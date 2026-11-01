@@ -16,14 +16,12 @@ def test_guided_dropdown_report_validation_printable_html_xss_safety_and_manager
         f"/api/cases/{case_id}/imports",
         json={
             "filename": "ps.json",
-            "content": json.dumps(
-                [{"title": "Encoded PowerShell", "process_name": "powershell.exe", "command_line": "powershell.exe -enc AAAA"}]
-            ),
+            "content": json.dumps([{"title": "Encoded PowerShell", "process_name": "powershell.exe", "command_line": "powershell.exe -enc AAAA"}]),
         },
     )
     client.post(
         f"/api/cases/{case_id}/quick-file-triage",
-        data={"file": (io.BytesIO(b"MZ" + b"\x00" * 128), "remittance.pdf")},
+        data={"file": (io.BytesIO(b"MZ" + b"\x00" * 128 + b"CreateRemoteThread VirtualAllocEx"), "remittance.pdf")},
         content_type="multipart/form-data",
     )
 
@@ -72,6 +70,7 @@ def test_guided_dropdown_report_validation_printable_html_xss_safety_and_manager
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html_text
     assert "quick-report-print.css" in html_text
     assert "remittance.pdf" in html_text
+    assert '<span class="badge high" dir="ltr">high_risk' in html_text
     assert "PowerShell" in html_text
 
     # 5. Direct 1-click escalation to SOC Manager

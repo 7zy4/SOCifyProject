@@ -206,11 +206,11 @@ def _ingest_records_for_source(
             record["source"] = source_name
             if record.get("source_type") in (None, "import", "training"):
                 record["source_type"] = "http" if source_row["type"] == "http" else str(source_row["type"])
-            raw_payload = record.get("raw_payload") if isinstance(record.get("raw_payload"), dict) else {}
+            raw_payload = record.get("raw_payload")
+            if not isinstance(raw_payload, dict):
+                raw_payload = {}
             explicit_ext_id = raw_payload.get("external_id") or raw_payload.get("id")
-            record["idempotency_key"] = (
-                f"siem:{source_id}:{explicit_ext_id}" if explicit_ext_id else f"siem:{source_id}:{content_hash}:{idx}"
-            )
+            record["idempotency_key"] = f"siem:{source_id}:{explicit_ext_id}" if explicit_ext_id else f"siem:{source_id}:{content_hash}:{idx}"
             try:
                 ev_id, triggered, duplicate = ingest_event(
                     get_db(),
@@ -232,7 +232,7 @@ def _ingest_records_for_source(
             except (ValueError, OverflowError, sqlite3.Error):
                 rejected += 1
 
-        if job_db_id is not None:
+        if job_db_id is not None and target_case_id is not None:
             from .autopsy_domain import custody, touch_case
 
             get_db().execute(

@@ -1,4 +1,4 @@
-"""Generate the CSS palette from the same token document used for Figma."""
+"""Generate the CSS palette from the same token document used for design & reports."""
 
 import argparse
 import json
@@ -7,8 +7,8 @@ from pathlib import Path
 
 def generate() -> str:
     root = Path(__file__).resolve().parents[1] / "static"
-    tokens = json.loads((root / "design-tokens.json").read_text())
-    css = "/* Generated from design-tokens.json. Keep Figma aliases and CSS in sync. */\n"
+    tokens = json.loads((root / "design-tokens.json").read_text(encoding="utf-8"))
+    css = "/* Generated from design-tokens.json. Keep design tokens and CSS in sync. */\n"
     css += ":root {\n"
     css += "".join(f"  --{key}: {value};\n" for key, value in tokens["css"].items())
     css += "".join(f"  --{key}: var(--{target});\n" for key, target in tokens["aliases"].items())
@@ -21,7 +21,7 @@ def generate() -> str:
         css += "".join(f"  --{key}: {values[index]};\n" for key, values in tokens["colors"].items())
         css += "}\n"
     css += 'html[lang="en"] {\n  --font-ui: var(--font-en),var(--font-ar),sans-serif;\n  --font-display: var(--font-display-en);\n  --font-comic-voice: var(--font-voice-en);\n}\n'
-    css += 'html[dir="rtl"] {\n  --ink-shadow: -5px 5px 0 var(--ink-black);\n  --control-shadow: -3px 3px 0 var(--ink-black);\n  --hero-shadow: -7px 7px 0 var(--ink-black);\n}\n'
+    css += 'html[dir="rtl"] {\n  --ink-shadow: none;\n  --control-shadow: none;\n  --hero-shadow: none;\n}\n'
     css += "@media print {\n  :root[data-theme] {\n    color-scheme: light;\n"
     css += "".join(f"    --{key}: {values[0]};\n" for key, values in tokens["colors"].items())
     css += "  }\n}\n"
@@ -35,10 +35,10 @@ def main() -> None:
     target = Path(__file__).resolve().parents[1] / "static" / "tokens.css"
     result = generate()
     if args.check:
-        if target.read_text() != result:
+        if target.read_text(encoding="utf-8") != result:
             raise SystemExit("tokens.css differs from design-tokens.json; run python -m scripts.generate_interface_tokens")
     else:
-        target.write_text(result)
+        target.write_text(result, encoding="utf-8")
 
 
 if __name__ == "__main__":

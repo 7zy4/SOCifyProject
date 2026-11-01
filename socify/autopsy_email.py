@@ -303,15 +303,19 @@ def inspect_email_with_attachment_triage(content: bytes) -> dict:
         raw_filename = str(part.get_filename() or "")
         if is_attachment:
             digest = hashlib.sha256(data).hexdigest()
-            triage = inspect_static_bytes(raw_filename or "attachment.bin", data, part.get_content_type()) if data else {
-                "filename": raw_filename or "empty.bin",
-                "size": 0,
-                "sha256": digest,
-                "verdict": "low_signal_static_only",
-                "risk_score": 0,
-                "flags": [],
-                "execution": "never executed",
-            }
+            triage = (
+                inspect_static_bytes(raw_filename or "attachment.bin", data, part.get_content_type())
+                if data
+                else {
+                    "filename": raw_filename or "empty.bin",
+                    "size": 0,
+                    "sha256": digest,
+                    "verdict": "low_signal_static_only",
+                    "risk_score": 0,
+                    "flags": [],
+                    "execution": "never executed",
+                }
+            )
             email_risk = max(email_risk, min(100, email_risk // 2 + int(triage.get("risk_score", 0))))
             attachments.append(
                 {

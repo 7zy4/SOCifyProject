@@ -138,7 +138,7 @@
         const body = { indicator_type: indicatorType, value: String(rawValue).trim(), severity: "high", note: noteText };
         if (caseId) body.source_case_id = Number(caseId);
         await api("/api/watchlist", { method: "POST", body });
-        btn.textContent = t("✓ في المراقبة");
+        btn.textContent = t("في المراقبة");
       } catch (error) {
         btn.disabled = false;
         handleError(error);
@@ -276,25 +276,25 @@
     const mails=records.items;
     for(const record of mails) {
       const mail=record.payload;
-      const headers=node("dl");for(const [key,value] of Object.entries(mail.headers))if(value)headers.append(node("dt",{text:key}),node("dd",{"data-user-content":"true",text:value}));
+      const headers=node("dl");for(const [key,value] of Object.entries(mail.headers))if(value)headers.append(node("dt",{dir:"ltr",text:key}),node("dd",{"data-user-content":"true",text:value}));
       const body=node("div",{class:"panel-body"});
       if (mail.email_verdict) {
         body.append(node("p", { class: "notice", text: `${t("الحكم الساكن")}: ${mail.email_verdict} (${mail.email_risk_score || 0}/100)` }));
       }
-      const wlActions = node("div", { class: "action-row" });
-      if (mail.sender_email) wlActions.append(node("span", { text: `From: ${mail.sender_email} ` }), quickWatchlistBtn("email", mail.sender_email, caseId, "Suspicious EML sender"));
-      if (mail.reply_to_email && mail.reply_to_email !== mail.sender_email) wlActions.append(node("span", { text: `Reply-To: ${mail.reply_to_email} ` }), quickWatchlistBtn("email", mail.reply_to_email, caseId, "Mismatched EML Reply-To"));
+      const wlActions = node("div", { class: "email-sender-row" });
+      if (mail.sender_email) wlActions.append(node("span", { class: "email-sender-chip" }, [node("bdi", { class: "mono", dir: "ltr", text: `From: ${mail.sender_email}` }), quickWatchlistBtn("email", mail.sender_email, caseId, "Suspicious EML sender")]));
+      if (mail.reply_to_email && mail.reply_to_email !== mail.sender_email) wlActions.append(node("span", { class: "email-sender-chip" }, [node("bdi", { class: "mono", dir: "ltr", text: `Reply-To: ${mail.reply_to_email}` }), quickWatchlistBtn("email", mail.reply_to_email, caseId, "Mismatched EML Reply-To")]));
       if (wlActions.children.length) body.append(wlActions);
       if (mail.header_flags?.length) {
         body.append(node("ul", {}, mail.header_flags.map(f => node("li", { text: `[${f.severity}] ${f.detail}` }))));
       }
-      body.append(headers,node("p",{class:"cell-meta",text:"SHA-256: "+mail.sha256}),node("h4",{text:t("نص الرسالة")}),node("pre",{class:"email-body",tabindex:0,"data-user-content":"true",text:mail.body||t("لا يوجد نص متاح")}));
+      body.append(headers,node("p",{class:"cell-meta mono",dir:"ltr",text:"SHA-256: "+mail.sha256}),node("h4",{text:t("نص الرسالة")}),node("pre",{class:"email-body",tabindex:0,"data-user-content":"true",text:mail.body||t("لا يوجد نص متاح")}));
       if(mail.body_truncated)body.append(node("p",{class:"notice",text:t("النص المعروض مختصر؛ الأصل محفوظ في الحجر.")}));
       body.append(node("details",{},[node("summary",{text:t("الروابط المرصودة")+" · "+number(mail.urls.length)}),node("ul",{class:"email-links"},mail.urls.map(value=>node("li",{},[node("bdi",{dir:"ltr","data-user-content":"true",text:value}), " ", quickWatchlistBtn("url", value, caseId, "Extracted EML URL")])))]));
       body.append(table([
         {label:t("المرفق"),value:att=>att.original_filename||att.filename},
         {label:t("النوع المعلن"),value:"content_type"},
-        {label:t("الفحص الساكن (بدون تشغيل)"),value:att=>att.triage?`${att.triage.verdict} (${att.triage.risk_score}/100) · ${att.triage.detected_magic}${att.triage.extension_mismatch?" [تعارض امتداد!]":""}`:t("بصمة فقط")},
+        {label:t("الفحص الساكن (بدون تشغيل)"),value:att=>att.triage?`${att.triage.verdict} (${att.triage.risk_score}/100) · ${att.triage.detected_magic}${att.triage.extension_mismatch?" · "+t("تعارض امتداد"):""}`:t("بصمة فقط")},
         {label:t("الحجم"),value:"size"},
         {label:"SHA-256",value:att=>node("div",{},[node("bdi",{dir:"ltr",text:att.sha256})," ",quickWatchlistBtn("sha256",att.sha256,caseId,`Attachment ${att.original_filename||att.filename}`)])},
       ],mail.attachments));

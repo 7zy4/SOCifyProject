@@ -1,9 +1,10 @@
+{% from "_nav_icon.html" import brand_mark %}
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="theme-color" content="#0C101A">
-
+  <meta name="theme-color" content="#0B0E14">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand-mark.svg') }}">
   <link rel="preload" href="{{ url_for('static', filename='fonts/IBMPlexSansArabic-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
   <script src="{{ url_for('static', filename='localization.js') }}"></script>
   <script src="{{ url_for('static', filename='theme.js') }}"></script>
@@ -15,21 +16,25 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
   <script src="{{ url_for('static', filename='register.js') }}" defer></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='design-system.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='comic-workspace.css') }}">
 </head>
 <body class="auth-shell">
-  {% include "_ink_filters.html" %}
   <div class="appearance-tools auth-tools"><div data-theme-control></div><button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button></div>
   <a class="skip-link" href="#register-form" data-ui-copy>انتقل إلى النموذج</a>
   <main class="auth-layout">
     <section class="auth-panel" aria-labelledby="register-title">
-      <a class="brand" aria-label="{{ product_name }}" translate="no" href="{{ url_for('ui.index') }}"><span class="brand-wordmark" lang="en" dir="ltr">SOCify</span></a>
-      <div><p class="eyebrow">SOC TEAM</p><h1 id="register-title" data-ui-copy>{{ 'انضم إلى فريق التحقيق' if operational else 'ابدأ رحلة فريق الأمن' }}</h1><p data-ui-copy>{{ 'استخدم الدعوة التي أصدرها مدير فريقك للبريد نفسه. التسجيل العام مغلق.' if operational else 'سجّل حسابًا فرديًا أو أنشئ مساحة فريق مستقلة أو انضم بدعوة مديرك.' }}</p></div>
+      <a class="brand" translate="no" href="{{ url_for('ui.index') }}">{{ brand_mark() }}<span class="brand-wordmark" lang="en" dir="ltr">SOCify<span class="brand-stamp" aria-hidden="true">SOC / V6</span></span></a>
+      <div class="auth-copy">
+        <p class="eyebrow" data-ui-copy>فريق العمليات الأمنية</p>
+        <h1 id="register-title" data-ui-copy>{{ 'انضم إلى فريق التحقيق' if operational else 'ابدأ رحلة فريق الأمن' }}</h1>
+        <p data-ui-copy>{{ 'استخدم الدعوة التي أصدرها مدير فريقك للبريد نفسه. التسجيل العام مغلق.' if operational else 'سجّل حسابًا فرديًا أو أنشئ مساحة فريق مستقلة أو انضم بدعوة مديرك.' }}</p>
+      </div>
       <p class="auth-assurance" data-ui-copy>عزل مساحة العمل · سياسة كلمة مرور · سجل تدقيق</p>
     </section>
     <section class="auth-card">
       <form id="register-form" method="post" action="{{ url_for('auth.register_form') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <header><p class="eyebrow" data-ui-copy>حساب جديد</p><h2 data-ui-copy>{{ 'بيانات عضو الفريق' if operational else 'بيانات عضو الفريق' }}</h2></header>
+        <header><p class="eyebrow" data-ui-copy>حساب جديد</p><h2 data-ui-copy>بيانات عضو الفريق</h2></header>
         {% if csrf_error %}<div class="notice" role="alert">{{ csrf_error }}<p dir="ltr">CSRF: {{ csrf_reason }} · {{ csrf_correlation_id }}</p></div>{% endif %}
         {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="notice {{ category }}" role="alert" data-ui-copy>{{ message }}</div>{% endfor %}{% endwith %}
         <label for="name" data-ui-copy>الاسم</label><input id="name" name="name" required minlength="2" maxlength="120" autocomplete="name">

@@ -261,7 +261,14 @@ def case_claim(case_id: int):
             (case_id, current_actor, current_actor, now),
         )
         get_db().execute("UPDATE case_tasks SET assignee = ? WHERE case_id = ? AND assignee IS NULL", (current_actor, case_id))
-        _history(get_db(), case_id, "case_claimed", {"assignee": row["assignee"], "status": row["status"]}, {"assignee": current_actor, "status": new_status}, "Claimed case ownership")
+        _history(
+            get_db(),
+            case_id,
+            "case_claimed",
+            {"assignee": row["assignee"], "status": row["status"]},
+            {"assignee": current_actor, "status": new_status},
+            "Claimed case ownership",
+        )
         custody(case_id, "case_claimed", {"owner": current_actor, "status": new_status})
         record_audit(get_db(), "claim", "case", case_id, details={"owner": current_actor})
     return case_summary(case_id)

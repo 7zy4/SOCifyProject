@@ -1,3 +1,4 @@
+import os
 import shutil
 import threading
 from pathlib import Path
@@ -8,6 +9,9 @@ from werkzeug.serving import make_server
 
 
 def launch_browser(playwright):
+    channel = os.environ.get("SOCIFY_BROWSER_CHANNEL")
+    if channel:
+        return playwright.chromium.launch(channel=channel)
     executable = shutil.which("chromium") or shutil.which("google-chrome")
     return playwright.chromium.launch(executable_path=executable) if executable else playwright.chromium.launch()
 

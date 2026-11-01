@@ -36,6 +36,31 @@ python run.py
 
 لإعداد بيئة النشر المؤسسي (Gunicorn والعمّال المستقلين والنسخ الاحتياطي وعزل الخدمات الاختياري على لينكس/Docker) راجع [دليل التشغيل](docs/operations-v4.md) و[ضوابط الأمان](docs/security-guide.md).
 
+## التحقق قبل النشر
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m ruff format --check .
+python -m ruff check .
+python -m mypy --platform linux socify scripts app.py run.py
+python -m scripts.generate_interface_tokens --check
+python -m scripts.audit_brand --tokens-only
+python -m bandit -c pyproject.toml -r socify scripts app.py run.py
+python -m pip_audit -r requirements.txt
+```
+
+تشغّل GitHub Actions اختبارات التكامل والأمان والتغطية والمتصفح والحاويات على Linux، بما فيها خدمة التحليل المعزولة. تتطلب المجموعة الكاملة هذه البيئة؛ تشغيل Python على Windows وحده لا يوفّر عزل Landlock/seccomp أو إخراج التقارير الأصلي. تفاصيل الخدمة في [دليل التشغيل](docs/operations-v4.md).
+
+لفحص الواجهة محليًا:
+
+```bash
+npm install --no-save --ignore-scripts --package-lock=false axe-core@4.14.0
+python -m playwright install chromium
+python -m pytest -m e2e tests/e2e/test_interface_theme.py tests/e2e/test_interface_languages.py
+```
+
+يمكن استخدام Edge المثبت على Windows بدل تنزيل Chromium بتعيين `$env:SOCIFY_BROWSER_CHANNEL = 'msedge'` في PowerShell قبل أمر pytest. تُحفظ لقطات الاختبار في `work/` و`artifacts/` المستبعدين من Git؛ تستخدم الاختبارات قواعد بيانات مؤقتة منفصلة.
+
 ## بنية المشروع
 
 | المسار | المسؤولية |

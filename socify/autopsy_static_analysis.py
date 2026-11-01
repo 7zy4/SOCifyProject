@@ -114,12 +114,49 @@ def analyze_sample(payload):
 
 
 EXECUTABLE_EXTS = {
-    ".exe", ".dll", ".sys", ".scr", ".com", ".pif", ".msi", ".msp", ".bat", ".cmd",
-    ".ps1", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh", ".hta", ".lnk", ".jar", ".elf", ".apk",
+    ".exe",
+    ".dll",
+    ".sys",
+    ".scr",
+    ".com",
+    ".pif",
+    ".msi",
+    ".msp",
+    ".bat",
+    ".cmd",
+    ".ps1",
+    ".vbs",
+    ".vbe",
+    ".js",
+    ".jse",
+    ".wsf",
+    ".wsh",
+    ".hta",
+    ".lnk",
+    ".jar",
+    ".elf",
+    ".apk",
 }
 BENIGN_DOC_EXTS = {
-    ".pdf", ".txt", ".csv", ".log", ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp",
-    ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".rtf", ".mp3", ".mp4",
+    ".pdf",
+    ".txt",
+    ".csv",
+    ".log",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".bmp",
+    ".webp",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".ppt",
+    ".pptx",
+    ".rtf",
+    ".mp3",
+    ".mp4",
 }
 MACRO_OOXML_EXTS = {".docm", ".xlsm", ".pptm", ".dotm", ".xltm"}
 ARCHIVE_DANGEROUS_EXTS = EXECUTABLE_EXTS | {".iso", ".img", ".vhd", ".vhdx", ".chm", ".cpl", ".reg"}
@@ -270,7 +307,8 @@ def inspect_static_bytes(
                 if len(infos) > 1024 or (ratio > 100 and total_uncompressed > 50 * 1024 * 1024):
                     add_flag("zip_bomb_ratio_warning", "high", 45, f"نسبة ضغط مرتفعة جدًا ({ratio}x) أو عدد ملفات ضخم داخل الأرشيف.")
                 macro_entries = [
-                    info for info in infos[:1024]
+                    info
+                    for info in infos[:1024]
                     if info.filename.lower().endswith(("vbaproject.bin", "vbadata.xml")) or "/macrosheets/" in info.filename.lower()
                 ]
                 if macro_entries:
@@ -279,7 +317,16 @@ def inspect_static_bytes(
                         try:
                             with zf.open(m_info) as m_stream:
                                 macro_buf = m_stream.read(262144).lower()
-                            for kw in (b"autoopen", b"document_open", b"workbook_open", b"wscript.shell", b"powershell", b"createobject", b"urldownloadtofile", b"shell"):
+                            for kw in (
+                                b"autoopen",
+                                b"document_open",
+                                b"workbook_open",
+                                b"wscript.shell",
+                                b"powershell",
+                                b"createobject",
+                                b"urldownloadtofile",
+                                b"shell",
+                            ):
                                 if kw in macro_buf:
                                     macro_keywords.append(kw.decode("ascii"))
                         except (RuntimeError, zipfile.BadZipFile, OSError):
@@ -291,10 +338,7 @@ def inspect_static_bytes(
                         70 if macro_keywords else 50,
                         f"تم رصد مشروع ماكرو VBA مضمّن داخل مستند Office{kw_note}.",
                     )
-                risky_members = [
-                    name for name in entry_names
-                    if PurePosixPath(name).suffix.lower() in ARCHIVE_DANGEROUS_EXTS
-                ]
+                risky_members = [name for name in entry_names if PurePosixPath(name).suffix.lower() in ARCHIVE_DANGEROUS_EXTS]
                 if risky_members:
                     add_flag(
                         "archive_contains_executable_or_script",
@@ -327,9 +371,7 @@ def inspect_static_bytes(
 
     # HTML smuggling & script execution indicators
     smuggling_hits = [
-        tok.decode("ascii")
-        for tok in (b"atob(", b"new blob(", b"blob([", b"mssaveoropenblob", b"createobjecturl(", b"fromcharcode(")
-        if tok in lower_window
+        tok.decode("ascii") for tok in (b"atob(", b"new blob(", b"blob([", b"mssaveoropenblob", b"createobjecturl(", b"fromcharcode(") if tok in lower_window
     ]
     if (magic_code in {"html_document", "text_or_script"} or declared_ext in {".html", ".htm", ".svg"}) and len(smuggling_hits) >= 2:
         add_flag(
@@ -375,10 +417,7 @@ def inspect_static_bytes(
             break
     joined_strings = "\n".join(strings)
     extracted_urls = list(dict.fromkeys(URL_EXTRACT_RE.findall(joined_strings)))[:50]
-    extracted_ips = [
-        ip for ip in dict.fromkeys(IPV4_EXTRACT_RE.findall(joined_strings))
-        if not ip.startswith(("0.", "127.", "255."))
-    ][:50]
+    extracted_ips = [ip for ip in dict.fromkeys(IPV4_EXTRACT_RE.findall(joined_strings)) if not ip.startswith(("0.", "127.", "255."))][:50]
     extracted_emails = list(dict.fromkeys(e.lower() for e in EMAIL_EXTRACT_RE.findall(joined_strings)))[:50]
 
     # Local YARA check (graceful pure-Python safety)

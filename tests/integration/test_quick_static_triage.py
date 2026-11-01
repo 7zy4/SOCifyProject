@@ -76,8 +76,7 @@ def test_ooxml_vba_macro_pdf_active_content_and_html_smuggling_triage(app, clien
     # 3. HTML smuggling page with high-entropy 256-byte window + atob/Blob
     high_entropy_blob = bytes(range(256)).hex()
     html_bytes = (
-        f"<html><body><script>const raw = atob('{high_entropy_blob}');"
-        "const b = new Blob([raw], {type:'application/octet-stream'});</script></body></html>"
+        f"<html><body><script>const raw = atob('{high_entropy_blob}');const b = new Blob([raw], {{type:'application/octet-stream'}});</script></body></html>"
     ).encode()
     html_resp = client.post(
         f"/api/cases/{case_id}/quick-file-triage",

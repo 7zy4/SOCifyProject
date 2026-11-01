@@ -1,12 +1,16 @@
 name: Enterprise Quality Gates
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
       - socify-version-2
       - socify-version-3
       - V4
+      - V5
+      - V6
+      - 'feat/v6-*'
 
 permissions:
   contents: read

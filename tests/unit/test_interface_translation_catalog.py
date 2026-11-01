@@ -6,11 +6,11 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_all_authored_operational_labels_have_english_translations():
-    script = (ROOT / "static" / "localization.js").read_text()
+    script = (ROOT / "static" / "localization.js").read_text(encoding="utf-8")
     catalog = json.JSONDecoder().raw_decode(script.split("const english = ", 1)[1])[0]
     missing = []
     for path in [*(ROOT / "static").glob("autopsy*.js"), ROOT / "static" / "soc-workbench.js", ROOT / "static" / "v4-workspace.js"]:
-        for match in re.finditer(r'(?:SOCifyLocale\.text|\bt)\(("(?:\\.|[^"\\])*")\)', path.read_text()):
+        for match in re.finditer(r'(?:SOCifyLocale\.text|\bt)\(("(?:\\.|[^"\\])*")\)', path.read_text(encoding="utf-8")):
             original = json.loads(match.group(1))
             if original not in catalog:
                 missing.append(f"{path.name}: {original}")

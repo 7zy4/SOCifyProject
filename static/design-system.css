@@ -13,7 +13,7 @@ input::placeholder,textarea::placeholder { color:var(--muted); opacity:1; }
 input[type="checkbox"],input[type="radio"] { min-height:18px; accent-color:var(--primary-fill); }
 textarea { min-height:110px; }
 label { font-size:13px; font-weight:700; }
-code,pre,.code-box,.mono { font-family:var(--font-ui); font-size:13px; line-height:1.7; }
+code,pre,.code-box,.mono { font-family:var(--font-mono),var(--font-ar),monospace; font-size:13px; line-height:1.65; }
 bdi,.mono,time { font-variant-numeric:tabular-nums; }
 .button { min-height:40px; gap:8px; padding:8px 14px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--text); font-size:13px; font-weight:700; }
 .button:hover { background:var(--panel-2); border-color:var(--muted); }
@@ -61,7 +61,7 @@ bdi,.mono,time { font-variant-numeric:tabular-nums; }
 .autopsy-shell .global-message { position:fixed; inset-block-start:calc(var(--header-height) + 12px); inset-inline:16px; margin-inline:auto; max-width:760px; z-index:200; box-shadow:0 5px 20px var(--ink-wash-66); }
 .channel-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin:0; gap:4px; padding-inline:12px; }
 .channel-tab { position:relative; display:flex; justify-content:center; align-items:center; gap:12px; min-height:64px; padding:14px 24px; isolation:isolate; font-size:14px; font-weight:700; color:var(--muted); text-decoration:none; text-align:center; }
-.channel-tab::before { content:""; position:absolute; inset:0; background:var(--panel-2); clip-path:polygon(8% 0,92% 0,100% 100%,0 100%); z-index:-1; }
+.channel-tab::before { display:none; }
 .channel-tab[aria-current="page"] { color:var(--blue); }
 .channel-tab[aria-current="page"]::before { background:var(--sidebar-active); }
 .channel-tab:hover::before { background:var(--sidebar-active); }
@@ -221,7 +221,7 @@ bdi,.mono,time { font-variant-numeric:tabular-nums; }
  .workspace-head .action-row { width:100%; }
  .channel-tabs { padding-inline:0; gap:2px; }
  .channel-tab { min-height:76px; gap:6px; padding:12px 6px; flex-direction:column; font-size:12px; }
- .channel-tab::before { clip-path:polygon(8% 0,92% 0,100% 100%,0 100%); }
+ .channel-tab::before { display:none; }
  .monitoring-toolbar { padding:16px; gap:10px; }
  .monitoring-toolbar > label:first-child { flex-basis:100%; }
  .monitoring-toolbar > label { flex:1; min-width:100px; }

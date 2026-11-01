@@ -1,9 +1,10 @@
+{% from "_nav_icon.html" import nav_icon, brand_mark %}
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="theme-color" content="#0C101A">
-
+  <meta name="theme-color" content="#0B0E14">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand-mark.svg') }}">
   <link rel="preload" href="{{ url_for('static', filename='fonts/IBMPlexSansArabic-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
   <script src="{{ url_for('static', filename='localization.js') }}"></script>
   <script src="{{ url_for('static', filename='theme.js') }}"></script>
@@ -14,12 +15,12 @@
   <title data-ui-copy>SOCify | الفرز والتحقيق الأمني السريع وإصدار التقارير</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='design-system.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='comic-workspace.css') }}">
 </head>
 <body class="landing">
-  {% include "_ink_filters.html" %}
   <a class="skip-link" href="#main" data-ui-copy>انتقل إلى المحتوى</a>
   <header class="landing-nav">
-    <a class="brand brand-surface" href="{{ url_for('ui.index') }}" aria-label="SOCify الرئيسية" data-ui-attributes><span class="brand-wordmark" lang="en" dir="ltr">SOCify</span></a>
+    <a class="brand brand-surface" href="{{ url_for('ui.index') }}" data-ui-attributes>{{ brand_mark() }}<span class="brand-wordmark" lang="en" dir="ltr">SOCify<span class="brand-stamp" aria-hidden="true">SOC / V6</span></span></a>
     <div class="appearance-tools"><div data-theme-control></div><button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button></div>
     <nav aria-label="التنقل الرئيسي" data-ui-attributes>
       {% if user %}
@@ -47,26 +48,44 @@
         </ul>
       </div>
       <div class="hero-console" aria-label="مسار تحليل الحادثة" data-ui-attributes>
-        <div class="console-bar"><span></span><strong data-ui-copy>مسار التحقيق</strong><small>Tactical triage</small></div>
+        <div class="console-bar">
+          <span class="status-dot" aria-hidden="true"></span>
+          <strong data-ui-copy>مسار التحقيق</strong>
+          <small class="mono" dir="ltr">CASE-2026-000084 · TLP:AMBER</small>
+        </div>
         <ol class="attack-chain">
-          <li data-ui-copy><span>01</span><div><strong>سجل أمني</strong><small data-ui-copy>تطبيع وحفظ المصدر الخام</small></div><b>مقبول</b></li>
-          <li data-ui-copy><span>02</span><div><strong>قاعدة كشف</strong><small data-ui-copy>تقييم محدد وسبب موثق</small></div><b>مطابقة</b></li>
-          <li data-ui-copy><span>03</span><div><strong>تنبيه</strong><small>Watchlist + ATT&amp;CK</small></div><b>حرج</b></li>
-          <li data-ui-copy><span>04</span><div><strong>تحقيق</strong><small>Static Triage + Quick Report</small></div><b>نشط</b></li>
+          <li>
+            <div class="console-step-main"><strong data-ui-copy>سجل أمني</strong><small class="mono" dir="ltr">Splunk HEC · WinEvent 4688 · powershell -enc</small></div>
+            <span class="badge medium" data-ui-copy>مطابقة</span>
+          </li>
+          <li>
+            <div class="console-step-main"><strong data-ui-copy>قائمة مراقبة مرنة</strong><small class="mono" dir="ltr">198.51.100.77 · billing-update@corp-mail.test</small></div>
+            <span class="badge critical" data-ui-copy>حرج</span>
+          </li>
+          <li>
+            <div class="console-step-main"><strong data-ui-copy>فحص أولي آمن بضغطة زر</strong><small class="mono" dir="ltr">invoice_q4.pdf.exe · DOS MZ · SHA-256 9f86d0…</small></div>
+            <span class="badge high" data-ui-copy>حكم الفرز</span>
+          </li>
+          <li>
+            <div class="console-step-main"><strong data-ui-copy>تقرير منسدل وتصعيد مباشر</strong><small class="mono" dir="ltr">9 / 9 · A4 Print · SOC Manager Escalation</small></div>
+            <span class="badge ok" data-ui-copy>تقرير فوري</span>
+          </li>
         </ol>
       </div>
     </section>
     <section id="capabilities" class="capabilities" aria-labelledby="capabilities-title">
-      <p class="eyebrow" data-ui-copy>منصة واحدة، دورة عمل كاملة</p>
-      <h2 id="capabilities-title" data-ui-copy>كل قرار يعود إلى دليل</h2>
+      <div class="section-intro">
+        <p class="eyebrow" data-ui-copy>منصة واحدة، دورة عمل كاملة</p>
+        <h2 id="capabilities-title" data-ui-copy>كل قرار يعود إلى دليل</h2>
+      </div>
       <div class="feature-grid">
-        <article><span>01</span><h3 data-ui-copy>سجلات SIEM وقواعد مدمجة</h3><p data-ui-copy>استورد ملفات السجلات أو اربطها مباشرة لتوليد التنبيهات تلقائياً فور وصولها.</p></article>
-        <article><span>02</span><h3 data-ui-copy>فحص أولي آمن بضغطة زر</h3><p data-ui-copy>افحص رسائل البريد ومرفقاتها والملفات المشبوهة ساكناً دون تشغيلها لكشف الامتدادات والمؤشرات الخطرة.</p></article>
-        <article><span>03</span><h3 data-ui-copy>قائمة مراقبة مرنة</h3><p data-ui-copy>احفظ عناوين الـ IP والإيميلات المشبوهة وطابقها فوراً مع السجلات والتنبيهات.</p></article>
-        <article><span>04</span><h3 data-ui-copy>تقرير منسدل وتصعيد مباشر</h3><p data-ui-copy>أجب عبر قوائم منسدلة سريعة واطبع التقرير النهائي أو صعّده مباشرة لمدير العمليات.</p></article>
+        <article><div class="feature-icon">{{ nav_icon("log-management") }}</div><h3 data-ui-copy>سجلات SIEM وقواعد مدمجة</h3><p data-ui-copy>استورد ملفات السجلات أو اربطها مباشرة لتوليد التنبيهات تلقائياً فور وصولها.</p></article>
+        <article><div class="feature-icon">{{ nav_icon("email-security") }}</div><h3 data-ui-copy>فحص أولي آمن بضغطة زر</h3><p data-ui-copy>افحص رسائل البريد ومرفقاتها والملفات المشبوهة ساكناً دون تشغيلها لكشف الامتدادات والمؤشرات الخطرة.</p></article>
+        <article><div class="feature-icon">{{ nav_icon("threat-intel") }}</div><h3 data-ui-copy>قائمة مراقبة مرنة</h3><p data-ui-copy>احفظ عناوين الـ IP والإيميلات المشبوهة وطابقها فوراً مع السجلات والتنبيهات.</p></article>
+        <article><div class="feature-icon">{{ nav_icon("reports") }}</div><h3 data-ui-copy>تقرير منسدل وتصعيد مباشر</h3><p data-ui-copy>أجب عبر قوائم منسدلة سريعة واطبع التقرير النهائي أو صعّده مباشرة لمدير العمليات.</p></article>
       </div>
     </section>
   </main>
-  <footer><span>SOCify</span><span data-ui-copy>الفرز والتحقيق الأمني السريع وإصدار التقارير</span></footer>
+  <footer><span class="mono" dir="ltr">SOCify · SOC / V6</span><span data-ui-copy>الفرز والتحقيق الأمني السريع وإصدار التقارير</span></footer>
 </body>
 </html>

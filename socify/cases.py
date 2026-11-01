@@ -303,11 +303,7 @@ def create_case():
 
 def _create_case(data: dict[str, Any]):
     reason = data["reason"] if "reason" in data and data["reason"] is not None else "tactical_triage"
-    objective = (
-        data["objective"]
-        if "objective" in data and data["objective"] is not None
-        else "التحقيق الأولي السريع وتحديد المؤشرات والإجراء المناسب"
-    )
+    objective = data["objective"] if "objective" in data and data["objective"] is not None else "التحقيق الأولي السريع وتحديد المؤشرات والإجراء المناسب"
     classification = data.get("classification", "confidential")
     if operational_mode():
         from .autopsy_domain import text_value

@@ -336,7 +336,9 @@ def quick_file_triage(case_id: int):
         if case["status"] == "closed":
             return error_response("CASE_CLOSED", "القضية مغلقة", 409)
         if raw_pack_id:
-            pack = get_db().execute("SELECT rules FROM autopsy_yara_packs WHERE id = ? AND workspace_id = ?", (int(raw_pack_id), case["workspace_id"])).fetchone()
+            pack = (
+                get_db().execute("SELECT rules FROM autopsy_yara_packs WHERE id = ? AND workspace_id = ?", (int(raw_pack_id), case["workspace_id"])).fetchone()
+            )
             if pack:
                 yara_source = pack["rules"]
         triage = inspect_static_bytes(original_name, content, upload.mimetype, yara_source=yara_source)

@@ -1,248 +1,248 @@
 {
   "colors": {
     "bg": [
-      "#E5D8B8",
-      "#0C101A"
+      "#F4F6F9",
+      "#0B0E14"
     ],
     "panel": [
-      "#F4ECD8",
-      "#141C2E"
+      "#FFFFFF",
+      "#111620"
     ],
     "panel-2": [
-      "#E7D9B8",
-      "#1D2942"
+      "#EDF1F6",
+      "#19202E"
     ],
     "text": [
-      "#141C2E",
-      "#F4ECD8"
+      "#111827",
+      "#ECF0F6"
     ],
     "muted": [
-      "#514936",
-      "#D6C7A9"
+      "#4B5565",
+      "#9AA6BA"
     ],
     "line": [
-      "#807052",
-      "#64789B"
+      "#CBD5E1",
+      "#2A3447"
     ],
     "line-soft": [
-      "#B5A481",
-      "#2E4268"
+      "#E2E8F0",
+      "#1E2636"
     ],
     "blue": [
-      "#1749A2",
-      "#90BAFF"
+      "#1854B8",
+      "#6EA8FE"
     ],
     "primary-fill": [
-      "#F5C518",
-      "#F5C518"
+      "#1854B8",
+      "#589BFF"
     ],
     "primary-hover": [
-      "#D99B00",
-      "#D99B00"
+      "#134394",
+      "#7BB2FF"
     ],
     "on-primary": [
-      "#07080C",
-      "#07080C"
+      "#FFFFFF",
+      "#080B10"
     ],
     "focus": [
-      "#1749A2",
-      "#F5C518"
+      "#1854B8",
+      "#6EA8FE"
     ],
     "red": [
-      "#A31622",
-      "#FF9DA5"
+      "#A61B29",
+      "#FF9AA4"
     ],
     "red-bg": [
-      "#F7DFD8",
-      "#3B1C2B"
+      "#FCE8EA",
+      "#33161D"
     ],
     "high": [
-      "#823700",
-      "#FFB981"
+      "#8A3800",
+      "#FFB37B"
     ],
     "high-bg": [
-      "#F6DEC0",
-      "#3B281D"
+      "#FDECE1",
+      "#332015"
     ],
     "amber": [
-      "#765100",
-      "#F5C518"
+      "#734F00",
+      "#F3C64F"
     ],
     "amber-bg": [
-      "#F2E1AE",
-      "#383019"
+      "#FBF1D4",
+      "#2E2612"
     ],
     "success": [
-      "#18682E",
-      "#83D99B"
+      "#146632",
+      "#6FD89C"
     ],
     "success-bg": [
-      "#DCE8C9",
-      "#153324"
+      "#E3F5E9",
+      "#122B1E"
     ],
     "info-bg": [
-      "#DEE4ED",
-      "#1D2942"
+      "#E8EFFA",
+      "#162238"
     ],
     "sidebar-bg": [
-      "#E7D9B8",
-      "#0C101A"
+      "#EDF1F6",
+      "#080B10"
     ],
     "sidebar-text": [
-      "#453E32",
-      "#D6C7A9"
+      "#334155",
+      "#9AA6BA"
     ],
     "sidebar-active": [
-      "#F5C518",
-      "#F5C518"
+      "#E2E8F0",
+      "#19202E"
     ],
     "hero-bg": [
-      "#E7D9B8",
-      "#141C2E"
+      "#FFFFFF",
+      "#111620"
     ],
     "window-bar": [
-      "#D6C7A9",
-      "#1D2942"
+      "#EDF1F6",
+      "#19202E"
     ],
     "window-bar-end": [
-      "#E7D9B8",
-      "#263040"
+      "#E2E8F0",
+      "#1E2636"
     ],
     "paper": [
-      "#F4ECD8",
-      "#F4ECD8"
+      "#FFFFFF",
+      "#FFFFFF"
     ],
     "paper-text": [
-      "#141C2E",
-      "#141C2E"
+      "#111827",
+      "#111827"
     ],
     "paper-muted": [
-      "#514936",
-      "#514936"
+      "#4B5565",
+      "#4B5565"
     ],
     "grid-line": [
-      "#B5A481",
-      "#2E4268"
+      "#E2E8F0",
+      "#1E2636"
     ],
     "terminal-bg": [
-      "#090D16",
-      "#090D16"
+      "#090C12",
+      "#090C12"
     ],
     "terminal-text": [
-      "#F4ECD8",
-      "#F4ECD8"
+      "#E6ECF5",
+      "#E6ECF5"
     ],
     "ink-black": [
-      "#07080C",
-      "#07080C"
+      "#080B10",
+      "#080B10"
     ],
     "border-ink": [
-      "#07080C",
-      "#07080C"
+      "#CBD5E1",
+      "#1E2636"
     ],
     "bg-stone": [
-      "#D6C7A9",
-      "#263040"
+      "#E2E8F0",
+      "#19202E"
     ],
     "border-rim": [
-      "#A59169",
-      "#2E4268"
+      "#CBD5E1",
+      "#263042"
     ],
     "cobalt-highlight": [
-      "#1D63DC",
-      "#1D63DC"
+      "#1854B8",
+      "#589BFF"
     ],
     "pulp-paper": [
-      "#F4ECD8",
-      "#F4ECD8"
+      "#FFFFFF",
+      "#FFFFFF"
     ],
     "pulp-aged": [
-      "#D6C7A9",
-      "#D6C7A9"
+      "#EDF1F6",
+      "#EDF1F6"
     ],
     "caption-yellow": [
-      "#F5C518",
-      "#F5C518"
+      "#1854B8",
+      "#589BFF"
     ],
     "severity-critical": [
-      "#C8232C",
-      "#C8232C"
+      "#C81E2B",
+      "#E5484D"
     ],
     "severity-high": [
-      "#E85D04",
-      "#E85D04"
+      "#C2410C",
+      "#F76B15"
     ],
     "severity-medium": [
-      "#D99B00",
-      "#D99B00"
+      "#A16207",
+      "#F5A623"
     ],
     "severity-low": [
-      "#3A86FF",
-      "#3A86FF"
+      "#1854B8",
+      "#589BFF"
     ],
     "status-resolved": [
-      "#2B9348",
-      "#2B9348"
+      "#15803D",
+      "#4CC38A"
     ],
     "white": [
       "#FFFFFF",
       "#FFFFFF"
     ],
     "text-muted": [
-      "#635943",
-      "#B7AD98"
+      "#64748B",
+      "#7E8B9F"
     ],
     "halftone": [
-      "#07080C10",
-      "#90BAFF0C"
+      "transparent",
+      "transparent"
     ],
     "hatch": [
-      "#07080C18",
-      "#07080C55"
+      "transparent",
+      "transparent"
     ],
     "spotlight": [
-      "#F5C51830",
-      "#F5C51824"
+      "transparent",
+      "transparent"
     ],
     "cobalt-wash": [
-      "#1D63DC22",
-      "#1D63DC38"
+      "#1854B814",
+      "#589BFF1A"
     ],
     "critical-wash": [
-      "#C8232C16",
-      "#C8232C28"
+      "#C81E2B12",
+      "#E5484D1C"
     ],
     "transparent": [
       "transparent",
       "transparent"
     ],
     "ink-wash-66": [
-      "#00000020",
-      "#00000020"
+      "#00000014",
+      "#00000040"
     ],
     "ink-wash-67": [
-      "#00000055",
-      "#00000055"
+      "#0F172A24",
+      "#00000070"
     ],
     "ink-wash-68": [
-      "#080D19A6",
-      "#080D19A6"
+      "#0F172A66",
+      "#05080DB8"
     ],
     "ink-wash-69": [
-      "#00000030",
-      "#00000030"
+      "#0F172A14",
+      "#00000045"
     ],
     "ink-wash-73": [
-      "RGB(20 43 73 / .18)",
-      "RGB(20 43 73 / .18)"
+      "RGB(15 23 42 / .12)",
+      "RGB(0 0 0 / .45)"
     ],
     "ink-wash-74": [
-      "RGB(20 43 73 / .45)",
-      "RGB(20 43 73 / .45)"
+      "RGB(15 23 42 / .42)",
+      "RGB(5 8 13 / .68)"
     ],
     "ink-wash-75": [
-      "RGB(20 43 73 / .12)",
-      "RGB(20 43 73 / .12)"
+      "RGB(15 23 42 / .08)",
+      "RGB(0 0 0 / .35)"
     ]
   },
   "spacing": [
@@ -250,16 +250,17 @@
     8,
     12,
     16,
+    20,
     24,
     32,
     48,
     64
   ],
   "radius": {
-    "6": 3,
-    "8": 3,
-    "12": 3,
-    "16": 3
+    "6": 6,
+    "8": 8,
+    "12": 12,
+    "16": 16
   },
   "typography": {
     "ar": {
@@ -268,7 +269,7 @@
         400,
         700
       ],
-      "lineHeight": 1.8,
+      "lineHeight": 1.65,
       "tracking": 0
     },
     "en": {
@@ -276,38 +277,34 @@
       "weights": [
         400,
         500,
-        600,
-        700
+        600
       ],
-      "lineHeight": 1.6,
+      "lineHeight": 1.5,
       "tracking": 0
     },
     "scale": {
       "caption": 12,
-      "label": 14,
-      "body": 15,
+      "label": 13,
+      "body": 14,
       "lead": 18,
-      "h3": 21,
-      "h2": 28,
-      "h1": 38,
-      "display": 56
+      "h3": 16,
+      "h2": 24,
+      "h1": 36,
+      "display": 52
     },
     "display": {
-      "en": "Bangers",
-      "ar": "Cairo"
+      "en": "IBM Plex Sans",
+      "ar": "IBM Plex Sans Arabic"
     },
     "voice": {
-      "en": "Comic Neue",
-      "ar": "Tajawal"
+      "en": "IBM Plex Sans",
+      "ar": "IBM Plex Sans Arabic"
     },
     "mono": "JetBrains Mono"
   },
   "visualReference": {
-    "type": "Original noir investigation design",
-    "description": "Ink-framed evidence panels, amber narration, cobalt rims, restrained halftone and crosshatching. Editable local atlas completed before application changes.",
-    "figmaFileKey": "AMxY6mcybMcfG2M4YiZHvD",
-    "figmaStatus": "File created; design upload blocked by Starter MCP limit",
-    "atlas": "docs/design/noir-atlas/index.html"
+    "type": "SOCify Tactical Workbench V6 — Swiss Security Instrument System",
+    "description": "Calm ink-slate neutral surfaces, precision 4px spacing scale, single tactical cobalt accent, semantic severity tokens, and JetBrains Mono tabular telemetry."
   },
   "aliases": {
     "bg-canvas": "bg",
@@ -327,21 +324,22 @@
     "font-en": "\"IBM Plex Sans\"",
     "font-ui": "var(--font-ar),var(--font-en),sans-serif",
     "font-body": "var(--font-ui)",
-    "font-display": "\"Cairo\",sans-serif",
-    "font-comic-voice": "\"Tajawal\",sans-serif",
+    "font-display": "var(--font-ui)",
+    "font-comic-voice": "var(--font-ui)",
     "font-mono": "\"JetBrains Mono\",monospace",
-    "font-display-en": "\"Bangers\",Impact,sans-serif",
-    "font-voice-en": "\"Comic Neue\",sans-serif",
-    "radius": "2px",
-    "sidebar-width": "240px",
-    "header-height": "76px",
-    "panel-gutter": "18px",
-    "ink-shadow": "5px 5px 0 var(--ink-black)",
-    "control-shadow": "3px 3px 0 var(--ink-black)",
-    "hero-shadow": "7px 7px 0 var(--ink-black)",
-    "text-shadow": "2px 2px 0 var(--ink-black)",
-    "panel-inset": "inset 2px 2px 0 var(--border-rim)",
-    "motion-fast": "140ms"
+    "font-display-en": "\"IBM Plex Sans\",var(--font-ar),sans-serif",
+    "font-voice-en": "\"IBM Plex Sans\",var(--font-ar),sans-serif",
+    "radius": "12px",
+    "sidebar-width": "248px",
+    "header-height": "60px",
+    "panel-gutter": "16px",
+    "ink-shadow": "none",
+    "control-shadow": "none",
+    "hero-shadow": "none",
+    "text-shadow": "none",
+    "panel-inset": "none",
+    "motion-fast": "140ms",
+    "ease-out": "cubic-bezier(0.22, 1, 0.36, 1)"
   },
   "fonts": [
     {
@@ -357,36 +355,6 @@
     {
       "family": "IBM Plex Sans Arabic",
       "file": "IBMPlexSansArabic-Bold.woff2",
-      "weight": "700"
-    },
-    {
-      "family": "Bangers",
-      "file": "Bangers-Regular.woff2",
-      "weight": "400"
-    },
-    {
-      "family": "Comic Neue",
-      "file": "ComicNeue-Regular.woff2",
-      "weight": "400"
-    },
-    {
-      "family": "Comic Neue",
-      "file": "ComicNeue-Bold.woff2",
-      "weight": "700"
-    },
-    {
-      "family": "Cairo",
-      "file": "Cairo.woff2",
-      "weight": "200 1000"
-    },
-    {
-      "family": "Tajawal",
-      "file": "Tajawal-Regular.woff2",
-      "weight": "400"
-    },
-    {
-      "family": "Tajawal",
-      "file": "Tajawal-Bold.woff2",
       "weight": "700"
     },
     {

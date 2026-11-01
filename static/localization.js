@@ -1229,7 +1229,11 @@
   "الحكم الأولي: {0} · درجة الخطورة: {1}/100 · البصمة الفعلية: {2}": "Preliminary verdict: {0} · Risk score: {1}/100 · Detected type: {2}",
   "الحكم: {0} · درجة الخطورة: {1}/100 · المرفقات المفحوصة: {2}": "Verdict: {0} · Risk score: {1}/100 · Attachments inspected: {2}",
   "ملخص الأدلة المضمنة تلقائيًا في التقرير: {0} سجل · {1} تنبيه ({2} قائمة مراقبة) · {3} فحص ساكن للملفات/البريد.": "Auto-included evidence summary: {0} logs · {1} alerts ({2} watchlist hits) · {3} static file/email checks.",
-  "حالة التقرير السريع: {0}{1}": "Quick report status: {0}{1}"
+  "حالة التقرير السريع: {0}{1}": "Quick report status: {0}{1}",
+  "في المراقبة": "Watchlisted",
+  "تعارض امتداد": "Extension mismatch",
+  "مساحة التحقيق الأمني": "Security investigation workspace",
+  "فريق العمليات الأمنية": "Security operations team"
 };
   function text(value) { return language === "en" ? (english[value] ?? value) : value; }
   function template(parts, ...values) {
