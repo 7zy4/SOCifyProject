@@ -63,7 +63,7 @@ def main():
         },
     )
     base = "/api/cases/" + str(case["id"])
-    call(base + "/approval", {"decision": "approved", "version": case["approval"]["version"], "reason": "Synthetic container acceptance scope"})
+    assert case["approval"]["state"] == "approved", case["approval"]
     call("/api/investigation-selection", {"case_ids": [case["id"]]})
     imported = call(
         base + "/imports", {"filename": "synthetic.jsonl", "content": '{"title":"Synthetic incident evidence","event_time":"2026-10-24T10:00:00Z"}\n'}
@@ -112,6 +112,7 @@ def main():
     assert restored["case_id"] != case["id"]
     restored_base = "/api/cases/" + str(restored["case_id"])
     restored_case = call(restored_base)
+    assert restored_case["approval"]["state"] == "pending", restored_case["approval"]
     call(restored_base + "/approval", {"decision": "approved", "version": restored_case["approval"]["version"], "reason": "Review restored synthetic evidence"})
     call("/api/investigation-selection", {"case_ids": [restored["case_id"]]})
     assert call("/api/cases/" + str(restored["case_id"]) + "/logs")["total"] == 1

@@ -25,6 +25,8 @@ def test_v4_real_demo_scope_review_roles_and_visual_matrix(tmp_path):
             "DATABASE": str(directory / "socify.db"),
             "ENV_NAME": "development",
             "DEMO_MODE": True,
+            "REQUIRE_CASE_APPROVAL": True,
+            "REQUIRE_INVESTIGATION_SELECTION": True,
             "SECRET_KEY": keys["SOCIFY_SECRET_KEY"],
             "CREDENTIAL_KEY": keys["SOCIFY_CREDENTIAL_KEY"],
         }

@@ -69,7 +69,7 @@ def test_soc_triage_case_tools_email_and_immediate_report_permissions(app, datab
             page.get_by_role("button", name="Close", exact=True).click()
             page.locator("#primary-nav [data-section=email-security]").click()
             page.locator("input[type=file][name=email]").set_input_files({"name": "investigation.eml", "mimeType": "message/rfc822", "buffer": message()})
-            page.get_by_role("button", name="Quarantine & inspect email", exact=True).click()
+            page.get_by_role("button", name="One-click email and attachment triage", exact=True).click()
             page.get_by_role("heading", name="Synthetic suspicious message", exact=True).wait_for()
             assert page.locator(".email-review img,.email-review iframe").count() == 0
             assert page.evaluate("typeof window.pwned === 'undefined'")
@@ -83,7 +83,7 @@ def test_soc_triage_case_tools_email_and_immediate_report_permissions(app, datab
             page.wait_for_url(f"**/cases/{case['id']}?tab=reports")
             expect(page.locator(".report-revision")).to_have_count(1)
             report = database.execute("SELECT payload FROM autopsy_reports WHERE case_id=?", (case["id"],)).fetchone()[0]
-            assert "eml_static_v1" in report
+            assert "v6_email_static_triage" in report
             assert database.execute("SELECT COUNT(*) FROM autopsy_reports WHERE case_id=?", (case["id"],)).fetchone()[0] == 1
             page.locator("[data-theme-select]").select_option("light")
             page.goto(base + "/monitoring")

@@ -44,6 +44,8 @@ def provision(directory: Path):
             "DATABASE": str(directory / "socify.db"),
             "ENV_NAME": "development",
             "DEMO_MODE": True,
+            # This retained V4 scenario includes an intake awaiting manager approval.
+            "REQUIRE_CASE_APPROVAL": True,
             "SECRET_KEY": keys["SOCIFY_SECRET_KEY"],
             "CREDENTIAL_KEY": keys["SOCIFY_CREDENTIAL_KEY"],
             "IMPORT_INLINE_EXECUTION": True,

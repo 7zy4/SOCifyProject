@@ -75,6 +75,8 @@ def audit_pages(output: Path) -> list[dict]:
                 "DATABASE": str(directory / "socify.db"),
                 "ENV_NAME": "development",
                 "DEMO_MODE": True,
+                "REQUIRE_CASE_APPROVAL": True,
+                "REQUIRE_INVESTIGATION_SELECTION": True,
                 "SECRET_KEY": keys["SOCIFY_SECRET_KEY"],
                 "CREDENTIAL_KEY": keys["SOCIFY_CREDENTIAL_KEY"],
             }

@@ -400,18 +400,21 @@ def escalate_quick_report(case_id: int):
 @quick_reports_api.get("/api/reports/escalated")
 @require_permission("cases.read")
 def list_escalated_reports():
+    from .operational import case_scope
+
+    scope, scope_args = case_scope(current_user() or {})
     rows = (
         get_db()
         .execute(
-            """SELECT qr.*, c.reference AS case_reference, c.title AS case_title, c.severity AS case_severity, c.status AS case_status,
+            f"""SELECT qr.*, c.reference AS case_reference, c.title AS case_title, c.severity AS case_severity, c.status AS case_status,
                       COALESCE(u.name, u.email) AS investigator_name
                FROM case_quick_reports qr
                JOIN incident_cases c ON c.id = qr.case_id
                LEFT JOIN users u ON u.id = COALESCE(qr.escalated_by, qr.prepared_by)
-               WHERE qr.workspace_id = ? AND qr.status IN ('escalated', 'acknowledged') AND c.archived_at IS NULL
+               WHERE qr.workspace_id = ? AND qr.status IN ('escalated', 'acknowledged') AND c.archived_at IS NULL{scope}
                ORDER BY CASE WHEN qr.status = 'escalated' THEN 0 ELSE 1 END, qr.escalated_at DESC, qr.updated_at DESC
                LIMIT 100""",
-            (workspace_id(),),
+            (workspace_id(), *scope_args),
         )
         .fetchall()
     )

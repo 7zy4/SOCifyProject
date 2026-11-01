@@ -24,6 +24,9 @@ Kept the existing IBM Plex/JetBrains fonts, neutral surfaces, cobalt accent, fea
 - Removed redundant accessible labels from textual brand links; decorative version stamps are hidden from assistive technology.
 - Corrected `high_risk` static-triage results using the low-severity report colour. The existing report workflow test now checks the high-severity badge.
 - Corrected optional-value narrowing in SIEM ingestion and formatted the files rejected by the repository's formatter.
+- Restricted the escalated-report inbox to cases visible to the current user, preventing disclosure of other investigators' case summaries.
+- Updated container/performance acceptance for V6 direct case creation, retained explicit approval/selection in the V4 demo, and aligned browser/font assertions with the current interface.
+- Removed two obsolete synthetic-fixture entries from the secret baseline; no new secrets were accepted into the baseline.
 
 ## Local verification
 
@@ -38,6 +41,7 @@ Environment: Windows, Python 3.13.7, Microsoft Edge through Playwright, syntheti
 - OpenAPI regeneration produced no specification differences; all JavaScript files passed Node syntax checks.
 - Browser design review covered sign-in, cases, monitoring, quick reports and the retained landing page at desktop and 390px widths, in Arabic/English and light/dark combinations. The corrected pages fit their viewport and emitted no JavaScript page errors. Dense monitoring tables scroll within their container on mobile.
 - All 13 browser tests in `test_interface_theme.py`, `test_interface_languages.py` and `test_browser.py` passed (428.62 seconds). The public-page typography, responsiveness and accessibility test also passed independently after the final accessible-label correction.
+- 48 focused V6 validation tests passed, including report access, invalid requests, watchlist correlation, retained-sample integrity, file signatures, spoofed extensions and bounded archive inspection.
 
 Local visual evidence is stored in ignored `artifacts/unslop-before`, `artifacts/unslop-after` and `artifacts/unslop-final` directories. Machine-readable test results are in the ignored `artifacts/readiness-v6-*.xml` files.
 

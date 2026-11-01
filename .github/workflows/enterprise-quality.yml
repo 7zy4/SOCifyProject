@@ -38,7 +38,7 @@ jobs:
       - run: python -m scripts.generate_openapi
       - run: git diff --exit-code docs/api/openapi.yaml
       - uses: ./.github/actions/analysis-backend
-      - run: python -m pytest -q --cov=socify --cov-branch --cov-report=xml --cov-fail-under=90
+      - run: python -m pytest -q --cov=socify --cov-branch --cov-report=xml --cov-report=term-missing --cov-fail-under=90
       - run: sudo apt-get update && sudo apt-get install --yes poppler-utils
       - name: Validate long bilingual report with the isolated native renderer
         run: |
@@ -46,6 +46,7 @@ jobs:
           pdftotext -bbox-layout "$RUNNER_TEMP/socify-long-report/long-report.pdf" "$RUNNER_TEMP/socify-long-report/bbox.xml"
           python -m tests.container.verify_report_layout --output "$RUNNER_TEMP/socify-long-report" --bbox "$RUNNER_TEMP/socify-long-report/bbox.xml"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
         with:
           name: coverage
           path: coverage.xml

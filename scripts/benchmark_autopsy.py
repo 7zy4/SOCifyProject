@@ -89,10 +89,7 @@ def main():
         )
         ensure(case.status_code == 201, "case creation")
         case_id, base = case.json["id"], f"/api/cases/{case.json['id']}"
-        approval = client.post(
-            base + "/approval", json={"decision": "approved", "version": case.json["approval"]["version"], "reason": "Synthetic capacity scope"}
-        )
-        ensure(approval.status_code == 200, "case approval")
+        ensure(case.json["approval"]["state"] == "approved", "direct case approval")
         ensure(client.post("/api/investigation-selection", json={"case_ids": [case_id]}).status_code == 200, "case scope selection")
         original = "\n".join(
             json.dumps(
