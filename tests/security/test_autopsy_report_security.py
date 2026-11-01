@@ -47,7 +47,7 @@ def test_rendered_reports_escape_active_content_and_never_resolve_network(monkey
     assert b"&lt;script" in files["html"]
     assert b"\\u202e" in files["html"]
     assert files["md"].count(b"```") == 2 * sum(1 for line in files["md"].splitlines() if line.startswith(b"## "))
-    assert not files["md"].startswith(b"# SOCify Digital Autopsy\n\n<script")
+    assert not files["md"].startswith(b"# SOCify Tactical Workbench\n\n<script")
     with zipfile.ZipFile(io.BytesIO(files["docx"])) as archive:
         assert b"&lt;script" in archive.read("word/document.xml")
         assert b'TargetMode="External"' not in archive.read("word/_rels/document.xml.rels")

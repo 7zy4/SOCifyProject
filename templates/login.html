@@ -9,7 +9,7 @@
   <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
-  <meta name="description" content="SOCify منصة تحليل الحوادث والتحقيق وإصدار التقارير" data-ui-attributes>
+  <meta name="description" content="SOCify منصة الفرز والتحقيق الأمني السريع وإصدار التقارير الفورية" data-ui-attributes>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-ui-copy>تسجيل الدخول | {{ product_name }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
@@ -23,7 +23,7 @@
   <main class="auth-layout">
     <section class="auth-panel" aria-labelledby="auth-title">
       <a class="brand" aria-label="{{ product_name }}" translate="no" href="{{ url_for('ui.index') }}"><span class="brand-wordmark" lang="en" dir="ltr">SOCify</span></a>
-      <div><p class="eyebrow">{{ 'DIGITAL INCIDENT INVESTIGATION' if operational else 'SECURE OPERATIONS WORKSPACE' }}</p><h1 id="auth-title" data-ui-copy>من الأدلة إلى تحقيق موثق</h1><p data-ui-copy>{{ 'مساحة عمل داخلية للتحليل والتحقيق والاستجابة والتقارير. استخدم حساب فريقك المصرح به.' if operational else 'سجّل دخولك للوصول إلى مساحة التحقيق المصرّح بها. كل محاولة دخول مسجلة ومحدودة المعدّل.' }}</p></div>
+      <div><p class="eyebrow">{{ 'TACTICAL SOC WORKBENCH' if operational else 'SECURE OPERATIONS WORKSPACE' }}</p><h1 id="auth-title" data-ui-copy>من اللوقز والمرفقات إلى تقرير فوري</h1><p data-ui-copy>{{ 'مساحة فرز وتحقيق سريع للسجلات والمرفقات وقوائم المراقبة وإصدار التقارير الفورية. استخدم حساب فريقك المصرح به.' if operational else 'سجّل دخولك للوصول إلى مساحة التحقيق المصرّح بها. كل محاولة دخول مسجلة ومحدودة المعدّل.' }}</p></div>
       <ol class="auth-flow" aria-hidden="true"><li data-ui-copy>الأدلة</li><li data-ui-copy>التحقيق</li><li data-ui-copy>التقارير</li></ol>
       <p class="auth-assurance" data-ui-copy>جلسات محمية · MFA متاح · Default deny</p>
     </section>

@@ -1,5 +1,5 @@
 {
-  "name": "SOCify Digital Autopsy",
+  "name": "SOCify V6 Tactical Workbench",
   "build": {
     "dockerfile": "Dockerfile"
   },

@@ -14,7 +14,7 @@ def test_case_first_context_membership_and_retired_routes(autopsy_case, app, cli
     assert client.get("/scores").status_code == 410
     assert client.get("/dashboard").headers["Location"] == "/cases"
     assert client.get("/health/ready").status_code == 200
-    assert "SOCify Digital Autopsy" in client.get("/cases").text
+    assert "SOCify Tactical Workbench" in client.get("/cases").text
     assert 'href="/lab"' not in client.get("/cases").text
     assert (
         client.post("/api/auth/register", json={"name": "Public User", "email": "public@example.test", "password": "Training-Safe-Password-2026!"}).status_code

@@ -236,7 +236,7 @@ async function autopsyCases(page = null, query = null) {
   window.history.replaceState(null, "", location.pathname + location.search);
   begin("cases");
   document.getElementById("section-title").textContent = SOCifyLocale.text("إدارة القضايا");
-  document.getElementById("section-kicker").textContent = "SOCIFY DIGITAL AUTOPSY";
+  document.getElementById("section-kicker").textContent = "SOCIFY TACTICAL WORKBENCH";
   const data = await api(`/api/cases?page=${page}&page_size=25&q=${encodeURIComponent(query)}`);
   const search = node("input", { name: "q", type: "search", value: query, maxlength: 200, placeholder: SOCifyLocale.text("الاسم أو مرجع القضية") });
   const filters = node("form", { class: "filter-row", "aria-label": SOCifyLocale.text("بحث القضايا") }, [field(SOCifyLocale.text("بحث"), search), node("button", { type: "submit", class: "button ghost", text: SOCifyLocale.text("بحث") })]);
@@ -309,7 +309,7 @@ async function autopsyCase(caseId) {
   if (window.SOCifyV4?.intake(current)) return;
   document.getElementById("section-title").textContent = current.reference;
   document.getElementById("section-kicker").textContent = current.reference;
-  document.title = `${current.reference} | SOCify Digital Autopsy`;
+  document.title = `${current.reference} | SOCify Tactical Workbench`;
   const restricted = current.full_case_access === false;
   if (restricted && !["summary", "logs"].includes(selected)) selected = "logs";
   const assetData = restricted ? { items: [] } : await api(`/api/cases/${caseId}/records?kind=asset&limit=100`);

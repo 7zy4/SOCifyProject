@@ -37,7 +37,7 @@ def build_config() -> dict[str, object]:
     return {
         "ENV_NAME": environment,
         "CODESPACE_PUBLIC_HOST": codespace_host,
-        "PRODUCT_NAME": "SOCify Digital Autopsy",
+        "PRODUCT_NAME": "SOCify Tactical Workbench",
         "LEGACY_TRAINING_TESTS": False,
         "REQUIRE_CASE_APPROVAL": True,
         "REQUIRE_INVESTIGATION_SELECTION": True,

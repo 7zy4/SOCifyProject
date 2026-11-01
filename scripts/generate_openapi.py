@@ -127,9 +127,9 @@ def generate() -> dict[str, object]:
     return {
         "openapi": "3.1.0",
         "info": {
-            "title": "SOCify Digital Autopsy API",
-            "version": "4.0.0",
-            "description": "Case-centered investigation with manager intake approval and a server-session selection of one or two related cases. General training and unscoped legacy data endpoints return 410 in operational mode. New cases require title, reason and objective and remain locked until approved. Structured records are published by /api/autopsy/catalog. All writes require an authenticated session, permission and CSRF token.",
+            "title": "SOCify Tactical Workbench API",
+            "version": "6.0.0",
+            "description": "Fast-triage SOC workbench API for SIEM log ingestion, built-in detection rules, safe static file and email inspection, suspicious IP and email watchlists, direct case ownership, and guided printable reporting with manager escalation. All writes require an authenticated session, permission and CSRF token.",
         },
         "servers": [{"url": "/"}],
         "paths": paths,

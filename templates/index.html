@@ -10,8 +10,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="SOCify منصة تحليل الحوادث والتحقيق وإصدار التقارير" data-ui-attributes>
-  <title data-ui-copy>SOCify | تحليل الحوادث والتحقيق والتقارير</title>
+  <meta name="description" content="SOCify منصة الفرز والتحقيق الأمني السريع وإصدار التقارير الفورية" data-ui-attributes>
+  <title data-ui-copy>SOCify | الفرز والتحقيق الأمني السريع وإصدار التقارير</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='design-system.css') }}">
 </head>
@@ -33,26 +33,26 @@
   <main id="main">
     <section class="hero">
       <div class="hero-copy">
-        <p class="eyebrow" data-ui-copy>مساحة واحدة للتحقيق الموثّق</p>
-        <h1 data-ui-copy>من السجلات إلى تحقيق موثّق</h1>
-        <p class="lead" data-ui-copy>منصة لتحليل الحوادث والتحقيق فيها وإصدار التقارير. اجمع السجلات والأدلة، وثّق النتائج والقرارات، وراجع الاستجابة داخل مساحة فريقك.</p>
+        <p class="eyebrow" data-ui-copy>السكين السويسرية لمحلل العمليات الأمنية</p>
+        <h1 data-ui-copy>من اللوقز والمرفقات إلى تقرير فوري</h1>
+        <p class="lead" data-ui-copy>منصة فرز وتحقيق أمني سريع تجمع سجلات السيم والقواعد المدمجة والفحص الساكن الآمن للملفات والإيميلات وقوائم المراقبة، مع استبيان منسدل يصدر تقريراً فورياً قابلاً للطباعة والتصعيد للمدير.</p>
         <div class="hero-actions">
           <a class="button primary large" href="{{ url_for('auth.login_page') }}" data-ui-copy>افتح مساحة التحقيق</a>
           <a class="button ghost large" href="#capabilities" data-ui-copy>استكشف القدرات</a>
         </div>
         <ul class="trust-list" aria-label="ضمانات المنصة" data-ui-attributes>
-          <li data-ui-copy>تحليل محلي مع حفظ أصل الدليل</li>
-          <li data-ui-copy>بيانات وأدلة قابلة للتتبع</li>
-          <li data-ui-copy>صلاحيات دقيقة وسجل تدقيق</li>
+          <li data-ui-copy>قواعد كشف مدمجة تعمل فور دخول السجلات</li>
+          <li data-ui-copy>فحص ساكن آمن للملفات ومرفقات البريد بضغطة زر</li>
+          <li data-ui-copy>قوائم مراقبة للإيميلات والـ IPs المشبوهة وتقرير منسدل فوري</li>
         </ul>
       </div>
       <div class="hero-console" aria-label="مسار تحليل الحادثة" data-ui-attributes>
-        <div class="console-bar"><span></span><strong data-ui-copy>مسار التحقيق</strong><small>Case workflow</small></div>
+        <div class="console-bar"><span></span><strong data-ui-copy>مسار التحقيق</strong><small>Tactical triage</small></div>
         <ol class="attack-chain">
           <li data-ui-copy><span>01</span><div><strong>سجل أمني</strong><small data-ui-copy>تطبيع وحفظ المصدر الخام</small></div><b>مقبول</b></li>
           <li data-ui-copy><span>02</span><div><strong>قاعدة كشف</strong><small data-ui-copy>تقييم محدد وسبب موثق</small></div><b>مطابقة</b></li>
-          <li data-ui-copy><span>03</span><div><strong>تنبيه</strong><small>Evidence + ATT&amp;CK</small></div><b>حرج</b></li>
-          <li data-ui-copy><span>04</span><div><strong>تحقيق</strong><small>Timeline + Playbook + Report</small></div><b>نشط</b></li>
+          <li data-ui-copy><span>03</span><div><strong>تنبيه</strong><small>Watchlist + ATT&amp;CK</small></div><b>حرج</b></li>
+          <li data-ui-copy><span>04</span><div><strong>تحقيق</strong><small>Static Triage + Quick Report</small></div><b>نشط</b></li>
         </ol>
       </div>
     </section>
@@ -60,13 +60,13 @@
       <p class="eyebrow" data-ui-copy>منصة واحدة، دورة عمل كاملة</p>
       <h2 id="capabilities-title" data-ui-copy>كل قرار يعود إلى دليل</h2>
       <div class="feature-grid">
-        <article><span>01</span><h3 data-ui-copy>كشف قابل للتفسير</h3><p data-ui-copy>قواعد آمنة بإصدارات، معاينة، منع تكرار، وقياس صحة حقيقي.</p></article>
-        <article><span>02</span><h3 data-ui-copy>تحليل الحوادث</h3><p data-ui-copy>فحص السجلات والمؤشرات والأصول لتحديد نطاق الحادثة ونتائجها.</p></article>
-        <article><span>03</span><h3 data-ui-copy>تحقيقات مترابطة</h3><p data-ui-copy>أدلة وملحوظات ومهام وسجل زمني وتقارير بإصدارات.</p></article>
-        <article><span>04</span><h3 data-ui-copy>تقارير موثقة</h3><p data-ui-copy>تقارير ثابتة بإصدارات وصيغ متعددة، مع مراجعة واعتماد وصلاحيات مشاركة.</p></article>
+        <article><span>01</span><h3 data-ui-copy>سجلات SIEM وقواعد مدمجة</h3><p data-ui-copy>استورد ملفات السجلات أو اربطها مباشرة لتوليد التنبيهات تلقائياً فور وصولها.</p></article>
+        <article><span>02</span><h3 data-ui-copy>فحص أولي آمن بضغطة زر</h3><p data-ui-copy>افحص رسائل البريد ومرفقاتها والملفات المشبوهة ساكناً دون تشغيلها لكشف الامتدادات والمؤشرات الخطرة.</p></article>
+        <article><span>03</span><h3 data-ui-copy>قائمة مراقبة مرنة</h3><p data-ui-copy>احفظ عناوين الـ IP والإيميلات المشبوهة وطابقها فوراً مع السجلات والتنبيهات.</p></article>
+        <article><span>04</span><h3 data-ui-copy>تقرير منسدل وتصعيد مباشر</h3><p data-ui-copy>أجب عبر قوائم منسدلة سريعة واطبع التقرير النهائي أو صعّده مباشرة لمدير العمليات.</p></article>
       </div>
     </section>
   </main>
-  <footer><span>SOCify</span><span data-ui-copy>تحليل الحوادث والتحقيق وإصدار التقارير</span></footer>
+  <footer><span>SOCify</span><span data-ui-copy>الفرز والتحقيق الأمني السريع وإصدار التقارير</span></footer>
 </body>
 </html>

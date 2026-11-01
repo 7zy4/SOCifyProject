@@ -17,7 +17,7 @@ const titles = {
   sources: [SOCifyLocale.text("مصادر البيانات"), "SOURCE MANAGEMENT"],
   imports: [SOCifyLocale.text("مركز الاستيراد"), "SAFE INGESTION"],
   incidents: [SOCifyLocale.text("مساحة التحقيقات"), "CASE MANAGEMENT"],
-  lab: [SOCifyLocale.text("مختبر المحاكاة"), "ATTACK CHAIN TRAINING"],
+  lab: [SOCifyLocale.text("مختبر الفرز التجريبي"), "TACTICAL TRIAGE LAB"],
   attack: ["MITRE ATT&CK", "COVERAGE ANALYTICS"],
   hunt: [SOCifyLocale.text("مساحة الصيد"), "PARAMETERIZED HUNTING"],
   graph: [SOCifyLocale.text("الرسم والأثر الزمني"), "EVIDENCE VISUALIZATION"],
@@ -763,7 +763,7 @@ async function renderPlaybooks() {
   const root = node("div");
   const cards = node("div", { class: "cards" });
   data.items.forEach((item) => cards.append(node("article", { class: "card" }, [node("div", { class: "card-meta" }, [badge(`v${item.active_version}`), badge(SOCifyLocale.template`${item.step_count} خطوات`), badge(item.trigger_type)]), node("h3", { text: item.name }), node("p", { text: item.description }), node("p", { text: SOCifyLocale.text("تأثير محاكى داخل DB فقط · لا أوامر خارجية") }), node("div", { class: "action-row" }, [button(SOCifyLocale.text("معاينة"), async () => { try { const result = await api(`/api/playbooks/${item.id}/preview`, { method: "POST", body: { parameters: {} } }); window.alert(JSON.stringify(result, null, 2)); } catch (error) { handleError(error); } }, "primary")])])));
-  root.append(pageHead(SOCifyLocale.text("مكتبة الاستجابة المحاكية"), SOCifyLocale.text("State machine بإصدارات وموافقات وتراجع؛ external_effects=false")), data.items.length ? cards : emptyState(SOCifyLocale.text("لا توجد Playbooks منشورة"), SOCifyLocale.text("فعّل بيانات التطوير أو أنشئ Playbook بإصدار منشور.")));
+  root.append(pageHead(SOCifyLocale.text("مكتبة إجراءات الاستجابة"), SOCifyLocale.text("State machine بإصدارات وموافقات وتراجع؛ external_effects=false")), data.items.length ? cards : emptyState(SOCifyLocale.text("لا توجد Playbooks منشورة"), SOCifyLocale.text("فعّل بيانات التطوير أو أنشئ Playbook بإصدار منشور.")));
   finish(root);
 }
 

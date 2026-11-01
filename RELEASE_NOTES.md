@@ -1,13 +1,20 @@
-# Release notes
+# سجل الإصدارات (Release Notes)
 
-## Enterprise platform release candidate
+## V6 — SOCify Tactical Workbench (منصة الفرز والتحقيق الأمني السريع)
 
-- Rebuilt the repository around an application factory, idempotent schema migrations, workspace scoping, secure sessions, RBAC, MFA, audit, and encrypted source credentials.
-- Added normalized ingestion for CSV, JSON, JSONL, Syslog, Linux auth, web logs, Sysmon XML, and EVTX.
-- Added typed detection DSL, event-time windows, ordered sequences, deduplicated alerts, rule versions, preview, rollback, clone, health, and bounded backfill.
-- Added investigation lifecycle, evidence hashing, tasks, notes, optimistic concurrency, closure gates, report revisions, and reopen support.
-- Added deterministic attack-chain simulation, ATT&CK coverage, hunting, IoCs, graph/timeline/SSE, simulated SOAR, and deterministic scoring.
-- Replaced legacy fake interactions with an RTL responsive interface backed by real APIs.
-- Added Docker, Compose, Codespaces, health checks, backup/restore, OpenAPI, security documentation, fixtures, and CI quality gates.
+- **تحول الهوية الكامل إلى "السكين السويسرية" للعمليات الأمنية (`SOCify Tactical Workbench` / `SOC / V6`):** إعادة توجيه المنصة من بيئة محاكاة/حوكمة مطولة إلى أداة فرز وتحقيق أولي سريع (عمق 1، سطح 10) لمحللي ومديري SOC والمحققين وطوارئ خارج الدوام وتحديات التحليل السريع (CTF).
+- **اعتماد خطة تنفيذ V6 الشاملة (`docs/v6-plan.md`):**
+  1. إلغاء قيد موافقة المدير المسبقة واستلام ملكية القضايا (`Direct Case Ownership`) مباشرة من المحللين والمحققين.
+  2. ربط سجلات SIEM مباشرة بجانب استيراد الملفات، مع حزمة قواعد كشف مدمجة تولّد التنبيهات تلقائياً فور دخول اللوقز.
+  3. فحص أولي ساكن وآمن للملفات ومرفقات البريد (`.eml`) بضغطة زر دون تشغيل المحتوى ودون اشتراط Docker.
+  4. قائمة مراقبة مرنة (`Watchlist`) للإيميلات وعناوين الـ IP المشبوهة مع مطابقة تلقائية ورجعية للسجلات.
+  5. استبيان تقرير موجّه بقوائم منسدلة يولّد تقريراً فورياً قابلاً للطباعة ويتصعّد مباشرة للمدير.
 
-Release status and measured acceptance are recorded in `docs/qa/final-acceptance-report.md` and must not be inferred from this change list.
+---
+
+## الأساس التقني الموروث من الإصدارات السابقة
+
+- بنية Flask معزولة المساحات (`workspace_id`) مع جلسات محمية، صلاحيات أدوار (RBAC)، مصادقة ثنائية (MFA)، تشفير الأسرار، وسجل تدقيق كامل.
+- تطبيع واستيعاب السجلات بصيغ CSV وJSON وJSONL وSyslog وLinux Auth وWeb Logs وSysmon XML وEVTX وPCAP.
+- محرك قواعد كشف حتمي بنوافذ زمنية وتسلسلات أحداث ومنع تكرار التنبيهات ودعم مجموعة Sigma المحلية وكتالوج MITRE ATT&CK.
+- حفظ الأدلة الأصلية ببصمات `SHA-256` وسلسلة حيازة قابلة للتحقق، مع واجهة ثنائية اللغة (عربي RTL / إنجليزي LTR).

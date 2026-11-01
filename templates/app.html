@@ -10,7 +10,7 @@
   <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
-  <meta name="description" content="SOCify منصة تحليل الحوادث والتحقيق وإصدار التقارير" data-ui-attributes>
+  <meta name="description" content="SOCify منصة الفرز والتحقيق الأمني السريع وإصدار التقارير الفورية" data-ui-attributes>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token }}">
   <meta name="section" content="{{ section }}">
@@ -66,12 +66,12 @@
       <a data-section="team" href="/team" data-ui-copy>{{ nav_icon("team") }}الفريق والمهام</a>
       {% endif %}
     </nav>
-    <div class="sidebar-foot"><strong translate="no">DIGITAL AUTOPSY</strong><span data-ui-copy>{{ 'تحليل داخلي · إثراء محلي' if operational else 'تحليل الحوادث والتحقيق والتقارير' }}</span></div>
+    <div class="sidebar-foot"><strong translate="no">TACTICAL WORKBENCH</strong><span data-ui-copy>{{ 'فرز سريع · كشف مدمج · فحص آمن' if operational else 'فرز السجلات والفحص السريع والتقارير' }}</span></div>
   </aside>
   <div class="app-main">
     <header class="topbar">
       <button id="menu-toggle" aria-controls="workspace-navigation" class="icon-button" type="button" aria-label="فتح القائمة" aria-expanded="false" data-ui-attributes><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
-      <span aria-label="{{ product_name }}" class="brand topbar-brand" translate="no"><span class="brand-wordmark" lang="en" dir="ltr">SOCify<span class="brand-stamp">SOC / 04</span></span></span>
+      <span aria-label="{{ product_name }}" class="brand topbar-brand" translate="no"><span class="brand-wordmark" lang="en" dir="ltr">SOCify<span class="brand-stamp">SOC / V6</span></span></span>
       {% if operational %}<div class="investigation-context" data-investigation-context></div>{% endif %}
       <div class="section-context sr-only"><p id="section-kicker" class="eyebrow">Incident investigation</p><h1 id="section-title" data-ui-copy>مركز العمليات</h1></div>
       <div class="appearance-tools"><div data-theme-control></div><button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button></div>

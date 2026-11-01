@@ -208,7 +208,7 @@ def catalog():
 
     return jsonify(
         {
-            "product": "SOCify Digital Autopsy",
+            "product": "SOCify Tactical Workbench",
             "import_formats": ["auto", "csv", "json", "jsonl", "syslog", "linux_auth", "web", "sysmon_xml", "evtx", "pcap", "pcapng"],
             "source_timezones": sorted(available_timezones()),
             "mapping_fields": [
