@@ -29,7 +29,10 @@ def test_language_toggle_persists_and_preserves_case_content(app, tmp_path):
             page.screenshot(path=str(output / "login-ar-desktop.png"), full_page=True)
             page.set_viewport_size({"width": 390, "height": 844})
             page.screenshot(path=str(output / "login-ar-mobile.png"), full_page=True)
-            page.get_by_role("button", name="Switch interface to English").click()
+            # Authentication stays focused on the form and honours the saved language.
+            assert page.locator("[data-language-toggle]").count() == 0
+            page.evaluate("localStorage.setItem('socify-interface-language', 'en')")
+            page.reload()
             page.wait_for_function("document.documentElement.lang === 'en'")
             assert page.locator("html").get_attribute("dir") == "ltr"
             page.get_by_label("Email", exact=True).fill("manager@socify.local")
