@@ -13,6 +13,10 @@
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
   document.cookie = `socify-language=${language}; Path=/; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
   const english = {
+  "أعدّه العضو": "Prepared by member",
+  "اعتمده العضو": "Approved by member",
+  "أسئلة السبب الجذري": "Root cause questions",
+  "وقت الاعتماد": "Approval time",
   "تجديد الجلسة": "Renew session",
   "متابعة العمل": "Continue working",
   "سجّل الدخول أولًا ثم تابع العمل.": "Sign in first, then continue working.",
