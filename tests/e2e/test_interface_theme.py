@@ -102,6 +102,45 @@ def test_theme_system_persistence_languages_and_operational_surfaces(app):
 
 
 @pytest.mark.e2e
+@pytest.mark.parametrize("language", ["ar", "en"])
+def test_mobile_operational_navigation_opens_inside_viewport(app, language):
+    app.config.update(LEGACY_TRAINING_TESTS=False, WTF_CSRF_ENABLED=True)
+    server = make_server("127.0.0.1", 0, app)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as playwright:
+            browser = launch_browser(playwright)
+            page = browser.new_page(viewport={"width": 360, "height": 844})
+            base = f"http://127.0.0.1:{server.server_port}"
+            page.goto(base + "/login")
+            page.evaluate("value => localStorage.setItem('socify-interface-language', value)", language)
+            page.reload()
+            page.locator("input[name=email]").fill("manager@socify.local")
+            page.locator("input[name=password]").fill(DEMO_LOGIN_VALUE)
+            page.locator("button[type=submit]").click()
+            page.wait_for_url("**/cases")
+            page.locator('#workspace[aria-busy="false"]').wait_for()
+            assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            page.locator("#menu-toggle").click()
+            team = page.locator('#primary-nav [data-section="team"]')
+            team.scroll_into_view_if_needed()
+            bounds = team.bounding_box()
+            assert bounds and bounds["x"] >= 0 and bounds["x"] + bounds["width"] <= 360
+            team.click()
+            page.wait_for_url("**/team")
+            page.locator('#workspace[aria-busy="false"]').wait_for()
+            page.locator("#menu-toggle").click()
+            page.keyboard.press("Escape")
+            assert not page.locator(".sidebar").is_visible()
+            assert page.locator("#menu-toggle").get_attribute("aria-expanded") == "false"
+            browser.close()
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+@pytest.mark.e2e
 def test_theme_control_works_when_browser_storage_is_unavailable(app):
     app.config["LEGACY_TRAINING_TESTS"] = True
     server = make_server("127.0.0.1", 0, app)

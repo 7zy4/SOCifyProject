@@ -26,6 +26,7 @@ Local Windows/Edge verification:
 - Twenty-six token contrast pairs passed the 4.5:1 threshold. Eleven representative screenshots produced no serious/critical axe violations or JavaScript errors; page widths stayed within their viewport. Visually hidden mobile table headings are retained for assistive technology.
 - Ruff formatting/lint, Bandit and Mypy for the Linux deployment target passed.
 - Additional legacy-browser checks caught the fixed header covering investigation actions. The training shell now keeps its header in the layout; both affected action/CSRF workflows passed again.
+- The full Linux browser suite exposed an RTL selector overriding the open mobile navigation transform. Corrected the open-state selector and added Arabic/English navigation checks at 360px. Metadata now uses a minimum 14px size.
 - The secret scan found no new secrets. Only two existing synthetic test-fixture line numbers changed in the baseline.
 
 Screenshots and measurement output are local, ignored artifacts under `artifacts/unslop-ink-*`. Full Linux service, native PDF, browser, container and performance acceptance is enforced by the Enterprise Quality Gates workflow on the uploaded commit.
