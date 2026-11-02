@@ -8,6 +8,8 @@ import pytest
 from playwright.sync_api import sync_playwright
 from werkzeug.serving import make_server
 
+from tests.e2e.test_browser import launch_browser
+
 
 @pytest.mark.e2e
 @pytest.mark.parametrize("zoom_mode", ["css", "native"])
@@ -26,7 +28,7 @@ def test_200_percent_zoom_keyboard_modal_and_searchable_choices(app, tmp_path, z
                 preferences.write_text(json.dumps({"partition": {"default_zoom_level": {"x": zoom_level, "1": zoom_level}}}))
                 browser = playwright.chromium.launch_persistent_context(
                     str(profile),
-                    channel="chromium",
+                    channel=os.environ.get("SOCIFY_BROWSER_CHANNEL", "chromium"),
                     executable_path=shutil.which("chromium"),
                     headless=not bool(os.environ.get("DISPLAY")),
                     no_viewport=True,
@@ -34,7 +36,7 @@ def test_200_percent_zoom_keyboard_modal_and_searchable_choices(app, tmp_path, z
                 )
                 page = browser.pages[0]
             else:
-                browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
+                browser = launch_browser(playwright)
                 page = browser.new_page(viewport={"width": 1440, "height": 1000})
             root = f"http://127.0.0.1:{server.server_port}"
             page.goto(root + "/login")
@@ -46,7 +48,7 @@ def test_200_percent_zoom_keyboard_modal_and_searchable_choices(app, tmp_path, z
             case = page.evaluate(
                 "async () => await api('/api/cases',{method:'POST',body:{title:'Native browser zoom acceptance',reason:'forensic_review',objective:'Verify readable keyboard operated investigation at native 200 percent zoom'}})"
             )
-            page.goto(root + f"/cases/{case['id']}?tab=analysis")
+            page.goto(root + f"/cases/{case['id']}?tab=analysis&analysis=files")
             page.get_by_role("heading", name="العينات والتحليل الساكن", exact=True).wait_for()
             if zoom_mode == "native":
                 assert page.evaluate("window.devicePixelRatio >= 1.99 && window.innerWidth <= 768"), "Native browser zoom did not reduce the CSS viewport"
@@ -55,6 +57,7 @@ def test_200_percent_zoom_keyboard_modal_and_searchable_choices(app, tmp_path, z
                 page.evaluate("document.documentElement.style.zoom='2'")
                 assert page.evaluate("Number(getComputedStyle(document.documentElement).zoom) === 2")
             assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+            page.locator(".analysis-tools a[href*='analysis=observables']").click()
             add = page.get_by_role("button", name="إضافة المؤشرات", exact=True)
             add.focus()
             page.keyboard.press("Enter")

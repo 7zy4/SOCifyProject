@@ -10,6 +10,26 @@ from .db import inserted_id
 from .timeutils import iso_now
 
 BUILTIN_RULES: tuple[dict[str, Any], ...] = (
+    *(
+        {
+            "name": f"[SOCify] Suricata {severity.title()} Signature",
+            "description": "A retained Suricata EVE alert contains a signature and the corresponding IDS severity.",
+            "severity": severity,
+            "confidence": 0.80,
+            "dsl": {
+                "condition": {
+                    "logic": "and",
+                    "conditions": [
+                        {"field": "event_type", "operator": "equals", "value": "suricata_alert"},
+                        {"field": "ids_severity", "operator": "equals", "value": priority},
+                        {"field": "ids_signature", "operator": "exists", "value": True},
+                    ],
+                },
+                "mitre_ids": [],
+            },
+        }
+        for priority, severity in ((1, "high"), (2, "medium"), (3, "low"))
+    ),
     {
         "name": "[SOCify] Exposed Credential Material",
         "description": "Credential assignments, bearer tokens or private key markers found in retained event text.",

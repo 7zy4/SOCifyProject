@@ -44,6 +44,12 @@ FIELDS = {
     "exposed_secret_count",
     "sensitive_data_count",
     "decoded_threat_count",
+    "ids_severity",
+    "ids_signature",
+    "query_name",
+    "query_action",
+    "destination_port",
+    "protocol",
 }
 OPERATORS = {
     "equals",

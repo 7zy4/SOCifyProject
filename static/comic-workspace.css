@@ -328,3 +328,26 @@ dialog::backdrop { background:rgb(10 13 15 / .78); }
  :is(.dossier-view,.content-inspection) .alert-property-table th { width:40%; }
  :is(.dossier-view,.content-inspection) .alert-property-table th,:is(.dossier-view,.content-inspection) .alert-property-table td { padding:10px 8px; }
 }
+/* Case analysis keeps one task visible while retaining the ink-and-stone identity. */
+.analysis-workspace { display: grid; gap: 24px; min-width: 0; }
+.analysis-workspace .empty-state { min-height: 0; padding: 24px; }
+.analysis-tools { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 8px; }
+.analysis-tools a[aria-current="page"] { background: var(--primary-fill); color: var(--on-primary); }
+.telemetry-view { display: grid; gap: 24px; padding: 24px; min-width: 0; }
+.telemetry-view .filter-row { margin: 0; }
+.telemetry-view .network-results, .telemetry-view .endpoint-results { display: grid; gap: 16px; min-width: 0; }
+.telemetry-view .evidence-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.telemetry-view .evidence-links .button { min-width: 48px; }
+.telemetry-view .network-detail:empty { display: none; }
+.telemetry-view .compact-empty { padding: 16px 0; margin: 0; }
+.telemetry-view .alert-property-table td { overflow-wrap: anywhere; }
+.telemetry-view .insight-counters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 640px) {
+  .analysis-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .analysis-tools .button { width: 100%; }
+  .telemetry-view { padding: 16px; gap: 16px; }
+  .telemetry-view .insight-counters { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .telemetry-view .insight-counter { padding: 12px 8px; min-width: 0; }
+  .telemetry-view .insight-counter span { font-size: 14px; overflow-wrap: anywhere; }
+  .telemetry-view .insight-counter strong { font-size: 24px; }
+}

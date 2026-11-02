@@ -23,6 +23,7 @@
   {% if operational %}<script src="{{ url_for('static', filename='soc-workbench.js') }}" defer></script>{% endif %}
   {% if operational %}<script src="{{ url_for('static', filename='soc-insights.js') }}" defer></script>{% endif %}
   {% if operational %}<script src="{{ url_for('static', filename='autopsy.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_data.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_procedures.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_reports.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_analysis.js') }}" defer></script>{% endif %}
+  {% if operational %}<script src="{{ url_for('static', filename='telemetry.js') }}" defer></script>{% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='design-system.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='comic-workspace.css') }}">
   {% if operational %}<script src="{{ url_for('static', filename='v4-workspace.js') }}" defer></script>{% endif %}
@@ -41,7 +42,7 @@
       <a data-section="endpoint-security" data-nav-permission="cases.read" href="/endpoint-security" data-ui-copy>{{ nav_icon("endpoint-security") }}أمن الأجهزة والأصول</a>
       <a data-section="threat-intel" data-nav-permission="cases.read" href="/threat-intel" data-ui-copy>{{ nav_icon("threat-intel") }}استخبارات التهديدات</a>
       <a data-section="email-security" data-nav-permission="cases.read" href="/email-security" data-ui-copy>{{ nav_icon("email-security") }}أمن البريد الإلكتروني</a>
-      <a data-section="sandbox" data-nav-permission="cases.read" href="/sandbox" data-ui-copy>{{ nav_icon("sandbox") }}تحليل العينات</a>
+      <a data-section="sandbox" data-nav-permission="cases.read" href="/sandbox" data-ui-copy>{{ nav_icon("sandbox") }}تحليل الأدلة</a>
       <span class="nav-group-label" data-ui-copy>مساحة العمل</span>
       <a data-section="reports" data-nav-permission="cases.read" href="/reports" data-ui-copy>{{ nav_icon("reports") }}التقارير</a>
       <a data-section="my-tasks" data-nav-permission="cases.read" href="/my-tasks" data-ui-copy>{{ nav_icon("my-tasks") }}مهامي</a>

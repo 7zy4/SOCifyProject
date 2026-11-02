@@ -17,6 +17,20 @@ FORMATS = {
 }
 LABELS = {
     "content_inspection": "فحص المحتوى والترميزات",
+    "network_analysis": "تحليل الشبكة",
+    "endpoint_results": "نتائج الأجهزة",
+    "connection_count": "عدد الاتصالات",
+    "periodic_count": "الاتصالات الدورية",
+    "pair_count": "أزواج الاتصال",
+    "median_interval_seconds": "وسيط الفاصل بالثواني",
+    "interval_mad_seconds": "الانحراف المطلق الوسيط بالثواني",
+    "regularity_percent": "انتظام الفواصل %",
+    "periodic": "اتصال دوري",
+    "bytes_sent": "البايتات المرسلة",
+    "bytes_received": "البايتات المستقبلة",
+    "timed_connections": "الاتصالات المؤقتة",
+    "query": "الاستعلام",
+    "columns": "الحقول",
     "event_id": "معرف السجل",
     "raw_hash": "بصمة السجل",
     "engine": "محرك الفحص",
@@ -256,6 +270,8 @@ def sections(payload):
             yield LABELS[kind], records
     for title, key in (
         ("فحص المحتوى والترميزات", "content_inspection"),
+        ("تحليل الشبكة", "network_analysis"),
+        ("نتائج الأجهزة", "endpoint_results"),
         ("الخط الزمني المشترك للأدلة والتحقيق والإجراءات", "chronology"),
         ("الإثراء المحلي ومصادر السمعة وإصداراتها", "observables"),
         ("SLA وجمع الأدلة ومراجعة ما بعد الحادثة", "workflow"),

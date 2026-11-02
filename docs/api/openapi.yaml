@@ -2039,6 +2039,35 @@
         }
       }
     },
+    "/api/cases/{case_id}/endpoint-queries": {
+      "get": {
+        "operationId": "autopsy_insights_endpoint_queries_get__api_cases_case_id_endpoint-queries",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
     "/api/cases/{case_id}/graph": {
       "get": {
         "operationId": "autopsy_investigation_case_graph_get__api_cases_case_id_graph",
@@ -2755,6 +2784,35 @@
             }
           }
         }
+      }
+    },
+    "/api/cases/{case_id}/network-insights": {
+      "get": {
+        "operationId": "autopsy_insights_network_insights_get__api_cases_case_id_network-insights",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
       }
     },
     "/api/cases/{case_id}/observables": {

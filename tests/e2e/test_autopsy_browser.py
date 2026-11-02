@@ -37,7 +37,8 @@ def test_case_first_operational_browser_with_csrf_and_mobile_layout(app):
             page.wait_for_url("**/cases/*")
             page.get_by_role("heading", name="Browser autopsy case", exact=True).first.wait_for()
             assert page.locator("textarea[name=objective]").input_value() == "Verify impact using retained evidence"
-            page.get_by_role("link", name="الأصول والمؤشرات", exact=True).click()
+            page.get_by_role("link", name="التحليل", exact=True).click()
+            page.locator(".analysis-tools a[href*='analysis=endpoints']").click()
             page.get_by_role("button", name="إضافة الأصول والأجهزة", exact=True).click()
             dialog = page.get_by_role("dialog")
             dialog.locator("input[name=name]").fill("Internal web defender")
@@ -143,7 +144,8 @@ def test_local_sample_manual_reputation_and_team_assignment_browser(app):
                 "caseId => api(`/api/cases/${caseId}/imports`, {method:'POST', body:{filename:'browser-assigned.jsonl',content:'{\"title\":\"Browser assignment log\"}\\n'}})",
                 case_id,
             )
-            page.get_by_role("link", name="الأصول والمؤشرات", exact=True).click()
+            page.get_by_role("link", name="التحليل", exact=True).click()
+            page.locator(".analysis-tools a[href*='analysis=files']").click()
             content = b"Synthetic EICAR-STANDARD-ANTIVIRUS-TEST-FILE marker"
             digest = hashlib.sha256(content).hexdigest()
             page.locator("input[name=sample]").set_input_files({"name": "browser-sample.bin", "mimeType": "application/octet-stream", "buffer": content})

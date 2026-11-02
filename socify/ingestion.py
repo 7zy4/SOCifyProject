@@ -71,10 +71,22 @@ def _detect_format(filename: str, content: bytes) -> str:
     sample = content[:4096].lstrip()
     if sample.startswith(b"ElfFile\x00"):
         return "evtx"
+    if sample.startswith(b"#separator"):
+        return "zeek_tsv"
     if sample.startswith(b"<"):
         return "sysmon_xml"
     if suffix in {".jsonl", ".ndjson"} and sample.startswith(b"{"):
         return "jsonl"
+    if sample.startswith(b"{"):
+        try:
+            json.loads(content)
+        except (ValueError, RecursionError):
+            first = content.splitlines()[0]
+            try:
+                if isinstance(json.loads(first), dict):
+                    return "jsonl"
+            except ValueError:
+                pass
     if suffix == ".json" or sample.startswith((b"[", b"{")):
         return "json"
     text = sample.decode("utf-8", errors="ignore")
@@ -104,10 +116,14 @@ def _decode(content: bytes) -> str:
 def _record_from_mapping(record: dict[str, Any], row_number: int, source_name: str, content_hash: str) -> dict[str, Any]:
     if _depth(record) > 12:
         raise ValueError("JSON nesting exceeds 12 levels")
+    from .telemetry import profile
+
+    raw = dict(record)
+    telemetry = profile(record)
+    record = {**record, **telemetry}
     event_time = record.get("event_time", record.get("timestamp", record.get("time", iso_now())))
     event_type = record.get("event_type", record.get("category", "imported_event"))
     title = record.get("title", str(event_type).replace("_", " ").title())
-    raw = dict(record)
     return {
         **record,
         "source": str(record.get("source") or source_name),
@@ -116,14 +132,85 @@ def _record_from_mapping(record: dict[str, Any], row_number: int, source_name: s
         "category": str(record.get("category") or event_type),
         "event_type": str(event_type),
         "title": str(title),
-        "description": str(record.get("description") or "Imported training log record"),
+        "description": str(record.get("description") or ""),
         "event_time": event_time,
         "raw_payload": raw,
         "external_id": str(record.get("external_id") or record.get("id") or f"row-{row_number}"),
         "idempotency_key": f"import:{content_hash}:{row_number}",
-        "parser_version": "socify-import-2",
+        "parser_version": telemetry.get("parser_version", "socify-import-2"),
         "provenance": {"file_sha256": content_hash, "row": row_number, "format": "structured"},
     }
+
+
+def _structured_records(record, row_number, source_name, content_hash):
+    from .telemetry import osquery_rows
+
+    if _depth(record) > 12:
+        raise ValueError("JSON nesting exceeds 12 levels")
+    rows = osquery_rows(record)
+    if rows is None:
+        yield _record_from_mapping(record, row_number, source_name, content_hash)
+        return
+    for index, (row, pointer) in enumerate(rows):
+        parsed = _record_from_mapping(row, row_number, source_name, content_hash)
+        parsed["idempotency_key"] += f":{index}"
+        parsed["provenance"]["row_pointer"] = pointer
+        yield parsed
+
+
+def _zeek_records(text, source_name, content_hash):
+    separator = "\t"
+    fields: list[str] = []
+    types: list[str] = []
+    unset, empty = "-", "(empty)"
+
+    def unescape(value):
+        return re.sub(r"\\x([0-9a-fA-F]{2})", lambda match: chr(int(match[1], 16)), value)
+
+    for line_number, line in enumerate(text.splitlines(), 1):
+        if line.startswith("#separator "):
+            separator = unescape(line.partition(" ")[2])
+            if len(separator) != 1 or separator in "\r\n\x00":
+                raise ValueError("invalid Zeek separator")
+            continue
+        if line.startswith("#"):
+            name, _, value = line.partition(separator)
+            if name == "#fields":
+                fields = value.split(separator)
+                types = []
+                if len(fields) > 200 or len(set(fields)) != len(fields):
+                    raise ValueError("invalid Zeek field header")
+            elif name == "#types":
+                types = value.split(separator)
+            elif name == "#unset_field":
+                unset = value
+            elif name == "#empty_field":
+                empty = value
+            continue
+        if not line.strip():
+            continue
+        values = line.split(separator)
+        if not fields or len(fields) != len(types) or len(values) != len(fields):
+            raise ValueError(f"invalid Zeek row at line {line_number}")
+        record: dict[str, Any] = {}
+        for key, kind, value in zip(fields, types, values, strict=True):
+            if value == unset:
+                record[key] = None
+            elif value == empty:
+                record[key] = ""
+            elif kind in {"time", "interval", "double"}:
+                record[key] = float(value)
+            elif kind in {"count", "int", "port"}:
+                record[key] = int(value)
+            elif kind == "bool":
+                if value not in {"T", "F"}:
+                    raise ValueError("invalid Zeek boolean")
+                record[key] = value == "T"
+            else:
+                record[key] = unescape(value)
+        parsed = _record_from_mapping(record, line_number, source_name, content_hash)
+        parsed["provenance"]["format"] = "zeek_tsv"
+        yield parsed
 
 
 def _csv_records(text: str, source_name: str, content_hash: str, delimiter: str = ",") -> Iterator[dict[str, Any]]:
@@ -150,7 +237,7 @@ def _json_records(text: str, source_name: str, content_hash: str, json_lines: bo
                 value = json.loads(line)
                 if not isinstance(value, dict):
                     raise ValueError(f"line {row_number} must contain an object")
-                yield _record_from_mapping(value, row_number, source_name, content_hash)
+                yield from _structured_records(value, row_number, source_name, content_hash)
             except (ValueError, RecursionError) as exc:
                 if not tolerant:
                     raise ValueError(f"invalid JSON record at line {row_number}") from exc
@@ -164,7 +251,7 @@ def _json_records(text: str, source_name: str, content_hash: str, json_lines: bo
     if not all(isinstance(item, dict) for item in records):
         raise ValueError("JSON must contain an object or an array of objects")
     for row_number, record in enumerate(records, 1):
-        yield _record_from_mapping(record, row_number, source_name, content_hash)
+        yield from _structured_records(record, row_number, source_name, content_hash)
 
 
 def _priority_severity(priority: int) -> str:
@@ -508,6 +595,8 @@ def parse_records(
     if format_name == "csv":
         records = _csv_records(text, source_name, content_hash, options.get("delimiter", ","))
         return format_name, _mapped_records(records, options, source_name)
+    if format_name == "zeek_tsv":
+        return format_name, _mapped_records(_zeek_records(text, source_name, content_hash), options, source_name)
     if format_name in {"jsonl", "ndjson"}:
         return "jsonl", _mapped_records(_json_records(text, source_name, content_hash, True, bool(options)), options, source_name)
     if format_name == "json":
@@ -533,6 +622,8 @@ def _mapped_records(records: Iterable[dict[str, Any]], options: dict[str, Any], 
         known_time = (
             any(key in raw and raw[key] not in (None, "") for key in ("event_time", "timestamp", "time")) or record.get("source_type") == "packet_capture"
         )
+        if record.get("parser_version") == "socify-telemetry-1":
+            known_time = any(raw.get(key) is not None for key in ("ts", "unixTime", "timestamp"))
         assumed_year = raw.get("timestamp_assumption") == "current_year_utc"
         if assumed_year:
             local = datetime.fromisoformat(str(record["event_time"]).replace("Z", "+00:00")).replace(

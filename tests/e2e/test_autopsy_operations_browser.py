@@ -111,7 +111,7 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
                 "id => api(`/api/cases/${id}/imports`,{method:'POST',body:{filename:'browser.json',content:JSON.stringify([{title:'Browser suspicious log',source_ip:'192.0.2.8'}])}})",
                 case_id,
             )
-            page.goto(f"http://127.0.0.1:{server.server_port}/cases/{case_id}?tab=analysis")
+            page.goto(f"http://127.0.0.1:{server.server_port}/cases/{case_id}?tab=analysis&analysis=detection")
             page.get_by_role("heading", name="الإثراء والكشف ومراجعة التنبيهات", exact=True).wait_for()
             assert page.get_by_role("cell", name="matched · suspicious", exact=True).count() == 1
             page.get_by_role("button", name="تفاصيل ومراجعة", exact=True).first.click()
@@ -222,7 +222,7 @@ def test_restricted_batch_browser_retains_case_navigation_without_indirect_discl
             page.get_by_role("cell", name="Visible assigned source", exact=True).wait_for()
             assert page.get_by_text("Hidden batch must never reach browser", exact=False).count() == 0
             assert page.get_by_role("link", name="التقارير والمراجعة", exact=True).count() == 0
-            assert page.get_by_role("link", name="الأصول والمؤشرات", exact=True).count() == 0
+            assert page.get_by_role("link", name="التحليل", exact=True).count() == 0
             assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
             assert errors == []
             browser.close()

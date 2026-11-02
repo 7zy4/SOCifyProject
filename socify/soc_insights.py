@@ -18,6 +18,78 @@ from .timeutils import iso_now, parse_timestamp, utc_now
 soc_insights_api = Blueprint("autopsy_insights", __name__)
 
 
+@soc_insights_api.get("/api/cases/<int:case_id>/network-insights")
+@require_permission("cases.read")
+@consistent_read
+def network_insights(case_id):
+    from .network_insights import network_snapshot
+
+    where, args = authorized_cases()
+    if not get_db().execute(f"SELECT 1 FROM incident_cases c WHERE c.id=? AND {where}", (case_id, *args)).fetchone():
+        return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+    try:
+        if set(request.args) - {"page", "pair", "q"} or any(len(request.args.getlist(key)) != 1 for key in request.args):
+            raise ValueError
+        page = int(request.args.get("page", "1"))
+        query = request.args.get("q", "").strip().casefold()
+        pair = request.args.get("pair", "")
+        if not 1 <= page <= 1000000 or len(query) > 200 or len(pair) > 24:
+            raise ValueError
+    except ValueError:
+        return error_response("INVALID_NETWORK_FILTER", "تحقق من مرشحات الشبكة", 422)
+    try:
+        snapshot = network_snapshot(get_db(), case_id, workspace_id())
+    except ValueError as exc:
+        return error_response("NETWORK_ANALYSIS_LIMIT", str(exc), 422)
+    items = snapshot.pop("items")
+    selected = next((item for item in items if item["key"] == pair), None)
+    if pair and selected is None:
+        return error_response("CONNECTION_NOT_FOUND", "الاتصال غير متاح", 404)
+    filtered = [
+        item for item in items if not query or query in " ".join(str(item[key]) for key in ("source", "source_ip", "destination_ip", "names")).casefold()
+    ]
+    return jsonify({**snapshot, "items": filtered[(page - 1) * 25 : page * 25], "total": len(filtered), "page": page, "page_size": 25, "selected": selected})
+
+
+@soc_insights_api.get("/api/cases/<int:case_id>/endpoint-queries")
+@require_permission("cases.read")
+@consistent_read
+def endpoint_queries(case_id):
+    where, args = authorized_cases()
+    if not get_db().execute(f"SELECT 1 FROM incident_cases c WHERE c.id=? AND {where}", (case_id, *args)).fetchone():
+        return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+    try:
+        if set(request.args) - {"page", "host", "action"} or any(len(request.args.getlist(key)) != 1 for key in request.args):
+            raise ValueError
+        page = int(request.args.get("page", "1"))
+        host, action = request.args.get("host", ""), request.args.get("action", "")
+        if not 1 <= page <= 1000000 or len(host) > 512 or action not in {"", "added", "removed", "snapshot", "unchanged"}:
+            raise ValueError
+    except ValueError:
+        return error_response("INVALID_ENDPOINT_FILTER", "تحقق من مرشحات الأجهزة", 422)
+    predicate = (
+        "owner_case_id=? AND workspace_id=? AND autopsy_active=1 AND source_type='osquery' AND json_extract(normalized_fields,'$.telemetry_schema')='osquery'"
+    )
+    params: list[object] = [case_id, workspace_id()]
+    if host:
+        predicate += " AND hostname=?"
+        params.append(host)
+    if action:
+        predicate += " AND action=?"
+        params.append(action)
+    total = get_db().execute(f"SELECT COUNT(*) FROM security_events WHERE {predicate}", params).fetchone()[0]
+    items = []
+    for row in get_db().execute(
+        f"SELECT id,hostname,event_time,title,action,normalized_fields FROM security_events WHERE {predicate} ORDER BY id DESC LIMIT 25 OFFSET ?",
+        (*params, (page - 1) * 25),
+    ):
+        item = dict(row)
+        fields = json.loads(item.pop("normalized_fields"))
+        item.update({"query": fields.get("query_name"), "columns": fields.get("query_columns", {}), "event_time_known": fields.get("event_time_known") is True})
+        items.append(item)
+    return jsonify({"items": items, "total": total, "page": page, "page_size": 25})
+
+
 @soc_insights_api.get("/api/cases/<int:case_id>/content-inspection")
 @require_permission("cases.read")
 @consistent_read

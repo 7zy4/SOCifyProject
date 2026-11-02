@@ -4,14 +4,13 @@ window.SOCifyAutopsy.analysis = async (caseId) => {
   const samples = await api(`/api/cases/${caseId}/samples`);
   const indicators = (await api(`/api/cases/${caseId}/records?kind=indicator&limit=100`)).items;
   const root = node("div");
-  root.append(await SOCifyInsights.contentInspection(caseId));
   const packs = await api("/api/autopsy/yara");
   const packChoice = autopsyChoice("yara_pack_id", [{ value: "", label: "EICAR" }, ...packs.items.map((pack) => ({ value: pack.id, label: `${pack.name} · v${pack.version} · ${pack.license}` }))]);
   const body = node("div", { class: "panel-body" });
-  body.append(field(SOCifyLocale.text("حزمة YARA لهذا الفحص · يحفظ الإصدار والبصمة"), packChoice.control), linkedButton(SOCifyLocale.text("إدارة حزم YARA المحلية"), "/analysis-library"));
+  body.append(field("YARA", packChoice.control), linkedButton(SOCifyLocale.text("إدارة حزم YARA المحلية"), "/analysis-library"));
   if (permission("evidence.add") && autopsy.current.status !== "closed") {
     const file = node("input", { type: "file", required: true, name: "sample" });
-    const quickBtn = button(SOCifyLocale.text("فحص أولي آمن بضغطة زر (بدون تشغيل)"), async () => {
+    const quickBtn = button(SOCifyLocale.language === "ar" ? "فحص الملف" : "Inspect file", async () => {
       if (!file.files[0]) { handleError(new Error(SOCifyLocale.text("اختر ملفًا أولًا"))); return; }
       quickBtn.disabled = true;
       try {
@@ -21,7 +20,7 @@ window.SOCifyAutopsy.analysis = async (caseId) => {
         if (selected) data.set("yara_pack_id", String(selected));
         const res = await api(`/api/cases/${caseId}/quick-file-triage`, { method: "POST", body: data });
         const t = res.triage;
-        autopsyModal(SOCifyLocale.text("نتيجة الفحص الساكن الفوري (بدون تشغيل)"), node("div", {}, [
+        autopsyModal(SOCifyLocale.language === "ar" ? "نتيجة الفحص" : "Inspection result", node("div", {}, [
           node("p", { text: SOCifyLocale.template`الحكم الأولي: ${t.verdict} · درجة الخطورة: ${t.risk_score}/100 · البصمة الفعلية: ${t.file_type_observation}` }),
           node("p", { text: `SHA-256: ${t.sha256}` }),
           node("pre", { text: JSON.stringify({ flags: t.flags, urls: t.extracted_urls, ips: t.extracted_ips, emails: t.extracted_emails }, null, 2) }),
@@ -40,8 +39,8 @@ window.SOCifyAutopsy.analysis = async (caseId) => {
 
     const emlFile = node("input", { type: "file", required: true, name: "eml_file", accept: ".eml,message/rfc822" });
     const emlForm = node("form", { class: "filter-row" }, [
-      field(SOCifyLocale.text("رسالة بريد (.eml) لفحص الرؤوس والمرفقات دون تشغيل"), emlFile),
-      node("button", { type: "submit", class: "button primary", text: SOCifyLocale.text("فحص البريد ومرفقاته بضغطة زر") }),
+      field(SOCifyLocale.language === "ar" ? "رسالة البريد (.eml)" : "Email (.eml)", emlFile),
+      node("button", { type: "submit", class: "button primary", text: SOCifyLocale.language === "ar" ? "فحص البريد" : "Inspect email" }),
     ]);
     emlForm.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -83,13 +82,13 @@ window.SOCifyAutopsy.analysis = async (caseId) => {
     const choices = [...samples.items.map((sample) => ({ value: `sample_id:${sample.id}`, label: SOCifyLocale.template`عينة: ${sample.filename} · ${sample.sha256}` })), ...indicators.filter((item) => item.payload.type === "sha256").map((item) => ({ value: `indicator_id:${item.id}`, label: SOCifyLocale.template`مؤشر SHA-256: ${item.payload.value}` }))];
     const subject = autopsyChoice("subject", choices, "", true);
     const file = node("input", { name: "vt_report", type: "file", required: true, accept: ".json,application/json" });
-    const form = node("form", { class: "form-grid panel-body" }, [node("p", { class: "span-2", text: SOCifyLocale.text("استيراد يدوي فقط لتقرير ملف VirusTotal v3. يجب أن يطابق SHA-256 لعينة أو مؤشر موجود في القضية؛ يحتفظ الأصل ببصمته ويعرض مصدره ووقته وحدود الثقة به. لا يوجد اتصال بـVirusTotal.") }), field(SOCifyLocale.text("العينة أو البصمة المعروفة"), subject.control, true), field(SOCifyLocale.text("تقرير JSON محفوظ محليًا"), file), node("button", { type: "submit", class: "button primary", text: SOCifyLocale.text("استيراد نتيجة الفحص") })]);
+    const form = node("form", { class: "form-grid panel-body" }, [field(SOCifyLocale.text("العينة أو البصمة المعروفة"), subject.control, true), field(SOCifyLocale.text("تقرير JSON محفوظ محليًا"), file), node("button", { type: "submit", class: "button primary", text: SOCifyLocale.text("استيراد نتيجة الفحص") })]);
     form.addEventListener("submit", async (event) => { event.preventDefault(); try { const [key, value] = subject.input.autopsyValue().split(":"); const data = new FormData(); data.set(key, value); data.set("file", file.files[0]); await api(`/api/cases/${caseId}/reputation/virustotal`, { method: "POST", body: data }); await autopsyCase(caseId); } catch (error) { handleError(error); } });
-    root.append(panel(SOCifyLocale.text("نتائج VirusTotal المستوردة"), form, true));
+    if (choices.length) root.append(panel("VirusTotal", form, true));
   }
   for (const kind of ["reputation", "analysis"]) {
     const records = await api(`/api/cases/${caseId}/records?kind=${kind}&limit=100`);
-    root.append(panel(autopsyLabel(kind), node("div", { class: "record-grid" }, records.items.map(autopsyRecordCard)), true));
+    if (records.items.length) root.append(panel(autopsyLabel(kind), node("div", { class: "record-grid" }, records.items.map(autopsyRecordCard)), true));
   }
   return root;
 };

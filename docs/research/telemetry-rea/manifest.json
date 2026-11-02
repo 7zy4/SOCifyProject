@@ -1,0 +1,84 @@
+{
+  "iris_ref": "v2.4.29",
+  "iris_evidence_id": "ev_ccbc10a9b042fce6c62efa672d89e0bb70a6692e3e38c43239aacd9805d44d39",
+  "artifact_sha256": "11337fb65f4921a4ace8e87a2fe2414fa87bafef7ed0a336b018df4a5a54592d",
+  "graph_id": "jag_b79024dfb986bd4180ceaef67cbda686a7ecf90ba53e44a264d39a11577c7deb",
+  "semantic_graph_id": "jsrg_6a67532b0b10950fda057b93f4396d0a4191062878011be9e557d95df2196eaa",
+  "scope": [
+    "case.asset.js",
+    "case.ioc.js",
+    "case.timeline.js"
+  ],
+  "sources": [
+    {
+      "path": "rita/analysis/beacons.go",
+      "sha256": "b4dd2f312ecc554f1b88c3ecb5e8c09c66b8d9239dc121ae1c65b781aeca4183"
+    },
+    {
+      "path": "rita/importer/zeektypes/conn.go",
+      "sha256": "a3d4ab839af07cf6fd5da5c662fda0689ba221a215ce3a25d90abb3479e1c9f5"
+    },
+    {
+      "path": "osquery/osquery/core/sql/diff_results.cpp",
+      "sha256": "c767f1eb66daff9e36cd8aedea7615b94e5d7e1f4ba632d1e25921c731f49902"
+    },
+    {
+      "path": "osquery/docs/wiki/deployment/logging.md",
+      "sha256": "120b8580edb47d2aefbc8928dfb9faaa7ba90835c773ea9a993272ab6e4886be"
+    },
+    {
+      "path": "suricata/doc/userguide/output/eve/eve-json-format.rst",
+      "sha256": "7d18df95972860b0b5dad3dcc805c7dbe1db8bf7d277d8339badc4a1b2f765ba"
+    },
+    {
+      "path": "iris/case.asset.js",
+      "sha256": "6c15ecbcc1c954f71e247a66ceba1a1be7fa4bbc43b8d53cd69adcbf3b1b844c"
+    },
+    {
+      "path": "iris/case.ioc.js",
+      "sha256": "e2f34fe29aa3769723b8094d3a0c7d6b453bdfa26c7a99ad560f7b4e50b20ef0"
+    },
+    {
+      "path": "iris/case.timeline.js",
+      "sha256": "f19b82a8b51f91f5150ee1743117f32ec7f906ae93c5b6a9b0923e747744bb71"
+    }
+  ],
+  "reference_import_errors": {
+    "rita": {
+      "error": "Import failed",
+      "code": "capability_unavailable",
+      "category": "unsupported_provider",
+      "message": "Safe no-follow file opens are unavailable Safe no-follow file opens are unavailable on this host. Import the source tree with REA on Linux (including WSL) or macOS.",
+      "retryable": false,
+      "remediation": {
+        "action": "Safe no-follow file opens are unavailable on this host. Import the source tree with REA on Linux (including WSL) or macOS."
+      },
+      "details": {
+        "provider_id": "filesystem",
+        "operation": "import_reference_source",
+        "reason": "Safe no-follow file opens are unavailable",
+        "diagnostics": {
+          "reference_source_code": "unsupported"
+        }
+      }
+    },
+    "osquery": {
+      "error": "Import failed",
+      "code": "capability_unavailable",
+      "category": "unsupported_provider",
+      "message": "Safe no-follow file opens are unavailable Safe no-follow file opens are unavailable on this host. Import the source tree with REA on Linux (including WSL) or macOS.",
+      "retryable": false,
+      "remediation": {
+        "action": "Safe no-follow file opens are unavailable on this host. Import the source tree with REA on Linux (including WSL) or macOS."
+      },
+      "details": {
+        "provider_id": "filesystem",
+        "operation": "import_reference_source",
+        "reason": "Safe no-follow file opens are unavailable",
+        "diagnostics": {
+          "reference_source_code": "unsupported"
+        }
+      }
+    }
+  }
+}

@@ -9,7 +9,7 @@
     "endpoint-security": [t("أمن الأجهزة والأصول"), null],
     "threat-intel": [t("استخبارات التهديدات"), null],
     "email-security": [t("أمن البريد الإلكتروني"), t("افحص رؤوس الرسالة وروابطها ومرفقاتها دون تشغيل محتواها.")],
-    sandbox: [t("تحليل العينات"), t("حجر مشفر وتحليل ساكن محلي؛ لا تنفيذ ديناميكي للعينات.")],
+    sandbox: [t("تحليل الأدلة"), null],
     reports: [t("التقارير"), null]
   };
   const tabs = {"log-management":"logs", "endpoint-security":"analysis", "threat-intel":"analysis", "email-security":"analysis", sandbox:"analysis", reports:"reports"};
@@ -379,6 +379,7 @@
       content.append(panel(t("أدلة القضية"),current.evidence.length ? table([{label:t("الدليل"),value:"title"},{label:t("النوع"),value:"evidence_type"},{label:"SHA-256",value:"sha256"}],current.evidence) : emptyState(t("لا أدلة مرتبطة"),null)));
     }
     else if(section==="endpoint-security") {
+      content.append(await window.SOCifyTelemetry.endpoints(current.id));
       content.append(await window.SOCifyInsights.hosts(current.id));
       content.append(await assetInventory(current.id));
       content.append(linkedButton(t("توثيق إجراءات الاستجابة"),url(`/cases/${current.id}`,{tab:"response"})));
@@ -386,8 +387,7 @@
       content.append(await autopsyRecordPanel("indicator"));
       content.append(await intelligence(current.id));
     }else if(section==="sandbox") {
-      content.append(await window.SOCifyAutopsy.analysis(current.id));
-      if(window.SOCifyAutopsy.localDetection)content.append(await window.SOCifyAutopsy.localDetection(current.id));
+      content.append(await window.SOCifyAutopsy.analysisWorkspace(current.id));
     }
     else if(section==="email-security")content.append(await email(current.id));
     else if(section==="reports") {

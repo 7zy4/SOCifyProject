@@ -346,7 +346,7 @@ async function autopsyCase(caseId) {
     ]));
   }
   let tabs = [["summary", SOCifyLocale.text("الملخص والمسؤوليات")], ["investigation", SOCifyLocale.text("التحقيق والخط الزمني")], ["response", SOCifyLocale.text("الاستجابة والتصعيد")], ["activity", SOCifyLocale.text("الحيازة والنشاط")]];
-  if (!window.SOCifyV4?.selection.required) tabs.splice(1, 0, ["logs", SOCifyLocale.text("السجلات والأدلة")], ["analysis", SOCifyLocale.text("الأصول والمؤشرات")]);
+  if (!window.SOCifyV4?.selection.required) tabs.splice(1, 0, ["logs", SOCifyLocale.text("السجلات والأدلة")], ["analysis", SOCifyLocale.language === "ar" ? "التحليل" : "Analysis"]);
   if (restricted) {
     tabs = [["summary", SOCifyLocale.text("الملخص والمسؤوليات")], ...(!window.SOCifyV4?.selection.required ? [["logs", SOCifyLocale.text("السجلات والأدلة")]] : [])];
     root.append(node("p", { class: "notice", text: SOCifyLocale.text("نطاق دفعات محدد: تظهر السجلات المصرح بها فقط. يتطلب سياق التحقيق والتقارير الوصول إلى جميع دفعات القضية.") }));
@@ -371,9 +371,7 @@ async function autopsyCase(caseId) {
     if (window.SOCifyAutopsy.logs) content.append(await window.SOCifyAutopsy.logs(caseId));
     content.append(panel(SOCifyLocale.text("أدلة القضية"), current.evidence.length ? table([{ label: SOCifyLocale.text("الدليل"), value: "title" }, { label: SOCifyLocale.text("النوع"), value: "evidence_type" }, { label: "SHA-256", value: (row) => node("bdi", { text: row.sha256 }) }, { label: SOCifyLocale.text("أضيف"), value: (row) => formatTime(row.added_at) }], current.evidence) : emptyState(SOCifyLocale.text("لا أدلة مرتبطة"),null), true));
   } else if (selected === "analysis") {
-    for (const kind of ["asset", "indicator", "hypothesis", "foothold"]) content.append(await autopsyRecordPanel(kind));
-    if (window.SOCifyAutopsy.analysis) content.append(await window.SOCifyAutopsy.analysis(caseId));
-    if (window.SOCifyAutopsy.localDetection) content.append(await window.SOCifyAutopsy.localDetection(caseId));
+    if (window.SOCifyAutopsy.analysisWorkspace) content.append(await window.SOCifyAutopsy.analysisWorkspace(caseId));
   } else if (selected === "investigation") {
     if (window.SOCifyAutopsy.investigation) content.append(await window.SOCifyAutopsy.investigation(caseId));
     for (const kind of ["timeline", "root_cause", "war_room", "hypothesis", "foothold"]) content.append(await autopsyRecordPanel(kind));

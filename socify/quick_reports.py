@@ -533,9 +533,11 @@ def print_quick_report(case_id: int):
         return error_response("REPORT_ANSWERS_REQUIRED", "احفظ إجابات التحقيق قبل طباعة التقرير", 409)
     from .autopsy_report_render import lines
     from .content_inspection import inspection_snapshot
+    from .network_insights import telemetry_report
 
     try:
         inspected = inspection_snapshot(get_db(), case_id, case["workspace_id"])
+        telemetry = telemetry_report(get_db(), case_id, case["workspace_id"])
     except ValueError as exc:
         return error_response("REPORT_CONTENT_LIMIT", str(exc), 422)
     inspection_html = ""
@@ -546,6 +548,11 @@ def print_quick_report(case_id: int):
             parts.extend(f'<tr><td dir="auto">{_esc(text)}</td></tr>' for _, text in lines(item))
             parts.append("</tbody></table>")
         inspection_html = "".join(parts)
+    for title, key in (("تحليل الشبكة", "network_analysis"), ("نتائج الأجهزة", "endpoint_results")):
+        if telemetry[key]:
+            inspection_html += f'<h2 class="section-title">{title}</h2><table class="qa-table"><tbody>'
+            inspection_html += "".join(f'<tr><td dir="auto">{_esc(text)}</td></tr>' for _, text in lines(telemetry[key]))
+            inspection_html += "</tbody></table>"
     qa_rows_html = "".join(
         f"<tr><th>{_fmt_bilingual(item['question'])}</th><td><strong>{_fmt_bilingual(item['answer_label'])}</strong></td></tr>"
         for item in report["resolved_questions"]

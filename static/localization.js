@@ -1017,6 +1017,8 @@
   "أمن البريد الإلكتروني": "Email Security",
   "افحص رؤوس الرسالة وروابطها ومرفقاتها دون تشغيل محتواها.": "Inspect message headers, URLs and attachments without executing content.",
   "تحليل العينات": "Sample Analysis",
+  "تحليل الأدلة": "Evidence Analysis",
+  "zeek_tsv": "Zeek TSV",
   "حجر مشفر وتحليل ساكن محلي؛ لا تنفيذ ديناميكي للعينات.": "Encrypted quarantine and local static analysis; samples are never executed.",
   "أنشئ نسخة فورية من التحقيق، ثم راجع الصيغ والاعتماد.": "Create an immediate investigation snapshot, then review its files and approval.",
   "إدارة القضايا": "Case Management",
