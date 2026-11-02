@@ -62,7 +62,7 @@
   "فتح القائمة": "Open menu",
   "الملف الشخصي": "Profile",
   "خروج": "Sign out",
-  "جارٍ تحميل البيانات المصرّح بها…": "Loading authorized data…",
+  "جارٍ التحميل…": "Loading…",
   "انتقل إلى النموذج": "Skip to form",
   "من الأدلة إلى تحقيق موثق": "Investigate with evidence",
   "مساحة عمل داخلية للتحليل والتحقيق والاستجابة والتقارير. استخدم حساب فريقك المصرح به.": "An internal workspace for analysis, investigation, response and reporting. Use your authorized team account.",

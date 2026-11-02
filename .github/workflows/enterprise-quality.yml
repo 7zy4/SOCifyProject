@@ -129,6 +129,7 @@ jobs:
           path: |
             artifacts/browser-junit.xml
             artifacts/brand/
+            artifacts/soc-insights/
             work/interface-review/
       - if: always()
         run: docker rm --force socify-ci-analysis

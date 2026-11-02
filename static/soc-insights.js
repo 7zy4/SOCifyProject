@@ -18,6 +18,7 @@ window.SOCifyInsights = (() => {
       const personal = data.member !== "team";
       const title = personal ? t("أداء المحلل", "Analyst performance") : t("أداء الفريق", "Team performance");
       document.getElementById("section-title").textContent = title;
+      document.title = `${title} | SOCify`;
       const root = node("div", {class:"insights-view"}, pageHead(title, null));
       const nav = node("nav", {class:"channel-tabs", "aria-label":t("نطاق الأداء", "Performance scope")});
       const targets = [["me",t("أدائي", "My performance")]];
@@ -43,7 +44,7 @@ window.SOCifyInsights = (() => {
       }
       root.append(panel(`${t("قائمة المتابعة", "Work queue")} · ${n(data.queue_total)}`,data.queue.length?table([{label:t("القضية", "Case"),value:r=>node("a",{href:`/cases/${r.id}`,text:`${r.reference} · ${r.title}`})},{label:t("الخطورة", "Severity"),value:r=>node("span",{class:`severity ${r.severity}`,text:label(r.severity)})},{label:t("المسؤول", "Owner"),value:r=>userText(r.assignee_name)},{label:t("الحالة", "Status"),value:r=>label(r.status)},{label:t("الموعد", "Deadline"),value:r=>time(r.sla_due_at)}],data.queue):emptyState(t("لا قضايا نشطة", "No active cases"),null,[linkedButton(t("إدارة القضايا", "Case management"),"/cases")]),true));
       if(data.tasks.length) root.append(panel(`${t("المهام المعلقة", "Pending tasks")} · ${n(data.task_total)}`,table([{label:t("المهمة", "Task"),value:r=>node("a",{href:`/cases/${r.case_id}?tab=procedures`,text:r.title})},{label:t("الحالة", "Status"),value:r=>label(r.status)}],data.tasks),true));
-      if(data.queue_total>50||data.task_total>50)root.append(node("p",{text:t("تظهر أول ٥٠ نتيجة؛ بقية القضايا في إدارة القضايا.","Showing the first 50 results. Open Case management for all cases.")}));
+      if(data.queue_total>50||data.task_total>50)root.append(linkedButton(t("إدارة القضايا", "Case management"),"/cases"));
       finish(root);
     } catch(error) {finish(emptyState(t("تعذر تحميل الأداء", "Unable to load performance"),error.message,[button(t("إعادة المحاولة", "Retry"),performance)]));}
   }

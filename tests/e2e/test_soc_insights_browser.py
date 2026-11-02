@@ -40,6 +40,7 @@ def test_uploaded_case_dashboard_dossier_and_explicit_report_answers(app, langua
             }""")
             page.goto(base + "/performance?member=team")
             page.locator(".insight-counters").wait_for()
+            assert page.title() == ("أداء الفريق | SOCify" if language == "ar" else "Team performance | SOCify")
             assert page.locator(".insight-counter strong").first.inner_text() in {"1", "١"}
             assert_accessible(page)
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
@@ -76,6 +77,9 @@ def test_uploaded_case_dashboard_dossier_and_explicit_report_answers(app, langua
             page.screenshot(path=str(output / f"hosts-{language}-{theme}-{width}.png"), full_page=True)
             assert not errors, errors
             page.locator(".account-menu summary").click()
+            assert_accessible(page)
+            assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            page.screenshot(path=str(output / f"account-{language}-{theme}-{width}.png"))
             page.locator("[data-account-switch]").click()
             page.wait_for_url("**/login")
             assert not errors, errors

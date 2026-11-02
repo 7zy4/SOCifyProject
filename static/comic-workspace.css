@@ -198,7 +198,6 @@ dialog::backdrop { background:rgb(10 13 15 / .78); }
  .autopsy-shell .topbar .user-menu { display:none; }
  .autopsy-shell .topbar .user-menu .avatar { display:grid; }
  .autopsy-shell .topbar .user-menu:has(.avatar) { display:flex; }
- .autopsy-shell .topbar [data-account-switch] { display:none; }
  .autopsy-shell .avatar { width:34px; height:36px; }
  #menu-toggle { width:34px; min-height:38px; padding:6px; }
  .theme-switch { width:126px; flex:none; }

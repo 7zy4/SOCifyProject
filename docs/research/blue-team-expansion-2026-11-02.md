@@ -27,7 +27,7 @@ This is feature and workflow research, not imported third-party code or copied s
 - Full immutable report snapshots now include saved guided assessment answers and management review, alongside existing evidence, chronology, responses, tasks and custody. Later edits do not mutate earlier snapshots.
 - New assessments start unanswered. Printing a guided report requires saved answers. Removed the prior unsaved preview that printed assumed decisions.
 - Removed repeated feature descriptions from operational page headings and explanatory tool paragraphs. Calculation documentation lives here, not as instructional copy in the interface. Dynamic error/state information and necessary scope limits remain.
-- Fixed account switching outside demo mode to submit the current account-menu logout form.
+- Fixed account switching outside demo mode to submit the current account-menu logout form, and removed a stale mobile rule hiding that action.
 
 ## Scope and metric contract
 

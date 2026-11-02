@@ -67,7 +67,7 @@ window.SOCifyAutopsy.analysis = async (caseId) => {
     try {
       const selected = packChoice.input.autopsyValue();
       const queued = await api(`/api/cases/${caseId}/samples/${row.id}/analyze`, { method: "POST", body: selected ? { yara_pack_id: Number(selected) } : {} });
-      const status = node("p", { role: "status", text: SOCifyLocale.text("العمل في الطابور المحلي. يمكنك إغلاق هذه النافذة؛ ستبقى المهمة محفوظة.") });
+      const status = node("p", { role: "status", text: SOCifyLocale.text("بانتظار التنفيذ") });
       const dialog = autopsyModal(SOCifyLocale.text("التحليل المحلي"), node("div", {}, [status, button(SOCifyLocale.text("تحديث النتيجة"), () => { dialog.close(); autopsyCase(caseId).catch(handleError); })]));
       let attempts = 0;
       const poll = async () => {

@@ -240,7 +240,8 @@ def test_operational_governance_routes_render_their_authorized_content(app):
                 assert page.locator("#workspace .workspace-head h2").inner_text() == heading
                 if route == "audit":
                     page.get_by_text("Activity", exact=True).wait_for()
-                    assert "Sensitive data is redacted" in page.locator(".workspace-head").inner_text()
+                    assert page.locator(".workspace-head").inner_text() == heading
+                    assert page.locator(".workspace-head p").count() == 0
             browser.close()
     finally:
         server.shutdown()

@@ -108,7 +108,7 @@ function setHeading(section) {
 function begin(section) {
   setHeading(section);
   workspace.setAttribute("aria-busy", "true");
-  workspace.replaceChildren(node("div", { class: "loading" }, [node("span"), node("p", { text: SOCifyLocale.text("جارٍ تحميل البيانات المصرّح بها…") })]));
+  workspace.replaceChildren(node("div", { class: "loading" }, [node("span"), node("p", { text: SOCifyLocale.text("جارٍ التحميل…") })]));
 }
 
 function finish(content) {
