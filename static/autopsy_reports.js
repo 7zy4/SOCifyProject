@@ -1,6 +1,7 @@
 "use strict";
 
 let autopsyReportTimer = null;
+const autopsyReportProfiles = new Map();
 
 const autopsyReportLabels = {
   evidenced_timeline: SOCifyLocale.text("السجل الزمني للأدلة"),
@@ -124,6 +125,22 @@ function autopsyQuickReportLabel(value) {
 function autopsyReportProcessingLabel(value) {
   return SOCifyLocale.text({ queued: "بانتظار المعالجة", processing: "تجري المعالجة", completed: "جاهز للتنزيل", failed: "تعذرت المعالجة", cancelled: "أُلغيت المعالجة" }[value] || "غير متاحة");
 }
+
+function autopsyReportIssue(job) {
+  if (!job.error_code || ["completed", "cancelled"].includes(job.state)) return null;
+  const retrying = job.state === "queued";
+  const messages = {
+    ANALYSIS_UNAVAILABLE: retrying ? "إعداد التقرير متوقف مؤقتًا. ستتم إعادة المحاولة تلقائيًا." : "تعذر إعداد التقرير حاليًا. بيانات التحقيق محفوظة.",
+    RESOURCE_LIMIT: "تجاوز إعداد التقرير الوقت المتاح. بيانات التحقيق محفوظة.",
+    ACCESS_REVOKED: "تغيرت صلاحيات صاحب طلب التقرير. راجع صلاحياته أو أعد إعداد التقرير.",
+    LEASE_EXPIRED: retrying ? "توقفت المعالجة قبل الاكتمال. ستتم إعادة المحاولة تلقائيًا." : "توقفت المعالجة قبل الاكتمال. بيانات التحقيق محفوظة.",
+  };
+  const notice = node("div", { class: "notice report-issue", role: "status" }, node("p", { text: SOCifyLocale.text(messages[job.error_code] || "تعذر إكمال إعداد التقرير. بيانات التحقيق محفوظة.") }));
+  if (job.state === "failed" && job.attempts >= 3) notice.append(node("p", { text: SOCifyLocale.text("انتهت محاولات الإعداد. يمكنك طلب تقرير جديد لاحقًا.") }));
+  return notice;
+}
+
+const autopsyReportSignature = report => JSON.stringify([report.state, report.job.state, report.job.error_code, report.job.attempts, report.formats]);
 
 async function autopsyQuickDropdownReportPanel(caseId) {
   const data = await api(`/api/cases/${caseId}/quick-report`);
@@ -265,7 +282,13 @@ window.SOCifyAutopsy.reports = async (caseId) => {
   const current = autopsy.current;
   const body = node("div", { class: "panel-body" });
   const profiles = permission("evidence.download") ? [{ value: "full", label: SOCifyLocale.text("كامل للاستخدام الداخلي المصرح") }, { value: "metadata_only_v1", label: SOCifyLocale.text("منقح: بيانات إحصائية وحالة فقط") }] : [{ value: "metadata_only_v1", label: SOCifyLocale.text("منقح: بيانات إحصائية وحالة فقط") }];
-  const choice = autopsyChoice("profile", profiles, profiles[0].value, true);
+  const profileKey = `${state.user.id}:${caseId}`;
+  const retainedProfile = autopsyReportProfiles.get(profileKey);
+  const choice = autopsyChoice("profile", profiles, profiles.some(item => item.value === retainedProfile) ? retainedProfile : profiles[0].value, true);
+  choice.input.addEventListener("input", () => {
+    const selected = profiles.find(item => item.label === choice.input.value);
+    if (selected) autopsyReportProfiles.set(profileKey, selected.value);
+  });
   const create = button(SOCifyLocale.text("إعداد تقرير جديد"), async () => {
     if (!SOCifyDrafts.confirmDiscard(workspace)) return;
     create.disabled = true;
@@ -274,9 +297,11 @@ window.SOCifyAutopsy.reports = async (caseId) => {
   }, "primary");
   body.append(field(SOCifyLocale.text("سياسة مشاركة التقرير"), choice.control), create, button(SOCifyLocale.text("تحديث حالة التقارير"), () => autopsyCase(caseId).catch(handleError)));
   let pending = false;
+  const reportStates = new Map();
   if (current.archived_reports?.length) body.append(panel(SOCifyLocale.text("أرشيف التقارير"), table([{ label: SOCifyLocale.text("الإصدار"), value: "revision" }, { label: SOCifyLocale.text("الصيغة"), value: "format" }, { label: SOCifyLocale.text("البصمة"), value: "sha256" }, { label: SOCifyLocale.text("الملف"), value: (item) => permission("evidence.download") ? linkedButton(SOCifyLocale.text("تنزيل النسخة المؤرشفة"), `/api/incidents/${caseId}/report?format=${item.format}&revision=${item.revision}`) : SOCifyLocale.text("التنزيل يتطلب صلاحية مستقلة") }], current.archived_reports)));
   for (const item of current.reports) {
     const report = await api(`/api/cases/${caseId}/reports/${item.id}`);
+    reportStates.set(report.id, autopsyReportSignature(report));
     const stale = report.source_version !== current.version;
     const card = node("article", { class: "card report-revision" }, [
       node("h3", { text: SOCifyLocale.template`تقرير ${report.revision}` }),
@@ -298,7 +323,8 @@ window.SOCifyAutopsy.reports = async (caseId) => {
       const preview = node("details", {}, [node("summary", { text: SOCifyLocale.text("عرض بيانات النسخة للمراجعة") }), node("div", { class: "report-preview" }, autopsyReportPreview(report.payload))]);
       card.append(preview);
     }
-    if (report.job.error_code) card.append(node("p", { class: "notice", role: "status", text: SOCifyLocale.template`تعذر المعالجة: ${report.job.error_code}. راجع عامل المعالجة المحلي وحدود الموارد دون تغيير الدليل.` }));
+    const issue = autopsyReportIssue(report.job);
+    if (issue) card.append(issue);
     if (["queued", "processing"].includes(report.job.state)) {
       pending = true;
       if (report.created_by === state.user.id || current.can_manage) card.append(button(SOCifyLocale.text("إلغاء المعالجة"), async () => { try { await api(`/api/cases/${caseId}/jobs/${report.job.id}/cancel`, { method: "POST", body: {} }); await autopsyCase(caseId); } catch (error) { handleError(error); } }));
@@ -314,11 +340,11 @@ window.SOCifyAutopsy.reports = async (caseId) => {
     let updates = 0;
     const poll = async () => {
       if (!body.isConnected || ++updates > 40) return;
-      if (SOCifyDrafts.hasChanges(workspace)) { autopsyReportTimer = setTimeout(poll, 2500); return; }
+      if (SOCifyDrafts.hasChanges(workspace) || !profiles.some(item => item.label === choice.input.value)) { autopsyReportTimer = setTimeout(poll, 2500); return; }
       try {
         const latest = await api(`/api/cases/${caseId}`);
         const statuses = await Promise.all(latest.reports.slice(0, 20).map((item) => api(`/api/cases/${caseId}/reports/${item.id}`)));
-        if (statuses.some((item) => !["queued", "processing"].includes(item.job.state) && !current.reports.some((old) => old.id === item.id && old.state === item.state))) return autopsyCase(caseId);
+        if (latest.version !== current.version || statuses.some(item => reportStates.get(item.id) !== autopsyReportSignature(item))) return autopsyCase(caseId);
         if (!statuses.some((item) => ["queued", "processing"].includes(item.job.state))) return autopsyCase(caseId);
         autopsyReportTimer = setTimeout(poll, 2500);
       } catch (error) { handleError(error); }
