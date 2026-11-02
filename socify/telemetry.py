@@ -1,9 +1,88 @@
-"""Read-only adapters for retained Zeek, Suricata EVE and osquery results."""
+"""Read-only adapters for structured sensor and endpoint evidence."""
 
 import math
+import re
 from typing import Any
 
 from .timeutils import iso_timestamp, parse_timestamp
+
+
+def falco_profile(record: dict[str, Any]) -> dict[str, Any]:
+    """Normalize runtime alerts without treating the collector as an affected host."""
+    values = record["output_fields"]
+    if not isinstance(values, dict) or len(values) > 200:
+        raise ValueError("invalid Falco output fields")
+
+    def text(value, limit=512):
+        if value is None or isinstance(value, str) and value in {"", "<NA>", "<nil>"}:
+            return None
+        if not isinstance(value, str) or len(value) > limit:
+            raise ValueError("invalid or oversized Falco text field")
+        return value
+
+    def process_id(key):
+        value = values.get(key)
+        return None if value in ("<NA>", "<nil>") else number(value, integral=True)
+
+    rule = text(record["rule"], 255)
+    priority = text(record["priority"], 32)
+    timestamp = text(record.get("time"), 80)
+    levels = {
+        "emergency": "critical",
+        "alert": "critical",
+        "critical": "critical",
+        "error": "high",
+        "warning": "medium",
+        "notice": "low",
+        "informational": "low",
+        "debug": "low",
+    }
+    if not rule or not priority or priority.casefold() not in levels or not timestamp:
+        raise ValueError("Falco rule, priority and event time are required")
+    tags = record.get("tags", [])
+    if not isinstance(tags, list) or len(tags) > 50 or any(not isinstance(tag, str) or len(tag) > 80 for tag in tags):
+        raise ValueError("invalid Falco tags")
+    fields = {
+        "telemetry_schema": "falco",
+        "runtime_rule": rule,
+        "runtime_priority": priority.casefold(),
+        "runtime_source": text(record.get("source"), 100),
+        "sensor_hostname": text(record.get("hostname")),
+        "process_id": process_id("proc.pid"),
+        "parent_process_id": process_id("proc.ppid"),
+        "process_path": text(values.get("proc.exepath"), 2048),
+        "container_id": text(values.get("container.id")),
+        "container_name": text(values.get("container.name")),
+        "container_image": text(values.get("container.image.repository")),
+        "container_image_tag": text(values.get("container.image.tag")),
+        "kubernetes_namespace": text(values.get("k8s.ns.name")),
+        "kubernetes_pod": text(values.get("k8s.pod.name")),
+        "kubernetes_node": text(values.get("k8s.node.name")),
+        "file_path": text(values.get("fd.name"), 2048),
+    }
+    if fields["container_id"] == "host":
+        for key in ("container_id", "container_name", "container_image", "container_image_tag"):
+            fields[key] = None
+    return {
+        "source": "Falco",
+        "source_type": "falco",
+        "event_type": "runtime_alert",
+        "category": "runtime",
+        "severity": levels[priority.casefold()],
+        "title": rule,
+        "description": text(record.get("output"), 4000) or "",
+        "event_time": iso_timestamp(timestamp),
+        "hostname": text(values.get("evt.hostname")) or "",
+        "username": text(values.get("user.name")) or "",
+        "process_name": text(values.get("proc.name")) or "",
+        "parent_process": text(values.get("proc.pname")) or "",
+        "command_line": text(values.get("proc.cmdline"), 2048) or "",
+        "action": text(values.get("evt.type")) or "",
+        "tags": tags,
+        "mitre_ids": list(dict.fromkeys(tag for tag in tags if re.fullmatch(r"T\d{4}(?:\.\d{3})?", tag)))[:20],
+        "normalized_fields": {key: value for key, value in fields.items() if value is not None},
+        "parser_version": "socify-falco-1",
+    }
 
 
 def number(value, maximum=2**53 - 1, integral=False):
@@ -58,6 +137,9 @@ def osquery_rows(record):
 
 
 def profile(record: dict[str, Any]) -> dict[str, Any]:
+    if all(key in record for key in ("rule", "priority", "output_fields")):
+        return falco_profile(record)
+
     def section(key) -> dict[str, Any]:
         value = record.get(key)
         return value if isinstance(value, dict) else {}

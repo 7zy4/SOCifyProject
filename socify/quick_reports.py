@@ -549,7 +549,7 @@ def print_quick_report(case_id: int):
             parts.extend(f'<tr><td dir="auto">{_esc(text)}</td></tr>' for _, text in lines(item))
             parts.append("</tbody></table>")
         inspection_html = "".join(parts)
-    for title, key in (("تحليل الشبكة", "network_analysis"), ("نتائج الأجهزة", "endpoint_results")):
+    for title, key in (("تحليل الشبكة", "network_analysis"), ("نتائج الأجهزة", "endpoint_results"), ("أمن الأنظمة والحاويات", "runtime_events")):
         if telemetry[key]:
             inspection_html += f'<h2 class="section-title">{title}</h2><table class="qa-table"><tbody>'
             readable = network_report_content(telemetry[key]) if key == "network_analysis" else telemetry[key]

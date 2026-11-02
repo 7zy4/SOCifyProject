@@ -105,7 +105,6 @@ window.SOCifyInsights = (() => {
     const details=detailTable(t("تفاصيل التنبيه", "Alert details"),[
       [t("معرف التنبيه", "Alert ID"),data.alert.alert_id],
       [t("اسم القاعدة", "Rule name"),data.alert.rule_name],
-      [t("إصدار القاعدة", "Rule version"),data.alert.rule_version],
       [t("الخطورة", "Severity"),node("span",{class:`severity ${data.alert.severity}`,text:label(data.alert.severity)})],
       [t("سبب الكشف", "Detection reason"),data.alert.reason],
       [t("وقت الكشف", "Detection time"),time(data.alert.detected_at)],
@@ -128,7 +127,7 @@ window.SOCifyInsights = (() => {
     for(const technique of data.techniques)section("MITRE ATT&CK · "+technique.technique_id,[[t("التقنية", "Technique"),technique.technique_id],[t("التقييم", "Assessment"),label(technique.assessment)],[t("الدليل", "Evidence"),technique.reason]],"technique");
     for(const event of data.events){
       const fields=event.normalized_fields;
-      const names={process_name:t("العملية", "Process"),parent_process:t("العملية الأم", "Parent process"),command_line:t("سطر الأوامر", "Command line"),file_hash:t("بصمة الملف", "File hash")};
+      const names={process_name:t("العملية", "Process"),parent_process:t("العملية الأم", "Parent process"),command_line:t("سطر الأوامر", "Command line"),file_hash:t("بصمة الملف", "File hash"),runtime_rule:t("قاعدة الرصد", "Sensor rule"),runtime_priority:t("أولوية الرصد", "Sensor priority"),runtime_source:t("مصدر الحدث", "Event source"),sensor_hostname:t("حساس الجمع", "Collector"),process_id:t("معرف العملية", "Process ID"),parent_process_id:t("معرف العملية الأم", "Parent process ID"),process_path:t("مسار العملية", "Process path"),file_path:t("مسار الملف", "File path"),container_id:t("معرف الحاوية", "Container ID"),container_name:t("الحاوية", "Container"),container_image:t("صورة الحاوية", "Container image"),container_image_tag:t("وسم الصورة", "Image tag"),kubernetes_namespace:t("نطاق الحاويات", "Namespace"),kubernetes_pod:t("مجموعة الحاويات", "Pod"),kubernetes_node:t("عقدة التشغيل", "Node")};
       const facts=[[t("معرف السجل", "Event ID"),event.id],[t("وقت الحدث", "Event time"),fields.event_time_known?time(event.event_time):null],[t("المصدر", "Source"),event.source_ip],[t("الوجهة", "Destination"),event.destination_ip],[t("الجهاز", "Host"),event.hostname],[t("الحساب", "Account"),event.username]];
       for(const [key,value] of Object.entries(fields))if(!["event_time_known","event_time","source_ip","destination_ip","hostname","username","content_inspection","exposed_secret_count","sensitive_data_count","decoded_threat_count"].includes(key))facts.push([names[key]||label(key),value]);
       facts.push([t("السجل الأصلي", "Original event"),node("pre",{dir:"ltr",tabindex:0,"data-user-content":"true",text:event.raw_data})]);

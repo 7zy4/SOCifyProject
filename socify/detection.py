@@ -48,6 +48,13 @@ FIELDS = {
     "ids_signature",
     "query_name",
     "query_action",
+    "runtime_rule",
+    "runtime_source",
+    "container_id",
+    "container_name",
+    "kubernetes_namespace",
+    "kubernetes_pod",
+    "kubernetes_node",
     "destination_port",
     "protocol",
 }

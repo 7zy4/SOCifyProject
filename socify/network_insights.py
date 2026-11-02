@@ -149,4 +149,47 @@ def telemetry_report(connection, case_id, workspace):
         endpoints.append(item)
         if len(endpoints) > 2000 or size > 4 * 1024 * 1024:
             raise ValueError("تجاوز التقرير حد نتائج الأجهزة")
-    return {"network_analysis": network if network["event_count"] else {}, "endpoint_results": endpoints}
+    runtime = []
+    for row in connection.execute(
+        "SELECT id,hostname,username,title,severity,event_time,raw_hash,normalized_fields FROM security_events WHERE owner_case_id=? AND workspace_id=? AND autopsy_active=1 AND source_type='falco' ORDER BY id LIMIT 2001",
+        (case_id, workspace),
+    ):
+        fields = json.loads(row["normalized_fields"])
+        item = {
+            "event_id": row["id"],
+            "hostname": row["hostname"],
+            "username": row["username"],
+            "title": row["title"],
+            "severity": row["severity"],
+            "event_time": row["event_time"] if fields.get("event_time_known") else None,
+            "sha256": row["raw_hash"],
+            **{
+                key: fields[key]
+                for key in (
+                    "runtime_rule",
+                    "runtime_priority",
+                    "runtime_source",
+                    "sensor_hostname",
+                    "process_name",
+                    "parent_process",
+                    "process_id",
+                    "parent_process_id",
+                    "process_path",
+                    "command_line",
+                    "file_path",
+                    "container_id",
+                    "container_name",
+                    "container_image",
+                    "container_image_tag",
+                    "kubernetes_namespace",
+                    "kubernetes_pod",
+                    "kubernetes_node",
+                )
+                if fields.get(key) not in (None, "")
+            },
+        }
+        size += len(json.dumps(item).encode())
+        runtime.append(item)
+        if len(runtime) > 2000 or size > 4 * 1024 * 1024:
+            raise ValueError("تجاوز التقرير حد أحداث أمن التشغيل")
+    return {"network_analysis": network if network["event_count"] else {}, "endpoint_results": endpoints, "runtime_events": runtime}

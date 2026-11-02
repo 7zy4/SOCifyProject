@@ -1,7 +1,8 @@
 :root { color-scheme:light; font-synthesis:none; }
 * { box-sizing:border-box; }
 body { margin:0; padding:28px; font:600 15px/1.75 "Cairo","IBM Plex Sans",sans-serif; background:#E4DFD1; color:#191D20; font-variant-numeric:tabular-nums; }
-code,.mono { font:500 14px/1.7 "JetBrains Mono","Cairo",monospace; overflow-wrap:anywhere; }
+code { font:500 14px/1.7 "JetBrains Mono","Cairo",monospace; overflow-wrap:anywhere; }
+.mono { font:inherit; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
 .print-toolbar { max-width:1040px; margin:0 auto 24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; padding:16px 20px; background:#242B30; color:#F4EEDF; border:2px solid #101416; border-radius:3px 8px 2px 5px; box-shadow:5px 5px 0 #101416; }
 .toolbar-brand,.toolbar-actions,.brand-kicker { display:inline-flex; align-items:center; gap:12px; }
 .toolbar-brand strong,.brand-kicker { font:400 32px/1.2 "Bangers",sans-serif; letter-spacing:1px; }

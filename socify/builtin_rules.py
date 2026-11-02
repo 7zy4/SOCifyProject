@@ -13,6 +13,26 @@ from .timeutils import iso_now
 BUILTIN_RULES: tuple[dict[str, Any], ...] = (
     *(
         {
+            "name": f"[SOCify] {severity.title()} Runtime Security Alert",
+            "description": "A retained runtime sensor alert matches the recorded severity and rule.",
+            "severity": severity,
+            "confidence": 0.80,
+            "dsl": {
+                "condition": {
+                    "logic": "and",
+                    "conditions": [
+                        {"field": "source_type", "operator": "equals", "value": "falco"},
+                        {"field": "event_type", "operator": "equals", "value": "runtime_alert"},
+                        {"field": "severity", "operator": "equals", "value": severity},
+                    ],
+                },
+                "mitre_ids": [],
+            },
+        }
+        for severity in ("critical", "high", "medium", "low")
+    ),
+    *(
+        {
             "name": f"[SOCify] Suricata {severity.title()} Signature",
             "description": "A retained Suricata EVE alert contains a signature and the corresponding IDS severity.",
             "severity": severity,
