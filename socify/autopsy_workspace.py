@@ -218,7 +218,7 @@ def demo_accounts():
     if not demo_enabled() or not get_db().execute("SELECT 1 FROM demo_accounts WHERE user_id=?", (actor_id(),)).fetchone():
         return jsonify({"enabled": False, "items": []})
     rows = get_db().execute(
-        "SELECT u.id,u.name,u.role FROM users u JOIN demo_accounts d ON d.user_id=u.id WHERE u.workspace_id=? AND u.is_active=1 ORDER BY u.id",
+        "SELECT u.id,socify_user_name(u.name,u.name_ar,u.name_en) AS name,u.role FROM users u JOIN demo_accounts d ON d.user_id=u.id WHERE u.workspace_id=? AND u.is_active=1 ORDER BY u.id",
         (workspace_id(),),
     )
     return jsonify({"enabled": True, "items": [dict(row) for row in rows]})

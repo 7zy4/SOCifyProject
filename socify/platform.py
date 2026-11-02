@@ -213,7 +213,7 @@ def audit_logs():
     rows = (
         get_db()
         .execute(
-            f"SELECT a.id, a.actor_id, u.name AS actor_name, a.action, a.resource_type, a.resource_id, a.result, a.details, a.correlation_id, a.ip_address, a.created_at FROM security_audit_logs a LEFT JOIN users u ON u.id = a.actor_id WHERE {where} ORDER BY a.id DESC LIMIT ? OFFSET ?",
+            f"SELECT a.id, a.actor_id, socify_user_name(u.name,u.name_ar,u.name_en) AS actor_name, a.action, a.resource_type, a.resource_id, a.result, a.details, a.correlation_id, a.ip_address, a.created_at FROM security_audit_logs a LEFT JOIN users u ON u.id = a.actor_id WHERE {where} ORDER BY a.id DESC LIMIT ? OFFSET ?",
             (*parameters, page_size, (page - 1) * page_size),
         )
         .fetchall()

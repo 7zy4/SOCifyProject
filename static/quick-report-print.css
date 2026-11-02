@@ -25,6 +25,8 @@ code { font:500 14px/1.7 "JetBrains Mono","Cairo",monospace; overflow-wrap:anywh
 .qa-table th,.qa-table td,.evidence-table th,.evidence-table td { border:1px solid #898C7F; padding:12px; text-align:right; vertical-align:top; overflow-wrap:anywhere; }
 .qa-table thead th,.evidence-table thead th { background:#DED8C8; color:#191D20; font-size:14px; font-weight:900; border-bottom:2px solid #252A26; }
 .qa-table tbody th { background:#E9E3D4; font-weight:800; }
+.report-facts th[scope="row"],.report-facts thead th:first-child { width:34%; }
+.report-facts .report-group th { background:#DED8C8; border-top:2px solid #252A26; }
 .badge { display:inline-flex; align-items:center; padding:4px 10px; border-radius:2px 5px 1px 3px; font:800 14px/1.6 "Cairo",sans-serif; border:2px solid #252A26; box-shadow:2px 2px 0 #252A26; background:#DED8C8; color:#191D20; white-space:normal; }
 .badge.critical { color:#FFF4E7; background:#8B3029; }
 .badge.high { color:#FFF4E7; background:#8E5128; }

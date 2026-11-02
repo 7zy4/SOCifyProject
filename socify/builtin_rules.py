@@ -13,6 +13,26 @@ from .timeutils import iso_now
 BUILTIN_RULES: tuple[dict[str, Any], ...] = (
     *(
         {
+            "name": f"[SOCify] Snort {severity.title()} Alert",
+            "description": "A retained Snort network alert matches the recorded priority.",
+            "severity": severity,
+            "confidence": 0.80,
+            "dsl": {
+                "condition": {
+                    "logic": "and",
+                    "conditions": [
+                        {"field": "source_type", "operator": "equals", "value": "snort"},
+                        {"field": "event_type", "operator": "equals", "value": "snort_alert"},
+                        {"field": "severity", "operator": "equals", "value": severity},
+                    ],
+                },
+                "mitre_ids": [],
+            },
+        }
+        for severity in ("high", "medium", "low")
+    ),
+    *(
+        {
             "name": f"[SOCify] {severity.title()} Runtime Security Alert",
             "description": "A retained runtime sensor alert matches the recorded severity and rule.",
             "severity": severity,

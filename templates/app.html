@@ -76,9 +76,9 @@
       <div class="section-context sr-only"><p id="section-kicker" class="eyebrow">Incident investigation</p><h1 id="section-title" data-ui-copy>مركز العمليات</h1></div>
       <div class="appearance-tools"><div data-theme-control></div><button class="button ghost compact language-toggle" type="button" data-language-toggle>English</button></div>
       <details class="account-menu">
-        <summary class="avatar" aria-label="الحساب" data-ui-attributes>{{ user.name[:1] }}</summary>
+        <summary class="avatar" aria-label="الحساب" data-ui-attributes data-account-initial>{{ user.name[:1] }}</summary>
         <div class="account-popover">
-          <strong>{{ user.name }}</strong>
+          <strong data-account-name data-name="{{ user.account_name }}" data-name-ar="{{ user.name_ar }}" data-name-en="{{ user.name_en }}">{{ user.name }}</strong>
           <a class="button ghost" href="/profile" data-ui-copy>الملف الشخصي</a>
           <button type="button" class="button ghost" data-account-switch data-ui-copy>تبديل الحساب</button>
           <form method="post" action="{{ url_for('auth.logout_page') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button ghost full" type="submit" data-ui-copy>خروج</button></form>

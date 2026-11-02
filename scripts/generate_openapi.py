@@ -36,7 +36,26 @@ def generate() -> dict[str, object]:
                 operation["parameters"] = parameters
             if method in {"POST", "PUT", "PATCH"}:
                 operation["requestBody"] = {"required": False, "content": {"application/json": {"schema": {"type": "object", "additionalProperties": True}}}}
-            if path == "/api/soc/performance":
+            if path == "/api/profile/display-name":
+                operation["summary"] = "Save the authenticated user's display names"
+                operation["requestBody"] = {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["name_ar", "name_en"],
+                                "additionalProperties": False,
+                                "properties": {key: {"type": "string", "maxLength": 100} for key in ("name_ar", "name_en")},
+                            }
+                        }
+                    },
+                }
+                operation["description"] = (
+                    "User-authored names are selected by interface language. Empty values fall back to the registered name. Account identity, email and role do not change."
+                )
+                operation["responses"]["422"] = {"description": "Invalid name or unknown field"}
+            elif path == "/api/soc/performance":
                 operation["summary"] = "Team and personal operational performance"
                 operation["description"] = (
                     "Current authorized backlog and period completions. Team/member selection is manager-only; analysts can select themselves. Missing evidenced times remain null. Excludes training, archived, unapproved and restricted-batch cases. Returns 422 above 2000 scoped cases; never silently samples."

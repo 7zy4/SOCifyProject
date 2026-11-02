@@ -6151,6 +6151,55 @@
         }
       }
     },
+    "/api/profile/display-name": {
+      "put": {
+        "operationId": "auth_update_display_name_put__api_profile_display-name",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "description": "Invalid name or unknown field"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name_ar",
+                  "name_en"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name_ar": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "name_en": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Save the authenticated user's display names",
+        "description": "User-authored names are selected by interface language. Empty values fall back to the registered name. Account identity, email and role do not change."
+      }
+    },
     "/api/profile/leaderboard": {
       "put": {
         "operationId": "platform_leaderboard_preference_put__api_profile_leaderboard",

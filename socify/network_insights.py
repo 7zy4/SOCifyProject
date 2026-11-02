@@ -102,7 +102,7 @@ def network_snapshot(connection, case_id, workspace):
           'duration_seconds',json_extract(normalized_fields,'$.duration_seconds'),'dns_question',substr(json_extract(normalized_fields,'$.dns_question'),1,512),
           'tls_sni',substr(json_extract(normalized_fields,'$.tls_sni'),1,512),'http_host',substr(json_extract(normalized_fields,'$.http_host'),1,512)) AS fields
         FROM security_events WHERE owner_case_id=? AND workspace_id=? AND autopsy_active=1
-          AND source_type IN ('zeek','suricata') AND json_extract(normalized_fields,'$.telemetry_schema') IN ('zeek','suricata')
+          AND source_type IN ('zeek','suricata','snort') AND json_extract(normalized_fields,'$.telemetry_schema') IN ('zeek','suricata','snort')
         ORDER BY id LIMIT ?""",
         (case_id, workspace, MAX_NETWORK_EVENTS + 1),
     ).fetchall()
@@ -192,4 +192,34 @@ def telemetry_report(connection, case_id, workspace):
         runtime.append(item)
         if len(runtime) > 2000 or size > 4 * 1024 * 1024:
             raise ValueError("تجاوز التقرير حد أحداث أمن التشغيل")
-    return {"network_analysis": network if network["event_count"] else {}, "endpoint_results": endpoints, "runtime_events": runtime}
+    alerts = []
+    for row in connection.execute(
+        "SELECT id,source_ip,destination_ip,title,severity,action,event_time,normalized_fields FROM security_events WHERE owner_case_id=? AND workspace_id=? AND autopsy_active=1 AND source_type='snort' ORDER BY id LIMIT 2001",
+        (case_id, workspace),
+    ):
+        fields = json.loads(row["normalized_fields"])
+        item = {"event_id": row["id"], **{key: row[key] for key in ("source_ip", "destination_ip", "title", "severity", "action")}}
+        item["event_time"] = row["event_time"] if fields.get("event_time_known") else None
+        item.update(
+            {
+                key: value
+                for key, value in fields.items()
+                if key
+                in {
+                    "source_port",
+                    "destination_port",
+                    "protocol",
+                    "ids_rule",
+                    "ids_priority",
+                    "ids_signature",
+                    "ids_classification",
+                    "source_timestamp",
+                    "packet_number",
+                }
+            }
+        )
+        alerts.append(item)
+        size += len(json.dumps(item).encode())
+        if len(alerts) > 2000 or size > 4 * 1024 * 1024:
+            raise ValueError("تجاوز التقرير حد تنبيهات الشبكة")
+    return {"network_analysis": network if network["event_count"] else {}, "endpoint_results": endpoints, "runtime_events": runtime, "network_alerts": alerts}

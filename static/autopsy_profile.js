@@ -24,6 +24,19 @@ window.SOCifyAutopsy.profile = async () => {
   begin("profile");
   const [status, sessions] = await Promise.all([api("/api/auth/mfa/status"), api("/api/auth/sessions")]);
   const root = node("div", {}, pageHead(SOCifyLocale.text("أمان الحساب"), `${state.user.name} · ${autopsyLabel(state.user.role)}`));
+  const names = node("form", { class: "form-grid", "data-display-name-form": true });
+  for (const [key, title, direction] of [["name_ar", "الاسم بالعربية", "rtl"], ["name_en", "الاسم بالإنجليزية", "ltr"]]) {
+    names.append(field(SOCifyLocale.text(title), node("input", { name: key, maxlength: 100, value: state.user[key] || "", placeholder: state.user.account_name, dir: direction, autocomplete: "off" })));
+  }
+  const nameStatus = node("p", { role: "status", class: "span-2" });
+  const saveName = node("button", { type: "submit", class: "button primary", text: SOCifyLocale.text("حفظ الاسم") });
+  names.append(nameStatus, saveName);
+  names.addEventListener("submit", async event => {
+    event.preventDefault(); saveName.disabled = true;
+    try { await api("/api/profile/display-name", { method: "PUT", body: Object.fromEntries(new FormData(names)) }); location.reload(); }
+    catch (error) { nameStatus.textContent = error.message; saveName.disabled = false; }
+  });
+  root.append(panel(SOCifyLocale.text("اسم العرض"), node("div", { class: "panel-body" }, names), true));
   const mfa = node("div", { class: "panel-body" }, node("p", { text: status.enabled ? SOCifyLocale.template`المصادقة متعددة العوامل مفعّلة · رموز استرداد غير مستخدمة: ${status.recovery_codes_remaining}` : status.pending ? SOCifyLocale.text("إعداد المصادقة لم يكتمل. ابدأ إعدادًا جديدًا ثم أكد الرمز من تطبيقك المحلي.") : SOCifyLocale.text("المصادقة متعددة العوامل غير مفعّلة.") }));
   if (!status.enabled) {
     mfa.append(securityForm([{ name: "current_password", label: SOCifyLocale.text("كلمة المرور الحالية لبدء الإعداد"), type: "password", autocomplete: "current-password" }], async (body) => {

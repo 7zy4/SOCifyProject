@@ -31,7 +31,11 @@ def team_detail():
 
     members = [
         dict(row)
-        for row in get_db().execute("SELECT id, name, email, role, is_active FROM users WHERE workspace_id = ? ORDER BY id", (workspace_id(),)).fetchall()
+        for row in get_db()
+        .execute(
+            "SELECT id, socify_user_name(name,name_ar,name_en) AS name, email, role, is_active FROM users WHERE workspace_id = ? ORDER BY id", (workspace_id(),)
+        )
+        .fetchall()
     ]
     roles = []
     for role in sorted(MEMBER_ROLES):
@@ -57,7 +61,7 @@ def team_detail():
         dict(row)
         for row in get_db()
         .execute(
-            f"SELECT a.*, t.status AS task_status, u.name AS assignee_name, c.reference, c.title AS case_title, j.filename FROM team_log_assignments a JOIN case_tasks t ON t.id = a.task_id JOIN users u ON u.id = a.assignee JOIN incident_cases c ON c.id = a.case_id JOIN ingestion_jobs j ON j.id = a.job_id WHERE a.workspace_id = ?{scope} ORDER BY a.id DESC LIMIT 100",
+            f"SELECT a.*, t.status AS task_status, socify_user_name(u.name,u.name_ar,u.name_en) AS assignee_name, c.reference, c.title AS case_title, j.filename FROM team_log_assignments a JOIN case_tasks t ON t.id = a.task_id JOIN users u ON u.id = a.assignee JOIN incident_cases c ON c.id = a.case_id JOIN ingestion_jobs j ON j.id = a.job_id WHERE a.workspace_id = ?{scope} ORDER BY a.id DESC LIMIT 100",
             args,
         )
         .fetchall()

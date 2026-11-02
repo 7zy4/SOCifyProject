@@ -235,7 +235,10 @@ def performance():
         )
     ]
     members = {
-        row["id"]: dict(row) for row in get_db().execute("SELECT id,name,role,is_active FROM users WHERE workspace_id=? ORDER BY name,id", (workspace_id(),))
+        row["id"]: dict(row)
+        for row in get_db().execute(
+            "SELECT id,socify_user_name(name,name_ar,name_en) AS name,role,is_active FROM users WHERE workspace_id=? ORDER BY name,id", (workspace_id(),)
+        )
     }
     workload = {key: {**value, "open": 0, "closed": 0, "tasks_completed": 0} for key, value in members.items() if manager or key == actor_id()}
     trend: dict[str, dict[str, int]] = defaultdict(lambda: {"opened": 0, "closed": 0})
@@ -361,7 +364,7 @@ def alert_dossier(case_id, alert_id):
     notes = [
         dict(row)
         for row in get_db().execute(
-            "SELECT n.body,n.created_at,u.name AS author FROM case_notes n JOIN users u ON u.id=n.author_id WHERE n.case_id=? AND n.visibility='team' ORDER BY n.id DESC LIMIT 10",
+            "SELECT n.body,n.created_at,socify_user_name(u.name,u.name_ar,u.name_en) AS author FROM case_notes n JOIN users u ON u.id=n.author_id WHERE n.case_id=? AND n.visibility='team' ORDER BY n.id DESC LIMIT 10",
             (case_id,),
         )
     ]

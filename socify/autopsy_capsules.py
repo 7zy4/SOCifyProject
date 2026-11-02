@@ -131,7 +131,10 @@ def export_snapshot(case_id, profile):
     snapshot["alert_events"] = rows(
         "SELECT ae.* FROM alert_events ae JOIN case_alerts ca ON ca.alert_id = ae.alert_id WHERE ca.case_id = ? ORDER BY ae.alert_id, ae.event_id", (case_id,)
     )
-    snapshot["actors"] = rows("SELECT DISTINCT u.id, u.name, u.role FROM users u WHERE u.workspace_id = ? ORDER BY u.id", (workspace_id(),))
+    snapshot["actors"] = rows(
+        "SELECT DISTINCT u.id, socify_user_name(u.name,u.name_ar,u.name_en) AS name, u.role FROM users u WHERE u.workspace_id = ? ORDER BY u.id",
+        (workspace_id(),),
+    )
     snapshot["imports"] = rows("SELECT * FROM ingestion_jobs WHERE case_id = ? ORDER BY id", (case_id,))
     for job in snapshot["imports"]:
         if job.get("evidence_ciphertext"):

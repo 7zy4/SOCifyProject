@@ -280,7 +280,7 @@ def list_cases():
     rows = (
         get_db()
         .execute(
-            f"""SELECT c.*, u.name AS assignee_name,
+            f"""SELECT c.*, socify_user_name(u.name,u.name_ar,u.name_en) AS assignee_name,
         (SELECT COUNT(*) FROM case_evidence e WHERE e.case_id = c.id) AS evidence_count,
         (SELECT COUNT(*) FROM case_tasks t WHERE t.case_id = c.id AND t.status != 'completed') AS pending_tasks
         FROM incident_cases c LEFT JOIN users u ON u.id = c.assignee
@@ -527,7 +527,7 @@ def case_detail(case_id: int):
         {**dict(value), "note": value["body"]}
         for value in get_db()
         .execute(
-            f"SELECT n.*, u.name AS author_name FROM case_notes n JOIN users u ON u.id = n.author_id WHERE n.case_id = ?{note_scope} ORDER BY n.created_at",
+            f"SELECT n.*, socify_user_name(u.name,u.name_ar,u.name_en) AS author_name FROM case_notes n JOIN users u ON u.id = n.author_id WHERE n.case_id = ?{note_scope} ORDER BY n.created_at",
             note_parameters,
         )
         .fetchall()
@@ -536,7 +536,8 @@ def case_detail(case_id: int):
         dict(value)
         for value in get_db()
         .execute(
-            "SELECT e.*, u.name AS added_by_name FROM case_evidence e JOIN users u ON u.id = e.added_by WHERE e.case_id = ? ORDER BY e.added_at", (case_id,)
+            "SELECT e.*, socify_user_name(u.name,u.name_ar,u.name_en) AS added_by_name FROM case_evidence e JOIN users u ON u.id = e.added_by WHERE e.case_id = ? ORDER BY e.added_at",
+            (case_id,),
         )
         .fetchall()
     ]
@@ -544,7 +545,10 @@ def case_detail(case_id: int):
     item["history"] = [
         dict(value)
         for value in get_db()
-        .execute("SELECT h.*, u.name AS actor_name FROM case_history h JOIN users u ON u.id = h.actor_id WHERE h.case_id = ? ORDER BY h.created_at", (case_id,))
+        .execute(
+            "SELECT h.*, socify_user_name(u.name,u.name_ar,u.name_en) AS actor_name FROM case_history h JOIN users u ON u.id = h.actor_id WHERE h.case_id = ? ORDER BY h.created_at",
+            (case_id,),
+        )
         .fetchall()
     ]
     item["reports"] = [
@@ -557,7 +561,7 @@ def case_detail(case_id: int):
         dict(value)
         for value in get_db()
         .execute(
-            "SELECT a.*, u.name AS author_name FROM case_technique_annotations a JOIN users u ON u.id = a.created_by WHERE a.case_id = ? ORDER BY a.id",
+            "SELECT a.*, socify_user_name(u.name,u.name_ar,u.name_en) AS author_name FROM case_technique_annotations a JOIN users u ON u.id = a.created_by WHERE a.case_id = ? ORDER BY a.id",
             (case_id,),
         )
         .fetchall()
@@ -784,7 +788,14 @@ def add_note(case_id: int):
         _history(get_db(), case_id, "note_added", None, {"note_id": note_id})
         record_audit(get_db(), "create", "case_note", note_id, details={"case_id": case_id})
         record_training_action(get_db(), row["training_run_id"], actor_id(), "note_added", "case", case_id, {}, f"note:{note_id}")
-    note = get_db().execute("SELECT n.*, u.name AS author_name FROM case_notes n JOIN users u ON u.id = n.author_id WHERE n.id = ?", (note_id,)).fetchone()
+    note = (
+        get_db()
+        .execute(
+            "SELECT n.*, socify_user_name(u.name,u.name_ar,u.name_en) AS author_name FROM case_notes n JOIN users u ON u.id = n.author_id WHERE n.id = ?",
+            (note_id,),
+        )
+        .fetchone()
+    )
     return jsonify(dict(note)), 201
 
 

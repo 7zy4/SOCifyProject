@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     name TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'analyst',
+    name_ar TEXT NOT NULL DEFAULT '',
+    name_en TEXT NOT NULL DEFAULT '',
     team TEXT,
     workspace_id INTEGER NOT NULL DEFAULT 1,
     created_at TEXT,
@@ -719,6 +721,8 @@ CREATE TABLE IF NOT EXISTS outbox_events (
 
 COLUMN_MIGRATIONS: dict[str, dict[str, str]] = {
     "users": {
+        "name_ar": "TEXT NOT NULL DEFAULT ''",
+        "name_en": "TEXT NOT NULL DEFAULT ''",
         "team": "TEXT",
         "workspace_id": "INTEGER NOT NULL DEFAULT 1",
         "created_at": "TEXT",

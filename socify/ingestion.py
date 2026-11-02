@@ -626,6 +626,8 @@ def _mapped_records(records: Iterable[dict[str, Any]], options: dict[str, Any], 
         )
         if record.get("parser_version") == "socify-telemetry-1":
             known_time = any(raw.get(key) is not None for key in ("ts", "unixTime", "timestamp"))
+        if record.get("parser_version") == "socify-snort-1":
+            known_time = record["normalized_fields"]["event_time_known"]
         assumed_year = raw.get("timestamp_assumption") == "current_year_utc"
         if assumed_year:
             local = datetime.fromisoformat(str(record["event_time"]).replace("Z", "+00:00")).replace(

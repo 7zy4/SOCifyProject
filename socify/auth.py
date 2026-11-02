@@ -2,6 +2,7 @@ import hashlib
 import re
 import secrets
 import sqlite3
+import unicodedata
 from datetime import timedelta
 from typing import Any, TypeGuard
 
@@ -410,6 +411,27 @@ def revoke_session(session_id: int):
     return "", 204
 
 
+@auth_api.put("/api/profile/display-name")
+@login_required
+def update_display_name():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or set(data) != {"name_ar", "name_en"}:
+        return error_response("INVALID_DISPLAY_NAME", "أدخل اسم العرض بالعربية والإنجليزية", 422)
+    values = {}
+    for key in ("name_ar", "name_en"):
+        value = data[key]
+        if not isinstance(value, str) or len(value) > 100 or any(unicodedata.category(char).startswith("C") for char in value):
+            return error_response("INVALID_DISPLAY_NAME", "اسم العرض يجب ألا يتجاوز ١٠٠ محرف دون محارف تحكم", 422)
+        values[key] = value.strip()
+    with transaction():
+        get_db().execute(
+            "UPDATE users SET name_ar=?, name_en=? WHERE id=? AND workspace_id=?",
+            (values["name_ar"], values["name_en"], actor_id(), int(_active_user()["workspace_id"])),
+        )
+        record_audit(get_db(), "update", "display_name", actor_id(), details=values)
+    return jsonify(values)
+
+
 @auth_api.post("/api/profile/password")
 @login_required
 def change_password():
@@ -533,7 +555,7 @@ def users_list():
     rows = (
         get_db()
         .execute(
-            "SELECT id, email, name, role, team, is_active, created_at, last_login FROM users WHERE workspace_id = ? ORDER BY name",
+            "SELECT id, email, socify_user_name(name,name_ar,name_en) AS name, role, team, is_active, created_at, last_login FROM users WHERE workspace_id = ? ORDER BY name",
             (workspace,),
         )
         .fetchall()
@@ -572,7 +594,11 @@ def update_user(user_id: int):
         if updates.get("is_active") == 0:
             get_db().execute("UPDATE auth_sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL", (iso_now(), user_id))
         record_audit(get_db(), "update", "user", user_id, details={"fields": list(updates)})
-    updated = get_db().execute("SELECT id, email, name, role, team, is_active FROM users WHERE id = ?", (user_id,)).fetchone()
+    updated = (
+        get_db()
+        .execute("SELECT id, email, socify_user_name(name,name_ar,name_en) AS name, role, team, is_active FROM users WHERE id = ?", (user_id,))
+        .fetchone()
+    )
     return jsonify(dict(updated))
 
 

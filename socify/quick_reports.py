@@ -212,7 +212,9 @@ def _report_view(row: sqlite3.Row | None) -> dict[str, Any] | None:
 def _collect_case_auto_summary(case_row: sqlite3.Row) -> dict[str, Any]:
     case_id = int(case_row["id"])
     db = get_db()
-    owner_row = db.execute("SELECT COALESCE(name, email) AS name, role FROM users WHERE id = ?", (case_row["assignee"] or case_row["creator"],)).fetchone()
+    owner_row = db.execute(
+        "SELECT COALESCE(socify_user_name(name,name_ar,name_en), email) AS name, role FROM users WHERE id = ?", (case_row["assignee"] or case_row["creator"],)
+    ).fetchone()
     logs_count = int(db.execute("SELECT COUNT(*) FROM case_events WHERE case_id = ? AND active_event = 1", (case_id,)).fetchone()[0])
     alerts_rows = db.execute(
         """SELECT a.id, a.alert_id, a.severity, a.reason, a.status, a.detected_at
@@ -411,7 +413,7 @@ def list_escalated_reports():
         get_db()
         .execute(
             f"""SELECT qr.*, c.reference AS case_reference, c.title AS case_title, c.severity AS case_severity, c.status AS case_status,
-                      COALESCE(u.name, u.email) AS investigator_name
+                      COALESCE(socify_user_name(u.name,u.name_ar,u.name_en), u.email) AS investigator_name
                FROM case_quick_reports qr
                JOIN incident_cases c ON c.id = qr.case_id
                LEFT JOIN users u ON u.id = COALESCE(qr.escalated_by, qr.prepared_by)
@@ -532,7 +534,7 @@ def print_quick_report(case_id: int):
 
     if not report:
         return error_response("REPORT_ANSWERS_REQUIRED", "احفظ إجابات التحقيق قبل طباعة التقرير", 409)
-    from .autopsy_report_render import lines, network_report_content
+    from .autopsy_report_render import ENUM_LABELS, network_report_content, report_table
     from .content_inspection import inspection_snapshot
     from .network_insights import telemetry_report
 
@@ -545,21 +547,23 @@ def print_quick_report(case_id: int):
     if inspected:
         parts = ['<h2 class="section-title">فحص المحتوى والترميزات</h2>']
         for item in inspected:
-            parts.append(f'<table class="qa-table content-inspection-report"><caption>السجل #{item["event_id"]}</caption><tbody>')
-            parts.extend(f'<tr><td dir="auto">{_esc(text)}</td></tr>' for _, text in lines(item))
-            parts.append("</tbody></table>")
+            parts.append(f'<div class="content-inspection-report">{report_table(item)}</div>')
         inspection_html = "".join(parts)
-    for title, key in (("تحليل الشبكة", "network_analysis"), ("نتائج الأجهزة", "endpoint_results"), ("أمن الأنظمة والحاويات", "runtime_events")):
+    for title, key in (
+        ("تحليل الشبكة", "network_analysis"),
+        ("نتائج الأجهزة", "endpoint_results"),
+        ("أمن الأنظمة والحاويات", "runtime_events"),
+        ("تنبيهات الشبكة", "network_alerts"),
+    ):
         if telemetry[key]:
-            inspection_html += f'<h2 class="section-title">{title}</h2><table class="qa-table"><tbody>'
+            inspection_html += f'<h2 class="section-title">{title}</h2>'
             readable = network_report_content(telemetry[key]) if key == "network_analysis" else telemetry[key]
-            inspection_html += "".join(f'<tr><td dir="auto">{_esc(text)}</td></tr>' for _, text in lines(readable))
-            inspection_html += "</tbody></table>"
+            inspection_html += report_table(readable)
     qa_rows_html = "".join(
         f"<tr><th>{_fmt_bilingual(item['question'])}</th><td><strong>{_fmt_bilingual(item['answer_label'])}</strong></td></tr>"
         for item in report["resolved_questions"]
     )
-    status_label = report["status"].upper()
+    status_label = {"draft": "مسودة", "escalated": "أُحيل للمراجعة", "acknowledged": "تمت المراجعة"}.get(report["status"], report["status"])
     status_tone = _badge_tone(report["status"])
     note_html = f'<div class="note-box"><strong>ملاحظة المحقق المختصرة:</strong> {_esc(report["executive_note"])}</div>' if report["executive_note"] else ""
     manager_html = (
@@ -570,7 +574,7 @@ def print_quick_report(case_id: int):
 
     if summary["alerts"]:
         alerts_rows_html = "".join(
-            f'<tr><td><code dir="ltr">{_esc(a["alert_id"])}</code></td><td><span class="badge {_badge_tone(a["severity"])}" dir="ltr">{_esc(a["severity"])}</span></td><td>{_esc(a["reason"])}</td><td><span class="mono" dir="ltr">{_esc(a["detected_at"])}</span></td></tr>'
+            f'<tr><td><code dir="ltr">{_esc(a["alert_id"])}</code></td><td><span class="badge {_badge_tone(a["severity"])}">{_esc(ENUM_LABELS.get(a["severity"], a["severity"]))}</span></td><td>{_esc(a["reason"])}</td><td><span class="mono" dir="ltr">{_esc(a["detected_at"])}</span></td></tr>'
             for a in summary["alerts"]
         )
     else:
@@ -619,7 +623,7 @@ def print_quick_report(case_id: int):
     <section class="meta-grid" aria-label="بيانات القضية الأساسية">
       <div class="meta-item"><strong>مرجع القضية</strong><span class="mono" dir="ltr">{_esc(cmeta["reference"])}</span></div>
       <div class="meta-item"><strong>المسؤول عن التحقيق</strong>{_esc(cmeta["owner_name"])}</div>
-      <div class="meta-item"><strong>الخطورة والحالة</strong><span class="mono" dir="ltr">{_esc(cmeta["severity"]).upper()} · {_esc(cmeta["status"])}</span></div>
+      <div class="meta-item"><strong>الخطورة والحالة</strong><span>{_esc(ENUM_LABELS.get(cmeta["severity"], cmeta["severity"]))} · {_esc(ENUM_LABELS.get(cmeta["status"], cmeta["status"]))}</span></div>
       <div class="meta-item"><strong>إجمالي السجلات المفحوصة</strong>{_esc(summary["logs_count"])} سجل</div>
       <div class="meta-item"><strong>التنبيهات وتطابقات المراقبة</strong>{_esc(summary["alerts_count"])} تنبيه (<span class="mono" dir="ltr">{_esc(summary["watchlist_hits_count"])} Watchlist</span>)</div>
       <div class="meta-item"><strong>وقت التوليد (UTC)</strong><span class="mono" dir="ltr">{_esc(iso_now()[:19].replace("T", " "))}</span></div>

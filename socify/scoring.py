@@ -514,7 +514,7 @@ def leaderboard():
     rows = (
         get_db()
         .execute(
-            f"""SELECT a.id, a.user_id, a.total_score, a.created_at, tr.difficulty, s.id AS scenario_id, s.name AS scenario_name, u.name, u.team
+            f"""SELECT a.id, a.user_id, a.total_score, a.created_at, tr.difficulty, s.id AS scenario_id, s.name AS scenario_name, socify_user_name(u.name,u.name_ar,u.name_en) AS name, u.team
         FROM assessment_snapshots a JOIN training_runs tr ON tr.id = a.run_id
         JOIN scenario_versions sv ON sv.id = tr.scenario_version_id JOIN attack_scenarios s ON s.id = sv.scenario_id
         JOIN users u ON u.id = a.user_id WHERE {" AND ".join(clauses)}

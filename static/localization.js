@@ -8,7 +8,12 @@
   try { language = localStorage.getItem(storageKey) === "en" ? "en" : "ar"; } catch (_) { /* Browser storage may be restricted. */ }
   document.documentElement.lang = language;
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
+  document.cookie = `socify-language=${language}; Path=/; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
   const english = {
+  "اسم العرض": "Display name",
+  "الاسم بالعربية": "Name in Arabic",
+  "الاسم بالإنجليزية": "Name in English",
+  "حفظ الاسم": "Save name",
   "قرارات التحقيق": "Investigation decisions",
   "اختر الإجابة": "Choose an answer",
   "الأداء": "Performance",
@@ -1254,6 +1259,7 @@
     SAMPLE_INTEGRITY_FAILED: "The retained sample failed its integrity check. Ask your case manager to review the original.",
 
     INVALID_CREDENTIALS: "Email or password is incorrect.", INVALID_MFA_CODE: "The MFA or recovery code is invalid or already used.",
+    INVALID_DISPLAY_NAME: "Enter display names of up to 100 characters without control characters.",
     MFA_REQUIRED: "Enter the MFA code from your authenticator app.", LOGIN_RATE_LIMITED: "Too many sign-in attempts. Try again later.",
     RATE_LIMITED: "Too many requests. Try again later.", FORBIDDEN: "Your account is not permitted to perform this action.",
     CASE_NOT_FOUND: "This case is unavailable.", CASE_VERSION_CONFLICT: "The case changed. Refresh the page and try again.",
@@ -1270,6 +1276,12 @@
     return errors[code] || english[message] || `Request could not be completed${code ? ` (${String(code).replaceAll("_", " ").toLowerCase()})` : ""}. Check the entered values and your access, then try again.`;
   }
   function translateShell() {
+    const account = document.querySelector("[data-account-name]");
+    if (account) {
+      const name = account.getAttribute(`data-name-${language}`) || account.dataset.name;
+      account.textContent = name;
+      document.querySelector("[data-account-initial]").textContent = [...name][0] || "";
+    }
     // Only explicitly marked template text is translated, once. Dynamic case
     // records, report values, account names and evidence remain untouched.
     for (const element of document.querySelectorAll("[data-ui-copy]")) {

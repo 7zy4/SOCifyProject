@@ -907,7 +907,7 @@ def list_alerts():
     rows = (
         get_db()
         .execute(
-            f"""SELECT a.*, r.name AS rule_name, u.name AS assignee_name
+            f"""SELECT a.*, r.name AS rule_name, socify_user_name(u.name,u.name_ar,u.name_en) AS assignee_name
         FROM alerts a JOIN rules r ON r.id = a.rule_id LEFT JOIN users u ON u.id = a.assignee
         WHERE {where} ORDER BY a.detected_at DESC LIMIT ? OFFSET ?""",
             (*params, page_size, (page - 1) * page_size),

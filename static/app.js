@@ -67,7 +67,7 @@ function showMessage(text, type = "error") {
 }
 
 async function api(path, options = {}) {
-  const config = { credentials: "same-origin", ...options, headers: { Accept: "application/json", ...(options.headers || {}) } };
+  const config = { credentials: "same-origin", ...options, headers: { Accept: "application/json", "X-SOCify-Language": SOCifyLocale.language, ...(options.headers || {}) } };
   if (config.body && !(config.body instanceof FormData) && typeof config.body !== "string") {
     config.headers["Content-Type"] = "application/json";
     config.body = JSON.stringify(config.body);

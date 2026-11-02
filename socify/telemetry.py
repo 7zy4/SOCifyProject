@@ -139,6 +139,10 @@ def osquery_rows(record):
 def profile(record: dict[str, Any]) -> dict[str, Any]:
     if all(key in record for key in ("rule", "priority", "output_fields")):
         return falco_profile(record)
+    if all(key in record for key in ("rule", "pkt_num", "proto")) and any(key in record for key in ("src_ap", "src_addr", "dst_ap", "dst_addr")):
+        from .snort import snort_profile
+
+        return snort_profile(record)
 
     def section(key) -> dict[str, Any]:
         value = record.get(key)

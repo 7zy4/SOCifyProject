@@ -143,7 +143,7 @@ def build_snapshot(case, revision: int, profile: str):
         "postmortems": payload["records"].get("postmortem", []),
     }
     payload["members"] = bounded_rows(
-        "SELECT m.user_id, u.name, u.role, m.responsibility FROM autopsy_case_members m JOIN users u ON u.id = m.user_id WHERE m.case_id = ? ORDER BY m.user_id",
+        "SELECT m.user_id, socify_user_name(u.name,u.name_ar,u.name_en) AS name, u.role, m.responsibility FROM autopsy_case_members m JOIN users u ON u.id = m.user_id WHERE m.case_id = ? ORDER BY m.user_id",
         (case_id,),
         200,
     )

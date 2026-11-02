@@ -140,7 +140,10 @@ def case_summary(case_id: int):
     result["members"] = [
         dict(row)
         for row in get_db()
-        .execute("SELECT m.*, u.name, u.role FROM autopsy_case_members m JOIN users u ON u.id = m.user_id WHERE m.case_id = ? ORDER BY u.name", (case_id,))
+        .execute(
+            "SELECT m.*, socify_user_name(u.name,u.name_ar,u.name_en) AS name, u.role FROM autopsy_case_members m JOIN users u ON u.id = m.user_id WHERE m.case_id = ? ORDER BY u.name",
+            (case_id,),
+        )
         .fetchall()
     ]
     result["tasks"] = [dict(row) for row in get_db().execute("SELECT * FROM case_tasks WHERE case_id = ? ORDER BY id DESC LIMIT 100", (case_id,)).fetchall()]
@@ -148,7 +151,7 @@ def case_summary(case_id: int):
         dict(row)
         for row in get_db()
         .execute(
-            "SELECT h.*, u.name AS actor_name FROM case_history h LEFT JOIN users u ON u.id = h.actor_id WHERE h.case_id = ? ORDER BY h.id DESC LIMIT 100",
+            "SELECT h.*, socify_user_name(u.name,u.name_ar,u.name_en) AS actor_name FROM case_history h LEFT JOIN users u ON u.id = h.actor_id WHERE h.case_id = ? ORDER BY h.id DESC LIMIT 100",
             (case_id,),
         )
         .fetchall()
@@ -201,7 +204,7 @@ def cases_claimable():
         get_db()
         .execute(
             """SELECT c.id, c.reference, c.title, c.severity, c.priority, c.status, c.created_at, c.updated_at,
-                      COALESCE(ctx.classification, 'confidential') AS classification, u.name AS creator_name
+                      COALESCE(ctx.classification, 'confidential') AS classification, socify_user_name(u.name,u.name_ar,u.name_en) AS creator_name
                FROM incident_cases c
                LEFT JOIN autopsy_case_context ctx ON ctx.case_id = c.id
                LEFT JOIN users u ON u.id = c.creator

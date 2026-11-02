@@ -70,7 +70,7 @@ def monitoring():
         .execute(
             f"""SELECT a.id,a.alert_id,a.severity,a.detected_at,a.reason,a.rule_version,r.name AS rule_name,
         c.id AS case_id,c.reference,c.title AS case_title,c.status AS case_status,c.version AS case_version,
-        c.assignee,u.name AS assignee_name,
+        c.assignee,socify_user_name(u.name,u.name_ar,u.name_en) AS assignee_name,
         (SELECT COUNT(*) FROM alert_events ae WHERE ae.alert_id=a.id) AS evidence_events,
         (SELECT json_extract(v.payload,'$.verdict') FROM autopsy_alert_reviews v WHERE v.alert_id=a.id) AS verdict
         FROM {source} WHERE {where} AND ({CHANNEL})=?

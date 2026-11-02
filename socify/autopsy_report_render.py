@@ -16,6 +16,21 @@ FORMATS = {
     "pdf": "application/pdf",
 }
 LABELS = {
+    "network_alerts": "تنبيهات الشبكة",
+    "ids_rule": "معرف قاعدة الرصد",
+    "ids_priority": "أولوية الرصد",
+    "ids_classification": "تصنيف التنبيه",
+    "ids_signature": "وصف التنبيه",
+    "packet_number": "رقم الحزمة",
+    "source_timestamp": "توقيت المصدر",
+    "source_type": "نوع المصدر",
+    "source_port": "منفذ المصدر",
+    "source_ip": "عنوان المصدر",
+    "destination_ip": "عنوان الوجهة",
+    "source_ports": "منافذ المصدر",
+    "event_ids": "معرفات السجلات المرتبطة",
+    "hostname": "الجهاز",
+    "username": "الحساب",
     "content_inspection": "فحص المحتوى والترميزات",
     "network_analysis": "تحليل الشبكة",
     "endpoint_results": "نتائج الأجهزة",
@@ -50,8 +65,6 @@ LABELS = {
     "timed_connections": "الاتصالات ذات الوقت المعروف",
     "items": "النتائج",
     "event_count": "عدد السجلات",
-    "event_ids": "مراجع الأدلة",
-    "source_type": "نوع المصدر",
     "destination_port": "منفذ الوجهة",
     "protocol": "البروتوكول",
     "first_seen": "أول اتصال",
@@ -181,6 +194,8 @@ LABELS = {
     "integrity_valid": "سلامة السلسلة عند إعداد التقرير",
 }
 ENUM_LABELS = {
+    "would_drop": "كان سيُحظر (would_drop)",
+    "drop": "أُسقطت الحزمة (drop)",
     "credential_assignment": "بيانات اعتماد مكشوفة",
     "bearer_token": "رمز وصول مكشوف",
     "private_key": "مفتاح خاص مكشوف",
@@ -238,7 +253,9 @@ def display(value) -> str:
 def lines(value, depth=0):
     if isinstance(value, dict):
         for key, item in value.items():
-            if isinstance(item, (dict, list)):
+            if isinstance(item, list) and all(not isinstance(cell, (dict, list)) for cell in item):
+                yield depth, f"{LABELS.get(key, key)}: " + ("، ".join(display(cell) for cell in item) if item else "—")
+            elif isinstance(item, (dict, list)):
                 yield depth, "عناصر الخط الزمني" if key == "entries" and isinstance(item, list) else LABELS.get(key, key)
                 yield from lines(item, depth + 1)
             else:
@@ -256,15 +273,21 @@ def lines(value, depth=0):
                     "time_basis",
                     "entry_type",
                     "kind",
+                    "action",
                 } and isinstance(item, str):
                     value = ENUM_LABELS.get(item, item)
                 yield depth, f"{LABELS.get(key, key)}: {value}"
     elif isinstance(value, list):
         if not value:
             yield depth, "لا توجد عناصر مسجلة"
-        for index, item in enumerate(value, 1):
-            yield depth, f"— {index} —"
-            yield from lines(item, depth + 1)
+        if all(not isinstance(item, (dict, list)) for item in value):
+            if value:
+                yield depth, "، ".join(display(item) for item in value)
+        else:
+            for item in value:
+                if isinstance(item, dict):
+                    yield depth, record_heading(item)
+                yield from lines(item, depth + 1)
     else:
         yield depth, display(value)
 
@@ -276,6 +299,51 @@ def network_report_content(value):
         for key, entry in value.items()
         if key != "engine"
     }
+
+
+def record_heading(item):
+    for key in ("event_id", "reference", "title", "name", "id"):
+        if item.get(key) not in (None, ""):
+            return f"{LABELS.get(key, key)}: {display(item[key])}"
+    if item.get("source_ip") and item.get("destination_ip"):
+        return f"{item['source_ip']} → {item['destination_ip']}"
+    return "تفاصيل العنصر"
+
+
+def report_table(value):
+    """Render structured evidence as labelled cells, never ordinal-only rows."""
+    rows = []
+
+    def row(label, cell):
+        rows.append(f'<tr><th scope="row">{html.escape(display(label))}</th><td><bdi dir="auto">{html.escape(display(cell))}</bdi></td></tr>')
+
+    def group(label):
+        rows.append(f'<tr class="report-group"><th colspan="2">{html.escape(display(label))}</th></tr>')
+
+    def walk(item, label="التفاصيل"):
+        if isinstance(item, dict):
+            for key, cell in item.items():
+                caption = LABELS.get(key) or str(key)
+                if isinstance(cell, dict):
+                    group(caption)
+                    walk(cell, caption)
+                elif isinstance(cell, list):
+                    walk(cell, caption)
+                else:
+                    text = next(lines({key: cell}))[1][len(caption) + 2 :]
+                    row(caption, text)
+        elif isinstance(item, list):
+            if all(not isinstance(cell, (dict, list)) for cell in item):
+                row(label, "، ".join(display(cell) for cell in item) if item else "—")
+            else:
+                for cell in item:
+                    group(record_heading(cell) if isinstance(cell, dict) else label)
+                    walk(cell, label)
+        else:
+            row(label, item)
+
+    walk(value)
+    return '<table class="qa-table report-facts"><thead><tr><th>الحقل</th><th>القيمة</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>"
 
 
 def sections(payload):
@@ -314,6 +382,7 @@ def sections(payload):
         ("تحليل الشبكة", "network_analysis"),
         ("نتائج الأجهزة", "endpoint_results"),
         ("أمن الأنظمة والحاويات", "runtime_events"),
+        ("تنبيهات الشبكة", "network_alerts"),
         ("الخط الزمني المشترك للأدلة والتحقيق والإجراءات", "chronology"),
         ("الإثراء المحلي ومصادر السمعة وإصداراتها", "observables"),
         ("SLA وجمع الأدلة ومراجعة ما بعد الحادثة", "workflow"),
