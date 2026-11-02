@@ -9,3 +9,5 @@ keepalive = 5
 accesslog = "-"
 errorlog = "-"
 capture_output = True
+# Process management uses the container supervisor; the root filesystem is read-only.
+control_socket_disable = True

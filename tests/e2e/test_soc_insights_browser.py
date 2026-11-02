@@ -140,6 +140,7 @@ def test_uploaded_case_dashboard_dossier_and_explicit_report_answers(app, langua
             assert "GB82WEST12345698765432" not in inspection_text
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             assert_accessible(page)
+            page.evaluate("window.scrollTo(0,0)")
             page.screenshot(path=str(output / f"content-{language}-{theme}-{width}.png"), full_page=True)
             page.goto(base + f"/monitoring?q={inspected['reference']}")
             page.locator("[data-alert-toggle]").first.click()
@@ -152,6 +153,7 @@ def test_uploaded_case_dashboard_dossier_and_explicit_report_answers(app, langua
             assert "Invoke-Expression" in page.locator(".report-sheet").inner_text()
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             assert_accessible(page)
+            page.evaluate("window.scrollTo(0,0)")
             page.screenshot(path=str(output / f"content-report-{language}-{theme}-{width}.png"), full_page=True)
             page.goto(base + "/performance")
             page.locator(".insight-counters").wait_for()
