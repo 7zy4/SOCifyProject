@@ -372,7 +372,7 @@ def me():
 
     user = _active_user()
     permissions = effective_permissions(user)
-    return jsonify({"user": user, "permissions": sorted(permissions)})
+    return jsonify({"user": user, "permissions": sorted(permissions), "csrf_token": generate_csrf()})
 
 
 def current_permissions(role: str) -> set[str]:

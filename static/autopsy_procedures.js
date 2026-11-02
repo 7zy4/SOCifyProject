@@ -1,8 +1,11 @@
 "use strict";
 
+Object.assign(autopsyLabels, { draft: SOCifyLocale.text("مسودة"), published: SOCifyLocale.text("منشور") });
+
 Object.assign(autopsyLabels, { any: SOCifyLocale.text("أي عضو مخول"), manager: SOCifyLocale.text("المدير"), analysis: SOCifyLocale.text("التحليل"), review: SOCifyLocale.text("المراجعة"), pending: SOCifyLocale.text("بانتظار التنفيذ"), awaiting_approval: SOCifyLocale.text("بانتظار اعتماد المدير"), notes: SOCifyLocale.text("ملاحظة القرار أو النتيجة"), override_reason: SOCifyLocale.text("سبب استثناء استقلال المراجع إن لزم"), user_id: SOCifyLocale.text("عضو الفريق"), responsibility: SOCifyLocale.text("المسؤولية") });
 
 async function autopsyProcedureLibrary() {
+  if (!SOCifyDrafts.confirmDiscard(workspace, true)) return;
   begin("playbooks");
   const library = await api("/api/autopsy/procedures");
   let copyTemplate = null;
@@ -24,13 +27,28 @@ async function autopsyProcedureLibrary() {
       steps.append(row);
     };
     add();
-    copyTemplate = (template) => { name.value = template.name; steps.replaceChildren(); template.steps.forEach(add); name.focus(); name.scrollIntoView({ block: "center" }); };
-    const form = node("form", { class: "panel-body" }, [field(SOCifyLocale.text("اسم القالب أو اسم الإصدار السابق"), name), steps, button(SOCifyLocale.text("إضافة خطوة"), () => { if (steps.children.length < 30) add(); }), node("button", { type: "submit", class: "button primary", text: SOCifyLocale.text("حفظ إصدار مسودة") })]);
-    form.addEventListener("submit", async (event) => { event.preventDefault(); try { await api("/api/autopsy/procedures", { method: "POST", body: { name: name.value, steps: [...steps.children].map((row) => row.autopsyValue()) } }); await autopsyProcedureLibrary(); } catch (error) { handleError(error); } });
+    copyTemplate = (template) => { if (!SOCifyDrafts.confirmDiscard(form)) return; name.value = template.name; steps.replaceChildren(); template.steps.forEach(add); name.focus(); name.scrollIntoView({ block: "center" }); };
+    const save = node("button", { type: "submit", class: "button primary", text: SOCifyLocale.text("حفظ إصدار مسودة") });
+    const errors = node("p", { class: "notice", role: "alert", hidden: true });
+    const form = SOCifyDrafts.track(node("form", { class: "panel-body" }, [field(SOCifyLocale.text("اسم القالب أو اسم الإصدار السابق"), name), steps, button(SOCifyLocale.text("إضافة خطوة"), () => { if (steps.children.length < 30) add(); }), errors, save]));
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (save.disabled) return;
+      save.disabled = true;
+      save.setAttribute("aria-busy", "true");
+      form.dataset.saving = "true";
+      errors.hidden = true;
+      try {
+        await api("/api/autopsy/procedures", { method: "POST", body: { name: name.value, steps: [...steps.children].map((row) => row.autopsyValue()) } });
+        SOCifyDrafts.saved(form);
+        await autopsyProcedureLibrary();
+      } catch (error) { errors.textContent = error.message; errors.hidden = false; handleError(error); }
+      finally { delete form.dataset.saving; save.disabled = false; save.removeAttribute("aria-busy"); }
+    });
     root.append(panel(SOCifyLocale.text("إنشاء إصدار جديد"), form, true));
   }
   for (const template of library.items) {
-    const card = node("article", { class: "card" }, [node("h2", { text: SOCifyLocale.template`${template.name} · الإصدار ${template.version}` }), node("p", { text: template.state }), node("ol", {}, template.steps.map((step) => node("li", { text: `${step.title} · ${autopsyLabel(step.phase)} · ${autopsyLabel(step.role)}` })))]);
+    const card = node("article", { class: "card" }, [node("h2", { text: SOCifyLocale.template`${template.name} · الإصدار ${template.version}` }), node("p", { text: autopsyLabel(template.state) }), node("ol", {}, template.steps.map((step) => node("li", { text: `${step.title} · ${autopsyLabel(step.phase)} · ${autopsyLabel(step.role)}` })))]);
     if (library.can_manage && template.state === "draft") card.append(button(SOCifyLocale.text("اعتماد ونشر هذا الإصدار"), async () => { try { await api(`/api/autopsy/procedures/${template.id}/publish`, { method: "POST", body: {} }); await autopsyProcedureLibrary(); } catch (error) { handleError(error); } }));
     if (library.can_manage) card.append(button(SOCifyLocale.text("إنشاء إصدار قابل للتعديل من هذا القالب"), () => copyTemplate(template)));
     root.append(card);

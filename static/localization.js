@@ -13,6 +13,12 @@
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
   document.cookie = `socify-language=${language}; Path=/; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
   const english = {
+  "تجديد الجلسة": "Renew session",
+  "متابعة العمل": "Continue working",
+  "سجّل الدخول أولًا ثم تابع العمل.": "Sign in first, then continue working.",
+  "سجّل الدخول بالحساب نفسه لمتابعة هذه المسودة.": "Sign in with the same account to continue this draft.",
+  "تعذر تجديد الجلسة. أعد المحاولة.": "Unable to renew the session. Try again.",
+  "مسودتك باقية هنا. سجّل الدخول في النافذة الجديدة ثم تابع العمل.": "Your draft remains here. Sign in in the new window, then continue working.",
   "لا عناصر بعد": "No items yet",
   "لم تُحدد المهلة": "No response deadline set",
   "المهلة جارية": "Response clock running",
@@ -521,6 +527,8 @@
   "نتيجة الهجوم": "Attack outcome",
   "قرار صحة التنبيه": "Alert verdict",
   "مسودة": "Draft",
+  "تحتاج الجلسة إلى تجديد. سجّل الدخول ثم أعد محاولة الحفظ.": "Your session needs renewal. Sign in, then retry saving.",
+  "منشور": "Published",
   "فرز أولي": "Initial triage",
   "تم الفرز": "Triaged",
   "قيد التحقيق": "Under investigation",
@@ -1641,7 +1649,8 @@
       "Choose an uncommon password of 12–128 characters and at most 72 UTF-8 bytes.",
     REGISTRATION_DISABLED: "Public registration is closed. Ask your team manager for an invitation.",
     REAUTHENTICATION_FAILED: "Password verification failed. Check your current password and try again.",
-    CSRF_FAILED: "Your security token expired. Reload the page and try again.",
+    CSRF_FAILED: "Your session needs renewal. Sign in, then retry saving.",
+    CSRF_VALIDATION_FAILED: "Your session needs renewal. Sign in, then retry saving.",
   };
   function error(code, message) {
     if (language !== "en") return message;

@@ -66,6 +66,40 @@ function showMessage(text, type = "error") {
   window.setTimeout(() => { messageBox.hidden = true; }, 5500);
 }
 
+function recoverSession() {
+  if (!state.user || !window.SOCifyDrafts?.hasChanges()) { window.location.assign("/login"); return; }
+  const existing = document.getElementById("session-recovery");
+  if (existing) { if (!existing.open) existing.showModal(); return; }
+  const principal = { id: state.user.id, workspace_id: state.user.workspace_id };
+  const previous = document.activeElement;
+  const errors = node("p", { role: "alert", class: "notice", hidden: true });
+  const login = node("a", { href: "/login", target: "_blank", rel: "noopener", class: "button primary", text: SOCifyLocale.text("تسجيل الدخول") });
+  const dialog = node("dialog", { id: "session-recovery", class: "autopsy-modal", "aria-label": SOCifyLocale.text("تجديد الجلسة") });
+  const resume = button(SOCifyLocale.text("متابعة العمل"), async () => {
+    resume.disabled = true;
+    errors.hidden = true;
+    try {
+      const current = await fetch("/api/auth/me", { credentials: "same-origin", headers: { Accept: "application/json" } });
+      if (!current.ok) { await current.text(); throw new Error(SOCifyLocale.text("سجّل الدخول أولًا ثم تابع العمل.")); }
+      const identity = await current.json();
+      if (identity.user.id !== principal.id || identity.user.workspace_id !== principal.workspace_id) throw new Error(SOCifyLocale.text("سجّل الدخول بالحساب نفسه لمتابعة هذه المسودة."));
+      const token = identity.csrf_token;
+      if (typeof token !== "string" || !token) throw new Error(SOCifyLocale.text("تعذر تجديد الجلسة. أعد المحاولة."));
+      state.csrf = token;
+      state.permissions = new Set(identity.permissions);
+      state.user = identity.user;
+      dialog.close();
+    } catch (error) {
+      errors.textContent = error instanceof TypeError ? SOCifyLocale.text("تعذر الاتصال. أعد المحاولة.") : error.message;
+      errors.hidden = false;
+    } finally { resume.disabled = false; }
+  });
+  dialog.append(node("h2", { text: SOCifyLocale.text("تجديد الجلسة") }), node("p", { text: SOCifyLocale.text("مسودتك باقية هنا. سجّل الدخول في النافذة الجديدة ثم تابع العمل.") }), node("div", { class: "action-row" }, [login, resume, button(SOCifyLocale.text("إغلاق"), () => dialog.close())]), errors);
+  dialog.addEventListener("close", () => { dialog.remove(); if (previous?.isConnected) previous.focus(); });
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
 async function api(path, options = {}) {
   const config = { credentials: "same-origin", ...options, headers: { Accept: "application/json", "X-SOCify-Language": SOCifyLocale.language, ...(options.headers || {}) } };
   if (config.body && !(config.body instanceof FormData) && typeof config.body !== "string") {
@@ -79,17 +113,19 @@ async function api(path, options = {}) {
     if (error.name === "AbortError") throw error;
     throw new Error(SOCifyLocale.text("تعذر الاتصال. أعد المحاولة."));
   }
-  if (response.status === 401) {
-    window.location.assign("/login");
-    throw new Error(SOCifyLocale.text("انتهت الجلسة"));
-  }
   let payload = null;
   if (response.status !== 204) {
     const contentType = response.headers.get("content-type") || "";
     payload = contentType.includes("json") ? await response.json() : await response.text();
   }
+  if (response.status === 401) {
+    recoverSession();
+    throw new Error(SOCifyLocale.text("انتهت الجلسة"));
+  }
   if (!response.ok) {
-    const error = new Error(SOCifyLocale.error(payload?.error?.code, payload?.error?.message) || SOCifyLocale.template`تعذر إكمال الطلب (${response.status})`);
+    const renewalRequired = ["CSRF_FAILED", "CSRF_VALIDATION_FAILED"].includes(payload?.error?.code);
+    if (renewalRequired) recoverSession();
+    const error = new Error(renewalRequired ? SOCifyLocale.text("تحتاج الجلسة إلى تجديد. سجّل الدخول ثم أعد محاولة الحفظ.") : SOCifyLocale.error(payload?.error?.code, payload?.error?.message) || SOCifyLocale.template`تعذر إكمال الطلب (${response.status})`);
     error.code = payload?.error?.code;
     error.status = response.status;
     error.details = payload?.error?.details;

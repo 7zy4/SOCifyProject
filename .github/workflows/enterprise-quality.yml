@@ -40,6 +40,15 @@ jobs:
           python -m tests.container.verify_report_layout --output "$RUNNER_TEMP/socify-long-report"
           pdftotext -bbox-layout "$RUNNER_TEMP/socify-long-report/long-report.pdf" "$RUNNER_TEMP/socify-long-report/bbox.xml"
           python -m tests.container.verify_report_layout --output "$RUNNER_TEMP/socify-long-report" --bbox "$RUNNER_TEMP/socify-long-report/bbox.xml"
+          pdftoppm -png -scale-to 1400 "$RUNNER_TEMP/socify-long-report/long-report.pdf" "$RUNNER_TEMP/socify-long-report/page"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: report-layout
+          path: |
+            ${{ runner.temp }}/socify-long-report/manifest.json
+            ${{ runner.temp }}/socify-long-report/long-report.pdf
+            ${{ runner.temp }}/socify-long-report/page-*.png
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
