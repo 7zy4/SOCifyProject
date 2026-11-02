@@ -44,7 +44,7 @@ def summarize_connections(events):
         if fields.get("connection_summary") is True:
             # Duplicate exports of one connection cannot become additional connections.
             stamp = event["event_time"] if fields.get("event_time_known") is True else None
-            flow_key = (fields.get("flow_id") or event["id"], stamp)
+            flow_key = (fields.get("flow_id") or event["id"], parse_timestamp(stamp).timestamp() if stamp else None)
             group["flows"].setdefault(flow_key, (event, stamp))
     output = []
     for group in groups.values():
@@ -75,8 +75,8 @@ def summarize_connections(events):
                 "event_ids": event_ids[:50],
                 "events_truncated": len(event_ids) > 50,
                 "names": sorted(group["names"]),
-                "first_seen": min(stamp for _, stamp in flows if stamp) if times else None,
-                "last_seen": max(stamp for _, stamp in flows if stamp) if times else None,
+                "first_seen": min((stamp for _, stamp in flows if stamp), key=parse_timestamp) if times else None,
+                "last_seen": max((stamp for _, stamp in flows if stamp), key=parse_timestamp) if times else None,
                 "timed_connections": len(times),
                 "median_interval_seconds": median,
                 "interval_mad_seconds": mad,

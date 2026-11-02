@@ -13,7 +13,8 @@ from tests.e2e.test_browser import launch_browser
 
 @pytest.mark.e2e
 @pytest.mark.parametrize("zoom_mode", ["css", "native"])
-def test_200_percent_zoom_keyboard_modal_and_searchable_choices(app, tmp_path, zoom_mode):
+@pytest.mark.parametrize("analysis_view", ["files", "observables"])
+def test_200_percent_zoom_keyboard_modal_and_searchable_choices(app, tmp_path, zoom_mode, analysis_view):
     app.config.update(LEGACY_TRAINING_TESTS=False, ALLOW_REGISTRATION=False, WTF_CSRF_ENABLED=True)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -48,16 +49,22 @@ def test_200_percent_zoom_keyboard_modal_and_searchable_choices(app, tmp_path, z
             case = page.evaluate(
                 "async () => await api('/api/cases',{method:'POST',body:{title:'Native browser zoom acceptance',reason:'forensic_review',objective:'Verify readable keyboard operated investigation at native 200 percent zoom'}})"
             )
-            page.goto(root + f"/cases/{case['id']}?tab=analysis&analysis=files")
-            page.get_by_role("heading", name="العينات والتحليل الساكن", exact=True).wait_for()
+            page.goto(root + f"/cases/{case['id']}?tab=analysis&analysis={analysis_view}")
+            page.get_by_role("heading", name="المؤشرات" if analysis_view == "observables" else "العينات والتحليل الساكن", exact=True).wait_for()
             if zoom_mode == "native":
                 assert page.evaluate("window.devicePixelRatio >= 1.99 && window.innerWidth <= 768"), "Native browser zoom did not reduce the CSS viewport"
                 assert page.evaluate("Number(getComputedStyle(document.documentElement).zoom) === 1")
             else:
                 page.evaluate("document.documentElement.style.zoom='2'")
                 assert page.evaluate("Number(getComputedStyle(document.documentElement).zoom) === 2")
-            assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
-            page.locator(".analysis-tools a[href*='analysis=observables']").click()
+            assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), page.evaluate(
+                "Array.from(document.querySelectorAll('main *')).filter(e=>e.getBoundingClientRect().right>innerWidth+1||e.getBoundingClientRect().left < -1).slice(0,12).map(e=>[e.tagName,e.className,e.getBoundingClientRect().width])"
+            )
+            if analysis_view == "files":
+                page.locator(".analysis-tools a[href*='analysis=observables']").click()
+                page.get_by_role("heading", name="المؤشرات", exact=True).wait_for()
+                if zoom_mode == "css":
+                    page.evaluate("document.documentElement.style.zoom='2'")
             add = page.get_by_role("button", name="إضافة المؤشرات", exact=True)
             add.focus()
             page.keyboard.press("Enter")

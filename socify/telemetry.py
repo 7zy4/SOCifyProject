@@ -11,7 +11,10 @@ def number(value, maximum=2**53 - 1, integral=False):
         return None
     if isinstance(value, bool):
         raise ValueError("boolean telemetry numbers are invalid")
-    parsed = float(value)
+    try:
+        parsed = float(value)
+    except (TypeError, OverflowError) as exc:
+        raise ValueError("invalid telemetry number") from exc
     if not math.isfinite(parsed) or not 0 <= parsed <= maximum or integral and not parsed.is_integer():
         raise ValueError("telemetry number is outside its permitted range")
     return int(parsed) if integral else parsed
@@ -164,6 +167,10 @@ def profile(record: dict[str, Any]) -> dict[str, Any]:
         }
     if not result:
         return {}
+    for key, limit in (("flow_id", 256), ("protocol", 32), ("dns_question", 512), ("tls_sni", 512), ("http_host", 512), ("query_name", 255)):
+        value = fields.get(key)
+        if value is not None and (not isinstance(value, str) or len(value) > limit):
+            raise ValueError(f"invalid or oversized telemetry field: {key}")
     if result["category"] == "network":
         # An HTTP Host header names a destination, not the endpoint hostname.
         result["hostname"] = ""

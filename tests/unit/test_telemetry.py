@@ -63,7 +63,7 @@ def test_zeek_eve_and_osquery_normalization_preserves_original(app):
         assert profile({"message": "ordinary log"}) == {}
 
 
-@pytest.mark.parametrize("value", [True, -1, float("nan"), float("inf"), 1.2, 65536])
+@pytest.mark.parametrize("value", [True, -1, float("nan"), float("inf"), 1.2, 65536, {}, 10**400])
 def test_invalid_ports_rejected(value):
     with pytest.raises(ValueError):
         profile(zeek(**{"id.resp_p": value}))
@@ -72,6 +72,12 @@ def test_invalid_ports_rejected(value):
 def test_numeric_missing_values_are_not_zero():
     assert number(None) is None and number("-") is None
     assert number("0", integral=True) == 0
+
+
+@pytest.mark.parametrize("extra", [{"uid": "x" * 257}, {"proto": "x" * 33}, {"query": "x" * 513}, {"server_name": []}])
+def test_network_grouping_fields_have_explicit_bounds(extra):
+    with pytest.raises(ValueError, match="telemetry field"):
+        profile(zeek(**extra))
 
 
 def test_osquery_expansion_has_distinct_ids_and_source_pointers(app):
@@ -201,3 +207,13 @@ def test_no_flow_summary_and_evidence_bounds():
     result = summarize_connections(events)[0]
     assert result["events_truncated"] and len(result["event_ids"]) == 50
     assert result["connection_count"] == 0 and result["regularity_percent"] is None
+
+
+def test_connection_time_bounds_use_instants_not_lexical_precision():
+    events = connections()[:3]
+    events[0]["event_time"] = "2026-01-01T00:00:00Z"
+    events[1]["event_time"] = "2026-01-01T00:00:00.100000Z"
+    events[2] = {**events[0], "id": 3, "event_time": "2026-01-01T00:00:00.000000Z"}
+    result = summarize_connections(events)[0]
+    assert result["connection_count"] == 2
+    assert result["first_seen"] == events[0]["event_time"] and result["last_seen"] == events[1]["event_time"]
