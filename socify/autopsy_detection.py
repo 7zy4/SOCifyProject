@@ -205,7 +205,12 @@ def run_detection_job(job):
         batch, alerts, findings = events[:1000], [], []
         baseline = []
         if parameters["mode"] == "rules":
+            from .content_inspection import inspect_event_fields
+
             for event in batch:
+                retained = get_db().execute("SELECT raw_data,normalized_fields,description FROM security_events WHERE id=?", (event["id"],)).fetchone()
+                fields = inspect_event_fields(retained["raw_data"], json.loads(retained["normalized_fields"]), retained["description"])
+                get_db().execute("UPDATE security_events SET normalized_fields=? WHERE id=?", (canonical(fields), event["id"]))
                 alerts.extend(evaluate_rules(get_db(), event["id"]))
             for alert_id in alerts:
                 get_db().execute(

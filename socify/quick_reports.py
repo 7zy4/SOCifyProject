@@ -531,6 +531,21 @@ def print_quick_report(case_id: int):
 
     if not report:
         return error_response("REPORT_ANSWERS_REQUIRED", "احفظ إجابات التحقيق قبل طباعة التقرير", 409)
+    from .autopsy_report_render import lines
+    from .content_inspection import inspection_snapshot
+
+    try:
+        inspected = inspection_snapshot(get_db(), case_id, case["workspace_id"])
+    except ValueError as exc:
+        return error_response("REPORT_CONTENT_LIMIT", str(exc), 422)
+    inspection_html = ""
+    if inspected:
+        parts = ['<h2 class="section-title">فحص المحتوى والترميزات</h2>']
+        for item in inspected:
+            parts.append(f'<table class="qa-table content-inspection-report"><caption>السجل #{item["event_id"]}</caption><tbody>')
+            parts.extend(f'<tr><td dir="auto">{_esc(text)}</td></tr>' for _, text in lines(item))
+            parts.append("</tbody></table>")
+        inspection_html = "".join(parts)
     qa_rows_html = "".join(
         f"<tr><th>{_fmt_bilingual(item['question'])}</th><td><strong>{_fmt_bilingual(item['answer_label'])}</strong></td></tr>"
         for item in report["resolved_questions"]
@@ -621,6 +636,8 @@ def print_quick_report(case_id: int):
       <thead><tr><th>الملف / الرسالة</th><th>الحكم الأولي</th><th>SHA-256</th><th>الملاحظات الفنية</th></tr></thead>
       <tbody>{triage_rows_html}</tbody>
     </table>
+
+    {inspection_html}
 
     <footer class="report-footer">
       <span dir="ltr">SOCify</span>

@@ -51,6 +51,13 @@ def generate() -> dict[str, object]:
                 operation["description"] = (
                     "Full case scope required. Includes alert review, up to 50 linked events, case decisions, tasks and shared notes. Private notes are excluded. Case decisions are distinct from the alert verdict."
                 )
+            elif path.endswith("/content-inspection"):
+                operation["summary"] = "Retained content inspection findings and decoded text"
+                operation["description"] = (
+                    "Full case scope required. Latest active case events with deterministic inspection results, 25 per page. Findings redact detected secret/financial values. Offsets are zero-based characters within the named source field or decoded layer. Original evidence is preserved separately. No execution or network lookups."
+                )
+                operation["parameters"] = parameters + [{"name": "page", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 1000000}}]
+                operation["responses"].update({"404": {"description": "Case unavailable"}, "422": {"description": "Invalid pagination"}})
             elif path.endswith("/observed-hosts"):
                 operation["summary"] = "Hosts and process observations from active uploaded logs"
                 operation["parameters"] = parameters + [

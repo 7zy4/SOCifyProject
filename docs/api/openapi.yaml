@@ -1803,6 +1803,52 @@
         }
       }
     },
+    "/api/cases/{case_id}/content-inspection": {
+      "get": {
+        "operationId": "autopsy_insights_content_inspection_get__api_cases_case_id_content-inspection",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Case unavailable"
+          },
+          "422": {
+            "description": "Invalid pagination"
+          }
+        },
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000
+            }
+          }
+        ],
+        "summary": "Retained content inspection findings and decoded text",
+        "description": "Full case scope required. Latest active case events with deterministic inspection results, 25 per page. Findings redact detected secret/financial values. Offsets are zero-based characters within the named source field or decoded layer. Original evidence is preserved separately. No execution or network lookups."
+      }
+    },
     "/api/cases/{case_id}/context": {
       "patch": {
         "operationId": "autopsy_update_context_patch__api_cases_case_id_context",

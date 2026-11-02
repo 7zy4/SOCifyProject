@@ -3,6 +3,7 @@
 let autopsyReportTimer = null;
 
 const autopsyReportLabels = {
+  content_inspection: SOCifyLocale.language === "ar" ? "فحص المحتوى والترميزات" : "Content and encoding inspection",
   investigation_assessment: SOCifyLocale.text("قرارات التحقيق"),
   summary: SOCifyLocale.text("الملخص التنفيذي"),
   case: SOCifyLocale.text("بيانات القضية ونطاق التحقيق"),

@@ -185,6 +185,9 @@ def build_snapshot(case, revision: int, profile: str):
         (case_id,),
         2000,
     )
+    from .content_inspection import inspection_snapshot
+
+    payload["content_inspection"] = inspection_snapshot(get_db(), case_id, case["workspace_id"])
     payload["shared_notes"] = bounded_rows(
         "SELECT id,author_id,body,created_at,updated_at,version FROM case_notes WHERE case_id = ? AND visibility = 'team' ORDER BY id", (case_id,), 1000
     )

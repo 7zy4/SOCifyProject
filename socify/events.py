@@ -112,7 +112,12 @@ def normalize_event(data: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("tags must be a list of short strings")
     if not isinstance(mitre_ids, list) or len(mitre_ids) > 20 or any(not isinstance(item, str) for item in mitre_ids):
         raise ValueError("mitre_ids must be a list of identifiers")
-    merged_normalized = {**normalized, **{key: value for key, value in extracted.items() if value is not None}}
+    from .content_inspection import RESERVED_FIELDS
+
+    merged_normalized = {
+        **{key: value for key, value in normalized.items() if key not in RESERVED_FIELDS},
+        **{key: value for key, value in extracted.items() if value is not None},
+    }
     raw_serialized = json.dumps(raw, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
     external_id = _string(data.get("external_id"), 255)
     idempotency_key = _string(data.get("idempotency_key"), 255)
@@ -192,6 +197,11 @@ def ingest_event(
         ).fetchone()
         if existing:
             return int(existing["id"]), [], True
+    if case_id is not None:
+        from .content_inspection import inspect_event_fields
+
+        fields = inspect_event_fields(normalized["raw_data"], json.loads(normalized["normalized_fields"]), normalized["description"])
+        normalized["normalized_fields"] = json.dumps(fields, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     event_public_id = public_id("EVT") if case_id is not None else _string(data.get("event_id"), 80) or public_id("EVT")
     now = iso_now()
     cursor = connection.execute(

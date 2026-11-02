@@ -16,6 +16,25 @@ FORMATS = {
     "pdf": "application/pdf",
 }
 LABELS = {
+    "content_inspection": "فحص المحتوى والترميزات",
+    "event_id": "معرف السجل",
+    "raw_hash": "بصمة السجل",
+    "engine": "محرك الفحص",
+    "findings": "النتائج",
+    "decoded": "النصوص المفكوكة",
+    "kind": "النوع",
+    "field": "الحقل",
+    "offset": "إزاحة الأحرف",
+    "length": "عدد الأحرف",
+    "layer": "الطبقة",
+    "layers": "الطبقات",
+    "depth": "رقم الطبقة",
+    "encoding": "الترميز",
+    "text": "النص",
+    "value": "القيمة",
+    "truncated": "تجاوز حد الفحص",
+    "depth_limit_reached": "بلوغ حد الطبقات",
+    "decoded_threat_count": "مطابقات أنماط التهديد بعد فك الترميز",
     "entry_type": "نوع عنصر الخط الزمني",
     "time_basis": "أساس التوقيت",
     "actor_id": "معرف المسجل",
@@ -116,6 +135,11 @@ LABELS = {
     "integrity_valid": "سلامة السلسلة عند إعداد التقرير",
 }
 ENUM_LABELS = {
+    "credential_assignment": "بيانات اعتماد مكشوفة",
+    "bearer_token": "رمز وصول مكشوف",
+    "private_key": "مفتاح خاص مكشوف",
+    "payment_card": "رقم بطاقة",
+    "iban": "IBAN",
     "log": "سجل مصدر",
     "record": "سجل تحقيق أو إجراء",
     "note": "ملاحظة تحقيق",
@@ -185,6 +209,7 @@ def lines(value, depth=0):
                     "responsibility",
                     "time_basis",
                     "entry_type",
+                    "kind",
                 } and isinstance(item, str):
                     value = ENUM_LABELS.get(item, item)
                 yield depth, f"{LABELS.get(key, key)}: {value}"
@@ -230,6 +255,7 @@ def sections(payload):
         if records:
             yield LABELS[kind], records
     for title, key in (
+        ("فحص المحتوى والترميزات", "content_inspection"),
         ("الخط الزمني المشترك للأدلة والتحقيق والإجراءات", "chronology"),
         ("الإثراء المحلي ومصادر السمعة وإصداراتها", "observables"),
         ("SLA وجمع الأدلة ومراجعة ما بعد الحادثة", "workflow"),

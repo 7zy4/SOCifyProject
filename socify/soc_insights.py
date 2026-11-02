@@ -18,6 +18,36 @@ from .timeutils import iso_now, parse_timestamp, utc_now
 soc_insights_api = Blueprint("autopsy_insights", __name__)
 
 
+@soc_insights_api.get("/api/cases/<int:case_id>/content-inspection")
+@require_permission("cases.read")
+@consistent_read
+def content_inspection(case_id):
+    from .content_inspection import ENGINE
+
+    where, args = authorized_cases()
+    if not get_db().execute(f"SELECT 1 FROM incident_cases c WHERE c.id=? AND {where}", (case_id, *args)).fetchone():
+        return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+    try:
+        if set(request.args) - {"page"} or len(request.args.getlist("page")) > 1:
+            raise ValueError
+        page = int(request.args.get("page", "1"))
+        if not 1 <= page <= 1000000:
+            raise ValueError
+    except ValueError:
+        return error_response("INVALID_INSPECTION_PAGE", "رقم الصفحة غير صالح", 422)
+    predicate = "owner_case_id=? AND workspace_id=? AND autopsy_active=1 AND json_extract(normalized_fields,'$.content_inspection.engine')=?"
+    params = (case_id, workspace_id(), ENGINE)
+    total = get_db().execute(f"SELECT COUNT(*) FROM security_events WHERE {predicate}", params).fetchone()[0]
+    rows = get_db().execute(
+        f"SELECT id,title,hostname,normalized_fields FROM security_events WHERE {predicate} ORDER BY id DESC LIMIT 25 OFFSET ?", (*params, (page - 1) * 25)
+    )
+    items = [
+        {"event_id": row["id"], "title": row["title"], "hostname": row["hostname"], "inspection": json.loads(row["normalized_fields"])["content_inspection"]}
+        for row in rows
+    ]
+    return jsonify({"items": items, "total": total, "page": page, "page_size": 25})
+
+
 @soc_insights_api.get("/api/cases/<int:case_id>/observed-hosts")
 @require_permission("cases.read")
 @consistent_read

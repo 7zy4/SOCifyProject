@@ -11,6 +11,27 @@ from .timeutils import iso_now
 
 BUILTIN_RULES: tuple[dict[str, Any], ...] = (
     {
+        "name": "[SOCify] Exposed Credential Material",
+        "description": "Credential assignments, bearer tokens or private key markers found in retained event text.",
+        "severity": "high",
+        "confidence": 0.80,
+        "dsl": {"condition": {"field": "exposed_secret_count", "operator": "gt", "value": 0}, "mitre_ids": []},
+    },
+    {
+        "name": "[SOCify] Sensitive Financial Data Exposure",
+        "description": "Payment card or IBAN checksum matches found in retained event text; not an exfiltration verdict.",
+        "severity": "medium",
+        "confidence": 0.80,
+        "dsl": {"condition": {"field": "sensitive_data_count", "operator": "gt", "value": 0}, "mitre_ids": []},
+    },
+    {
+        "name": "[SOCify] Suspicious Decoded Content",
+        "description": "Decoded text matches a command, credential-dumping, recovery-tampering or sensitive-path detection pattern.",
+        "severity": "high",
+        "confidence": 0.85,
+        "dsl": {"condition": {"field": "decoded_threat_count", "operator": "gt", "value": 0}, "mitre_ids": ["T1027"]},
+    },
+    {
         "name": "[SOCify] Brute Force Authentication Burst",
         "description": "Detect 5 or more failed authentication attempts from the same source IP within 10 minutes.",
         "severity": "high",

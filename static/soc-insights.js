@@ -10,6 +10,57 @@ window.SOCifyInsights = (() => {
   function definition(items) {
     return node("dl", {class:"insight-facts"}, items.flatMap(([title,value]) => [node("dt", {text:title}), node("dd", {}, value instanceof Node ? value : userText(value))]));
   }
+  function detailRows(items) {
+    return items.map(([name,value])=>node("tr",{},[
+        node("th",{scope:"row",text:name}),
+        node("td",{},value instanceof Node?value:node("span",{"data-user-content":"true",dir:"auto",text:value===null||value===undefined||value===""?"—":typeof value==="object"?JSON.stringify(value):String(value)}))
+      ]));
+  }
+  function detailTable(title, items) {
+    return node("table", {class:"alert-property-table"}, [node("caption",{text:title}),node("tbody",{},detailRows(items))]);
+  }
+  function inspectionRows(inspection) {
+    const names={credential_assignment:t("بيانات اعتماد مكشوفة", "Exposed credentials"),bearer_token:t("رمز وصول مكشوف", "Exposed access token"),private_key:t("مفتاح خاص مكشوف", "Exposed private key"),payment_card:t("رقم بطاقة", "Payment card"),iban:"IBAN"};
+    const rows=[];
+    for(const [index,finding] of inspection.findings.entries()) {
+      rows.push([`${t("النتيجة", "Finding")} ${n(index+1)}`,names[finding.kind]||finding.kind],
+        [t("الحقل", "Field"),finding.field],
+        [t("موضع الأحرف", "Character position"),`${n(finding.offset+1)}–${n(finding.offset+finding.length)}`],
+        [t("الطبقة", "Layer"),finding.layer?n(finding.layer):t("الأصل", "Original")],
+        [t("القيمة", "Value"),t("محجوبة", "Redacted")]);
+    }
+    for(const content of inspection.decoded) {
+      rows.push([t("الحقل المرمّز", "Encoded field"),content.field]);
+      for(const layer of content.layers) {
+        rows.push([`${t("الطبقة", "Layer")} ${n(layer.depth)} · ${layer.encoding}`,node("pre",{dir:"auto",tabindex:0,"data-user-content":"true",text:layer.text==="[REDACTED]"?t("محجوبة", "Redacted"):layer.text})]);
+      }
+      if(content.depth_limit_reached)rows.push([t("حد الطبقات", "Layer limit"),t("٤ طبقات", "4 layers")]);
+    }
+    if(inspection.truncated)rows.push([t("حالة الفحص", "Inspection status"),t("فحص جزئي — تجاوز حد المحتوى", "Partial inspection — content limit exceeded")]);
+    return rows;
+  }
+  async function contentInspection(caseId) {
+    const body=node("div",{class:"panel-body content-inspection"});
+    async function load(page=1) {
+      const data=await api(`/api/cases/${caseId}/content-inspection?page=${page}`);
+      const items=data.items.map(item=>{
+        const detail=node("details",{class:"evidence-event"},node("summary",{"data-user-content":"true",text:`#${item.event_id} · ${item.title}`}));
+        detail.append(detailTable(t("نتائج الفحص", "Inspection results"),inspectionRows(item.inspection)));
+        return detail;
+      });
+      body.replaceChildren(...items);
+      if(!items.length)body.append(node("p",{text:t("لا نتائج", "No findings")}));
+      if(data.total>data.page_size||data.page>1){
+        const nav=node("nav",{class:"pagination","aria-label":t("صفحات فحص المحتوى", "Content inspection pages")});
+        const move=async page=>{try{await load(page);}catch(error){handleError(error);}};
+        if(data.page>1)nav.append(button(t("السابق", "Previous"),()=>move(data.page-1)));
+        if(data.page*data.page_size<data.total)nav.append(button(t("التالي", "Next"),()=>move(data.page+1)));
+        body.append(nav);
+      }
+    }
+    await load();
+    return panel(t("فحص المحتوى والترميزات", "Content and encoding inspection"),body,true);
+  }
   async function performance() {
     begin("performance");
     try {
@@ -51,28 +102,46 @@ window.SOCifyInsights = (() => {
   async function dossier(item, container) {
     const data=await api(`/api/cases/${item.case_id}/alerts/${item.id}/dossier`);
     const root=node("div",{class:"dossier-view"});
-    root.append(definition([[t("وقت الكشف", "Detection time"),time(data.alert.detected_at)],[t("الإغلاق", "Closed at"),time(data.case.closed_at)],[t("قرار المحلل", "Analyst verdict"),label(data.review?.verdict||"undetermined")],[t("نتيجة الهجوم", "Attack outcome"),label(data.review?.attack_outcome||"unknown")]]));
-    if(data.review) root.append(node("section",{},[node("h3",{text:t("ملاحظة المحلل", "Analyst note")}),node("p",{"data-user-content":"true",text:data.review.reason})]));
+    const details=detailTable(t("تفاصيل التنبيه", "Alert details"),[
+      [t("معرف التنبيه", "Alert ID"),data.alert.alert_id],
+      [t("اسم القاعدة", "Rule name"),data.alert.rule_name],
+      [t("إصدار القاعدة", "Rule version"),data.alert.rule_version],
+      [t("الخطورة", "Severity"),node("span",{class:`severity ${data.alert.severity}`,text:label(data.alert.severity)})],
+      [t("سبب الكشف", "Detection reason"),data.alert.reason],
+      [t("وقت الكشف", "Detection time"),time(data.alert.detected_at)],
+      [t("القضية", "Case"),node("a",{href:`/cases/${item.case_id}`,text:`${data.case.reference} · ${item.case_title}`})],
+      [t("حالة القضية", "Case status"),label(data.case.status)],
+      [t("المسؤول", "Owner"),item.assignee_name],
+      [t("السجلات المرتبطة", "Linked events"),n(item.evidence_events)],
+      [t("الإغلاق", "Closed at"),time(data.case.closed_at)],
+      [t("قرار المحلل", "Analyst verdict"),label(data.review?.verdict||"undetermined")],
+      [t("نتيجة الهجوم", "Attack outcome"),label(data.review?.attack_outcome||"unknown")],
+      ...(data.review?[[t("ملاحظة المحلل", "Analyst note"),data.review.reason]]:[])
+    ]);
+    const section=(name,rows,key)=>details.append(node("tbody",{"data-dossier-section":key},[node("tr",{},node("th",{colspan:2,class:"dossier-section",text:name})),...detailRows(rows)]));
     if(data.assessment){
-      root.append(node("h3",{text:t("قرارات القضية", "Case decisions")}));
-      root.append(definition(data.assessment.resolved_questions.map(q=>[SOCifyLocale.text(q.question),SOCifyLocale.text(q.answer_label)])));
-      if(data.assessment.executive_note)root.append(node("p",{"data-user-content":"true",text:data.assessment.executive_note}));
-      if(data.assessment.manager_comment)root.append(node("section",{},[node("h3",{text:t("ملاحظة المراجع", "Reviewer note")}),userText(data.assessment.manager_comment)]));
+      const decisions=data.assessment.resolved_questions.map(q=>[SOCifyLocale.text(q.question),SOCifyLocale.text(q.answer_label)]);
+      if(data.assessment.executive_note)decisions.push([t("خلاصة التحقيق", "Investigation summary"),data.assessment.executive_note]);
+      if(data.assessment.manager_comment)decisions.push([t("ملاحظة المراجع", "Reviewer note"),data.assessment.manager_comment]);
+      section(t("قرارات القضية", "Case decisions"),decisions,"decisions");
     }
-    if(data.techniques.length)root.append(panel("MITRE ATT&CK",table([{label:t("التقنية", "Technique"),value:"technique_id"},{label:t("التقييم", "Assessment"),value:r=>label(r.assessment)},{label:t("الدليل", "Evidence"),value:"reason"}],data.techniques)));
-    root.append(node("h3",{text:t("سجلات التنبيه", "Alert evidence events")}));
+    for(const technique of data.techniques)section("MITRE ATT&CK · "+technique.technique_id,[[t("التقنية", "Technique"),technique.technique_id],[t("التقييم", "Assessment"),label(technique.assessment)],[t("الدليل", "Evidence"),technique.reason]],"technique");
     for(const event of data.events){
-      const detail=node("details",{class:"evidence-event"},node("summary",{text:`#${event.id} · ${event.normalized_fields.event_time_known?time(event.event_time):"—"} · ${event.hostname||event.source_ip||""}`}));
-      detail.append(definition([[t("المصدر", "Source"),event.source_ip],[t("الوجهة", "Destination"),event.destination_ip],[t("الجهاز", "Host"),event.hostname],[t("الحساب", "Account"),event.username]]));
-      detail.append(node("pre",{dir:"ltr",tabindex:0,"data-user-content":"true",text:JSON.stringify(event.normalized_fields,null,2)}),node("pre",{dir:"ltr",tabindex:0,"data-user-content":"true",text:event.raw_data}));
-      if(event.raw_truncated)detail.append(linkedButton(t("فتح السجل الكامل", "Open complete event"),`/cases/${item.case_id}?tab=logs`));
-      if(!event.autopsy_active)detail.append(node("span",{text:t("نسخة سجل سابقة", "Historical event version")}));
-      root.append(detail);
+      const fields=event.normalized_fields;
+      const names={process_name:t("العملية", "Process"),parent_process:t("العملية الأم", "Parent process"),command_line:t("سطر الأوامر", "Command line"),file_hash:t("بصمة الملف", "File hash")};
+      const facts=[[t("معرف السجل", "Event ID"),event.id],[t("وقت الحدث", "Event time"),fields.event_time_known?time(event.event_time):null],[t("المصدر", "Source"),event.source_ip],[t("الوجهة", "Destination"),event.destination_ip],[t("الجهاز", "Host"),event.hostname],[t("الحساب", "Account"),event.username]];
+      for(const [key,value] of Object.entries(fields))if(!["event_time_known","event_time","source_ip","destination_ip","hostname","username","content_inspection","exposed_secret_count","sensitive_data_count","decoded_threat_count"].includes(key))facts.push([names[key]||label(key),value]);
+      facts.push([t("السجل الأصلي", "Original event"),node("pre",{dir:"ltr",tabindex:0,"data-user-content":"true",text:event.raw_data})]);
+      if(event.raw_truncated)facts.push([t("السجل الكامل", "Complete event"),linkedButton(t("فتح السجل الكامل", "Open complete event"),`/cases/${item.case_id}?tab=logs`)]);
+      if(!event.autopsy_active)facts.push([t("نسخة السجل", "Event version"),t("نسخة سجل سابقة", "Historical event version")]);
+      section(t("السجل", "Event")+" #"+event.id,facts,"event");
+      if(fields.content_inspection)section(t("فحص المحتوى والترميزات", "Content and encoding inspection")+" #"+event.id,inspectionRows(fields.content_inspection),"inspection");
     }
-    if(!data.events.length)root.append(node("p",{text:t("لا سجلات مرتبطة", "No linked events")}));
-    if(data.events_truncated)root.append(linkedButton(t("عرض جميع السجلات", "View all logs"),`/cases/${item.case_id}?tab=logs`));
-    if(data.tasks.length)root.append(panel(t("مهام التحقيق", "Investigation tasks"),table([{label:t("المهمة", "Task"),value:"title"},{label:t("الحالة", "Status"),value:r=>label(r.status)},{label:t("أُنجزت", "Completed"),value:r=>time(r.completed_at)}],data.tasks)));
-    for(const note of data.notes)root.append(node("blockquote",{"data-user-content":"true"},[node("p",{text:note.body}),node("cite",{text:`${note.author} · ${time(note.created_at)}`})]));
+    if(!data.events.length)section(t("سجلات التنبيه", "Alert evidence events"),[[t("السجلات", "Events"),t("لا سجلات مرتبطة", "No linked events")]],"event");
+    if(data.events_truncated)section(t("سجلات التنبيه", "Alert evidence events"),[[t("السجلات", "Events"),linkedButton(t("عرض جميع السجلات", "View all logs"),`/cases/${item.case_id}?tab=logs`)]],"more-events");
+    for(const task of data.tasks)section(t("المهمة", "Task")+" #"+task.id,[[t("المهمة", "Task"),task.title],[t("الحالة", "Status"),label(task.status)],[t("أُنجزت", "Completed"),time(task.completed_at)]],"task");
+    for(const [index,note] of data.notes.entries())section(t("ملاحظة التحقيق", "Investigation note")+" "+n(index+1),[[t("المحلل", "Analyst"),note.author],[t("الوقت", "Time"),time(note.created_at)],[t("الملاحظة", "Note"),note.body]],"note");
+    root.append(details);
     container.replaceChildren(root);
   }
   async function hosts(caseId) {
@@ -100,5 +169,5 @@ window.SOCifyInsights = (() => {
     }
     return panel(t("أجهزة القضية", "Case devices"),root,true);
   }
-  return {performance,dossier,hosts};
+  return {performance,dossier,hosts,contentInspection};
 })();

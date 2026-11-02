@@ -82,15 +82,12 @@
       const head=node("thead",{},node("tr",{},[t("التفاصيل"),t("الخطورة"),t("وقت الاكتشاف"),t("اسم القاعدة"),t("معرف التنبيه"),t("القضية"),t("المسؤول"),t("الإجراء")].map(label=>node("th",{scope:"col",text:label}))));
       for (const item of data.items) {
         const detailId=`alert-details-${item.id}`;
-        const detail=node("tr",{id:detailId,hidden:true},node("td",{colspan:8,class:"alert-detail-cell"},node("div",{class:"alert-details"},[
-          node("div",{},[node("h3",{text:t("سبب الكشف")}),node("p",{"data-user-content":"true",text:item.reason}),node("p",{class:"cell-meta",text:t("إصدار القاعدة")+": "+item.rule_version})]),
-          node("div",{},[node("dl",{},[node("dt",{text:t("السجلات المرتبطة")}),node("dd",{text:number(item.evidence_events)}),node("dt",{text:t("قرار التنبيه")}),node("dd",{text:autopsyLabel(item.verdict||"undetermined")}),node("dt",{text:t("حالة القضية")}),node("dd",{text:autopsyLabel(item.case_status)})]),node("div",{class:"action-row"},[linkedButton(t("مراجعة التنبيه"),url(`/cases/${item.case_id}`,{tab:"analysis"})),linkedButton(t("السجلات والأدلة"),url(`/cases/${item.case_id}`,{tab:"logs"})),linkedButton(t("التقارير"),url("/reports",{case_id:item.case_id}))])])
-        ])));
+        const detail=node("tr",{id:detailId,hidden:true},node("td",{colspan:8,class:"alert-detail-cell"}));
         const expandedContent=node("div",{class:"dossier-content"});
-        detail.querySelector("td").append(expandedContent);
+        detail.querySelector("td").append(expandedContent,node("div",{class:"action-row"},[linkedButton(t("مراجعة التنبيه"),url(`/cases/${item.case_id}`,{tab:"analysis"})),linkedButton(t("السجلات والأدلة"),url(`/cases/${item.case_id}`,{tab:"logs"})),linkedButton(t("التقارير"),url("/reports",{case_id:item.case_id}))]));
         let loaded=false;
         const expand=button("",async()=>{
-          detail.hidden=!detail.hidden;expand.setAttribute("aria-expanded",String(!detail.hidden));
+          detail.hidden=!detail.hidden;expand.setAttribute("aria-expanded",String(!detail.hidden));ruleToggle.setAttribute("aria-expanded",String(!detail.hidden));
           if(!detail.hidden&&!loaded){
             expand.disabled=true;
             try{await window.SOCifyInsights.dossier(item,expandedContent);loaded=true;}
@@ -100,17 +97,22 @@
         },"row-expand");
         expand.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
         expand.className="row-expand"; expand.setAttribute("aria-label",t("تفاصيل التنبيه")+" "+item.alert_id);expand.setAttribute("aria-expanded","false");expand.setAttribute("aria-controls",detailId);
-        const cells=[expand,node("span",{class:`severity ${item.severity}`,text:autopsyLabel(item.severity)}),node("time",{datetime:item.detected_at,text:formatTime(item.detected_at)}),node("div",{class:"rule-cell"},[node("strong",{"data-user-content":"true",text:item.rule_name||item.reason}),node("small",{text:t("إصدار القاعدة")+" "+item.rule_version})]),node("bdi",{dir:"ltr",text:item.alert_id}),node("div",{},[node("a",{class:"case-link",href:`/cases/${item.case_id}`,text:item.reference}),node("span",{class:"cell-meta",text:autopsyLabel(item.case_status)})]),node("span",{"data-user-content":"true",text:item.assignee_name||t("غير مسند")}),linkedButton(t("فتح التحقيق"),`/cases/${item.case_id}`)];
+        const ruleToggle=node("button",{type:"button",class:"alert-name","data-alert-toggle":"","data-user-content":"true","aria-expanded":"false","aria-controls":detailId,text:item.rule_name||item.reason,onclick:()=>expand.click()});
+        const cells=[expand,node("span",{class:`severity ${item.severity}`,text:autopsyLabel(item.severity)}),node("time",{datetime:item.detected_at,text:formatTime(item.detected_at)}),node("div",{class:"rule-cell"},[ruleToggle,node("small",{text:t("إصدار القاعدة")+" "+item.rule_version})]),node("bdi",{dir:"ltr",text:item.alert_id}),node("div",{},[node("a",{class:"case-link",href:`/cases/${item.case_id}`,text:item.reference}),node("span",{class:"cell-meta",text:autopsyLabel(item.case_status)})]),node("span",{"data-user-content":"true",text:item.assignee_name||t("غير مسند")}),linkedButton(t("فتح التحقيق"),`/cases/${item.case_id}`)];
         body.append(node("tr",{"data-alert-row":item.id},cells.map((value,index)=>node("td",{"data-label":[t("التفاصيل"),t("الخطورة"),t("وقت الاكتشاف"),t("اسم القاعدة"),t("معرف التنبيه"),t("القضية"),t("المسؤول"),t("الإجراء")][index]},value))),detail);
       }
       surface.append(node("div",{class:"table-wrap",role:"region",tabindex:0,"aria-label":t("جدول التنبيهات")},node("table",{class:"monitoring-table"},[head,body])));
     }
-    const pages=node("div",{class:"pagination"},node("p",{text:number(data.total)+" · "+t("الصفحة")+" "+number(data.page)}));
-    for(const [label,page] of [[t("السابق"),data.page-1],[t("التالي"),data.page+1]]) {
-      if(page<1||page===data.page+1&&data.page*data.page_size>=data.total)continue;
-      const target=new URL(location.href);target.searchParams.set("page",String(page));pages.append(linkedButton(label,target.pathname+target.search));
+    root.append(surface);
+    if(data.total>data.page_size || data.page>1) {
+      const pages=node("nav",{class:"pagination monitoring-pagination","aria-label":t("جدول التنبيهات")},node("p",{text:t("الصفحة")+" "+number(data.page)+" / "+number(Math.max(1,Math.ceil(data.total/data.page_size)))}));
+      for(const [label,page] of [[t("السابق"),data.page-1],[t("التالي"),data.page+1]]) {
+        if(page<1||page===data.page+1&&data.page*data.page_size>=data.total)continue;
+        const target=new URL(location.href);target.searchParams.set("page",String(page));pages.append(linkedButton(label,target.pathname+target.search));
+      }
+      root.append(pages);
     }
-    surface.append(pages);root.append(surface);finish(root);
+    finish(root);
   }
   async function chooseCase(section, selected) {
     if (window.SOCifyV4?.selection.required) {

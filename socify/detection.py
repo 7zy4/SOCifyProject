@@ -41,6 +41,9 @@ FIELDS = {
     "command_line",
     "training_run_id",
     "mitre_ids",
+    "exposed_secret_count",
+    "sensitive_data_count",
+    "decoded_threat_count",
 }
 OPERATORS = {
     "equals",

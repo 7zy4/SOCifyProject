@@ -4,6 +4,7 @@ window.SOCifyAutopsy.analysis = async (caseId) => {
   const samples = await api(`/api/cases/${caseId}/samples`);
   const indicators = (await api(`/api/cases/${caseId}/records?kind=indicator&limit=100`)).items;
   const root = node("div");
+  root.append(await SOCifyInsights.contentInspection(caseId));
   const packs = await api("/api/autopsy/yara");
   const packChoice = autopsyChoice("yara_pack_id", [{ value: "", label: "EICAR" }, ...packs.items.map((pack) => ({ value: pack.id, label: `${pack.name} · v${pack.version} · ${pack.license}` }))]);
   const body = node("div", { class: "panel-body" });

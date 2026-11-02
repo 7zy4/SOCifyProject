@@ -48,3 +48,30 @@ The case-deadline count uses `sla_due_at`, excluding paused cases. It is deliber
 | Fresh deployment | Normal startup creates schema/reference catalog/rules, not operational cases/logs/reports | Repeated clean startup must keep evidence tables empty. Demo scripts remain explicit developer test utilities. |
 
 URL reconnaissance, port scanning, offensive tools, automatic containment, unsourced feeds and fabricated training scores were excluded because they do not improve this retained-evidence investigation workflow.
+
+## CarterPerez source inspection and additional implementation
+
+The follow-up review opened the repository tree and actual implementation files, not only its README. The inspected `main` tree was `ee0a9c92c95f801cc34fad19ba8ebc05dc73d82d`. These are independently implemented capabilities in SOCify, not bundled upstream programs or copied AGPL source. Upstream projects were read; SOCify's implementations were executed and tested.
+
+| Reviewed implementation | New SOCify capability | Connected workflow |
+|---|---|---|
+| [base64-tool peeler.py](https://github.com/CarterPerez-dev/Cybersecurity-Projects/blob/ee0a9c92c95f801cc34fad19ba8ebc05dc73d82d/PROJECTS/beginner/base64-tool/src/base64_tool/peeler.py), blob `919723089577684930da67d355165f4c5b8aebd3` | Layered decoding of Base64/Base64URL, Base32, hexadecimal and percent-encoded text; PowerShell encoded-command UTF-16LE handling | Upload → inspection → retained decoded layers → suspicious decoded-content rule → alert dossier and report |
+| [secrets-scanner entropy.go](https://github.com/CarterPerez-dev/Cybersecurity-Projects/blob/ee0a9c92c95f801cc34fad19ba8ebc05dc73d82d/PROJECTS/intermediate/secrets-scanner/internal/rules/entropy.go), blob `464039025011df79dba45d15b4085d62b1f26fb7`, and its README | Contextual detection of credential assignments, bearer tokens and private-key blocks, with redacted findings | Upload → credential-exposure rule → exact event/field/character location → analyst review |
+| [dlp-scanner financial.py](https://github.com/CarterPerez-dev/Cybersecurity-Projects/blob/ee0a9c92c95f801cc34fad19ba8ebc05dc73d82d/PROJECTS/intermediate/dlp-scanner/src/dlp_scanner/detectors/rules/financial.py), blob `835580187dc0d4ca8da1c3b0410ab4e6fc9decce`, and [redaction.py](https://github.com/CarterPerez-dev/Cybersecurity-Projects/blob/ee0a9c92c95f801cc34fad19ba8ebc05dc73d82d/PROJECTS/intermediate/dlp-scanner/src/dlp_scanner/redaction.py), blob `2982866b9ae7046c51bf1638627f82592e150b53` | Payment-card Luhn and IBAN mod-97 checks, with masked results | Upload → financial-data exposure rule → case analysis and report |
+
+The SIEM project's `backend/app/engine/correlation.py` was also reviewed. Threshold, sequence and aggregation support already exist in SOCify; these are not presented as newly added capabilities. Other offensive/scanning projects were excluded from this change.
+
+### Behavior and boundaries
+
+- `socify/content_inspection.py` is a deterministic standard-library implementation. It never executes decoded text, contacts observed addresses, validates credentials remotely or installs endpoint agents.
+- Inspection runs on case ingestion, before rule evaluation. Re-running case rules also inspects older retained events. Original text and its hash remain unchanged. Repeated rule runs retain alert deduplication.
+- Three published built-in rules consume engine-owned counts. Uploaded normalized fields cannot forge these counts or retained inspection objects. A decoding match alone does not imply malicious activity; the decoded-content rule requires a suspicious pattern.
+- Findings retain field paths, character offsets, layer numbers and masked values. A later discovered secret also masks its earlier encoded layers; private-key blocks are masked as a whole. Original evidence remains available to authorized investigators in the existing raw-log view. This is pattern detection, not a guarantee that every possible secret has been recognized.
+- Financial matches prove a format/checksum match, not a valid bank account, active payment card or exfiltration. Credential heuristics are deliberately narrower than the upstream scanner's full rule collection. No claims of importing its 150+ rules or benchmark accuracy are made.
+- Bounds per event: 32,768 source characters, 64 fields, 12 candidate tokens, 4 layers, 40 retained findings. Partial inspection and layer limits are explicit results. The API pages 25 matching events; reports reject more than 2,000 matching events or 4 MiB of inspection data rather than silently omitting results.
+- Results are wired to the case's analysis page, the same single alert-details table, immutable full reports and the guided printable report. Metadata-only sharing excludes them. Scope checks cover workspace, membership, investigation selection, approval and full import visibility.
+- Alert rows start collapsed. Clicking their name or arrow expands one vertical property table containing metadata, decisions, source events, inspection results, tasks and notes. List pagination sits outside the disclosure and is absent for a single page.
+
+### Validation artifacts
+
+`tests/unit/test_content_inspection.py` exercises decoding, checksums, masking, invalid input and limits. `tests/integration/test_content_inspection_workflow.py` exercises real uploads, new rule alerts, source preservation, re-scanning, deduplication, access boundaries, pagination and both report paths. `tests/e2e/test_soc_insights_browser.py` exercises disclosure, decisions, pagination, new analysis results and printable reports in Arabic/English, light/dark, desktop/mobile, with accessibility and page-overflow assertions. Screenshots are generated under `artifacts/soc-insights/`; the CI run for the final commit is the acceptance record.
