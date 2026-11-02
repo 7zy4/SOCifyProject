@@ -16,7 +16,7 @@ def test_branded_choices_and_documented_why_answers(app, tmp_path):
     try:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
-            page = browser.new_page(viewport={"width": 390, "height": 844})
+            page = browser.new_page(locale="ar-SA", viewport={"width": 390, "height": 844})
             page.goto(f"http://127.0.0.1:{server.server_port}/login")
             page.locator("input[name=email]").fill("analyst@socify.local")
             page.locator("input[name=password]").fill(DEMO_LOGIN_VALUE)

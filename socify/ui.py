@@ -52,7 +52,7 @@ def test_redirect():
 def dashboard(case_id: int | None = None):
     if operational_mode():
         from .cases import _case_row
-        from .security import error_response, has_permission
+        from .security import has_permission
 
         if request.path in {
             "/monitoring",
@@ -64,11 +64,11 @@ def dashboard(case_id: int | None = None):
             "/sandbox",
             "/reports",
         } and not has_permission(current_user(), "cases.read"):
-            return error_response("PERMISSION_DENIED", "هذا القسم غير متاح لدورك", 403)
+            return render_template("unavailable.html"), 403
         if case_id is not None and not _case_row(case_id):
-            return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+            return render_template("unavailable.html"), 404
         if request.path in {"/lab", "/scores"}:
-            return error_response("FEATURE_RETIRED", "وظائف التدريب متقاعدة في النسخة التشغيلية", 410)
+            return render_template("unavailable.html"), 410
         if (
             request.path
             not in {

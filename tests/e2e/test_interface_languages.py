@@ -20,7 +20,7 @@ def test_language_toggle_persists_and_preserves_case_content(app, tmp_path):
     try:
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
-            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            page = browser.new_page(locale="ar-SA", viewport={"width": 1440, "height": 1000})
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             root = f"http://127.0.0.1:{server.server_port}"

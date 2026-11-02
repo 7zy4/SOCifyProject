@@ -21,7 +21,7 @@ def test_uploaded_case_dashboard_dossier_and_explicit_report_answers(app, langua
     try:
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
-            page = browser.new_page(viewport={"width": width, "height": 1000})
+            page = browser.new_page(locale="ar-SA", viewport={"width": width, "height": 1000})
             page.add_init_script(path=str(Path("node_modules/axe-core/axe.min.js").resolve()))
             page.add_init_script(f"localStorage.setItem('socify-interface-language','{language}');localStorage.setItem('socify-interface-theme','{theme}');")
             errors = []

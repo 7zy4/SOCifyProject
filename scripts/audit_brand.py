@@ -93,7 +93,7 @@ def audit_pages(output: Path) -> list[dict]:
         try:
             with sync_playwright() as playwright:
                 browser = playwright.chromium.launch(executable_path=shutil.which("chromium") or shutil.which("google-chrome"))
-                page = browser.new_page(viewport={"width": 1440, "height": 1000})
+                page = browser.new_page(locale="ar-SA", viewport={"width": 1440, "height": 1000})
                 errors = []
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 base = f"http://127.0.0.1:{server.server_port}"

@@ -21,7 +21,7 @@ def test_soc_triage_case_tools_email_and_immediate_report_permissions(app, datab
     try:
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
-            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            page = browser.new_page(locale="ar-SA", viewport={"width": 1440, "height": 1000})
             page.add_init_script("if (!localStorage.getItem('socify-interface-language')) localStorage.setItem('socify-interface-language','en')")
             page.add_init_script(path=str(Path("node_modules/axe-core/axe.min.js").resolve()))
             errors = []

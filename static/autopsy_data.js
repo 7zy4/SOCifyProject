@@ -9,13 +9,14 @@ function autopsyImportForm(caseId) {
   const zone = autopsyChoice("source_timezone", autopsy.catalog.source_timezones, "UTC", true);
   const encoding = autopsySelect("encoding", ["utf-8-sig", "utf-8", "utf-16", "latin-1"], "utf-8-sig");
   const delimiter = node("select", { name: "delimiter" }, [[",", SOCifyLocale.text("فاصلة ,")], [";", SOCifyLocale.text("فاصلة منقوطة ;")], ["\t", "Tab"], ["|", SOCifyLocale.text("فاصل |")]].map(([value, label]) => node("option", { value, text: label })));
-  const form = node("form", { class: "form-grid", "aria-label": SOCifyLocale.text("استيراد أدلة القضية") }, [field(SOCifyLocale.text("ملف السجلات أو الأدلة الشبكية"), file, true), field(SOCifyLocale.text("مصدر جمع السجلات"), source), field(SOCifyLocale.text("الصيغة"), format), field(SOCifyLocale.text("المنطقة الزمنية للمصدر"), zone.control), field(SOCifyLocale.text("الترميز"), encoding), field(SOCifyLocale.text("فاصل CSV"), delimiter)]);
+  const options = node("details", { class: "import-options span-2" }, [node("summary", { text: SOCifyLocale.text("خيارات الاستيراد") }), node("div", { class: "form-grid" }, [field(SOCifyLocale.text("مصدر جمع السجلات"), source), field(SOCifyLocale.text("الصيغة"), format), field(SOCifyLocale.text("المنطقة الزمنية للمصدر"), zone.control), field(SOCifyLocale.text("الترميز"), encoding), field(SOCifyLocale.text("فاصل CSV"), delimiter)])]);
+  const form = node("form", { class: "form-grid", "aria-label": SOCifyLocale.text("استيراد أدلة القضية") }, [field(SOCifyLocale.text("ملف السجلات أو الأدلة الشبكية"), file, true), options]);
   const preview = node("div", { class: "span-2", "aria-live": "polite" });
   const mappingView = node("div", { class: "span-2" });
   const mapping = Object.create(null);
   let confirmed = null;
   const identity = () => JSON.stringify([file.files[0]?.name, file.files[0]?.size, file.files[0]?.lastModified, source.value, format.value, zone.input.value, encoding.value, delimiter.value, mapping]);
-  const commit = node("button", { type: "submit", class: "button primary", text: SOCifyLocale.text("اعتماد الاستيراد"), disabled: true });
+  const commit = node("button", { type: "submit", class: "button primary", text: SOCifyLocale.text("اعتماد الاستيراد"), disabled: true, hidden: true });
   const body = () => {
     if (!file.files[0]) throw new Error(SOCifyLocale.text("اختر ملفًا أولًا"));
     const data = new FormData();
@@ -52,6 +53,7 @@ function autopsyImportForm(caseId) {
         to.input.required = false;
       }
       confirmed = identity();
+      commit.hidden = false;
       commit.disabled = false;
     } catch (error) { preview.replaceChildren(node("p", { class: "notice", role: "alert", text: error.message })); commit.disabled = true; }
     finally { previewButton.disabled = false; }
@@ -115,7 +117,7 @@ function autopsySiemConnectorPanel(caseId, connectors) {
         createBtn.disabled = false;
       }
     });
-    body.append(form);
+    body.append(node("details", { class: "import-options" }, [node("summary", { text: SOCifyLocale.text("إضافة مصدر SIEM") }), form]));
   }
   const items = connectors?.items || [];
   if (items.length) {
@@ -137,8 +139,6 @@ function autopsySiemConnectorPanel(caseId, connectors) {
       },
     ];
     body.append(table(cols, items));
-  } else {
-    body.append(emptyState(SOCifyLocale.text("لا توجد موصلات SIEM مرتبطة"),null));
   }
   return panel(SOCifyLocale.text("ربط SIEM مباشر بالقضية"), body, Boolean(items.length));
 }
@@ -150,6 +150,14 @@ async function autopsyLogsPanel(caseId) {
   const jobFilter = selectedJob ? `&job_id=${encodeURIComponent(selectedJob)}` : "";
   const [data, imports, connectors] = await Promise.all([api(`/api/cases/${caseId}/logs?q=${encodeURIComponent(query)}&page=${page}${jobFilter}`), api(`/api/cases/${caseId}/imports`), api(`/api/cases/${caseId}/siem-connectors`).catch(() => ({ items: [] }))]);
   const root = node("div", { class: "case-content" });
+  const latest = imports.items[0];
+  if (latest && ["completed", "completed_with_errors"].includes(latest.status)) {
+    root.append(node("section", { class: "import-result", role: "status", "aria-label": SOCifyLocale.text("نتيجة الاستيراد") }, [
+      node("strong", { "data-user-content": true, text: latest.original_filename || latest.filename }),
+      node("p", { text: SOCifyLocale.template`${latest.accepted} مقبول · ${latest.rejected} مرفوض · ${latest.skipped} متكرر` }),
+      latest.accepted > 0 ? linkedButton(SOCifyLocale.text("مراجعة التنبيهات"), `/monitoring?case_id=${caseId}&channel=${["closed", "cancelled"].includes(autopsy.current.status) ? "closed" : ["new", "open", "triaged"].includes(autopsy.current.status) ? "main" : "investigation"}`, "primary") : null,
+    ]));
+  }
   if (autopsy.current.can_update && autopsy.current.status !== "closed") root.append(panel(SOCifyLocale.text("استيراد مرتبط بالقضية"), node("div", { class: "panel-body" }, autopsyImportForm(caseId)), true));
   root.append(autopsySiemConnectorPanel(caseId, connectors));
   const jobColumns = [{ label: SOCifyLocale.text("الملف"), value: (job) => job.original_filename || job.filename }, { label: SOCifyLocale.text("الحالة"), value: "status" }, { label: SOCifyLocale.text("مقبول"), value: "accepted" }, { label: SOCifyLocale.text("مرفوض"), value: "rejected" }, { label: SOCifyLocale.text("متكرر"), value: "skipped" }, { label: SOCifyLocale.text("الأصل"), value: (job) => permission("evidence.download") ? linkedButton(SOCifyLocale.text("تنزيل الأصل"), `/api/cases/${caseId}/imports/${job.id}/original`) : "—" }, { label: SOCifyLocale.text("التفاصيل"), value: (job) => button(SOCifyLocale.text("حالة الاستيراد"), async () => {
@@ -171,12 +179,12 @@ async function autopsyLogsPanel(caseId) {
     autopsyModal(SOCifyLocale.text("نطاق الدفعة وتفعيل النسخة؛ أعد فحص القواعد بعد التفعيل"), content);
   }) });
   if (selectedJob) root.append(node("p", { text: SOCifyLocale.text("تعرض سجلات نسخة محددة، وقد تكون تاريخية.") }), linkedButton(SOCifyLocale.text("عرض النسخ الفعالة"), autopsyCaseURL(caseId, { tab: "logs", job_id: null, page: null })));
-  root.append(panel(SOCifyLocale.text("أصول الاستيراد والمعالجة"), imports.items.length ? table(jobColumns, imports.items) : emptyState(SOCifyLocale.text("لا استيرادات بعد"),null), true));
+  if (imports.items.length) root.append(panel(SOCifyLocale.text("أصول الاستيراد والمعالجة"), table(jobColumns, imports.items), true));
   const search = node("input", { type: "search", name: "q", value: query, maxlength: 200 });
   const form = node("form", { class: "filter-row", "aria-label": SOCifyLocale.text("بحث سجلات القضية") }, [field(SOCifyLocale.text("عنوان أو عنوان شبكة أو مستخدم أو مضيف"), search), node("button", { type: "submit", class: "button ghost", text: SOCifyLocale.text("بحث السجلات") })]);
   form.addEventListener("submit", (event) => { event.preventDefault(); window.location.assign(autopsyCaseURL(caseId, { tab: "logs", q: search.value, page: null })); });
   const exports = node("div", { class: "action-row" });
-  if (permission("cases.export")) for (const format of ["csv", "json", "jsonl"]) {
+  if (data.total > 0 && permission("cases.export")) for (const format of ["csv", "json", "jsonl"]) {
     exports.append(linkedButton(SOCifyLocale.template`${format.toUpperCase()} · بيانات وصفية محجوبة`, `/api/cases/${caseId}/logs/export?format=${format}&redacted=1&q=${encodeURIComponent(query)}${jobFilter}`));
     if (permission("evidence.download")) exports.append(linkedButton(SOCifyLocale.template`${format.toUpperCase()} · غير منقّح`, `/api/cases/${caseId}/logs/export?format=${format}&redacted=0&q=${encodeURIComponent(query)}${jobFilter}`));
   }

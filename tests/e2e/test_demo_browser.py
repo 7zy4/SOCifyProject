@@ -40,7 +40,7 @@ def test_real_demo_scope_review_roles_and_visual_matrix(tmp_path):
     try:
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
-            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            page = browser.new_page(locale="ar-SA", viewport={"width": 1440, "height": 1000})
             page.add_init_script(path=str(Path("node_modules/axe-core/axe.min.js").resolve()))
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
@@ -125,7 +125,8 @@ def test_real_demo_scope_review_roles_and_visual_matrix(tmp_path):
             assert page.locator("[data-investigation-context] select").count() == 0
             assert page.evaluate("async () => (await api('/api/investigation-selection')).case_ids.length") == 0
             page.goto(root + f"/cases/{manifest['unrelated_private_case']}")
-            assert page.locator("body").inner_text().find("CASE_NOT_FOUND") >= 0
+            page.get_by_role("heading", name="الصفحة غير متاحة", exact=True).wait_for()
+            assert page.get_by_role("link", name="العودة إلى القضايا", exact=True).is_visible()
             page.goto(root + "/cases")
             loaded()
             page.locator(".account-menu summary").click()

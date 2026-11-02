@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, render_template, request
 from flask_wtf.csrf import CSRFError, CSRFProtect, generate_csrf
 
 from .attack import attack_api
@@ -182,7 +182,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     def not_found(_: Exception):
         if request.path.startswith("/api/"):
             return error_response("NOT_FOUND", "المورد المطلوب غير موجود", 404)
-        return jsonify({"error": "Not Found"}), 404
+        return render_template("unavailable.html"), 404
 
     @app.errorhandler(405)
     def method_not_allowed(_: Exception):

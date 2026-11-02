@@ -134,7 +134,10 @@
       const cases=await api(`/api/cases?page=${page}&page_size=25&q=${encodeURIComponent(query)}`);
       const list=node("div",{class:"case-selector-list"});
       for(const item of cases.items)list.append(node("a",{href:url(`/${section}`,{case_id:item.id})},[node("span",{text:item.title}),node("bdi",{text:item.reference})]));
-      if(!cases.items.length)list.append(node("p",{text:t("لا توجد قضايا في النطاق المصرح")}));
+      if(!cases.items.length) {
+        list.append(node("p",{text:t("لا توجد قضايا في النطاق المصرح")}));
+        if(permission("cases.create"))list.append(button(t("إنشاء قضية"),()=>autopsyNewCase(false,section==="log-management"?"logs":"overview"),"primary"));
+      }
       root.append(list);
       const pages=node("div",{class:"pagination"},node("p",{text:number(cases.total)+" · "+t("الصفحة")+" "+number(page)}));
       if(page>1)pages.append(linkedButton(t("السابق"),url(`/${section}`,{case_id:selected?.id,choose:1,selector_q:query,selector_page:page-1})));

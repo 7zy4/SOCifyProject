@@ -1,0 +1,23 @@
+{% from "_nav_icon.html" import brand_mark %}
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-ui-copy>الصفحة غير متاحة | {{ product_name }}</title>
+  <script src="{{ url_for('static', filename='localization.js') }}"></script>
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
+  {% for sheet in ['fonts.css', 'tokens.css', 'app.css', 'design-system.css', 'comic-workspace.css'] %}
+  <link rel="stylesheet" href="{{ url_for('static', filename=sheet) }}">
+  {% endfor %}
+</head>
+<body class="auth-shell">
+  <main class="auth-layout auth-focused">
+    <a class="brand auth-logo" translate="no" href="{{ url_for('ui.index') }}">{{ brand_mark() }}<span class="brand-wordmark" lang="en" dir="ltr">SOCify</span></a>
+    <section class="auth-card" aria-labelledby="unavailable-title">
+      <h1 id="unavailable-title" data-ui-copy>الصفحة غير متاحة</h1>
+      <a class="button primary full" href="/cases" data-ui-copy>العودة إلى القضايا</a>
+    </section>
+  </main>
+</body>
+</html>

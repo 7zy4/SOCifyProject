@@ -95,22 +95,26 @@ async function autopsyQuickDropdownReportPanel(caseId) {
   const data = await api(`/api/cases/${caseId}/quick-report`);
   const savedAnswers = data.report?.answers || data.default_answers || {};
   const selects = Object.create(null);
-  const grid = node("form", { class: "form-grid", "aria-label": SOCifyLocale.text("تقرير الفرز السريع بالقوائم المنسدلة") });
+  const label = value => {
+    const parts = value.match(/^(.*)\s+\(([^()]*)\)$/u);
+    return parts ? (SOCifyLocale.language === "ar" ? parts[1] : parts[2]) : SOCifyLocale.text(value);
+  };
+  const grid = node("form", { class: "form-grid", "aria-label": SOCifyLocale.text("قرارات التحقيق") });
 
   const sum = data.auto_summary;
   grid.append(node("p", {
     class: "span-2",
-    text: SOCifyLocale.template`ملخص الأدلة المضمنة تلقائيًا في التقرير: ${sum.logs_count} سجل · ${sum.alerts_count} تنبيه (${sum.watchlist_hits_count} قائمة مراقبة) · ${sum.static_triage_items.length} فحص ساكن للملفات/البريد.`,
+    text: SOCifyLocale.template`${sum.logs_count} سجل · ${sum.alerts_count} تنبيه · ${sum.static_triage_items.length} فحص`,
   }));
 
   for (const q of data.questions) {
     const sel = node(
       "select",
       { name: q.id, required:true, disabled: !autopsy.current.can_update || autopsy.current.status === "closed" },
-      [node("option", {value:"", selected:!savedAnswers[q.id], disabled:true, text:SOCifyLocale.text("اختر الإجابة")}), ...q.options.map((opt) => node("option", { value: opt.value, selected: opt.value === savedAnswers[q.id], text: SOCifyLocale.text(opt.label) }))],
+      [node("option", {value:"", selected:!savedAnswers[q.id], disabled:true, text:SOCifyLocale.text("اختر الإجابة")}), ...q.options.map((opt) => node("option", { value: opt.value, selected: opt.value === savedAnswers[q.id], text: label(opt.label) }))],
     );
     selects[q.id] = sel;
-    grid.append(field(SOCifyLocale.text(q.label), sel));
+    grid.append(field(label(q.label), sel));
   }
 
   const noteInput = node("input", {
@@ -134,7 +138,7 @@ async function autopsyQuickDropdownReportPanel(caseId) {
     }));
   }
 
-  const printLink = linkedButton(SOCifyLocale.text("فتح وطباعة التقرير الفوري (A4 / PDF)"), data.print_url);
+  const printLink = linkedButton(SOCifyLocale.text("فتح التقرير"), data.print_url);
   printLink.target = "_blank";
   printLink.rel = "noopener";
 
@@ -189,7 +193,7 @@ async function autopsyQuickDropdownReportPanel(caseId) {
     });
     container.append(mgrForm);
   }
-  return panel(SOCifyLocale.text("تقرير الفرز السريع بالقوائم المنسدلة (قابل للطباعة والتصعيد المباشر للمدير)"), container, true);
+  return panel(SOCifyLocale.text("قرارات التحقيق"), container, true);
 }
 
 window.SOCifyAutopsy.reports = async (caseId) => {

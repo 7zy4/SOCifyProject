@@ -38,6 +38,9 @@ def test_monitoring_filters_channels_pagination_and_membership(autopsy_case, cli
     assert response.json["items"][0]["id"] == first
     assert response.json["counts"]["investigation"] == 0
     assert "Restricted management" not in response.text and "HIDDEN" not in response.text
+    scoped = client.get(f"/api/soc/monitoring?case_id={autopsy_case}").json
+    assert scoped["total"] == 2 and all(item["case_id"] == autopsy_case for item in scoped["items"])
+    assert client.get(f"/api/soc/monitoring?case_id={other}&channel=investigation").json["total"] == 0
     assert client.get("/api/soc/monitoring?page_size=1&page=2&sort=severity").json["items"][0]["id"] != first
     assert client.get("/api/soc/monitoring?severity=critical").json["total"] == 1
     assert client.get("/api/soc/monitoring?q=VISIBLE-2").json["total"] == 1
@@ -64,6 +67,11 @@ def test_monitoring_filters_channels_pagination_and_membership(autopsy_case, cli
         "q=" + "x" * 201,
         "page=1&page=2",
         "unsupported=1",
+        "case_id=0",
+        "case_id=-1",
+        "case_id=invalid",
+        "case_id=9223372036854775808",
+        "case_id=1&case_id=2",
     ],
 )
 def test_monitoring_rejects_invalid_queries(autopsy_case, client, query):

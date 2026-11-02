@@ -38,7 +38,7 @@ def test_200_percent_zoom_keyboard_modal_and_searchable_choices(app, tmp_path, z
                 page = browser.pages[0]
             else:
                 browser = launch_browser(playwright)
-                page = browser.new_page(viewport={"width": 1440, "height": 1000})
+                page = browser.new_page(locale="ar-SA", viewport={"width": 1440, "height": 1000})
             root = f"http://127.0.0.1:{server.server_port}"
             page.goto(root + "/login")
             page.locator("input[name=email]").fill("manager@socify.local")

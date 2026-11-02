@@ -4,12 +4,24 @@
 // never pass through a DOM text translator.
 (() => {
   const storageKey = "socify-interface-language";
-  let language = "ar";
-  try { language = localStorage.getItem(storageKey) === "en" ? "en" : "ar"; } catch (_) { /* Browser storage may be restricted. */ }
+  let language = (navigator.language || "ar").toLowerCase().startsWith("ar") ? "ar" : "en";
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved === "ar" || saved === "en") language = saved;
+  } catch (_) { /* Browser storage may be restricted. */ }
   document.documentElement.lang = language;
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
   document.cookie = `socify-language=${language}; Path=/; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
   const english = {
+  "خيارات الاستيراد": "Import options",
+  "إضافة مصدر SIEM": "Add SIEM source",
+  "مراجعة التنبيهات": "Review alerts",
+  "نتيجة الاستيراد": "Import result",
+  "{0} مقبول · {1} مرفوض · {2} متكرر": "{0} accepted · {1} rejected · {2} duplicates",
+  "{0} سجل · {1} تنبيه · {2} فحص": "{0} logs · {1} alerts · {2} inspections",
+  "الصفحة غير متاحة": "Page unavailable",
+  "العودة إلى القضايا": "Return to cases",
+  "فتح التقرير": "Open report",
   "اسم العرض": "Display name",
   "الاسم بالعربية": "Name in Arabic",
   "الاسم بالإنجليزية": "Name in English",

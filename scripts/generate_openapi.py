@@ -97,6 +97,7 @@ def generate() -> dict[str, object]:
                     "page": {"type": "integer", "minimum": 1, "maximum": 1000000, "default": 1},
                     "page_size": {"type": "integer", "minimum": 1, "maximum": 50, "default": 25},
                     "q": {"type": "string", "maxLength": 200},
+                    "case_id": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
                     "severity": {"type": "string", "enum": ["critical", "high", "medium", "low"]},
                     "mine": {"type": "string", "enum": ["0", "1"], "default": "0"},
                     "sort": {"type": "string", "enum": ["detected_at", "severity", "rule_name"]},

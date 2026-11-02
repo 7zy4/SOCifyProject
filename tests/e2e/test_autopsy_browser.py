@@ -20,7 +20,7 @@ def test_case_first_operational_browser_with_csrf_and_mobile_layout(app):
     try:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
-            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            page = browser.new_page(locale="ar-SA", viewport={"width": 1440, "height": 1000})
             page.add_init_script(path=str(Path("node_modules/axe-core/axe.min.js").resolve()))
             page.goto(f"http://127.0.0.1:{server.server_port}/login")
             page.locator("input[name=email]").fill("analyst@socify.local")
@@ -66,7 +66,7 @@ def test_manager_procedure_library_and_report_worker_browser(app):
     try:
         with local_worker_services(app.config), sync_playwright() as playwright:
             browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
-            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            page = browser.new_page(locale="ar-SA", viewport={"width": 1440, "height": 1000})
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.add_init_script(path=str(Path("node_modules/axe-core/axe.min.js").resolve()))
@@ -121,7 +121,7 @@ def test_local_sample_manual_reputation_and_team_assignment_browser(app):
     try:
         with local_worker_services(app.config), sync_playwright() as playwright:
             browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
-            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            page = browser.new_page(locale="ar-SA", viewport={"width": 1440, "height": 1000})
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.add_init_script(path=str(Path("node_modules/axe-core/axe.min.js").resolve()))
@@ -217,7 +217,7 @@ def test_local_sample_manual_reputation_and_team_assignment_browser(app):
             invite.wait_for()
             invitation_url = invite.input_value()
             assert "#invitation_token=" in invitation_url and "?invitation_token=" not in invitation_url
-            join = browser.new_page()
+            join = browser.new_page(locale="ar-SA")
             join.goto(invitation_url)
             assert len(join.locator("input[name=invitation_token]").input_value()) >= 32
             assert "invitation_token" not in join.url
@@ -246,7 +246,7 @@ def test_case_import_preview_commit_and_export_browser(app):
     try:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
-            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            page = browser.new_page(locale="ar-SA", viewport={"width": 1440, "height": 1000})
             page.add_init_script(path=str(Path("node_modules/axe-core/axe.min.js").resolve()))
             page.goto(f"http://127.0.0.1:{server.server_port}/login")
             page.locator("input[name=email]").fill("analyst@socify.local")

@@ -16,7 +16,7 @@ CHANNEL = "CASE WHEN c.status IN ('closed','cancelled') THEN 'closed' WHEN c.sta
 @consistent_read
 def monitoring():
     try:
-        allowed = {"channel", "page", "page_size", "q", "severity", "mine", "sort", "direction"}
+        allowed = {"channel", "page", "page_size", "q", "severity", "mine", "sort", "direction", "case_id"}
         if set(request.args) - allowed or any(len(request.args.getlist(key)) != 1 for key in request.args):
             raise ValueError
         channel = request.args.get("channel", "main")
@@ -24,6 +24,9 @@ def monitoring():
         query, severity = request.args.get("q", "").strip(), request.args.get("severity", "")
         mine, direction = request.args.get("mine", "0"), request.args.get("direction", "desc")
         sort = request.args.get("sort", "detected_at")
+        case_id = int(request.args["case_id"]) if "case_id" in request.args else None
+        if case_id is not None and not 1 <= case_id <= 9223372036854775807:
+            raise ValueError
         sorts = {
             "detected_at": "a.detected_at",
             "severity": "CASE a.severity WHEN 'critical' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END",
@@ -40,6 +43,9 @@ def monitoring():
     user = current_user() or {}
     where = "c.workspace_id=? AND a.workspace_id=c.workspace_id AND c.archived_at IS NULL"
     args: list[object] = [workspace_id()]
+    if case_id is not None:
+        where += " AND c.id=?"
+        args.append(case_id)
     if current_app.config["REQUIRE_INVESTIGATION_SELECTION"]:
         from .autopsy_workspace import selected_ids
 

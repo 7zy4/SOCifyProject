@@ -22,7 +22,7 @@ def test_theme_system_persistence_languages_and_operational_surfaces(app):
     try:
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
-            page = browser.new_page(viewport={"width": 1440, "height": 1000}, color_scheme="dark")
+            page = browser.new_page(locale="ar-SA", viewport={"width": 1440, "height": 1000}, color_scheme="dark")
             page.add_init_script(path=str(Path("node_modules/axe-core/axe.min.js").resolve()))
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
@@ -111,7 +111,7 @@ def test_mobile_operational_navigation_opens_inside_viewport(app, language):
     try:
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
-            page = browser.new_page(viewport={"width": 360, "height": 844})
+            page = browser.new_page(locale="ar-SA", viewport={"width": 360, "height": 844})
             base = f"http://127.0.0.1:{server.server_port}"
             page.goto(base + "/login")
             page.evaluate("value => localStorage.setItem('socify-interface-language', value)", language)
@@ -149,7 +149,7 @@ def test_theme_control_works_when_browser_storage_is_unavailable(app):
     try:
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
-            page = browser.new_page(color_scheme="dark")
+            page = browser.new_page(locale="ar-SA", color_scheme="dark")
             page.add_init_script("Storage.prototype.getItem = Storage.prototype.setItem = () => { throw new Error('Storage unavailable'); };")
             page.goto(f"http://127.0.0.1:{server.server_port}/")
             assert page.locator("html").get_attribute("data-theme") == "dark"
@@ -171,7 +171,7 @@ def test_public_pages_theme_typography_and_responsive_layout(app):
     try:
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
-            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            page = browser.new_page(locale="ar-SA", viewport={"width": 1440, "height": 1000})
             page.add_init_script(path=str(Path("node_modules/axe-core/axe.min.js").resolve()))
             base = f"http://127.0.0.1:{server.server_port}"
             page.goto(base + "/login")
@@ -207,7 +207,7 @@ def test_operational_governance_routes_render_their_authorized_content(app):
     try:
         with sync_playwright() as playwright:
             browser = launch_browser(playwright)
-            page = browser.new_page()
+            page = browser.new_page(locale="ar-SA")
             base = f"http://127.0.0.1:{server.server_port}"
             page.goto(base + "/login")
             page.get_by_label("البريد الإلكتروني", exact=True).fill("admin@socify.local")

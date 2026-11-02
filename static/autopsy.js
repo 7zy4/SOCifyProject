@@ -218,11 +218,11 @@ function autopsyForm(schema, submit, initial = {}) {
   return form;
 }
 
-function autopsyNewCase(unassigned = false) {
+function autopsyNewCase(unassigned = false, destination = "overview") {
   const form = autopsyForm({ title: { required: true, max: 255 }, reason: { required: true, choices: autopsy.catalog.reasons }, objective: { required: true, max: 2000 }, classification: { required: true, choices: autopsy.catalog.classifications } }, async (body) => {
     const payload = unassigned ? { ...body, assignee: null } : body;
     const created = await api("/api/cases", { method: "POST", body: payload });
-    window.location.assign(unassigned ? "/cases" : `/cases/${created.id}`);
+    window.location.assign(unassigned ? "/cases" : `/cases/${created.id}${destination === "logs" ? "?tab=logs" : ""}`);
   }, { reason: "alert_review", objective: SOCifyLocale.text("التحقيق الأولي السريع وتحديد المؤشرات والإجراء المناسب"), classification: "confidential" });
   autopsyModal(unassigned ? SOCifyLocale.text("إيداع قضية مفتوحة في طابور الفريق") : SOCifyLocale.text("إنشاء قضية سريعة وبدء التحقيق"), form);
 }
@@ -366,7 +366,7 @@ async function autopsyCase(caseId) {
       content.append(autopsyEditPanel(SOCifyLocale.text("تحديد مسؤولية عضو"), node("div", { class: "panel-body" }, autopsyForm({ user_id: { required: true, user: true }, responsibility: { required: true, choices: ["monitoring", "l1", "l2", "investigator", "reviewer", "owner"] } }, async (body) => { await api(`/api/cases/${caseId}/members`, { method: "POST", body }); await autopsyCase(caseId); }))));
       if (current.status !== "closed") content.append(autopsyEditPanel(SOCifyLocale.text("تسليم المناوبة"), node("div", { class: "panel-body" }, [node("p", { text: SOCifyLocale.text("ينقل المسؤوليات والمهام المفتوحة والتصعيد والإسناد مع حفظ تاريخ المسؤول السابق. يبقى حسابه ووصوله الحالي فعالين؛ سحب الوصول يتم من إدارة الفريق.") }), autopsyForm({ from_user: { required: true, user: true, case_member: true }, to_user: { required: true, user: true }, reason: { required: true, max: 1000 } }, async (body) => { await api(`/api/cases/${caseId}/handoff`, { method: "POST", body: { ...body, version: current.version } }); await autopsyCase(caseId); })])));
     }
-    content.append(panel(SOCifyLocale.text("مهام القضية"), current.tasks.length ? table([{ label: SOCifyLocale.text("المهمة"), value: "title" }, { label: SOCifyLocale.text("الحالة"), value: "status" }, { label: SOCifyLocale.text("إكمال"), value: (row) => current.can_update && row.status !== "completed" ? button(SOCifyLocale.text("إكمال المهمة"), async () => { try { await api(`/api/incidents/${caseId}/tasks/${row.id}`, { method: "PATCH", body: { status: "completed" } }); await autopsyCase(caseId); } catch (error) { handleError(error); } }) : "—" }], current.tasks) : emptyState(SOCifyLocale.text("لا مهام"),null)));
+    content.append(panel(SOCifyLocale.text("مهام القضية"), current.tasks.length ? table([{ label: SOCifyLocale.text("المهمة"), value: "title" }, { label: SOCifyLocale.text("الحالة"), value: row => autopsyLabel(row.status) }, { label: SOCifyLocale.text("إكمال"), value: (row) => current.can_update && row.status !== "completed" ? button(SOCifyLocale.text("إكمال المهمة"), async () => { try { await api(`/api/incidents/${caseId}/tasks/${row.id}`, { method: "PATCH", body: { status: "completed" } }); await autopsyCase(caseId); } catch (error) { handleError(error); } }) : "—" }], current.tasks) : emptyState(SOCifyLocale.text("لا مهام"),null)));
   } else if (selected === "logs") {
     if (window.SOCifyAutopsy.logs) content.append(await window.SOCifyAutopsy.logs(caseId));
     content.append(panel(SOCifyLocale.text("أدلة القضية"), current.evidence.length ? table([{ label: SOCifyLocale.text("الدليل"), value: "title" }, { label: SOCifyLocale.text("النوع"), value: "evidence_type" }, { label: "SHA-256", value: (row) => node("bdi", { text: row.sha256 }) }, { label: SOCifyLocale.text("أضيف"), value: (row) => formatTime(row.added_at) }], current.evidence) : emptyState(SOCifyLocale.text("لا أدلة مرتبطة"),null), true));

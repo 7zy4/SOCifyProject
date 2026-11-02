@@ -20,7 +20,7 @@ def new_page(browser, **kwargs):
     axe_path = Path("node_modules/axe-core/axe.min.js").resolve()
     if not axe_path.exists():
         raise AssertionError("axe-core is required for browser accessibility tests")
-    page = browser.new_page(**kwargs)
+    page = browser.new_page(locale="ar-SA", **kwargs)
     page.add_init_script(path=str(axe_path))
     return page
 
