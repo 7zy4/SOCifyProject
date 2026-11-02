@@ -329,7 +329,7 @@ async function autopsyEditRecord(kind, record = null) {
 async function autopsyRecordPanel(kind) {
   const base = `/api/cases/${autopsy.current.id}/records?kind=${kind}&limit=25`;
   const data = await api(base);
-  const content = data.items.length ? node("div", { class: "record-grid" }, data.items.map(autopsyRecordCard)) : emptyState(SOCifyLocale.text("لا سجلات بعد"),null);
+  const content = data.items.length ? node("div", { class: "record-grid" }, data.items.map(autopsyRecordCard)) : node("p", { class: "record-empty", text: SOCifyLocale.text("لا عناصر بعد") });
   let cursor = data.next_before;
   const more = button(SOCifyLocale.text("عرض المزيد"), async () => {
     more.disabled = true;

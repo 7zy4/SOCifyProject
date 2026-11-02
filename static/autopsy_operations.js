@@ -61,8 +61,9 @@ window.SOCifyAutopsy.library = async () => {
   root.append(panel(SOCifyLocale.text("حزم YARA المحلية"), yaraBody, true));
   if (permission("cases.create") && permission("evidence.add")) {
     const file = node("input", { type: "file", accept: ".zip,application/zip", required: true, "aria-label": SOCifyLocale.text("حزمة قضية محلية") });
-    const form = node("form", { class: "form-grid" }, [field(SOCifyLocale.text("حزمة ZIP محلية · حتى 64 MiB موسعة"), file), node("button", { type: "submit", class: "button primary", text: SOCifyLocale.text("استعادة كقضية جديدة") })]);
-    form.addEventListener("submit", async (event) => { event.preventDefault(); const control = form.querySelector("button"); control.disabled = true; try { if (!file.files[0] || file.files[0].size > 64 * 1024 * 1024 + 524288) throw new Error(SOCifyLocale.text("حجم الحزمة يتجاوز الحد")); const body = new FormData(); body.set("file", file.files[0]); const result = await api("/api/cases/import-capsule", { method: "POST", body }); window.location.assign(`/cases/${result.case_id}?tab=reports`); } catch (error) { handleError(error); control.disabled = false; } });
+    const errors = node("p", { class: "notice span-2", role: "alert", hidden: true });
+    const form = node("form", { class: "form-grid" }, [field(SOCifyLocale.text("حزمة ZIP محلية · حتى 64 MiB موسعة"), file), errors, node("button", { type: "submit", class: "button primary", text: SOCifyLocale.text("استعادة كقضية جديدة") })]);
+    form.addEventListener("submit", async (event) => { event.preventDefault(); const control = form.querySelector("button"); control.disabled = true; errors.hidden = true; try { if (!file.files[0] || file.files[0].size > 64 * 1024 * 1024 + 524288) throw new Error(SOCifyLocale.text("حجم الحزمة يتجاوز الحد")); const body = new FormData(); body.set("file", file.files[0]); const result = await api("/api/cases/import-capsule", { method: "POST", body }); window.location.assign(`/cases/${result.case_id}?tab=reports`); } catch (error) { errors.textContent = error.message; errors.hidden = false; control.disabled = false; } });
     root.append(panel(SOCifyLocale.text("استعادة حزمة قضية"), node("div", { class: "panel-body" }, [node("p", { text: SOCifyLocale.text("تُفحص البصمات والمسارات والحدود قبل الاستعادة. تحفظ إفادات واعتمادات المالك السابق في أرشيف ثابت للمراجعة ولا تمنح صلاحية أو اعتمادًا محليًا تلقائيًا.") }), form]), true));
   }
   finish(root);
@@ -115,18 +116,46 @@ window.SOCifyAutopsy.capsules = async (caseId) => {
   return panel(SOCifyLocale.text("حزم القضية والاستعادة والأرشيف"), root, true);
 };
 
+function autopsyWorkflowState(value) {
+  return SOCifyLocale.text({ not_configured: "لم تُحدد المهلة", running: "المهلة جارية", paused: "المهلة معلقة", breached: "تجاوز المهلة", closed: "مغلقة", pending_approval: "بانتظار الاعتماد", approved: "معتمد", rejected: "مرفوض", documented: "وُثق الجمع", draft: "مسودة", reviewed: "تمت المراجعة" }[value] || value);
+}
+
+function autopsySLASummary(sla) {
+  const minutes = (seconds) => SOCifyLocale.template`${new Intl.NumberFormat(SOCifyLocale.language, { maximumFractionDigits: 1 }).format(Math.abs(seconds) / 60)} دقيقة`;
+  const rows = [{ label: SOCifyLocale.text("الحالة"), value: autopsyWorkflowState(sla.status) }];
+  if (sla.configured) {
+    rows.push(
+      { label: SOCifyLocale.text("مهلة الاستجابة"), value: minutes(sla.policy.minutes * 60) },
+      { label: SOCifyLocale.text("الوقت المحتسب"), value: minutes(sla.elapsed_work_seconds) },
+      { label: SOCifyLocale.text(sla.remaining_work_seconds < 0 ? "مدة التجاوز" : "الوقت المتبقي"), value: minutes(sla.remaining_work_seconds) },
+      { label: SOCifyLocale.text("الموعد المتوقع"), value: sla.status === "paused" ? SOCifyLocale.text("بعد استئناف المهلة") : sla.projected_due_at ? formatTime(sla.projected_due_at) : "—" },
+      { label: SOCifyLocale.text("تقويم الاحتساب"), value: `${autopsyLabel(sla.policy.calendar.mode)} · ${sla.policy.calendar.timezone}` }
+    );
+    if (sla.paused_work_seconds > 0) rows.push({ label: SOCifyLocale.text("الوقت المستثنى بالتعليق"), value: minutes(sla.paused_work_seconds) });
+    if (sla.policy.calendar.mode === "business") rows.push({ label: SOCifyLocale.text("ساعات العمل"), value: `${autopsyLabel(sla.policy.calendar.weekdays.includes(6) ? "sun_thu" : "mon_fri")} · ${sla.policy.calendar.start_hour}:00–${sla.policy.calendar.end_hour}:00` });
+  }
+  const result = table([{ label: SOCifyLocale.text("مهلة الاستجابة"), value: "label" }, { label: SOCifyLocale.text("القيمة"), value: "value" }], rows);
+  result.classList.add("sla-summary");
+  return result;
+}
+
 window.SOCifyAutopsy.workflow = async (caseId) => {
   const data = await api(`/api/cases/${caseId}/workflow`), current = autopsy.current, base = `/api/cases/${caseId}`;
-  const root = node("div", { class: "panel-body" }, [node("p", { text: `SLA: ${data.sla.status} · ${data.sla.notification || SOCifyLocale.text("لا إشعار تجاوز مسجل")}` }), node("details", {}, [node("summary", { text: SOCifyLocale.text("قياسات الاستجابة وأساس حسابها") }), node("pre", { text: JSON.stringify(data.metrics, null, 2) })])]);
-  if (data.scope) root.append(node("h4", { text: SOCifyLocale.text("نطاق الفحص وحدوده") }), node("p", { text: data.scope.limitations }), table([{ label: SOCifyLocale.text("تقييم الأصل"), value: (row) => autopsyLabel(row.assessment) }, { label: SOCifyLocale.text("الأصول الموثقة"), value: "count" }], Object.entries(data.scope.counts_by_assessment).map(([assessment, count]) => ({ assessment, count }))), node("details", {}, [node("summary", { text: SOCifyLocale.text("أقدم ملاحظة وأدلتها · لا تثبت بداية الهجوم") }), node("pre", { text: JSON.stringify(data.scope.earliest_retained_observation, null, 2) })]));
+  const root = node("div", { class: "panel-body" }, [autopsySLASummary(data.sla), node("details", {}, [node("summary", { text: SOCifyLocale.text("قياسات الاستجابة وأساس حسابها") }), node("pre", { text: JSON.stringify(data.metrics, null, 2) })])]);
+  if (data.scope) root.append(node("details", {}, [node("summary", { text: SOCifyLocale.text("نطاق الفحص وحدوده") }), node("p", { text: SOCifyLocale.text(data.scope.limitations) }), table([{ label: SOCifyLocale.text("تقييم الأصل"), value: (row) => autopsyLabel(row.assessment) }, { label: SOCifyLocale.text("الأصول الموثقة"), value: "count" }], Object.entries(data.scope.counts_by_assessment).map(([assessment, count]) => ({ assessment, count }))), node("details", {}, [node("summary", { text: SOCifyLocale.text("أقدم ملاحظة وأدلتها · لا تثبت بداية الهجوم") }), node("pre", { text: JSON.stringify(data.scope.earliest_retained_observation, null, 2) })])]));
   if (current.can_manage && current.status !== "closed") {
-    root.append(autopsyForm({ minutes: { required: true, integer: true, min: 1, max: 525600 }, mode: { required: true, choices: ["24x7", "business"] }, timezone: { required: true, choices: autopsy.catalog.source_timezones }, weekdays: { required: true, choices: ["mon_fri", "sun_thu"] }, start_hour: { required: true, integer: true, min: 0, max: 23 }, end_hour: { required: true, integer: true, min: 1, max: 24 }, reason: { required: true, max: 1000 } }, async (body) => { const calendar = { mode: body.mode, timezone: body.timezone }; if (body.mode === "business") Object.assign(calendar, { weekdays: body.weekdays === "sun_thu" ? [6, 0, 1, 2, 3] : [0, 1, 2, 3, 4], start_hour: body.start_hour, end_hour: body.end_hour, holidays: [] }); await api(base + "/sla", { method: "POST", body: { version: current.version, minutes: body.minutes, calendar, reason: body.reason } }); await autopsyCase(caseId); }, { mode: "24x7", timezone: "Asia/Riyadh", weekdays: "sun_thu", start_hour: 9, end_hour: 17 }));
+    const policy = data.sla.policy, calendar = policy?.calendar;
+    const form = autopsyForm({ minutes: { required: true, integer: true, min: 1, max: 525600 }, mode: { required: true, choices: ["24x7", "business"] }, timezone: { required: true, choices: autopsy.catalog.source_timezones }, weekdays: { required: true, choices: ["mon_fri", "sun_thu"] }, start_hour: { required: true, integer: true, min: 0, max: 23 }, end_hour: { required: true, integer: true, min: 1, max: 24 }, reason: { required: true, max: 1000 } }, async (body) => { const calendar = { mode: body.mode, timezone: body.timezone }; if (body.mode === "business") Object.assign(calendar, { weekdays: body.weekdays === "sun_thu" ? [6, 0, 1, 2, 3] : [0, 1, 2, 3, 4], start_hour: body.start_hour, end_hour: body.end_hour, holidays: [] }); await api(base + "/sla", { method: "POST", body: { version: current.version, minutes: body.minutes, calendar, reason: body.reason } }); await autopsyCase(caseId); }, { minutes: policy?.minutes, mode: calendar?.mode || "24x7", timezone: calendar?.timezone || "Asia/Riyadh", weekdays: calendar?.weekdays && !calendar.weekdays.includes(6) ? "mon_fri" : "sun_thu", start_hour: calendar?.start_hour ?? 9, end_hour: calendar?.end_hour ?? 17 });
+    const mode = form.querySelector("input[name=mode]");
+    const showHours = () => { for (const key of ["weekdays", "start_hour", "end_hour"]) { const input = form.querySelector(`[name=${key}]`); input.closest("label").hidden = mode.value !== autopsyLabel("business"); input.required = !input.closest("label").hidden; } };
+    mode.addEventListener("input", showHours); showHours();
+    root.append(data.sla.configured ? node("details", { class: "sla-settings" }, [node("summary", { text: SOCifyLocale.text("تعديل مهلة الاستجابة") }), form]) : form);
     if (data.sla.configured) root.append(autopsyAction(data.sla.status === "paused" ? SOCifyLocale.text("استئناف SLA") : SOCifyLocale.text("إيقاف SLA مؤقتًا"), async () => { let dialog; dialog = autopsyModal(SOCifyLocale.text("تغيير ساعة SLA مع توثيق السبب"), autopsyForm({ reason: { required: true, max: 1000 } }, async (body) => { await api(base + `/sla/${data.sla.status === "paused" ? "resume" : "pause"}`, { method: "POST", body: { ...body, version: current.version } }); dialog.close(); await autopsyCase(caseId); })); }));
   }
-  if (current.can_update && current.status !== "closed") root.append(autopsyForm({ recipe_id: { required: true, choices: Object.entries(data.recipes).map(([value, item]) => ({ value, label: item.title })) }, collector_id: { required: true, user: true, case_member: true }, reason: { required: true, max: 2000 } }, async (body) => { await api(base + "/collections", { method: "POST", body: { ...body, version: current.version } }); await autopsyCase(caseId); }));
+  if (current.can_update && current.status !== "closed") root.append(autopsyForm({ recipe_id: { required: true, choices: Object.entries(data.recipes).map(([value, item]) => ({ value, label: SOCifyLocale.text(item.title) })) }, collector_id: { required: true, user: true, case_member: true }, reason: { required: true, max: 2000 } }, async (body) => { await api(base + "/collections", { method: "POST", body: { ...body, version: current.version } }); await autopsyCase(caseId); }));
   for (const item of data.collections) {
     const body = item.payload;
-    const card = node("article", { class: "card" }, [node("h4", { text: body.recipe_snapshot.title }), node("p", { text: `${body.state} · ${body.reason}` }), node("p", { text: body.recipe_snapshot.guidance })]);
+    const card = node("article", { class: "card" }, [node("h4", { text: SOCifyLocale.text(body.recipe_snapshot.title) }), node("p", { text: `${autopsyWorkflowState(body.state)} · ${body.reason}` }), node("details", {}, [node("summary", { text: SOCifyLocale.text("نطاق الجمع") }), node("p", { text: SOCifyLocale.text(body.recipe_snapshot.guidance) })])]);
     if (current.can_manage && body.state === "pending_approval") for (const action of ["approve", "reject"]) card.append(autopsyAction(action === "approve" ? SOCifyLocale.text("اعتماد نطاق الجمع") : SOCifyLocale.text("رفض نطاق الجمع"), async () => { let dialog; dialog = autopsyModal(SOCifyLocale.text("توثيق قرار نطاق الجمع"), autopsyForm({ reason: { required: true, max: 1000 } }, async (values) => { await api(base + `/collections/${item.id}/${action}`, { method: "POST", body: { ...values, version: item.version, case_version: current.version } }); dialog.close(); await autopsyCase(caseId); })); }));
     if (current.can_update && body.state === "approved" && (current.can_manage || body.collector_id === state.user.id)) card.append(autopsyAction(SOCifyLocale.text("توثيق الجمع المنفذ محليًا"), async () => {
       let dialog;
@@ -139,7 +168,7 @@ window.SOCifyAutopsy.workflow = async (caseId) => {
   }
   if (current.can_update && ["closed", "awaiting_review", "recovered", "remediated", "contained"].includes(current.status)) root.append(autopsyAction(SOCifyLocale.text("إنشاء مسودة مراجعة ما بعد الحادثة"), async () => { await api(base + "/postmortems", { method: "POST", body: { version: current.version } }); await autopsyCase(caseId); }));
   for (const item of data.postmortems) {
-    const card = node("article", { class: "card" }, [node("h4", { text: SOCifyLocale.template`مراجعة ما بعد الحادثة · ${item.payload.state}` }), node("p", { text: item.payload.executive_summary }), node("p", { text: item.payload.lessons || SOCifyLocale.text("الدروس تحتاج مراجعة المحقق") }), node("p", { text: item.payload.limitations })]);
+    const card = node("article", { class: "card" }, [node("h4", { text: SOCifyLocale.template`مراجعة ما بعد الحادثة · ${autopsyWorkflowState(item.payload.state)}` }), node("p", { text: item.payload.executive_summary }), node("p", { text: item.payload.lessons || SOCifyLocale.text("الدروس تحتاج مراجعة المحقق") }), node("p", { text: item.payload.limitations })]);
     if (current.can_approve && item.payload.state === "draft") card.append(autopsyAction(SOCifyLocale.text("مراجعة المسودة"), async () => { let dialog; dialog = autopsyModal(SOCifyLocale.text("مراجعة مستقلة للدروس والقيود"), autopsyForm({ executive_summary: { required: true, max: 5000 }, lessons: { required: true, max: 5000 }, limitations: { required: true, max: 5000 }, override_reason: { max: 1000 } }, async (values) => { await api(base + `/postmortems/${item.id}/review`, { method: "POST", body: { ...values, version: item.version, case_version: current.version } }); dialog.close(); await autopsyCase(caseId); }, item.payload)); }));
     root.append(card);
   }

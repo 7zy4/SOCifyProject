@@ -97,7 +97,7 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
     const title = document.createElementNS("http://www.w3.org/2000/svg", "title"); title.textContent = displayText(item.label); text.append(title); svg.append(text);
   }
   canvas.append(svg);
-  graphBody.append(canvas, panel(SOCifyLocale.text("جدول العلاقات ومراجع الأدلة"), table([{ label: SOCifyLocale.text("الكيان"), value: "label" }, { label: SOCifyLocale.text("النوع"), value: "type" }, { label: SOCifyLocale.text("المرجع"), value: "reference_id" }, { label: SOCifyLocale.text("طبيعة الربط"), value: "provenance" }], graph.nodes)));
+  if (graph.nodes.length) graphBody.append(canvas, panel(SOCifyLocale.text("جدول العلاقات ومراجع الأدلة"), table([{ label: SOCifyLocale.text("الكيان"), value: "label" }, { label: SOCifyLocale.text("النوع"), value: "type" }, { label: SOCifyLocale.text("المرجع"), value: "reference_id" }, { label: SOCifyLocale.text("طبيعة الربط"), value: "provenance" }], graph.nodes)));
   root.append(panel(SOCifyLocale.text("رسم العلاقات داخل القضية"), graphBody));
   const attackBody = node("div", { class: "panel-body" });
   const search = node("input", { name: "attack_search", type: "search", maxlength: 100, placeholder: SOCifyLocale.text("T1059 أو اسم التقنية") });

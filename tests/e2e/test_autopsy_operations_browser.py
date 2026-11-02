@@ -153,7 +153,7 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
             dialog.locator("textarea[name=lessons]").fill("Retain complete logs and verify hypotheses independently")
             dialog.locator("input[name=override_reason]").fill("Synthetic manager self-review exception documented")
             dialog.get_by_role("button", name="حفظ", exact=True).click()
-            page.get_by_role("heading", name="مراجعة ما بعد الحادثة · reviewed", exact=True).wait_for()
+            page.get_by_role("heading", name="مراجعة ما بعد الحادثة · تمت المراجعة", exact=True).wait_for()
             page.get_by_role("link", name="التقارير والمراجعة", exact=True).click()
             page.get_by_role("heading", name="حزم القضية والاستعادة والأرشيف", exact=True).wait_for()
             with page.expect_download() as download:
