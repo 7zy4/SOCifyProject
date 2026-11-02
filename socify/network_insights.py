@@ -222,4 +222,25 @@ def telemetry_report(connection, case_id, workspace):
         size += len(json.dumps(item).encode())
         if len(alerts) > 2000 or size > 4 * 1024 * 1024:
             raise ValueError("تجاوز التقرير حد تنبيهات الشبكة")
-    return {"network_analysis": network if network["event_count"] else {}, "endpoint_results": endpoints, "runtime_events": runtime, "network_alerts": alerts}
+    from .windows_logon import CONTEXT_FIELDS
+
+    logons = []
+    for row in connection.execute(
+        "SELECT id,hostname,username,source_ip,event_time,outcome,normalized_fields FROM security_events WHERE owner_case_id=? AND workspace_id=? AND autopsy_active=1 AND source_type='windows' AND json_extract(normalized_fields,'$.windows_event_id') IN (4624,4625) ORDER BY event_time,id LIMIT 2001",
+        (case_id, workspace),
+    ):
+        fields = json.loads(row["normalized_fields"])
+        item = {"event_id": row["id"], **{key: row[key] for key in ("hostname", "username", "source_ip", "outcome")}}
+        item["event_time"] = row["event_time"] if fields.get("event_time_known") else None
+        item.update({key: fields[key] for key in CONTEXT_FIELDS if fields.get(key) not in (None, "")})
+        logons.append(item)
+        size += len(json.dumps(item).encode())
+        if len(logons) > 2000 or size > 4 * 1024 * 1024:
+            raise ValueError("تجاوز التقرير حد أحداث تسجيل الدخول")
+    return {
+        "network_analysis": network if network["event_count"] else {},
+        "endpoint_results": endpoints,
+        "runtime_events": runtime,
+        "network_alerts": alerts,
+        "logon_events": logons,
+    }

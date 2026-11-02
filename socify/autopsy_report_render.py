@@ -16,6 +16,17 @@ FORMATS = {
     "pdf": "application/pdf",
 }
 LABELS = {
+    "logon_events": "تسجيل الدخول",
+    "outcome": "النتيجة",
+    "windows_event_id": "معرف حدث Windows",
+    "account_domain": "نطاق الحساب",
+    "logon_type": "نوع الدخول",
+    "logon_type_code": "رمز نوع الدخول",
+    "authentication_package": "آلية المصادقة",
+    "logon_id": "معرف جلسة الدخول",
+    "source_workstation": "جهاز المصدر",
+    "logon_status": "رمز الحالة",
+    "logon_substatus": "رمز الحالة الفرعي",
     "network_alerts": "تنبيهات الشبكة",
     "ids_rule": "معرف قاعدة الرصد",
     "ids_priority": "أولوية الرصد",
@@ -194,6 +205,17 @@ LABELS = {
     "integrity_valid": "سلامة السلسلة عند إعداد التقرير",
 }
 ENUM_LABELS = {
+    "interactive": "دخول تفاعلي",
+    "network_logon": "دخول عبر الشبكة",
+    "batch_logon": "دخول مهمة مجدولة",
+    "service_logon": "دخول خدمة",
+    "unlock_logon": "فتح القفل",
+    "network_cleartext": "مصادقة شبكة بكلمة مرور غير مجزأة",
+    "new_credentials": "بيانات اعتماد جديدة",
+    "remote_interactive": "دخول تفاعلي عن بُعد",
+    "cached_interactive": "دخول تفاعلي ببيانات مخزنة",
+    "cached_remote_interactive": "دخول بعيد ببيانات مخزنة",
+    "cached_unlock": "فتح القفل ببيانات مخزنة",
     "would_drop": "كان سيُحظر (would_drop)",
     "drop": "أُسقطت الحزمة (drop)",
     "credential_assignment": "بيانات اعتماد مكشوفة",
@@ -220,6 +242,8 @@ ENUM_LABELS = {
     "closed": "مغلقة",
     "reopened": "أعيد فتحها",
     "successful": "ناجح",
+    "success": "ناجح",
+    "failed": "فشل",
     "blocked": "محجوب أو فاشل",
     "partial": "نجاح جزئي",
     "unknown": "غير معروف",
@@ -274,6 +298,8 @@ def lines(value, depth=0):
                     "entry_type",
                     "kind",
                     "action",
+                    "logon_type",
+                    "outcome",
                 } and isinstance(item, str):
                     value = ENUM_LABELS.get(item, item)
                 yield depth, f"{LABELS.get(key, key)}: {value}"
@@ -383,6 +409,7 @@ def sections(payload):
         ("نتائج الأجهزة", "endpoint_results"),
         ("أمن الأنظمة والحاويات", "runtime_events"),
         ("تنبيهات الشبكة", "network_alerts"),
+        ("تسجيل الدخول", "logon_events"),
         ("الخط الزمني المشترك للأدلة والتحقيق والإجراءات", "chronology"),
         ("الإثراء المحلي ومصادر السمعة وإصداراتها", "observables"),
         ("SLA وجمع الأدلة ومراجعة ما بعد الحادثة", "workflow"),

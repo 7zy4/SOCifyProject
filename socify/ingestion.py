@@ -546,7 +546,17 @@ def _sysmon_xml_records(content: bytes, source_name: str, content_hash: str) -> 
             "outcome": ev_out,
             "raw_payload": event_data,
         }
-        yield _record_from_mapping(record, row_number, source_name, content_hash)
+        logon_fields = {}
+        if channel == "security" and event_id in {"4624", "4625"}:
+            from .windows_logon import logon_context
+
+            context = logon_context(event_id, event_data, system.get("Computer"))
+            logon_fields = context.pop("normalized_fields")
+            record.update(context)
+        parsed = _record_from_mapping(record, row_number, source_name, content_hash)
+        if logon_fields:
+            parsed["normalized_fields"] = logon_fields
+        yield parsed
 
 
 def _evtx_records(content: bytes, source_name: str, content_hash: str) -> Iterator[dict[str, Any]]:
@@ -923,6 +933,10 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
             )
             if latest == job_id and accepted > 0:
                 activate_import(finished, actor=job["executor_id"] or job["created_by"])
+                from .windows_logon import reconcile_logons
+
+                for event_id, alerts in reconcile_logons(get_db(), finished):
+                    _attach_import_result(finished, event_id, alerts)
             custody(
                 job["case_id"],
                 "import_completed",

@@ -57,6 +57,8 @@ FIELDS = {
     "kubernetes_node",
     "destination_port",
     "protocol",
+    "auth_target",
+    "event_time_known",
 }
 OPERATORS = {
     "equals",
@@ -370,16 +372,19 @@ def evaluate_dsl(connection: sqlite3.Connection, dsl: dict[str, Any], event: dic
     if sequence:
         ordered_ids: list[int] = []
         position = 0
-        for candidate in candidates:
-            if _group_key(candidate, group_fields) != target_group:
+        for candidate, _ in matching:
+            if candidate["id"] == event["id"]:
+                break
+            if position == len(sequence) - 1:
                 continue
             matched, _ = _condition_matches(sequence[position], candidate)
             if matched:
                 ordered_ids.append(int(candidate["id"]))
                 position += 1
-                if position == len(sequence):
-                    break
-        matched = position == len(sequence)
+        matched = position == len(sequence) - 1
+        if matched:
+            ordered_ids.append(int(event["id"]))
+            position += 1
         return Evaluation(
             matched,
             tuple(ordered_ids) if matched else (),
@@ -421,11 +426,11 @@ def _alert_reason(rule_name: str, evaluation: Evaluation) -> str:
     if policy == "event_time_window":
         return f"{rule_name}: {evaluation.trace.get('count')} matching events reached threshold {evaluation.trace.get('threshold')} for {evaluation.group_key}"
     if policy == "ordered_sequence":
-        return f"{rule_name}: ordered sequence completed for {evaluation.group_key}"
+        return f"{rule_name}: {evaluation.trace.get('matched_steps')} ordered events within {evaluation.trace.get('window_seconds')} seconds"
     return f"{rule_name}: event matched the published rule"
 
 
-def evaluate_rules(connection: sqlite3.Connection, event_id: int) -> list[int]:
+def evaluate_rules(connection: sqlite3.Connection, event_id: int, only_rule_id: int | None = None) -> list[int]:
     row = connection.execute("SELECT * FROM security_events WHERE id = ?", (event_id,)).fetchone()
     if not row or row["source"] == "rules_engine" or not row["autopsy_active"]:
         return []
@@ -444,6 +449,8 @@ def evaluate_rules(connection: sqlite3.Connection, event_id: int) -> list[int]:
             ).fetchall()
     alert_ids: list[int] = []
     for rule in rules:
+        if only_rule_id is not None and rule["id"] != only_rule_id:
+            continue
         started = time.perf_counter()
         try:
             dsl = legacy_dsl(rule)

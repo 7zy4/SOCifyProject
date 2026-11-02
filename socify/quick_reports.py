@@ -554,6 +554,7 @@ def print_quick_report(case_id: int):
         ("نتائج الأجهزة", "endpoint_results"),
         ("أمن الأنظمة والحاويات", "runtime_events"),
         ("تنبيهات الشبكة", "network_alerts"),
+        ("تسجيل الدخول", "logon_events"),
     ):
         if telemetry[key]:
             inspection_html += f'<h2 class="section-title">{title}</h2>'

@@ -11,6 +11,29 @@ from .db import inserted_id
 from .timeutils import iso_now
 
 BUILTIN_RULES: tuple[dict[str, Any], ...] = (
+    {
+        "name": "[SOCify] Successful Windows Logon After Repeated Failures",
+        "description": "Five failed remote logons followed by success within 10 minutes for the same source, account domain, target host and logon type. Requires review of whether the access was authorized.",
+        "severity": "high",
+        "confidence": 0.85,
+        "dsl": {
+            "condition": {
+                "logic": "and",
+                "conditions": [
+                    {"field": "source_type", "operator": "equals", "value": "windows"},
+                    {"field": "category", "operator": "equals", "value": "authentication"},
+                    {"field": "auth_target", "operator": "exists", "value": True},
+                    {"field": "event_time_known", "operator": "boolean", "value": True},
+                ],
+            },
+            "sequence": [
+                *({"field": "outcome", "operator": "equals", "value": "failed"} for _ in range(5)),
+                {"field": "outcome", "operator": "equals", "value": "success"},
+            ],
+            "window": {"seconds": 600, "threshold": 6, "group_by": ["source_ip", "auth_target"], "mode": "count", "allowed_lateness_seconds": 86400},
+            "mitre_ids": ["T1110"],
+        },
+    },
     *(
         {
             "name": f"[SOCify] Snort {severity.title()} Alert",
