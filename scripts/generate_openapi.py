@@ -67,6 +67,23 @@ def generate() -> dict[str, object]:
                     {"name": "page_size", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 200, "default": 100}},
                 ]
                 operation["responses"]["422"] = {"description": "Search or filter exceeds its length limit"}
+            elif path == "/api/team/assignments" and method == "GET":
+                operation["summary"] = "Authorized assigned work, filtered before pagination"
+                operation["parameters"] = [
+                    {"name": "q", "in": "query", "schema": {"type": "string", "maxLength": 200}},
+                    {"name": "status", "in": "query", "schema": {"type": "string", "enum": ["", "pending", "in_progress", "completed", "reviewed"]}},
+                    {"name": "scope", "in": "query", "schema": {"type": "string", "enum": ["me", "team"], "default": "me"}},
+                    {"name": "page", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 1000000, "default": 1}},
+                ]
+                operation["description"] = (
+                    "25 items per page. Team scope is manager-only; other roles retain their own assignments. Case selection, membership and batch access are applied to both results and total. can_update reflects the current role and case status."
+                )
+                operation["responses"]["422"] = {"description": "Invalid filter or page"}
+            elif path == "/api/team/assignments/{assignment_id}" and method == "PATCH":
+                operation["description"] = (
+                    "Updates both the assignment and its case task. Optional expected_status rejects stale changes with 409; repeating the current status makes no new history or completion timestamp."
+                )
+                operation["responses"]["409"] = {"description": "Task changed or case closed"}
             elif path == "/api/soc/performance":
                 operation["summary"] = "Team and personal operational performance"
                 operation["description"] = (

@@ -146,7 +146,15 @@ def case_summary(case_id: int):
         )
         .fetchall()
     ]
-    result["tasks"] = [dict(row) for row in get_db().execute("SELECT * FROM case_tasks WHERE case_id = ? ORDER BY id DESC LIMIT 100", (case_id,)).fetchall()]
+    result["tasks"] = [
+        dict(row)
+        for row in get_db()
+        .execute(
+            "SELECT t.*, a.id AS assignment_id, socify_user_name(u.name,u.name_ar,u.name_en) AS assignee_name FROM case_tasks t LEFT JOIN team_log_assignments a ON a.task_id=t.id LEFT JOIN users u ON u.id=t.assignee WHERE t.case_id=? ORDER BY t.id DESC LIMIT 100",
+            (case_id,),
+        )
+        .fetchall()
+    ]
     result["history"] = [
         dict(row)
         for row in get_db()
@@ -179,6 +187,10 @@ def case_summary(case_id: int):
     ]
     result["can_manage"] = manager()
     result["can_update"] = has_permission(current_user(), "cases.update")
+    for task in result["tasks"]:
+        task["can_update"] = bool(
+            result["can_update"] and result["status"] != "closed" and (not task["assignment_id"] or task["assignee"] == actor_id() or manager())
+        )
     result["can_approve"] = has_permission(current_user(), "reports.approve")
     return jsonify(result)
 

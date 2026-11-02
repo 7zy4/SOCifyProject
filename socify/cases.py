@@ -1072,9 +1072,13 @@ def update_task(case_id: int, task_id: int):
     status = data.get("status") if isinstance(data, dict) else None
     if not task or not isinstance(status, str) or status not in {"pending", "in_progress", "completed", "reviewed"}:
         return error_response("INVALID_TASK_UPDATE", "المهمة أو حالتها غير صالحة", 422)
-    assignment = get_db().execute("SELECT assignee FROM team_log_assignments WHERE task_id = ?", (task_id,)).fetchone()
-    if assignment and assignment["assignee"] != actor_id() and (current_user() or {}).get("role") not in {"admin", "soc_manager"}:
-        return error_response("PERMISSION_DENIED", "المهمة مخصصة لعضو آخر", 403)
+    assignment = get_db().execute("SELECT id, assignee FROM team_log_assignments WHERE task_id = ?", (task_id,)).fetchone()
+    if assignment:
+        if assignment["assignee"] != actor_id() and (current_user() or {}).get("role") not in {"admin", "soc_manager"}:
+            return error_response("PERMISSION_DENIED", "المهمة مخصصة لعضو آخر", 403)
+        from .teams import update_assignment_status
+
+        return update_assignment_status(assignment["id"], status, data.get("expected_status") if isinstance(data, dict) else None)
     completed_at = iso_now() if status in {"completed", "reviewed"} else None
     completed_by = actor_id() if completed_at else None
     get_db().execute("UPDATE case_tasks SET status = ?, completed_by = ?, completed_at = ? WHERE id = ?", (status, completed_by, completed_at, task_id))

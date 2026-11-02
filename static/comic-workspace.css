@@ -231,6 +231,19 @@ dialog::backdrop { background:rgb(10 13 15 / .78); }
  .autopsy-shell .topbar .appearance-tools { gap:6px; }
  .autopsy-shell .topbar .brand-wordmark { font-size:25px; }
 }
+.assignment-cell-label { display:none; }
+@media (max-width:760px) {
+ .autopsy-shell .assignment-table { overflow:visible; border:0; }
+ .autopsy-shell .assignment-table table { display:block; min-width:0; width:100%; }
+ .assignment-table thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+ .assignment-table tbody { display:block; }
+ .assignment-table tbody tr { display:grid; grid-template-columns:minmax(0,1fr); border:2px solid var(--line); margin-bottom:16px; background:var(--panel); }
+ .assignment-table tbody td { display:block; min-width:0; padding:14px; text-align:start; white-space:normal; overflow-wrap:anywhere; border:0; border-bottom:1px solid var(--line-soft); }
+ .assignment-table .assignment-cell-label { display:block; margin-bottom:8px; font-weight:800; color:var(--text); }
+ .assignment-table tbody td:last-child { border-bottom:0; }
+ .assignment-table .action-row { align-items:stretch; }
+ .assignment-table .action-row .button { flex:1 1 140px; }
+}
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; } .button:hover,.button:active { transform:none; } }
 @media print { .sidebar,.topbar { display:none!important; } .panel,.card,.metric,.case-overview { box-shadow:none; } }
 /* Drawn edge details remain outside the text area. */

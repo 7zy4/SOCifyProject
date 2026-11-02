@@ -12,6 +12,77 @@ const teamPermissionLabels = {
   "reports.approve": "اعتماد التقارير", "rules.read": "عرض قواعد الكشف", "sources.read": "عرض مصادر السجلات"
 };
 
+async function autopsyAssignmentQueue(mine = false) {
+  const params = new URLSearchParams(window.location.search);
+  const body = node("div", { class: "panel-body assignment-queue" });
+  const query = node("input", { type: "search", name: "task_q", maxlength: 200, value: params.get("task_q") || "" });
+  const labels = { "": "كل الحالات", pending: "لم تبدأ", in_progress: "جارٍ", completed: "مكتمل", reviewed: "تمت المراجعة" };
+  const status = node("select", { name: "task_status" }, Object.entries(labels).map(([value, label]) => node("option", { value, selected: value === (params.get("task_status") || ""), text: SOCifyLocale.text(label) })));
+  const notice = node("p", { role: "alert", class: "notice", hidden: true });
+  const results = node("div", { class: "assignment-results", "aria-live": "polite" });
+  let currentPage = Number(params.get("task_page")) || 1;
+  let requestId = 0;
+  const load = async (page = currentPage) => {
+    const request = ++requestId;
+    results.setAttribute("aria-busy", "true");
+    const filters = { q: query.value.trim(), status: status.value };
+    const options = new URLSearchParams({ scope: mine ? "me" : "team", ...filters, page: String(page) });
+    try {
+      const data = await api(`/api/team/assignments?${options}`);
+      if (request !== requestId) return;
+      if (data.total > 0 && !data.items.length && data.page > 1) return load(Math.ceil(data.total / data.page_size));
+      currentPage = data.page;
+      const url = new URL(window.location.href);
+      for (const [key, value] of Object.entries({ task_q: filters.q, task_status: filters.status, task_page: currentPage > 1 ? String(currentPage) : "" })) value ? url.searchParams.set(key, value) : url.searchParams.delete(key);
+      window.history.replaceState(null, "", url);
+      const update = async (row, target, actions) => {
+        notice.hidden = true;
+        actions.querySelectorAll("button").forEach(control => { control.disabled = true; });
+        try { await api(`/api/team/assignments/${row.id}`, { method: "PATCH", body: { status: target, expected_status: row.task_status } }); await load(); }
+        catch (error) { notice.textContent = error.message; notice.hidden = false; }
+        finally { actions.querySelectorAll("button").forEach(control => { control.disabled = false; }); }
+      };
+      const columns = [
+        { label: SOCifyLocale.text("القضية"), value: row => node("div", {}, [linkedButton(row.reference, `/cases/${row.case_id}`), node("p", { text: row.case_title, "data-user-content": "true" })]) },
+        { label: SOCifyLocale.text("الملف"), value: "filename" },
+        { label: SOCifyLocale.text("التعليمات"), value: "instructions" },
+        ...(!mine ? [{ label: SOCifyLocale.text("المسؤول"), value: "assignee_name" }] : []),
+        { label: SOCifyLocale.text("الحالة"), value: row => SOCifyLocale.text(labels[row.task_status] || row.task_status) },
+        { label: SOCifyLocale.text("الإجراء"), value: row => {
+          const actions = node("div", { class: "action-row" }, linkedButton(SOCifyLocale.text("فتح الدفعة"), `/cases/${row.case_id}?tab=logs&job_id=${row.job_id}`));
+          if (row.can_update) {
+            if (row.task_status === "pending") actions.append(button(SOCifyLocale.text("بدء التحليل"), () => update(row, "in_progress", actions)));
+            if (["pending", "in_progress"].includes(row.task_status)) actions.append(button(SOCifyLocale.text("إكمال المهمة"), () => update(row, "completed", actions)));
+            else actions.append(button(SOCifyLocale.text("إعادة فتح المهمة"), () => update(row, "in_progress", actions)));
+          }
+          return actions;
+        } },
+      ];
+      const previous = button(SOCifyLocale.text("السابق"), () => load(currentPage - 1));
+      previous.disabled = currentPage <= 1;
+      const next = button(SOCifyLocale.text("التالي"), () => load(currentPage + 1));
+      next.disabled = currentPage * data.page_size >= data.total;
+      let content = emptyState(SOCifyLocale.text("لا مهام مطابقة"), null);
+      if (data.items.length) {
+        content = table(columns, data.items);
+        content.classList.add("assignment-table");
+        content.querySelector("table").setAttribute("role", "table");
+        content.querySelectorAll("thead,tbody").forEach(group => group.setAttribute("role", "rowgroup"));
+        content.querySelectorAll("tr").forEach(row => row.setAttribute("role", "row"));
+        content.querySelectorAll("th").forEach(cell => cell.setAttribute("role", "columnheader"));
+        content.querySelectorAll("tbody tr").forEach(row => [...row.cells].forEach((cell, index) => { cell.setAttribute("role", "cell"); cell.prepend(node("span", { class: "assignment-cell-label", "aria-hidden": "true", text: columns[index].label })); }));
+      }
+      results.replaceChildren(content, node("div", { class: "action-row" }, [previous, node("span", { text: SOCifyLocale.template`الصفحة ${currentPage} من ${Math.max(1, Math.ceil(data.total / data.page_size))}` }), next]));
+    } catch (error) { if (request === requestId) { notice.textContent = error.message; notice.hidden = false; } }
+    finally { if (request === requestId) results.setAttribute("aria-busy", "false"); }
+  };
+  const form = node("form", { class: "filter-row" }, [field(SOCifyLocale.text("بحث المهام"), query), field(SOCifyLocale.text("الحالة"), status), node("button", { type: "submit", class: "button", text: SOCifyLocale.text("بحث") }), button(SOCifyLocale.text("تحديث القائمة"), () => { notice.hidden = true; return load(); })]);
+  form.addEventListener("submit", event => { event.preventDefault(); notice.hidden = true; load(1); });
+  body.append(form, notice, results);
+  await load();
+  return panel(SOCifyLocale.text(mine ? "مهامي داخل القضايا" : "دفعات الفريق"), body, true);
+}
+
 window.SOCifyAutopsy.team = async () => {
   begin("team");
   const data = await api("/api/team");
@@ -44,9 +115,14 @@ window.SOCifyAutopsy.team = async () => {
     const selected = autopsyChoice("case_id", cases.map((item) => ({ value: item.id, label: `${item.reference} · ${item.title}` })), "", true);
     const batchHolder = node("div");
     let batchChoice = null;
+    let selectionRequest = 0;
+    selected.input.addEventListener("input", () => { ++selectionRequest; batchChoice = null; batchHolder.replaceChildren(); });
     selected.input.addEventListener("change", async () => {
-      try { const caseId = selected.input.autopsyValue(); const imports = await api(`/api/cases/${caseId}/imports`); batchChoice = autopsyChoice("job_id", imports.items.filter((job) => ["completed", "completed_with_errors"].includes(job.status)).map((job) => ({ value: job.id, label: SOCifyLocale.template`${job.original_filename || job.filename} · ${job.accepted} سجل` })), "", true); batchHolder.replaceChildren(field(SOCifyLocale.text("دفعة من القضية المحددة"), batchChoice.control)); }
-      catch (error) { batchChoice = null; batchHolder.replaceChildren(node("p", { text: error.message })); }
+      const request = ++selectionRequest;
+      batchChoice = null;
+      batchHolder.replaceChildren();
+      try { const caseId = selected.input.autopsyValue(); const imports = await api(`/api/cases/${caseId}/imports`); if (request !== selectionRequest) return; batchChoice = autopsyChoice("job_id", imports.items.filter((job) => ["completed", "completed_with_errors"].includes(job.status)).map((job) => ({ value: job.id, label: SOCifyLocale.template`${job.original_filename || job.filename} · ${job.accepted} سجل` })), "", true); batchHolder.replaceChildren(field(SOCifyLocale.text("دفعة من القضية المحددة"), batchChoice.control)); }
+      catch (error) { if (request === selectionRequest) { batchChoice = null; batchHolder.replaceChildren(node("p", { text: error.message })); } }
     });
     const form = autopsyForm({ assignee: { required: true, user: true }, instructions: { required: true, max: 2000 } }, async (body) => {
       if (!batchChoice) throw new Error(SOCifyLocale.text("اختر قضية ثم دفعة مكتملة منها"));
@@ -56,6 +132,6 @@ window.SOCifyAutopsy.team = async () => {
     form.prepend(field(SOCifyLocale.text("القضية"), selected.control), batchHolder);
     root.append(panel(SOCifyLocale.text("إسناد دفعة سجلات"), node("div", { class: "panel-body" }, form), true));
   }
-  root.append(panel(SOCifyLocale.text("دفعات الفريق"), table([{ label: SOCifyLocale.text("القضية"), value: (row) => linkedButton(row.case_title, `/cases/${row.case_id}`) }, { label: SOCifyLocale.text("المسؤول"), value: "assignee_name" }, { label: SOCifyLocale.text("التعليمات"), value: "instructions" }, { label: SOCifyLocale.text("الحالة"), value: "task_status" }], data.assignments), true));
+  if (permission("cases.read")) root.append(await autopsyAssignmentQueue());
   finish(root);
 };

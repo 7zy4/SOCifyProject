@@ -8,7 +8,7 @@ from flask import Blueprint, jsonify, request
 from .audit import record_audit
 from .db import get_db, inserted_id, transaction
 from .operational import case_scope, case_visible, operational_mode
-from .security import actor_id, current_user, error_response, has_permission, login_required, workspace_id
+from .security import actor_id, current_user, error_response, has_permission, login_required, require_permission, workspace_id
 from .timeutils import iso_now, utc_now
 
 teams_api = Blueprint("teams", __name__)
@@ -73,6 +73,60 @@ def team_detail():
 
         assignments = [assignment for assignment in assignments if job_visible(assignment["job_id"])]
     return jsonify({"members": members, "roles": roles, "assignments": assignments, "can_manage": manager()})
+
+
+@teams_api.get("/api/team/assignments")
+@require_permission("cases.read")
+def list_assignments():
+    query = request.args.get("q", "").strip()
+    status = request.args.get("status", "")
+    scope = request.args.get("scope", "me")
+    page_text = request.args.get("page", "1")
+    if len(query) > 200 or status not in {"", "pending", "in_progress", "completed", "reviewed"} or scope not in {"me", "team"}:
+        return error_response("INVALID_TASK_FILTER", "حدد مرشحات المهام الصحيحة", 422)
+    if len(page_text) > 7 or not page_text.isascii() or not page_text.isdecimal() or not 1 <= int(page_text) <= 1000000:
+        return error_response("INVALID_TASK_FILTER", "حدد صفحة صحيحة", 422)
+    page, page_size = int(page_text), 25
+    where = "a.workspace_id = ? AND c.archived_at IS NULL"
+    args: list[object] = [workspace_id()]
+    if scope == "me" or not manager():
+        where += " AND a.assignee = ?"
+        args.append(actor_id())
+    if operational_mode():
+        from .autopsy_workspace import selection_scope_sql
+
+        membership, parameters = case_scope(current_user() or {})
+        selection, selected = selection_scope_sql()
+        where += membership + selection + " AND c.training_run_id IS NULL"
+        args.extend([*parameters, *selected])
+        if not manager():
+            where += " AND (NOT EXISTS (SELECT 1 FROM autopsy_batch_access b WHERE b.job_id=j.id AND b.restricted=1) OR j.created_by=? OR EXISTS (SELECT 1 FROM autopsy_batch_members m WHERE m.job_id=j.id AND m.user_id=?))"
+            args.extend([actor_id(), actor_id()])
+    if status:
+        where += " AND t.status = ?"
+        args.append(status)
+    if query:
+        value = "%" + query.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        where += " AND (" + " OR ".join(f"LOWER({field}) LIKE ? ESCAPE '\\'" for field in ("a.instructions", "c.title", "c.reference", "j.filename")) + ")"
+        args.extend([value] * 4)
+    source = "FROM team_log_assignments a JOIN case_tasks t ON t.id=a.task_id JOIN users u ON u.id=a.assignee JOIN incident_cases c ON c.id=a.case_id JOIN ingestion_jobs j ON j.id=a.job_id"
+    total = get_db().execute(f"SELECT COUNT(*) {source} WHERE {where}", args).fetchone()[0]
+    rows = (
+        get_db()
+        .execute(
+            f"SELECT a.*, t.status AS task_status, c.status AS case_status, c.reference, c.title AS case_title, j.filename, socify_user_name(u.name,u.name_ar,u.name_en) AS assignee_name {source} WHERE {where} ORDER BY a.id DESC LIMIT ? OFFSET ?",
+            [*args, page_size, (page - 1) * page_size],
+        )
+        .fetchall()
+    )
+    items = []
+    for row in rows:
+        item = dict(row)
+        item["can_update"] = bool(
+            has_permission(current_user(), "cases.update") and row["case_status"] != "closed" and (manager() or row["assignee"] == actor_id())
+        )
+        items.append(item)
+    return jsonify({"items": items, "total": total, "page": page, "page_size": page_size})
 
 
 @teams_api.post("/api/team/invitations")
@@ -240,19 +294,23 @@ def assign_logs():
 @teams_api.patch("/api/team/assignments/<int:assignment_id>")
 @login_required
 def update_assignment(assignment_id):
-    from .cases import _history
-
     if not has_permission(current_user(), "cases.update"):
         return error_response("PERMISSION_DENIED", "الدور لا يسمح بتحديث مهام التحقيق", 403)
     data = request.get_json(silent=True)
     status = data.get("status") if isinstance(data, dict) else None
     if not isinstance(status, str) or status not in {"in_progress", "completed"}:
         return error_response("INVALID_ASSIGNMENT_STATE", "حالة المهمة غير صالحة", 422)
+    return update_assignment_status(assignment_id, status, data.get("expected_status") if isinstance(data, dict) else None)
+
+
+def update_assignment_status(assignment_id, status, expected_status=None):
+    from .cases import _history
+
     with transaction():
         row = (
             get_db()
             .execute(
-                "SELECT a.*, c.status AS case_status FROM team_log_assignments a JOIN incident_cases c ON c.id = a.case_id WHERE a.id = ? AND a.workspace_id = ?",
+                "SELECT a.*, c.status AS case_status, t.status AS task_status FROM team_log_assignments a JOIN incident_cases c ON c.id = a.case_id JOIN case_tasks t ON t.id=a.task_id WHERE a.id = ? AND a.workspace_id = ?",
                 (assignment_id, workspace_id()),
             )
             .fetchone()
@@ -268,16 +326,23 @@ def update_assignment(assignment_id):
                 return error_response("ASSIGNMENT_NOT_FOUND", "دفعة المهمة غير متاحة", 404)
         if row["case_status"] == "closed":
             return error_response("CASE_CLOSED", "المهمة مقفلة مع القضية", 409)
+        if status == row["task_status"]:
+            return jsonify({"id": row["task_id"], "status": status, "updated": False})
+        if expected_status is not None and expected_status != row["task_status"]:
+            return error_response("TASK_CHANGED", "تغيرت المهمة. حدّث القائمة قبل المتابعة", 409)
+        completed = status in {"completed", "reviewed"}
+        completed_at = iso_now() if completed else None
         get_db().execute(
             "UPDATE case_tasks SET status = ?, completed_by = ?, completed_at = ? WHERE id = ?",
-            (status, actor_id() if status == "completed" else None, iso_now() if status == "completed" else None, row["task_id"]),
+            (status, actor_id() if completed else None, completed_at, row["task_id"]),
         )
         get_db().execute(
-            "UPDATE team_log_assignments SET state = ?, completed_at = ? WHERE id = ?", (status, iso_now() if status == "completed" else None, assignment_id)
+            "UPDATE team_log_assignments SET state = ?, completed_at = ? WHERE id = ?",
+            ("completed" if completed else "assigned" if status == "pending" else status, completed_at, assignment_id),
         )
         _history(get_db(), row["case_id"], "assigned_logs_updated", None, {"assignment_id": assignment_id, "status": status})
         record_audit(get_db(), "update", "team_logs", assignment_id, details={"status": status})
-    return jsonify({"updated": True})
+    return jsonify({"id": row["task_id"], "status": status, "updated": True})
 
 
 @teams_api.post("/api/team/members/<int:user_id>/deactivate")
