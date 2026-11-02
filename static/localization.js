@@ -13,6 +13,8 @@
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
   document.cookie = `socify-language=${language}; Path=/; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
   const english = {
+  "العضو لا يستطيع فتح الدفعة. أضفه من إدارة الدفعة ثم أعد الإسناد": "This member cannot open the batch. Add them in Manage batch, then assign it again.",
+  "العضو لا يملك صلاحية تنفيذ مهام التحقيق": "This member does not have permission to perform investigation tasks.",
   "العنصر": "Item",
   "السجل الزمني للأدلة": "Evidence timeline",
   "قرارات الإغلاق السابقة": "Previous closure decisions",

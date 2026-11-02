@@ -232,7 +232,11 @@ def assign_logs():
     ):
         return error_response("INVALID_ASSIGNMENT", "حدد الاستيراد والقضية والعضو والتعليمات", 422)
     case, job = _case_row(data["case_id"]), _job_access(data["job_id"])
-    member = get_db().execute("SELECT role FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (data["assignee"], workspace_id())).fetchone()
+    member = (
+        get_db()
+        .execute("SELECT id, role, workspace_id FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (data["assignee"], workspace_id()))
+        .fetchone()
+    )
     if (
         not case
         or not job
@@ -247,7 +251,10 @@ def assign_logs():
     if job["status"] not in {"completed", "completed_with_errors"} or case["status"] == "closed":
         return error_response("ASSIGNMENT_NOT_READY", "يلزم استيراد مكتمل وقضية مفتوحة", 409)
     policy = get_db().execute("SELECT permissions FROM team_role_permissions WHERE workspace_id = ? AND role = ?", (workspace_id(), member["role"])).fetchone()
-    if policy and "cases.update" not in json.loads(policy[0]):
+    principal = dict(member)
+    if policy:
+        principal["role_permissions"] = json.loads(policy[0])
+    if not all(has_permission(principal, permission) for permission in ("cases.read", "cases.update", "events.read")):
         return error_response("ASSIGNEE_PERMISSION_REQUIRED", "العضو لا يملك صلاحية تنفيذ مهام التحقيق", 422)
     missing = (
         get_db()
@@ -262,6 +269,11 @@ def assign_logs():
     with transaction():
         if get_db().execute("SELECT status FROM incident_cases WHERE id = ?", (case["id"],)).fetchone()[0] == "closed":
             return error_response("ASSIGNMENT_NOT_READY", "القضية مغلقة", 409)
+        if operational_mode():
+            from .autopsy_pipeline import job_visible
+
+            if not job_visible(job["id"], principal):
+                return error_response("ASSIGNEE_BATCH_ACCESS_REQUIRED", "العضو لا يستطيع فتح الدفعة. أضفه من إدارة الدفعة ثم أعد الإسناد", 422)
         duplicate = (
             get_db()
             .execute(

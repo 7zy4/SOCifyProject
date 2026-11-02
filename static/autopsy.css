@@ -78,6 +78,7 @@
 .choice-control .search-choice { padding-inline-end: 3.2rem; }
 .choice-toggle { position: absolute; inset-inline-end: .5rem; inset-block-start: .45rem; width: 2.5rem; height: 2.7rem; border: 0; border-radius: 10px; background: var(--panel-2); color: var(--blue); cursor: pointer; }
 .choice-menu { position: absolute; inset-inline: 0; inset-block-start: 100%; z-index: 5; max-height: 17rem; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-block-start: .4rem; padding: .35rem; }
+.panel:has(.choice-menu:not([hidden])) { overflow: visible; z-index: 10; }
 .choice-menu [role="option"] { display: block; width: 100%; border: 0; border-radius: 8px; padding: .65rem .8rem; color: var(--text); background: var(--panel); text-align: start; cursor: pointer; overflow-wrap: anywhere; }
 .choice-menu [role="option"]:hover, .choice-menu [aria-selected="true"] { background: var(--panel-2); color: var(--blue); }
 .answer-control { display: grid; gap: .6rem; }

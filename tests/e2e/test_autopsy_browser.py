@@ -177,7 +177,7 @@ def test_local_sample_manual_reputation_and_team_assignment_browser(app):
             page.locator("textarea[name=instructions]").fill("Record shared team findings")
             page.locator("form").filter(has=page.locator("textarea[name=instructions]")).get_by_role("button", name="حفظ", exact=True).click()
             page.get_by_role("cell", name="Record shared team findings", exact=True).wait_for()
-            page.get_by_role("link", name="Browser forensic evidence", exact=True).click()
+            page.locator(".assignment-queue").get_by_role("link", name=case["reference"], exact=True).click()
             page.get_by_role("link", name="التحقيق والخط الزمني", exact=True).click()
             page.get_by_role("heading", name="Browser assignment log", exact=True).wait_for()
             assert page.get_by_text("وقت الحدث غير معروف؛ لا يُستبدل بوقت الاستيراد", exact=False).count() == 1

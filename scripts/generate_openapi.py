@@ -67,6 +67,11 @@ def generate() -> dict[str, object]:
                     {"name": "page_size", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 200, "default": 100}},
                 ]
                 operation["responses"]["422"] = {"description": "Search or filter exceeds its length limit"}
+            elif path == "/api/team/assignments" and method == "POST":
+                operation["description"] = (
+                    "Assigns a completed batch in an open case to an active operational investigator. The recipient must have cases.read, cases.update and events.read, and access to the batch. Restricted access is never granted implicitly. Rejection creates no assignment or task."
+                )
+                operation["responses"]["422"] = {"description": "Invalid scope, recipient permissions or batch access"}
             elif path == "/api/team/assignments" and method == "GET":
                 operation["summary"] = "Authorized assigned work, filtered before pagination"
                 operation["parameters"] = [

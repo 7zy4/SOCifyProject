@@ -124,7 +124,9 @@ window.SOCifyAutopsy.team = async () => {
       try { const caseId = selected.input.autopsyValue(); const imports = await api(`/api/cases/${caseId}/imports`); if (request !== selectionRequest) return; batchChoice = autopsyChoice("job_id", imports.items.filter((job) => ["completed", "completed_with_errors"].includes(job.status)).map((job) => ({ value: job.id, label: SOCifyLocale.template`${job.original_filename || job.filename} · ${job.accepted} سجل` })), "", true); batchHolder.replaceChildren(field(SOCifyLocale.text("دفعة من القضية المحددة"), batchChoice.control)); }
       catch (error) { if (request === selectionRequest) { batchChoice = null; batchHolder.replaceChildren(node("p", { text: error.message })); } }
     });
-    const form = autopsyForm({ assignee: { required: true, user: true }, instructions: { required: true, max: 2000 } }, async (body) => {
+    const assignmentRoles = data.roles.filter(role => ["analyst", "l1_analyst", "l2_responder", "investigator", "soc_manager"].includes(role.role) && ["cases.read", "cases.update", "events.read"].every(permission => role.permissions.includes(permission))).map(role => role.role);
+    const assignees = data.members.filter(member => member.is_active && assignmentRoles.includes(member.role)).map(member => ({ value: member.id, label: `${member.name} · ${autopsyLabel(member.role)}` }));
+    const form = autopsyForm({ assignee: { required: true, choices: assignees }, instructions: { required: true, max: 2000 } }, async (body) => {
       if (!batchChoice) throw new Error(SOCifyLocale.text("اختر قضية ثم دفعة مكتملة منها"));
       await api("/api/team/assignments", { method: "POST", body: { ...body, case_id: selected.input.autopsyValue(), job_id: batchChoice.input.autopsyValue() } });
       await window.SOCifyAutopsy.team();

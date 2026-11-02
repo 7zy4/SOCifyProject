@@ -7575,6 +7575,9 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "description": "Invalid scope, recipient permissions or batch access"
           }
         },
         "requestBody": {
@@ -7587,7 +7590,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Assigns a completed batch in an open case to an active operational investigator. The recipient must have cases.read, cases.update and events.read, and access to the batch. Restricted access is never granted implicitly. Rejection creates no assignment or task."
       }
     },
     "/api/team/assignments/{assignment_id}": {

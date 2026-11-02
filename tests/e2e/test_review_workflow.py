@@ -2,6 +2,7 @@
 
 import json
 import re
+import sys
 import threading
 import time
 from contextlib import contextmanager
@@ -243,10 +244,14 @@ def test_removed_assessment_note_stays_removed_after_escalation(app, language):
 
 @pytest.mark.e2e
 @pytest.mark.parametrize("language", ["ar", "en"])
-def test_complete_review_closes_alert_and_reopening_preserves_report(app, language):
+@pytest.mark.parametrize(
+    "required_procedure", [False, pytest.param(True, marks=pytest.mark.skipif(sys.platform == "win32", reason="Requires the isolated native report service"))]
+)
+def test_complete_review_closes_alert_and_reopening_preserves_report(app, language, required_procedure):
     app.config.update(LEGACY_TRAINING_TESTS=False)
     download_pdf = "تنزيل PDF" if language == "ar" else "Download PDF"
-    with local_worker_services(app.config), review_session(app, language, "complete-case-closure") as (analyst, manager, result):
+    scenario = "closure-native-required-procedure" if required_procedure else "complete-case-closure"
+    with local_worker_services(app.config), review_session(app, language, scenario) as (analyst, manager, result):
         analyst.click("link", "السجلات والأدلة")
         content = [
             {
@@ -281,6 +286,30 @@ def test_complete_review_closes_alert_and_reopening_preserves_report(app, langua
                 "details": "Containment is not applicable to the verified maintenance operation.",
             },
         )
+        if required_procedure:
+            from tests.e2e.test_procedure_boundary_journeys import attach, publish, requirements
+            from tests.e2e.test_procedure_goal_journeys import procedure, set_status
+
+            manager.login("manager@socify.local")
+            manager.case_url = analyst.case_url
+            publish(manager, required=True, approval=True)
+            attach(manager)
+            analyst.click("link", "الاستجابة والتصعيد")
+            analyst.click("button", "تحديث الخطوة")
+            dialog = analyst.page.get_by_role("dialog")
+            set_status(analyst, dialog, "completed", "Retained maintenance evidence confirms the approved activity")
+            dialog.locator("input[name=evidence_id]").press("ArrowDown")
+            dialog.get_by_role("option").filter(has_text="maintenance.json").first.click()
+            analyst.click("button", "حفظ", dialog)
+            assert procedure(analyst)["payload"]["steps"][0]["status"] == "awaiting_approval"
+            requirements(manager, True)
+            manager.click("link", "الاستجابة والتصعيد")
+            manager.click("button", "تحديث الخطوة")
+            dialog = manager.page.get_by_role("dialog")
+            set_status(manager, dialog, "completed", "Independent reviewer confirmed the retained approval")
+            manager.click("button", "حفظ", dialog)
+            assert procedure(manager)["payload"]["steps"][0]["approved_by"] == manager.page.evaluate("state.user.id")
+            requirements(manager, False)
         analyst.transition("awaiting_review")
         analyst.page.get_by_role("button", name=analyst.text("إكمال المهمة"), exact=True).first.wait_for()
         while analyst.page.get_by_role("button", name=analyst.text("إكمال المهمة"), exact=True).count():
@@ -290,7 +319,12 @@ def test_complete_review_closes_alert_and_reopening_preserves_report(app, langua
         analyst.click("link", "التقارير والمراجعة")
         analyst.click("button", "إعداد تقرير جديد")
         analyst.page.get_by_role("link", name=download_pdf, exact=True).wait_for(timeout=60000)
-        open_manager_review(manager)
+        if required_procedure:
+            manager.page.goto(analyst.case_url)
+            manager.settle()
+            manager.click("link", "التقارير والمراجعة")
+        else:
+            open_manager_review(manager)
         manager.click("button", "مراجعة واعتماد النسخة")
         manager.click("button", "حفظ", manager.page.get_by_role("dialog"))
         expect(manager.page.locator(".report-status")).to_have_text(manager.text("معتمد") + " · " + manager.text("جاهز للتنزيل"))
@@ -316,7 +350,8 @@ def test_complete_review_closes_alert_and_reopening_preserves_report(app, langua
         manager.page.locator("[data-alert-toggle]").click()
         manager.settle()
         expect(manager.page.locator(".dossier-view")).to_contain_text("APP-SRV01")
-        manager.page.screenshot(path=str(ARTIFACTS / f"closed-alert-{language}.png"), full_page=True)
+        capture = f"{scenario}-closed-alert-{language}" if required_procedure else f"closed-alert-{language}"
+        manager.page.screenshot(path=str(ARTIFACTS / f"{capture}.png"), full_page=True)
         manager.nav("إدارة القضايا")
         manager.page.get_by_label(manager.text("بحث"), exact=True).fill(closed["reference"])
         manager.click("button", "بحث")

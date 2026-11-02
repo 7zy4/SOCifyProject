@@ -16,6 +16,59 @@ def assigned(autopsy_case, client, login_as, user_ids):
     return row
 
 
+@pytest.mark.parametrize("permission", ["cases.read", "cases.update", "events.read"])
+def test_assignment_requires_recipient_read_and_execution_permissions(autopsy_case, client, database, login_as, user_ids, permission):
+    login_as("soc_manager")
+    job = client.post(f"/api/cases/{autopsy_case}/imports", json={"filename": "review.json", "content": '[{"title":"Review policy"}]'}).json["id"]
+    policy = next(role["permissions"] for role in client.get("/api/team").json["roles"] if role["role"] == "analyst")
+    assert client.put("/api/team/roles/analyst", json={"permissions": [value for value in policy if value != permission]}).status_code == 200
+    version = client.get(f"/api/cases/{autopsy_case}").json["version"]
+    tasks = database.execute("SELECT COUNT(*) FROM case_tasks WHERE case_id=?", (autopsy_case,)).fetchone()[0]
+    payload = {"case_id": autopsy_case, "job_id": job, "assignee": user_ids["analyst"], "instructions": "Review identity context"}
+    rejected = client.post("/api/team/assignments", json=payload)
+    assert rejected.status_code == 422 and rejected.json["error"]["code"] == "ASSIGNEE_PERMISSION_REQUIRED"
+    assert client.get(f"/api/cases/{autopsy_case}").json["version"] == version
+    assert database.execute("SELECT COUNT(*) FROM case_tasks WHERE case_id=?", (autopsy_case,)).fetchone()[0] == tasks
+    assert client.put("/api/team/roles/analyst", json={"permissions": policy}).status_code == 200
+    assert client.post("/api/team/assignments", json=payload).status_code == 201
+
+
+def test_restricted_assignment_requires_explicit_access_without_silent_grants(autopsy_case, client, database, login_as, user_ids):
+    login_as("soc_manager")
+    base = f"/api/cases/{autopsy_case}"
+    job = client.post(base + "/imports", json={"filename": "private.json", "content": '[{"title":"Sensitive review"}]'}).json["id"]
+    access = f"{base}/imports/{job}/access"
+    assert client.put(access, json={"restricted": True, "members": [], "reason": "Restrict review"}).status_code == 200
+    payload = {"case_id": autopsy_case, "job_id": job, "assignee": user_ids["analyst"], "instructions": "Review private identity batch"}
+    before = client.get(base).json["version"]
+    rejected = client.post("/api/team/assignments", json=payload)
+    assert rejected.status_code == 422 and rejected.json["error"]["code"] == "ASSIGNEE_BATCH_ACCESS_REQUIRED"
+    assert client.get(base).json["version"] == before
+    assert database.execute("SELECT COUNT(*) FROM autopsy_batch_members WHERE job_id=?", (job,)).fetchone()[0] == 0
+    assert database.execute("SELECT COUNT(*) FROM team_log_assignments WHERE job_id=?", (job,)).fetchone()[0] == 0
+    assert client.put(access, json={"restricted": True, "members": [user_ids["analyst"]], "reason": "Approve specific recipient"}).status_code == 200
+    created = client.post("/api/team/assignments", json=payload)
+    assert created.status_code == 201
+    assert client.put(access, json={"restricted": True, "members": [], "reason": "Withdraw access before repeat"}).status_code == 200
+    assert client.post("/api/team/assignments", json=payload).status_code == 422
+    assert database.execute("SELECT COUNT(*) FROM team_log_assignments WHERE job_id=?", (job,)).fetchone()[0] == 1
+    login_as("analyst")
+    assert client.get("/api/team/assignments").json["items"] == []
+
+
+def test_restricted_batch_creator_can_receive_own_work(autopsy_case, client, login_as, user_ids):
+    base = f"/api/cases/{autopsy_case}"
+    job = client.post(base + "/imports", json={"filename": "own.json", "content": '[{"title":"Own evidence review"}]'}).json["id"]
+    login_as("soc_manager")
+    assert client.put(f"{base}/imports/{job}/access", json={"restricted": True, "members": [], "reason": "Preserve creator access"}).status_code == 200
+    response = client.post(
+        "/api/team/assignments", json={"case_id": autopsy_case, "job_id": job, "assignee": user_ids["analyst"], "instructions": "Review own evidence"}
+    )
+    assert response.status_code == 201
+    login_as("analyst")
+    assert client.get("/api/team/assignments").json["total"] == 1
+
+
 def test_queue_search_pages_and_personal_scope_do_not_silently_stop_at_100(assigned, client, login_as, user_ids):
     for index in range(102):
         job = client.post(
