@@ -202,7 +202,7 @@ def email_reviews(case_id: int):
     rows = (
         get_db()
         .execute(
-            "SELECT id,payload,created_at FROM autopsy_records WHERE case_id=? AND kind='analysis' AND json_extract(payload,'$.method') IN ('eml_static_v1', 'v6_email_static_triage') AND id<? ORDER BY id DESC LIMIT 11",
+            "SELECT id,payload,created_at FROM autopsy_records WHERE case_id=? AND kind='analysis' AND (json_extract(payload,'$.method') IN ('eml_static_v1', 'email_static_triage') OR json_extract(payload,'$.method') GLOB 'v[0-9]*_email_static_triage') AND id<? ORDER BY id DESC LIMIT 11",
             (case_id, before),
         )
         .fetchall()
@@ -222,8 +222,8 @@ def _email_domain(addr: str) -> str:
 def inspect_email_with_attachment_triage(content: bytes) -> dict:
     from .autopsy_static_analysis import inspect_static_bytes
 
-    max_v6_eml = 5 * 1024 * 1024
-    if not content or len(content) > max_v6_eml:
+    max_eml_bytes = 5 * 1024 * 1024
+    if not content or len(content) > max_eml_bytes:
         raise ValueError("حجم رسالة EML يجب ألا يتجاوز 5MiB")
     try:
         message = BytesParser(policy=policy.default).parsebytes(content)
@@ -403,10 +403,10 @@ def quick_email_triage(case_id: int):
             return error_response("CASE_NOT_FOUND", "القضية غير متاحة ضمن النطاق الحالي", 404)
         if case["status"] == "closed":
             return error_response("CASE_CLOSED", "القضية مغلقة", 409)
-        sample_id, evidence_id, digest, duplicate_sample = quarantine_or_get_sample(case_id, original_name, content, "v6_email_static_triage")
+        sample_id, evidence_id, digest, duplicate_sample = quarantine_or_get_sample(case_id, original_name, content, "email_static_triage")
         payload = {
             "title": parsed["headers"]["Subject"][:255] or original_name,
-            "method": "v6_email_static_triage",
+            "method": "email_static_triage",
             "sample_id": sample_id,
             "evidence_id": evidence_id,
             "sha256": digest,

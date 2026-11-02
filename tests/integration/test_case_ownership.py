@@ -29,7 +29,7 @@ def test_analyst_creates_case_with_tactical_defaults_and_works_immediately(app, 
     case_id = body["id"]
     assert body["assignee"] == user_ids["analyst"]
     assert body["approval"]["state"] == "approved"
-    assert body["approval"]["source"] == "v6_direct"
+    assert body["approval"]["source"] == "direct_investigation"
     assert body["context"]["reason"]
     assert body["context"]["objective"]
 

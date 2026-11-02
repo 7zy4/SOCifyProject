@@ -1,5 +1,6 @@
 import html
 import json
+import re
 import sqlite3
 from typing import Any
 
@@ -231,7 +232,7 @@ def _collect_case_auto_summary(case_row: sqlite3.Row) -> dict[str, Any]:
     for a_row in analysis_rows:
         p = json.loads(a_row["payload"])
         method = p.get("method") or p.get("engine") or "static_analysis"
-        if method == "v6_email_static_triage":
+        if isinstance(method, str) and re.sub(r"^v\d+_", "", method) == "email_static_triage":
             static_items.append(
                 {
                     "id": a_row["id"],

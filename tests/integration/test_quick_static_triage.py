@@ -90,7 +90,7 @@ def test_ooxml_vba_macro_pdf_active_content_and_html_smuggling_triage(app, clien
     assert any(flag["code"] == "html_smuggling_indicator" for flag in html_triage["flags"])
 
 
-def test_one_click_email_and_attachment_static_triage(app, client, login_as):
+def test_one_click_email_and_attachment_static_triage(app, client, login_as, database):
     app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
     login_as("analyst")
     case_id = client.post("/api/cases", json={"title": "Phishing EML 1-click triage"}).json["id"]
@@ -117,7 +117,7 @@ def test_one_click_email_and_attachment_static_triage(app, client, login_as):
     )
     assert resp.status_code == 201, resp.json
     payload = resp.json["payload"]
-    assert payload["method"] == "v6_email_static_triage"
+    assert payload["method"] == "email_static_triage"
     assert payload["email_verdict"] == "high_risk"
     assert payload["sender_email"] == "cfo@corp.example"
     assert payload["reply_to_email"] == "collector@evil-drop.example"
@@ -135,4 +135,15 @@ def test_one_click_email_and_attachment_static_triage(app, client, login_as):
     # Listed in email-reviews endpoint seamlessly
     reviews = client.get(f"/api/cases/{case_id}/email-reviews")
     assert reviews.status_code == 200
-    assert any(item["payload"]["method"] == "v6_email_static_triage" for item in reviews.json["items"])
+    assert any(item["payload"]["method"] == "email_static_triage" for item in reviews.json["items"])
+
+    # Archived method labels remain readable without rewriting stored evidence.
+    legacy_method = "v0_email_static_triage"
+    database.execute(
+        "UPDATE autopsy_records SET payload=json_set(payload, '$.method', ?) WHERE case_id=? AND kind='analysis'",
+        (legacy_method, case_id),
+    )
+    archived = client.get(f"/api/cases/{case_id}/email-reviews").json["items"]
+    assert any(item["payload"]["method"] == legacy_method for item in archived)
+    summary = client.get(f"/api/cases/{case_id}/quick-report").json["auto_summary"]
+    assert any(item["kind"] == "email" and item["sha256"] == payload["sha256"] for item in summary["static_triage_items"])

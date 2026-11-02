@@ -351,10 +351,10 @@ def quick_file_triage(case_id: int):
             return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
         if case["status"] == "closed":
             return error_response("CASE_CLOSED", "القضية مغلقة", 409)
-        sample_id, evidence_id, digest, duplicate_sample = quarantine_or_get_sample(case_id, original_name, content, "v6_quick_file_triage")
+        sample_id, evidence_id, digest, duplicate_sample = quarantine_or_get_sample(case_id, original_name, content, "quick_file_triage")
         payload = {
             "title": f"Quick Static Triage · {original_name[:180]}",
-            "method": "v6_quick_static_triage",
+            "method": "quick_static_triage",
             "sample_id": sample_id,
             "evidence_id": evidence_id,
             **triage,
@@ -408,7 +408,7 @@ def quick_triage_existing_sample(case_id: int, sample_id: int):
     with transaction():
         payload = {
             "title": f"Quick Static Triage · {original_name[:180]}",
-            "method": "v6_quick_static_triage",
+            "method": "quick_static_triage",
             "sample_id": sample_id,
             "evidence_id": row["evidence_id"],
             **triage,

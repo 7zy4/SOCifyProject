@@ -83,7 +83,7 @@ def test_soc_triage_case_tools_email_and_immediate_report_permissions(app, datab
             page.wait_for_url(f"**/cases/{case['id']}?tab=reports")
             expect(page.locator(".report-revision")).to_have_count(1)
             report = database.execute("SELECT payload FROM autopsy_reports WHERE case_id=?", (case["id"],)).fetchone()[0]
-            assert "v6_email_static_triage" in report
+            assert "email_static_triage" in report
             assert database.execute("SELECT COUNT(*) FROM autopsy_reports WHERE case_id=?", (case["id"],)).fetchone()[0] == 1
             page.locator('[data-theme-option="light"]').click()
             page.goto(base + "/monitoring")

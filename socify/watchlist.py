@@ -243,7 +243,7 @@ def evaluate_watchlist_for_event(connection: sqlite3.Connection, event_id: int) 
         reason = f"[Watchlist Match] {entry['indicator_type'].upper()} {entry['value']}{note_suffix} matched event #{event_id}"
         alert_pub_id = public_id("ALT")
         trace = {
-            "policy": "v6_watchlist_match",
+            "policy": "watchlist_match",
             "watchlist_id": entry["id"],
             "indicator_type": entry["indicator_type"],
             "indicator_value": entry["value"],
