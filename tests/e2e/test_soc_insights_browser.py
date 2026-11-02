@@ -75,6 +75,10 @@ def test_uploaded_case_dashboard_dossier_and_explicit_report_answers(app, langua
             page.evaluate("window.scrollTo(0,0)")
             page.screenshot(path=str(output / f"hosts-{language}-{theme}-{width}.png"), full_page=True)
             assert not errors, errors
+            page.locator(".account-menu summary").click()
+            page.locator("[data-account-switch]").click()
+            page.wait_for_url("**/login")
+            assert not errors, errors
             browser.close()
     finally:
         server.shutdown()

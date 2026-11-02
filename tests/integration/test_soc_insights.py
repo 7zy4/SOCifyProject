@@ -1,4 +1,5 @@
 import json
+import secrets
 from datetime import timedelta
 
 import pytest
@@ -165,6 +166,7 @@ def test_evidenced_performance_durations_do_not_use_import_times(autopsy_case, c
 
 
 def test_normal_startup_never_populates_operational_evidence(tmp_path):
+    from scripts.bootstrap_team import create_manager
     from socify import create_app
     from socify.db import get_db
 
@@ -172,11 +174,20 @@ def test_normal_startup_never_populates_operational_evidence(tmp_path):
         "DATABASE": str(tmp_path / "blank.db"),
         "TESTING": True,
         "LEGACY_TRAINING_TESTS": False,
-        "SECRET_KEY": "test-only-startup",
-        "CREDENTIAL_KEY": "test-only-startup",
+        "SECRET_KEY": secrets.token_urlsafe(32),
+        "CREDENTIAL_KEY": secrets.token_urlsafe(32),
+        "WTF_CSRF_ENABLED": False,
     }
     for _ in range(2):
         app = create_app(config)
         with app.app_context():
             for table in ("incident_cases", "security_events", "alerts", "autopsy_reports", "case_quick_reports"):
                 assert get_db().execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0
+    password = secrets.token_urlsafe(24) + "Aa9!"
+    create_manager(app, "owner@response.example.test", "Response owner", "Response team", password)
+    client = app.test_client()
+    assert client.post("/api/auth/login", json={"email": "owner@response.example.test", "password": password}).status_code == 200
+    case = client.post("/api/cases", json={"title": "User uploaded endpoint investigation"}).json
+    assert client.get(f"/api/cases/{case['id']}/logs").json["total"] == 0
+    assert upload(client, case["id"])
+    assert client.get("/api/soc/performance?member=team").json["counts"]["open"] == 1

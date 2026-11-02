@@ -5,7 +5,7 @@ window.SOCifyAutopsy.analysis = async (caseId) => {
   const indicators = (await api(`/api/cases/${caseId}/records?kind=indicator&limit=100`)).items;
   const root = node("div");
   const packs = await api("/api/autopsy/yara");
-  const packChoice = autopsyChoice("yara_pack_id", [{ value: "", label: SOCifyLocale.text("EICAR") }, ...packs.items.map((pack) => ({ value: pack.id, label: `${pack.name} · v${pack.version} · ${pack.license}` }))]);
+  const packChoice = autopsyChoice("yara_pack_id", [{ value: "", label: "EICAR" }, ...packs.items.map((pack) => ({ value: pack.id, label: `${pack.name} · v${pack.version} · ${pack.license}` }))]);
   const body = node("div", { class: "panel-body" });
   body.append(field(SOCifyLocale.text("حزمة YARA لهذا الفحص · يحفظ الإصدار والبصمة"), packChoice.control), linkedButton(SOCifyLocale.text("إدارة حزم YARA المحلية"), "/analysis-library"));
   if (permission("evidence.add") && autopsy.current.status !== "closed") {
