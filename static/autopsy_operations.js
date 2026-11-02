@@ -117,7 +117,7 @@ window.SOCifyAutopsy.capsules = async (caseId) => {
 };
 
 function autopsyWorkflowState(value) {
-  return SOCifyLocale.text({ not_configured: "لم تُحدد المهلة", running: "المهلة جارية", paused: "المهلة معلقة", breached: "تجاوز المهلة", closed: "مغلقة", pending_approval: "بانتظار الاعتماد", approved: "معتمد", rejected: "مرفوض", documented: "وُثق الجمع", draft: "مسودة", reviewed: "تمت المراجعة" }[value] || value);
+  return SOCifyLocale.text({ not_configured: "لم تُحدد المهلة", running: "المهلة جارية", paused: "المهلة معلقة", breached: "تجاوز المهلة", closed: "مغلقة", pending_approval: "بانتظار الاعتماد", approved: "معتمد", rejected: "مرفوض", documented: "وُثق الجمع", documented_with_gaps: "وُثق الجمع جزئيًا", draft: "مسودة", reviewed: "تمت المراجعة" }[value] || value);
 }
 
 function autopsySLASummary(sla) {
@@ -157,10 +157,12 @@ window.SOCifyAutopsy.workflow = async (caseId) => {
     const body = item.payload;
     const card = node("article", { class: "card" }, [node("h4", { text: SOCifyLocale.text(body.recipe_snapshot.title) }), node("p", { text: `${autopsyWorkflowState(body.state)} · ${body.reason}` }), node("details", {}, [node("summary", { text: SOCifyLocale.text("نطاق الجمع") }), node("p", { text: SOCifyLocale.text(body.recipe_snapshot.guidance) })])]);
     if (current.can_manage && body.state === "pending_approval") for (const action of ["approve", "reject"]) card.append(autopsyAction(action === "approve" ? SOCifyLocale.text("اعتماد نطاق الجمع") : SOCifyLocale.text("رفض نطاق الجمع"), async () => { let dialog; dialog = autopsyModal(SOCifyLocale.text("توثيق قرار نطاق الجمع"), autopsyForm({ reason: { required: true, max: 1000 } }, async (values) => { await api(base + `/collections/${item.id}/${action}`, { method: "POST", body: { ...values, version: item.version, case_version: current.version } }); dialog.close(); await autopsyCase(caseId); })); }));
-    if (current.can_update && body.state === "approved" && (current.can_manage || body.collector_id === state.user.id)) card.append(autopsyAction(SOCifyLocale.text("توثيق الجمع المنفذ محليًا"), async () => {
+    if (body.artifacts?.length) card.append(table([{ label: SOCifyLocale.text("المصادر المجمعة فعليًا"), value: "value" }], body.artifacts.map((value) => ({ value }))));
+    if (body.missing_artifacts?.length) card.append(table([{ label: SOCifyLocale.text("المصادر التي لم تُجمع"), value: "value" }], body.missing_artifacts.map((value) => ({ value }))));
+    if (current.can_update && current.status !== "closed" && ["approved", "documented_with_gaps"].includes(body.state) && (current.can_manage || body.collector_id === state.user.id)) card.append(autopsyAction(SOCifyLocale.text(body.state === "documented_with_gaps" ? "استكمال توثيق الجمع" : "توثيق الجمع المنفذ محليًا"), async () => {
       let dialog;
-      const artifacts = node("select", { multiple: true, required: true, "aria-label": SOCifyLocale.text("المصادر المجمعة فعليًا") }, body.recipe_snapshot.artifacts.map((value) => node("option", { value, text: value })));
-      const form = autopsyForm({ evidence_id: { required: true, evidence: true }, tool: { required: true, max: 255 }, source: { required: true, max: 500 }, collected_at: { required: true, timestamp: true } }, async (values) => { await api(base + `/collections/${item.id}/document`, { method: "POST", body: { ...values, artifacts: [...artifacts.selectedOptions].map((option) => option.value), version: item.version, case_version: current.version } }); dialog.close(); await autopsyCase(caseId); });
+      const artifacts = node("select", { multiple: true, required: true, "aria-label": SOCifyLocale.text("المصادر المجمعة فعليًا") }, body.recipe_snapshot.artifacts.map((value) => node("option", { value, text: value, selected: body.artifacts?.includes(value) })));
+      const form = autopsyForm({ evidence_id: { required: true, evidence: true }, tool: { required: true, max: 255 }, source: { required: true, max: 500 }, collected_at: { required: true, timestamp: true } }, async (values) => { await api(base + `/collections/${item.id}/document`, { method: "POST", body: { ...values, artifacts: [...artifacts.selectedOptions].map((option) => option.value), version: item.version, case_version: current.version } }); dialog.close(); await autopsyCase(caseId); }, body);
       form.prepend(field(SOCifyLocale.text("المصادر التي جُمعت فعليًا · يمكن اختيار عدة عناصر"), artifacts));
       dialog = autopsyModal(SOCifyLocale.text("توثيق جمع أدلة مخول؛ لا تنفيذ أوامر على الأجهزة"), form);
     }));

@@ -1,3 +1,4 @@
+import json
 import secrets
 from datetime import UTC, datetime
 
@@ -129,6 +130,24 @@ def test_collection_authorization_evidence_and_postmortem_independent_review(aut
     assert documented.status_code == 200, documented.json
     assert documented.json["payload"]["state"] == "documented_with_gaps"
     assert "sysmon_evtx" in documented.json["payload"]["missing_artifacts"]
+    partial = documented.json
+    completed = client.post(
+        path + "/document",
+        json={
+            "version": partial["version"],
+            "case_version": version(client, base),
+            "evidence_id": evidence,
+            "tool": "Approved collection follow-up",
+            "collected_at": "2026-10-24T10:30:00Z",
+            "source": "Completed retained export",
+            "artifacts": partial["payload"]["recipe_snapshot"]["artifacts"],
+        },
+    )
+    assert completed.status_code == 200, completed.json
+    assert completed.json["payload"]["state"] == "documented"
+    assert completed.json["payload"]["missing_artifacts"] == []
+    history = database.execute("SELECT payload FROM autopsy_record_revisions WHERE record_id=? AND version=?", (partial["id"], partial["version"])).fetchone()
+    assert json.loads(history["payload"])["state"] == "documented_with_gaps"
     assert client.post(base + "/postmortems", json={"version": version(client, base)}).status_code == 409
     database.execute("UPDATE incident_cases SET status='awaiting_review' WHERE id=?", (autopsy_case,))
     client.post(base + "/records/war_room", json={"title": "Private", "body": "Private postmortem exclusion fixture", "visibility": "private"})

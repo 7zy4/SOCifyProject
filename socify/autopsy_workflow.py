@@ -545,7 +545,7 @@ def update_collection(case_id: int, record_id: int, action: str):
                     approved_at=iso_now(),
                 )
             else:
-                if payload["state"] != "approved":
+                if payload["state"] not in {"approved", "documented_with_gaps"}:
                     return error_response("COLLECTION_STATE_CONFLICT", "يلزم اعتماد النطاق قبل توثيق الجمع", 409)
                 if payload["collector_id"] != actor_id() and not manager():
                     return error_response("PERMISSION_DENIED", "توثيق الجمع للجامع المحدد أو المدير", 403)
