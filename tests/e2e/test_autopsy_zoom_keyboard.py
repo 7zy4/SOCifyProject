@@ -33,6 +33,7 @@ def test_200_percent_zoom_keyboard_modal_and_searchable_choices(app, tmp_path, z
                     executable_path=shutil.which("chromium"),
                     headless=not bool(os.environ.get("DISPLAY")),
                     no_viewport=True,
+                    locale="ar-SA",
                     args=["--window-size=1440,1000"],
                 )
                 page = browser.pages[0]

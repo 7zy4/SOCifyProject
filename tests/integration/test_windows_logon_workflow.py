@@ -120,3 +120,43 @@ def test_timestamp_upper_boundary_does_not_abort_import(autopsy_case, client, da
     rows = [*(logon_xml(i, minute=54 + i) for i in range(5)), logon_xml(5, 4624, minute=59)]
     upload_logons(client, autopsy_case, [row.replace("2026-11-02T02:", "9999-12-31T23:") for row in rows])
     assert len(correlated(database, autopsy_case)) == 1
+
+
+@pytest.mark.parametrize("order", ["forward", "reverse", "mixed", "late_file"])
+@pytest.mark.parametrize("spray", [False, True])
+def test_failed_logon_windows_are_independent_of_export_order(autopsy_case, client, database, order, spray):
+    count = 4 if spray else 5
+    rows = [logon_xml(i, user=f"account-{i}" if spray else "noura") for i in range(count)]
+    if order == "reverse":
+        rows.reverse()
+    elif order == "mixed":
+        rows = [rows[-1], *rows[:-1]]
+    elif order == "late_file":
+        upload_logons(client, autopsy_case, rows[-1:])
+        rows = rows[:-1]
+    upload_logons(client, autopsy_case, rows)
+    name = "[SOCify] Password Spraying Across Accounts" if spray else "[SOCify] Brute Force Authentication Burst"
+
+    def matches(case_id):
+        return database.execute(
+            "SELECT a.evidence FROM alerts a JOIN rules r ON r.id=a.rule_id WHERE a.owner_case_id=? AND r.name=?", (case_id, name)
+        ).fetchall()
+
+    alerts = matches(autopsy_case)
+    assert len(alerts) == 1 and len(json.loads(alerts[0]["evidence"])["event_ids"]) == count
+    upload_logons(client, autopsy_case, rows)
+    assert len(matches(autopsy_case)) == 1
+    other = client.post("/api/cases", json={"title": "Separate authentication case"}).json["id"]
+    upload_logons(client, other, [logon_xml(5)])
+    assert not matches(other)
+
+
+def test_backfill_does_not_duplicate_an_already_proven_authentication_burst(autopsy_case, client, database):
+    upload_logons(client, autopsy_case, [logon_xml(i) for i in range(6)])
+    query = "SELECT COUNT(*) FROM alerts a JOIN rules r ON r.id=a.rule_id WHERE a.owner_case_id=? AND r.name='[SOCify] Brute Force Authentication Burst'"
+    before = database.execute(query, (autopsy_case,)).fetchone()[0]
+    assert before == 1
+    upload_logons(client, autopsy_case, [logon_xml(0).replace("T02:00:00Z", "T01:59:30Z")])
+    assert database.execute(query, (autopsy_case,)).fetchone()[0] == before
+    upload_logons(client, autopsy_case, [logon_xml(i, minute=20 + i) for i in reversed(range(5))])
+    assert database.execute(query, (autopsy_case,)).fetchone()[0] == before + 1
