@@ -116,7 +116,7 @@
   }
   async function chooseCase(section, selected) {
     if (window.SOCifyWorkspace?.selection.required) {
-      const root = node("section",{class:"case-switcher","aria-label":t("سياق القضية")});
+      const root = node("section",{class:"case-switcher","aria-label":t("سياق القضية"),hidden:Boolean(selected)});
       if (!selected) root.append(linkedButton(t("اختيار نطاق التحقيق"),"/cases"));
       return root;
     }
