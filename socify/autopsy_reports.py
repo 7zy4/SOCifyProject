@@ -28,6 +28,7 @@ STATES = {
     "false_positive": {"awaiting_review", "reopened"},
     "awaiting_review": {"investigating", "closed"},
     "closed": {"reopened"},
+    "resolved": {"investigating", "awaiting_review"},
     "reopened": {"investigating", "contained", "awaiting_review"},
     "cancelled": {"reopened"},
 }
@@ -417,6 +418,39 @@ def closure_gaps(case_id: int, version: int):
     return gaps
 
 
+def closure_readiness(case):
+    destinations = {
+        "أدلة محفوظة": "logs",
+        "تحليل سبب جذري أو توثيق عدم إمكان تحديده": "investigation",
+        "تصعيد لم تتم الاستجابة له": "response",
+        "نتيجة التحقق من الاستجابة أو سبب عدم انطباقها": "response",
+        "خطوات كتيب استجابة إلزامية": "response",
+        "مهام إلزامية": "summary",
+        "أعمال معالجة لم تنته": "logs",
+        "تقرير كامل معتمد مطابق لإصدار القضية الحالي": "reports",
+    }
+    missing = [] if case["status"] == "closed" else closure_gaps(case["id"], case["version"])
+    if case["status"] not in {"awaiting_review", "closed"}:
+        missing.insert(0, "نقل القضية إلى انتظار المراجعة")
+    return {
+        "closed": case["status"] == "closed",
+        "ready": case["status"] == "awaiting_review" and not missing,
+        "can_close": has_permission(current_user(), "cases.close"),
+        "missing": [{"label": label, "tab": destinations.get(label, "summary")} for label in missing],
+    }
+
+
+def record_case_transition(case_id, case, target, reason):
+    """Persist a validated transition inside the caller's write transaction."""
+    now = iso_now()
+    get_db().execute(
+        "UPDATE incident_cases SET status = ?, closed_at = ?, updated_at = ?, version = version + 1 WHERE id = ?",
+        (target, now if target == "closed" else None, now, case_id),
+    )
+    _history(get_db(), case_id, "status_changed", case["status"], target, reason)
+    custody(case_id, "case_transition", {"from": case["status"], "to": target, "reason": reason, "source_version": case["version"]})
+
+
 def transition_operational(case_id, row, target, reason, data):
     if not isinstance(data, dict) or set(data) - {"status", "reason", "version"} or type(data.get("version")) is not int:
         return error_response("INVALID_TRANSITION", "حدد الحالة والسبب وإصدار القضية فقط", 422)
@@ -436,13 +470,7 @@ def transition_operational(case_id, row, target, reason, data):
             gaps = closure_gaps(case_id, fresh["version"])
             if gaps:
                 return error_response("CASE_CLOSURE_INCOMPLETE", "أكمل متطلبات الإغلاق", 409, {"missing": gaps})
-        now = iso_now()
-        get_db().execute(
-            "UPDATE incident_cases SET status = ?, closed_at = ?, updated_at = ?, version = version + 1 WHERE id = ?",
-            (target, now if target == "closed" else None, now, case_id),
-        )
-        _history(get_db(), case_id, "status_changed", fresh["status"], target, reason)
-        custody(case_id, "case_transition", {"from": fresh["status"], "to": target, "reason": reason, "source_version": fresh["version"]})
+        record_case_transition(case_id, fresh, target, reason)
     return case_summary(case_id)
 
 

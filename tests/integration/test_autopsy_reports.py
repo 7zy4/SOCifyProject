@@ -22,7 +22,8 @@ def transition(client, case_id, status, path="/api/cases"):
     return client.post(f"{path}/{case_id}/transitions", json={"status": status, "version": version, "reason": "Documented investigation decision"})
 
 
-def test_local_report_formats_snapshot_review_and_closure(autopsy_case, app, client, login_as, database, user_ids):
+@pytest.mark.parametrize("quick_close", [False, True], ids=["case-transition", "manager-review"])
+def test_local_report_formats_snapshot_review_and_closure(autopsy_case, app, client, login_as, database, user_ids, quick_close):
     case_id = autopsy_case
     base = f"/api/cases/{case_id}"
     for visibility, body in (("private", "PRIVATE_NOTE_NOT_FOR_REPORT"), ("team", "SHARED_DECISION_FOR_REPORT")):
@@ -45,6 +46,11 @@ def test_local_report_formats_snapshot_review_and_closure(autopsy_case, app, cli
         == 201
     )
     assert transition(client, case_id, "investigating").status_code == 200
+    if quick_close:
+        from socify.quick_reports import QUICK_REPORT_QUESTIONS
+
+        answers = {question["id"]: question["options"][0]["value"] for question in QUICK_REPORT_QUESTIONS}
+        assert client.put(base + "/quick-report", json={"answers": answers}).status_code == 200
     for task in client.get(base).json["tasks"]:
         assert client.patch(f"/api/incidents/{case_id}/tasks/{task['id']}", json={"status": "completed"}).status_code == 200
     assert transition(client, case_id, "awaiting_review").status_code == 200
@@ -88,8 +94,15 @@ def test_local_report_formats_snapshot_review_and_closure(autopsy_case, app, cli
     missing = transition(client, case_id, "closed")
     assert missing.status_code == 409 and "تقرير كامل معتمد" in str(missing.json)
     assert client.post(path + "/approve", json={"version": snapshot["source_version"]}).status_code == 200
-    assert transition(client, case_id, "closed").status_code == 200
+    if quick_close:
+        reviewed_version = client.get(base).json["version"]
+        assert client.post(base + "/quick-report/acknowledge", json={"decision": "closed", "case_version": reviewed_version}).status_code == 200
+        assert client.get(base).json["version"] == reviewed_version + 1
+        assert client.get(base + "/quick-report").json["report"]["manager_decision"] == "closed"
+    else:
+        assert transition(client, case_id, "closed").status_code == 200
     assert client.get(base).json["status"] == "closed"
+    assert client.get(base).json["closed_at"]
     assert client.post(base + "/records/asset", json={"name": "Late edit", "type": "workstation", "role": "defender"}).status_code == 409
     login_as("analyst")
     postmortem = client.post(base + "/postmortems", json={"version": client.get(base).json["version"]})

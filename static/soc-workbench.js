@@ -244,10 +244,10 @@
     body.append(table([
       { label: t("القضية"), value: item => node("a", { class: "case-link", href: `/cases/${item.case_id}?tab=reports`, text: `${item.case_reference} · ${item.case_title}` }) },
       { label: t("المحقق"), value: "investigator_name" },
-      { label: t("التصنيف"), value: "incident_classification_label" },
-      { label: t("حكم الفرز"), value: "triage_verdict_label" },
-      { label: t("الاستعجال"), value: "urgency_level_label" },
-      { label: t("الحالة"), value: item => item.manager_decision ? `${item.status} (${item.manager_decision})` : item.status },
+      { label: t("التصنيف"), value: item => autopsyQuickChoiceLabel(item.incident_classification_label) },
+      { label: t("حكم الفرز"), value: item => autopsyQuickChoiceLabel(item.triage_verdict_label) },
+      { label: t("الاستعجال"), value: item => autopsyQuickChoiceLabel(item.urgency_level_label) },
+      { label: t("الحالة"), value: item => autopsyQuickReportLabel(item.manager_decision || item.status) },
       {
         label: t("الطباعة والاعتماد"),
         value: item => {
@@ -256,12 +256,7 @@
           printBtn.rel = "noopener";
           const controls = [printBtn];
           if (inbox.can_acknowledge && item.status === "escalated") {
-            controls.push(button(t("اعتماد المدير"), async () => {
-              try {
-                await api(`/api/cases/${item.case_id}/quick-report/acknowledge`, { method: "POST", body: { decision: "approved", comment: "Approved from Manager Inbox" } });
-                await start("reports");
-              } catch (error) { handleError(error); }
-            }, "primary"));
+            controls.push(linkedButton(t("مراجعة التقرير"), `/cases/${item.case_id}?tab=reports`));
           }
           return node("div", { class: "action-row" }, controls);
         },

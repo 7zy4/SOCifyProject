@@ -44,10 +44,10 @@ def test_report_validation_and_manager_decision(case_base, client, login_as, dat
     assert client.post(path + "/acknowledge", json=[]).status_code == 400
     assert client.post(path + "/acknowledge", json={"decision": "invalid"}).status_code == 422
     assert client.post(path + "/acknowledge", json={"decision": "closed", "comment": "x" * 501}).status_code == 422
-    accepted = client.post(path + "/acknowledge", json={"decision": "closed", "comment": "Reviewed retained evidence"})
+    accepted = client.post(path + "/acknowledge", json={"decision": "approved", "comment": "Reviewed retained evidence"})
     assert accepted.status_code == 200
-    assert accepted.json["report"]["manager_decision"] == "closed"
-    assert client.get(case_base).json["status"] == "resolved"
+    assert accepted.json["report"]["manager_decision"] == "approved"
+    assert client.get(case_base).json["status"] == "escalated"
     printed = client.get(case_base.replace("/api", "") + "/quick-report/print").get_data(as_text=True)
     assert "Reviewed retained evidence" in printed
     revised = client.put(path, json={"answers": TEST_ANSWERS}).json["report"]

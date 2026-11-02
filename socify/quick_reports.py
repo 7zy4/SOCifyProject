@@ -285,6 +285,8 @@ def _collect_case_auto_summary(case_row: sqlite3.Row) -> dict[str, Any]:
 @quick_reports_api.get("/api/cases/<int:case_id>/quick-report")
 @require_permission("cases.read")
 def get_quick_report(case_id: int):
+    from .autopsy_reports import closure_readiness
+
     case = _case_row(case_id)
     if not case:
         return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
@@ -296,7 +298,9 @@ def get_quick_report(case_id: int):
             "default_answers": DEFAULT_ANSWERS,
             "report": _report_view(row),
             "auto_summary": _collect_case_auto_summary(case),
-            "can_acknowledge_as_manager": _is_manager_user(),
+            "can_acknowledge_as_manager": _is_manager_user() and has_permission(current_user(), "cases.update") and case["status"] != "closed",
+            "closure": closure_readiness(case),
+            "case_version": case["version"],
             "print_url": f"/cases/{case_id}/quick-report/print",
         }
     )
@@ -324,6 +328,13 @@ def save_quick_report(case_id: int):
     now = iso_now()
     user_id = actor_id()
     with transaction():
+        case = _case_row(case_id)
+        if not case:
+            return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+        if case["status"] == "closed":
+            return error_response("CASE_CLOSED", "القضية مغلقة", 409)
+        if "case_version" in body and (type(body["case_version"]) is not int or body["case_version"] != case["version"]):
+            return error_response("CASE_VERSION_CONFLICT", "تغيرت القضية؛ حدّث قبل الحفظ", 409)
         prior = get_db().execute("SELECT status FROM case_quick_reports WHERE case_id = ?", (case_id,)).fetchone()
         if prior:
             next_status = prior["status"] if prior["status"] == "escalated" else "draft"
@@ -361,11 +372,18 @@ def escalate_quick_report(case_id: int):
     now = iso_now()
     user_id = actor_id()
     with transaction():
+        case = _case_row(case_id)
+        if not case:
+            return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+        if case["status"] == "closed":
+            return error_response("CASE_CLOSED", "القضية مغلقة", 409)
+        if "case_version" in body and (type(body["case_version"]) is not int or body["case_version"] != case["version"]):
+            return error_response("CASE_VERSION_CONFLICT", "تغيرت القضية؛ حدّث قبل التصعيد", 409)
         existing = get_db().execute("SELECT * FROM case_quick_reports WHERE case_id = ?", (case_id,)).fetchone()
         if "answers" in body:
             try:
                 answers = _validate_answers(body.get("answers"))
-                note = str(body.get("executive_note") or (existing["executive_note"] if existing else "")).strip()
+                note = str(body.get("executive_note", existing["executive_note"] if existing else "") or "").strip()
                 if len(note) > 280:
                     raise ValueError("الملاحظة المختصرة يجب ألا تتجاوز 280 محرفًا")
             except ValueError as exc:
@@ -396,6 +414,8 @@ def escalate_quick_report(case_id: int):
 
         if case["status"] not in {"closed", "resolved", "escalated"}:
             get_db().execute("UPDATE incident_cases SET status = 'escalated', updated_at = ?, version = version + 1 WHERE id = ?", (now, case_id))
+        else:
+            touch_case(case_id)
         custody(case_id, "quick_report_escalated_to_manager", {"escalated_by": user_id, "escalated_at": now})
         record_audit(get_db(), "escalate_quick_report", "case", case_id, details={"escalated_by": user_id})
 
@@ -453,8 +473,10 @@ def list_escalated_reports():
 
 
 @quick_reports_api.post("/api/cases/<int:case_id>/quick-report/acknowledge")
-@require_permission("cases.read")
+@require_permission("cases.update")
 def acknowledge_escalated_report(case_id: int):
+    from .autopsy_reports import closure_readiness, record_case_transition
+
     if not _is_manager_user():
         return error_response("FORBIDDEN", "اعتماد التقارير المصعدة مخصص لمدير مركز العمليات (SOC Manager)", 403)
     case = _case_row(case_id)
@@ -469,24 +491,39 @@ def acknowledge_escalated_report(case_id: int):
     comment = str(body.get("comment") or "").strip()
     if len(comment) > 500:
         return error_response("INVALID_COMMENT", "تعليق المدير يجب ألا يتجاوز 500 محرف", 422)
+    if "case_version" in body and type(body["case_version"]) is not int:
+        return error_response("INVALID_CASE_VERSION", "حدد إصدار القضية الحالي", 422)
+    if decision == "closed" and type(body.get("case_version")) is not int:
+        return error_response("INVALID_CASE_VERSION", "حدد إصدار القضية الحالي", 422)
 
     now = iso_now()
     user_id = actor_id()
     with transaction():
+        case = _case_row(case_id)
+        if not case:
+            return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+        if case["status"] == "closed":
+            return error_response("CASE_CLOSED", "أعد فتح القضية قبل تعديل قرار المراجعة", 409)
+        if "case_version" in body and case["version"] != body["case_version"]:
+            return error_response("CASE_VERSION_CONFLICT", "تغيرت القضية؛ حدّث قبل الاعتماد", 409)
         existing = get_db().execute("SELECT * FROM case_quick_reports WHERE case_id = ?", (case_id,)).fetchone()
         if not existing:
             return error_response("QUICK_REPORT_MISSING", "لا يوجد تقرير سريع محفوظ لهذه القضية", 404)
+        if decision == "closed":
+            readiness = closure_readiness(case)
+            if not readiness["can_close"]:
+                return error_response("PERMISSION_DENIED", "إغلاق القضية يتطلب صلاحية الإغلاق", 403)
+            if not readiness["ready"]:
+                return error_response("CASE_CLOSURE_INCOMPLETE", "أكمل متطلبات الإغلاق", 409, {"missing": readiness["missing"]})
+            record_case_transition(case_id, case, "closed", comment or "اعتماد إغلاق القضية بعد المراجعة")
         get_db().execute(
             """UPDATE case_quick_reports
                SET status = 'acknowledged', acknowledged_by = ?, acknowledged_at = ?, manager_decision = ?, manager_comment = ?, updated_at = ?
                WHERE case_id = ?""",
             (user_id, now, decision, comment, now, case_id),
         )
-        if decision == "closed" and case["status"] != "closed":
-            get_db().execute(
-                "UPDATE incident_cases SET status = 'resolved', resolved_at = COALESCE(resolved_at, ?), updated_at = ?, version = version + 1 WHERE id = ?",
-                (now, now, case_id),
-            )
+        if decision != "closed":
+            touch_case(case_id)
         custody(case_id, "quick_report_manager_acknowledged", {"decision": decision, "manager_id": user_id})
         record_audit(get_db(), "acknowledge_quick_report", "case", case_id, details={"decision": decision})
 

@@ -91,14 +91,20 @@ function autopsyReportPreview(value, depth = 0) {
   return body;
 }
 
+function autopsyQuickChoiceLabel(value) {
+  const parts = String(value).match(/^(.*)\s+\(([^()]*)\)$/u);
+  return parts ? (SOCifyLocale.language === "ar" ? parts[1] : parts[2]) : SOCifyLocale.text(value);
+}
+
+function autopsyQuickReportLabel(value) {
+  return SOCifyLocale.text({ draft: "مسودة", escalated: "أُحيل للمراجعة", acknowledged: "تمت المراجعة", approved: "معتمد", needs_followup: "يتطلب متابعة", closed: "مغلقة" }[value] || "—");
+}
+
 async function autopsyQuickDropdownReportPanel(caseId) {
   const data = await api(`/api/cases/${caseId}/quick-report`);
   const savedAnswers = data.report?.answers || data.default_answers || {};
   const selects = Object.create(null);
-  const label = value => {
-    const parts = value.match(/^(.*)\s+\(([^()]*)\)$/u);
-    return parts ? (SOCifyLocale.language === "ar" ? parts[1] : parts[2]) : SOCifyLocale.text(value);
-  };
+  const label = autopsyQuickChoiceLabel;
   const grid = node("form", { class: "form-grid", "aria-label": SOCifyLocale.text("قرارات التحقيق") });
 
   const sum = data.auto_summary;
@@ -129,12 +135,13 @@ async function autopsyQuickDropdownReportPanel(caseId) {
   const collectPayload = () => ({
     answers: Object.fromEntries(Object.entries(selects).map(([k, el]) => [k, el.value])),
     executive_note: noteInput.value.trim(),
+    case_version: data.case_version,
   });
 
   const statusNotice = node("div", { class: "span-2", "aria-live": "polite" });
   if (data.report) {
     statusNotice.append(node("p", {
-      text: SOCifyLocale.template`حالة التقرير السريع: ${data.report.status}${data.report.manager_decision ? ` · قرار المدير: ${data.report.manager_decision}` : ""}`,
+      text: `${SOCifyLocale.text("الحالة")}: ${autopsyQuickReportLabel(data.report.status)}`,
     }));
   }
 
@@ -172,11 +179,27 @@ async function autopsyQuickDropdownReportPanel(caseId) {
   });
 
   const container = node("div", { class: "panel-body" }, [grid]);
+  if (data.report?.manager_decision) {
+    container.prepend(node("div", { class: "notice review-decision", role: "status" }, [
+      node("strong", { text: `${SOCifyLocale.text("قرار المدير")}: ${autopsyQuickReportLabel(data.report.manager_decision)}` }),
+      data.report.manager_comment ? node("p", { "data-user-content": "true", text: data.report.manager_comment }) : null,
+    ]));
+  }
+  if (data.closure && !data.closure.closed) {
+    const requirements = node("details", { class: "closure-requirements" }, [
+      node("summary", { text: SOCifyLocale.text("متطلبات الإغلاق") }),
+    ]);
+    if (data.closure.ready) requirements.append(node("p", { text: SOCifyLocale.text("القضية جاهزة للإغلاق") }));
+    else requirements.append(node("ul", {}, data.closure.missing.map(item => node("li", {}, [
+      node("a", { href: autopsyCaseURL(caseId, { tab: item.tab }), text: SOCifyLocale.text(item.label) }),
+    ]))));
+    container.append(requirements);
+  }
   if (data.can_acknowledge_as_manager && data.report) {
     const decSelect = node("select", { name: "decision" }, [
       ["approved", SOCifyLocale.text("اعتماد التقرير والإجراءات (Approved)")],
       ["needs_followup", SOCifyLocale.text("طلب استكمال تحقيق إضافي (Needs Follow-up)")],
-      ["closed", SOCifyLocale.text("اعتماد وإغلاق/حل القضية (Approve & Resolve)")],
+      ...(data.closure?.can_close ? [["closed", SOCifyLocale.text("اعتماد وإغلاق القضية")]] : []),
     ].map(([v, l]) => node("option", { value: v, selected: v === (data.report.manager_decision || "approved"), text: l })));
     const mgrComment = node("input", { name: "comment", maxlength: 500, value: data.report.manager_comment || "", placeholder: SOCifyLocale.text("توجيه أو تعليق مدير مركز العمليات…") });
     const mgrForm = node("form", { class: "filter-row" }, [
@@ -187,9 +210,15 @@ async function autopsyQuickDropdownReportPanel(caseId) {
     mgrForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       try {
-        await api(`/api/cases/${caseId}/quick-report/acknowledge`, { method: "POST", body: { decision: decSelect.value, comment: mgrComment.value.trim() } });
+        await api(`/api/cases/${caseId}/quick-report/acknowledge`, { method: "POST", body: { decision: decSelect.value, comment: mgrComment.value.trim(), case_version: data.case_version } });
         await autopsyCase(caseId);
-      } catch (error) { handleError(error); }
+      } catch (error) {
+        statusNotice.replaceChildren(node("p", { class: "notice", role: "alert", text: error.message }));
+        if (error.code === "CASE_CLOSURE_INCOMPLETE") {
+          const requirements = container.querySelector(".closure-requirements");
+          if (requirements) { requirements.open = true; requirements.scrollIntoView({ block: "center" }); }
+        }
+      }
     });
     container.append(mgrForm);
   }
@@ -205,7 +234,7 @@ window.SOCifyAutopsy.reports = async (caseId) => {
     handleError(error);
   }
   const current = autopsy.current;
-  const body = node("div", { class: "panel-body" }, [node("p", { text: SOCifyLocale.text("إصدارات ثابتة تجمع نتائج التحقيق والأدلة والإجراءات. الملاحظات الخاصة مستبعدة. لا يعني إنشاء التقرير اعتماده أو إغلاق القضية.") }), node("p", { text: SOCifyLocale.text("يتطلب الإغلاق: أدلة، تحليل سبب جذري أو سبب عدم تحديده، تحقق من الاستجابة، إكمال المهام والخطوات الإلزامية، وتقرير كامل معتمد يطابق آخر إصدار للقضية.") })]);
+  const body = node("div", { class: "panel-body" });
   const profiles = permission("evidence.download") ? [{ value: "full", label: SOCifyLocale.text("كامل للاستخدام الداخلي المصرح") }, { value: "metadata_only_v1", label: SOCifyLocale.text("منقح: بيانات إحصائية وحالة فقط") }] : [{ value: "metadata_only_v1", label: SOCifyLocale.text("منقح: بيانات إحصائية وحالة فقط") }];
   const choice = autopsyChoice("profile", profiles, profiles[0].value, true);
   const create = button(SOCifyLocale.text("إعداد تقرير جديد"), async () => {
