@@ -56,9 +56,8 @@ class ReviewJourney:
         while time.monotonic() < deadline:
             self.page.wait_for_timeout(75)
             workspace = self.page.locator("#workspace")
-            if not self.pending and time.monotonic() - self.last_request > 0.3:
-                if not workspace.count() or workspace.get_attribute("aria-busy") == "false":
-                    return
+            if not self.pending and time.monotonic() - self.last_request > 0.3 and (not workspace.count() or workspace.get_attribute("aria-busy") == "false"):
+                return
         raise AssertionError("The interface did not finish loading")
 
     def click(self, role, name, within=None):
