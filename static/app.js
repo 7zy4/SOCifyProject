@@ -822,10 +822,50 @@ async function renderScores() {
 
 async function renderAudit() {
   begin("audit");
-  const data = await api("/api/audit?page_size=200");
-  const root = node("div");
-  const columns = [{ label: SOCifyLocale.text("الوقت"), value: (row) => formatTime(row.created_at) }, { label: SOCifyLocale.text("الفاعل"), value: (row) => row.actor_name || `#${row.actor_id || "system"}` }, { label: SOCifyLocale.text("العملية"), value: "action" }, { label: SOCifyLocale.text("المورد"), value: (row) => `${row.resource_type}${row.resource_id ? ` #${row.resource_id}` : ""}` }, { label: SOCifyLocale.text("النتيجة"), value: (row) => badge(row.result) }, { label: "Correlation", value: (row) => node("span", { class: "mono", text: row.correlation_id }) }, { label: SOCifyLocale.text("التفاصيل"), value: (row) => JSON.stringify(row.details) }];
-  root.append(pageHead(SOCifyLocale.text("سجل التدقيق"), SOCifyLocale.template`${data.total} عملية ضمن مساحة العمل · البيانات الحساسة محجوبة`), panel(SOCifyLocale.text("النشاط"), data.items.length ? table(columns, data.items) : emptyState(SOCifyLocale.text("لا يوجد نشاط مسجل"), SOCifyLocale.text("ستظهر عمليات المصادقة والقواعد والمصادر والتحقيقات هنا.")), true));
+  const t = SOCifyLocale.text;
+  const url = new URL(location.href);
+  const applied = Object.fromEntries(["q", "action", "resource", "result"].map(key => [key, url.searchParams.get(key) || ""]));
+  const requestedPage = Number(url.searchParams.get("page") || 1);
+  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 && requestedPage <= 1000000 ? requestedPage : 1;
+  const params = new URLSearchParams({...applied, page, page_size:25});
+  const data = await api(`/api/audit?${params}`);
+  const labels = {login:"تسجيل الدخول",logout:"خروج",create:"إنشاء",update:"تعديل",review:"مراجعة",selection_changed:"تحديد نطاق التحقيق",case_linked:"ربط القضايا",read:"عرض",download:"تنزيل",ingest:"استقبال السجلات",ingest_retry:"إعادة إرسال السجلات",rotate_key:"تجديد مفتاح المصدر",case:"قضية",auth:"المصادقة",source:"مصدر السجلات",rule:"قاعدة كشف",investigation:"نطاق التحقيق",user:"عضو",auth_session:"جلسة دخول",case_evidence:"دليل",case_report:"تقرير",workspace:"مساحة العمل",success:"نجاح",denied:"مرفوض",failure:"فشل",error:"خطأ"};
+  Object.assign(labels, {decision:"القرار",approved:"معتمد",rejected:"مرفوض",events:"السجلات",alerts:"التنبيهات",fields:"الحقول",case_ids:"القضايا",case_id:"القضية",reason:"السبب"});
+  const label = value => t(labels[value] || value);
+  const detailValue = (value, key = "") => {
+    if (Array.isArray(value)) return value.length ? node("ul", {}, value.map(item => node("li", {}, detailValue(item,key)))) : node("span", {text:"—"});
+    if (value && typeof value === "object") return node("dl", {}, Object.entries(value).flatMap(([name, item]) => [node("dt", {text:label(name)}),node("dd", {}, detailValue(item,name))]));
+    return node("bdi", {text:["decision","result","status"].includes(key) && typeof value === "string" ? label(value) : String(value ?? "—")});
+  };
+  const navigate = async (filters, nextPage = 1) => {
+    const next = new URL(location.href);
+    for (const key of ["q", "action", "resource", "result"]) {
+      if (filters[key]) next.searchParams.set(key, filters[key]); else next.searchParams.delete(key);
+    }
+    if (nextPage > 1) next.searchParams.set("page", nextPage); else next.searchParams.delete("page");
+    history.replaceState(null, "", next.pathname + next.search + next.hash);
+    try { await renderAudit(); } catch (error) { handleError(error); }
+  };
+  const query = node("input", {name:"q",type:"search",maxlength:200,value:applied.q});
+  const controls = {};
+  for (const [key, facet] of [["action","actions"],["resource","resources"],["result","results"]]) {
+    const values = [...new Set([...(data.filters?.[facet] || []), ...(applied[key] ? [applied[key]] : [])])];
+    controls[key] = node("select", {name:key}, [node("option", {value:"",text:t("الكل")}), ...values.map(value => node("option", {value,selected:value === applied[key],text:label(value)}))]);
+  }
+  const filters = node("form", {class:"filter-row", "aria-label":t("بحث سجل التدقيق")}, [field(t("بحث"),query),field(t("العملية"),controls.action),field(t("المورد"),controls.resource),field(t("النتيجة"),controls.result),node("button", {type:"submit",class:"button primary",text:t("بحث")}),button(t("مسح المرشحات"), () => navigate({}))]);
+  filters.addEventListener("submit", event => { event.preventDefault(); navigate({q:query.value.trim(),action:controls.action.value,resource:controls.resource.value,result:controls.result.value}); });
+  const columns = [
+    {label:t("الوقت"),value:row => formatTime(row.created_at)},
+    {label:t("الفاعل"),value:row => row.actor_name || t("النظام")},
+    {label:t("العملية"),value:row => label(row.action)},
+    {label:t("المورد"),value:row => node("div", {class:"cell-title"}, [node("strong", {text:row.resource_title || label(row.resource_type)}),node("bdi", {text:row.resource_reference || (row.resource_id ? `#${row.resource_id}` : "—")})])},
+    {label:t("النتيجة"),value:row => node("span", {class:`badge ${String(row.result).replace(/[^a-z_]/g, "")}`,text:label(row.result)})},
+    {label:t("التفاصيل"),value:row => node("details", {class:"audit-entry-details"}, [node("summary", {text:t("تفاصيل العملية")}),node("dl", {}, [node("dt", {text:t("معرف التتبع")}),node("dd", {}, node("bdi", {text:row.correlation_id}))]),...(Object.keys(row.details).length ? [detailValue(row.details)] : [])])}
+  ];
+  const pages = node("div", {class:"action-row pagination"}, node("p", {role:"status",text:SOCifyLocale.template`${data.total} عملية · الصفحة ${page}`}));
+  if (page > 1) pages.append(button(t("السابق"), () => navigate(applied,page - 1)));
+  if (page * data.page_size < data.total) pages.append(button(t("التالي"), () => navigate(applied,page + 1)));
+  const root = node("div", {class:"audit-view"}, [pageHead(t("سجل التدقيق"),null),filters,panel(t("النشاط"),data.items.length ? table(columns,data.items) : emptyState(t("لا توجد نتائج"),null),true),pages]);
   finish(root);
 }
 

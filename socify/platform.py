@@ -193,13 +193,21 @@ def stats_compatibility():
 @platform_api.get("/api/audit")
 @require_permission("audit.read")
 def audit_logs():
+    from .operational import case_scope
+
     try:
         page = max(int(request.args.get("page", 1)), 1)
         page_size = min(max(int(request.args.get("page_size", request.args.get("limit", 100))), 1), 200)
     except ValueError:
         return error_response("INVALID_PAGINATION", "قيم الترقيم غير صالحة", 400)
+    if page > 1000000:
+        return error_response("INVALID_PAGINATION", "قيم الترقيم غير صالحة", 400)
     action = request.args.get("action")
     resource = request.args.get("resource")
+    result = request.args.get("result")
+    query = request.args.get("q", "").strip()
+    if len(query) > 200 or any(len(value or "") > 100 for value in (action, resource, result)):
+        return error_response("INVALID_FILTER", "قيمة البحث أو الترشيح أطول من المسموح", 422)
     clauses = ["a.workspace_id = ?"]
     parameters: list[object] = [workspace_id()]
     if action:
@@ -208,13 +216,35 @@ def audit_logs():
     if resource:
         clauses.append("a.resource_type = ?")
         parameters.append(resource)
+    if result:
+        clauses.append("a.result = ?")
+        parameters.append(result)
+    if query:
+        pattern = "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        fields = [
+            "a.action",
+            "a.resource_type",
+            "a.resource_id",
+            "a.correlation_id",
+            "a.details",
+            "socify_user_name(u.name,u.name_ar,u.name_en)",
+            "c.reference",
+            "c.title",
+        ]
+        clauses.append("(" + " OR ".join(f"{field} LIKE ? ESCAPE '\\'" for field in fields) + ")")
+        parameters.extend([pattern] * len(fields))
+    scope, scope_args = case_scope(current_user() or {})
+    joins = f"""LEFT JOIN users u ON u.id = a.actor_id
+        LEFT JOIN incident_cases c ON a.resource_type = 'case' AND c.id = a.resource_id
+        AND c.workspace_id = a.workspace_id AND c.archived_at IS NULL{scope}"""
     where = " AND ".join(clauses)
-    total = int(get_db().execute(f"SELECT COUNT(*) FROM security_audit_logs a WHERE {where}", parameters).fetchone()[0])
+    values = [*scope_args, *parameters]
+    total = int(get_db().execute(f"SELECT COUNT(*) FROM security_audit_logs a {joins} WHERE {where}", values).fetchone()[0])
     rows = (
         get_db()
         .execute(
-            f"SELECT a.id, a.actor_id, socify_user_name(u.name,u.name_ar,u.name_en) AS actor_name, a.action, a.resource_type, a.resource_id, a.result, a.details, a.correlation_id, a.ip_address, a.created_at FROM security_audit_logs a LEFT JOIN users u ON u.id = a.actor_id WHERE {where} ORDER BY a.id DESC LIMIT ? OFFSET ?",
-            (*parameters, page_size, (page - 1) * page_size),
+            f"SELECT a.id, a.actor_id, socify_user_name(u.name,u.name_ar,u.name_en) AS actor_name, a.action, a.resource_type, a.resource_id, a.result, a.details, a.correlation_id, a.ip_address, a.created_at, c.reference AS resource_reference, c.title AS resource_title FROM security_audit_logs a {joins} WHERE {where} ORDER BY a.id DESC LIMIT ? OFFSET ?",
+            (*values, page_size, (page - 1) * page_size),
         )
         .fetchall()
     )
@@ -223,7 +253,12 @@ def audit_logs():
         item = dict(row)
         item["details"] = json.loads(item["details"] or "{}")
         items.append(item)
-    return jsonify({"items": items, "total": total, "page": page, "page_size": page_size})
+    facets = {}
+    for key, column in (("actions", "action"), ("resources", "resource_type"), ("results", "result")):
+        facets[key] = [
+            row[0] for row in get_db().execute(f"SELECT DISTINCT {column} FROM security_audit_logs WHERE workspace_id=? ORDER BY {column}", (workspace_id(),))
+        ]
+    return jsonify({"items": items, "total": total, "page": page, "page_size": page_size, "filters": facets})
 
 
 @platform_api.get("/api/profile")

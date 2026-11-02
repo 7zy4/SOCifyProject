@@ -126,6 +126,8 @@ td small,.rule-cell small,.autopsy-shell td small { font-size:14px; color:var(--
 .case-selection-label { display:flex; gap:12px; align-items:flex-start; min-width:0; }
 .case-selection-label input { flex:none; }
 .case-selection-label>span { display:grid; gap:6px; }
+.audit-entry-details dl { display:grid; gap:6px; overflow-wrap:anywhere; max-inline-size:40rem; }
+.audit-entry-details dd { margin-inline:0; overflow-wrap:anywhere; unicode-bidi:normal; text-align:start; }
 .case-selected-list { display:grid; gap:12px; padding:0; list-style:none; }
 .case-selected-list li { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:12px; border:2px solid var(--border-ink); }
 .case-selected-list li>span { display:grid; gap:4px; min-width:0; overflow-wrap:anywhere; }

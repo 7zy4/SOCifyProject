@@ -55,6 +55,18 @@ def generate() -> dict[str, object]:
                     "User-authored names are selected by interface language. Empty values fall back to the registered name. Account identity, email and role do not change."
                 )
                 operation["responses"]["422"] = {"description": "Invalid name or unknown field"}
+            elif path == "/api/audit":
+                operation["summary"] = "Search retained workspace activity"
+                operation["description"] = (
+                    "Requires audit.read. Searches literal text in actor names, operations, resource identifiers, trace IDs and retained redacted details. Case titles and references are searchable and returned only when that case is visible to the caller. Filter choices are workspace-scoped. Results are newest first; filters and pagination never change the underlying audit history."
+                )
+                operation["parameters"] = [
+                    {"name": "q", "in": "query", "schema": {"type": "string", "maxLength": 200}},
+                    *[{"name": key, "in": "query", "schema": {"type": "string", "maxLength": 100}} for key in ("action", "resource", "result")],
+                    {"name": "page", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 1000000, "default": 1}},
+                    {"name": "page_size", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 200, "default": 100}},
+                ]
+                operation["responses"]["422"] = {"description": "Search or filter exceeds its length limit"}
             elif path == "/api/soc/performance":
                 operation["summary"] = "Team and personal operational performance"
                 operation["description"] = (

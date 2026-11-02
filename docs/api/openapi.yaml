@@ -521,8 +521,67 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "description": "Search or filter exceeds its length limit"
           }
-        }
+        },
+        "summary": "Search retained workspace activity",
+        "description": "Requires audit.read. Searches literal text in actor names, operations, resource identifiers, trace IDs and retained redacted details. Case titles and references are searchable and returned only when that case is visible to the caller. Filter choices are workspace-scoped. Results are newest first; filters and pagination never change the underlying audit history.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "resource",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "result",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            }
+          }
+        ]
       }
     },
     "/api/auth/csrf": {
