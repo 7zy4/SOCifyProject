@@ -85,6 +85,45 @@ function autopsyImportForm(caseId) {
   return form;
 }
 
+function autopsySourceActions(caseId, item) {
+  const path = `/api/sources/${item.id}`;
+  const edit = button(SOCifyLocale.text("تعديل المصدر"), () => {
+    const form = autopsyForm({
+      name: { required: true, max: 100, label: SOCifyLocale.text("اسم مصدر SIEM") },
+      endpoint: { max: 500, label: SOCifyLocale.text("رابط السحب المباشر (اختياري)") },
+      credential: { max: 512, label: SOCifyLocale.text("رمز مصادقة جديد للسحب (اختياري)") },
+    }, async (values) => {
+      await api(path, { method: "PATCH", body: { ...values, endpoint: values.endpoint || null } });
+      SOCifyDrafts.saved(form);
+      dialog.close();
+      await autopsyCase(caseId);
+    }, { name: item.name, endpoint: item.endpoint });
+    const credential = form.querySelector('[name="credential"]');
+    credential.type = "password";
+    credential.autocomplete = "new-password";
+    const dialog = autopsyModal(SOCifyLocale.text("تعديل المصدر"), form);
+  }, "ghost");
+  const rotate = button(SOCifyLocale.text("تجديد مفتاح الإرسال"), async () => {
+    if (!confirm(SOCifyLocale.text("سيتوقف المفتاح السابق فورًا. تجديد مفتاح الإرسال؟"))) return;
+    rotate.disabled = true;
+    try {
+      const updated = await api(`${path}/rotate-key`, { method: "POST", body: {} });
+      autopsyModal(SOCifyLocale.text("انسخ مفتاح الإرسال الجديد"), node("pre", { text: `X-SOCify-Source-Key: ${updated.ingest_key}` }));
+    } catch (error) { handleError(error); }
+    finally { rotate.disabled = false; }
+  }, "ghost");
+  const toggle = button(SOCifyLocale.text(item.is_active ? "إيقاف استقبال السجلات" : "استئناف استقبال السجلات"), async () => {
+    if (item.is_active && !confirm(SOCifyLocale.text("إيقاف الاستقبال من هذا المصدر؟ ستبقى السجلات السابقة محفوظة."))) return;
+    toggle.disabled = true;
+    try {
+      await api(path, item.is_active ? { method: "DELETE" } : { method: "PATCH", body: { is_active: true } });
+      await autopsyCase(caseId);
+    } catch (error) { handleError(error); }
+    finally { toggle.disabled = false; }
+  }, "ghost");
+  return node("details", {}, [node("summary", { text: SOCifyLocale.text("إدارة المصدر") }), node("div", { class: "action-row" }, [edit, rotate, toggle])]);
+}
+
 function autopsySiemConnectorPanel(caseId, connectors) {
   const body = node("div", { class: "panel-body" });
   if (autopsy.current.can_update && autopsy.current.status !== "closed") {
@@ -129,21 +168,22 @@ function autopsySiemConnectorPanel(caseId, connectors) {
     const cols = [
       { label: SOCifyLocale.text("المصدر"), value: "name" },
       { label: SOCifyLocale.text("النوع"), value: "type" },
-      { label: SOCifyLocale.text("الحالة"), value: (item) => SOCifyLocale.text(item.status === "connected" ? "تم استقبال السجلات" : item.status === "failed" ? "تعذر استقبال السجلات" : "بانتظار السجلات") },
+      { label: SOCifyLocale.text("الحالة"), value: (item) => SOCifyLocale.text(!item.is_active ? "متوقف" : item.status === "connected" ? "تم استقبال السجلات" : item.status === "failed" ? "تعذر استقبال السجلات" : "بانتظار السجلات") },
       { label: SOCifyLocale.text("السجلات المستقبلة"), value: "rows_ingested" },
       { label: SOCifyLocale.text("نقطة الاستقبال"), value: (item) => `/api/sources/${item.id}/ingest` },
       {
         label: SOCifyLocale.text("سحب فوري"),
-        value: (item) => (item.endpoint && autopsy.current.can_update && autopsy.current.status !== "closed")
+        value: (item) => (item.is_active && item.endpoint && autopsy.current.can_update && autopsy.current.status !== "closed")
           ? button(SOCifyLocale.text("سحب السجلات الآن"), async () => {
               try {
                 await api(`/api/cases/${caseId}/siem-connectors/${item.id}/pull`, { method: "POST", body: {} });
                 await autopsyCase(caseId);
               } catch (error) { handleError(error); }
             }, "ghost")
-          : "Webhook",
+          : item.endpoint ? "—" : "Webhook",
       },
     ];
+    if (permission("sources.manage")) cols.push({ label: SOCifyLocale.text("الإجراءات"), value: (item) => autopsySourceActions(caseId, item) });
     body.append(table(cols, items));
   }
   return panel(SOCifyLocale.text("ربط SIEM مباشر بالقضية"), body, Boolean(items.length));

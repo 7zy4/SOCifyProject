@@ -153,6 +153,40 @@ def _ingest_records_for_source(
             )
             if not case_check or case_check["archived_at"] is not None or case_check["status"] == "closed":
                 raise ValueError("linked target case is closed or unavailable")
+            retained = (
+                get_db()
+                .execute(
+                    """SELECT id, total FROM ingestion_jobs WHERE workspace_id = ? AND source_id = ? AND case_id = ?
+                   AND content_hash = ? AND status = 'completed' AND active_version = 1 AND accepted > 0 AND rejected = 0
+                   ORDER BY id LIMIT 1""",
+                    (ws_id, source_id, target_case_id, content_hash),
+                )
+                .fetchone()
+            )
+            if retained:
+                get_db().execute(
+                    "UPDATE event_sources SET error_rate = 0, last_sync = ?, status = 'connected', updated_at = ? WHERE id = ?",
+                    (now, now, source_id),
+                )
+                record_audit(
+                    get_db(),
+                    "ingest_retry",
+                    "source",
+                    source_id,
+                    details={"accepted": 0, "skipped": retained["total"], "case_id": target_case_id, "retained_job_id": retained["id"]},
+                    actor=effective_actor,
+                    workspace=ws_id,
+                )
+                return {
+                    "source_id": source_id,
+                    "case_id": target_case_id,
+                    "format": fmt,
+                    "accepted": 0,
+                    "rejected": 0,
+                    "skipped": retained["total"],
+                    "alerts_triggered": 0,
+                    "alert_ids": [],
+                }
             ciphertext = encrypt_secret(base64.b64encode(raw_bytes).decode())
             cursor = get_db().execute(
                 """INSERT INTO ingestion_jobs
@@ -394,6 +428,10 @@ def update_source(source_id: int):
         updates["default_case_id"] = data["default_case_id"]
     if "is_active" in data:
         updates["is_active"] = 1 if data["is_active"] else 0
+        if not data["is_active"]:
+            updates["status"] = "disabled"
+        elif not row["is_active"]:
+            updates["status"] = "not_tested"
     if "credential" in data:
         credential = data["credential"]
         updates["credential_ciphertext"] = encrypt_secret(credential) if isinstance(credential, str) and credential else None
@@ -480,7 +518,7 @@ def source_webhook_ingest(source_id: int):
     target_case = row["default_case_id"]
     query_case = request.args.get("case_id")
     if query_case:
-        if not query_case.isdecimal():
+        if len(query_case) > 19 or not query_case.isdecimal():
             return error_response("INVALID_CASE", "معرف القضية غير صالح", 422)
         if target_case is None or int(query_case) != target_case:
             return error_response("SOURCE_CASE_MISMATCH", "مفتاح المصدر لا يخول الإرسال إلى هذه القضية", 403)
@@ -541,7 +579,7 @@ def list_case_siem_connectors(case_id: int):
     rows = (
         get_db()
         .execute(
-            "SELECT * FROM event_sources WHERE workspace_id = ? AND default_case_id = ? AND is_active = 1 ORDER BY id DESC",
+            "SELECT * FROM event_sources WHERE workspace_id = ? AND default_case_id = ? ORDER BY id DESC",
             (workspace_id(), case_id),
         )
         .fetchall()

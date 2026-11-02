@@ -3,6 +3,9 @@
 let autopsyReportTimer = null;
 
 const autopsyReportLabels = {
+  evidenced_timeline: SOCifyLocale.text("السجل الزمني للأدلة"),
+  legacy_closure: SOCifyLocale.text("قرارات الإغلاق السابقة"),
+  shared_notes: SOCifyLocale.text("الملاحظات المشتركة"),
   content_inspection: SOCifyLocale.language === "ar" ? "فحص المحتوى والترميزات" : "Content and encoding inspection",
   investigation_assessment: SOCifyLocale.text("قرارات التحقيق"),
   summary: SOCifyLocale.text("الملخص التنفيذي"),
@@ -70,21 +73,39 @@ const autopsyReportLabels = {
   retention_until: SOCifyLocale.text("الاحتفاظ حتى")
 };
 
-function autopsyReportPreview(value, depth = 0) {
-  if (value === null || typeof value !== "object") return node("span", { "data-user-content": "true", text: value === null ? "—" : String(value) });
+function autopsyReportHasContent(value) {
+  if (value === null || value === undefined || value === "") return false;
+  if (typeof value === "object") return Object.values(value).some(autopsyReportHasContent);
+  return true;
+}
+
+function autopsyReportFieldLabel(key) {
+  return autopsyReportLabels[key] || (autopsy.catalog.report_labels?.[key] ? SOCifyLocale.text(autopsy.catalog.report_labels[key]) : autopsyLabel(key));
+}
+
+function autopsyReportPreview(value, depth = 0, fieldKey = "") {
+  if (value === null || typeof value !== "object") {
+    let text = value === null ? "—" : String(value);
+    if (fieldKey === "profile") text = value === "full" ? SOCifyLocale.text("كامل للاستخدام الداخلي المصرح") : value === "metadata_only_v1" ? SOCifyLocale.text("منقح: بيانات إحصائية وحالة فقط") : text;
+    if (["created_at", "updated_at", "generated_at", "event_time", "performed_at", "closed_at"].includes(fieldKey) && typeof value === "string" && Number.isFinite(Date.parse(value))) text = formatTime(value);
+    return node("span", { "data-user-content": "true", text });
+  }
   if (depth >= 8) return node("p", { text: SOCifyLocale.text("تفاصيل إضافية متاحة في ملف JSON الكامل.") });
-  const entries = Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value);
+  const entries = (Array.isArray(value) ? value.map((item, index) => {
+    const identity = item && typeof item === "object" && ["question", "reference", "title", "name", "original_filename", "id"].find(key => item[key] !== null && item[key] !== undefined && item[key] !== "");
+    return [identity ? `${autopsyReportFieldLabel(identity)}: ${item[identity]}` : `${SOCifyLocale.text("العنصر")} ${index + 1}`, item];
+  }) : Object.entries(value).filter(([key]) => !["schema", "revision", "version", "source_version", "parser_version"].includes(key))).filter(([, item]) => autopsyReportHasContent(item));
   if (!entries.length) return node("p", { text: SOCifyLocale.text("لا توجد عناصر مسجلة") });
   const body = node("dl", { class: "report-data" });
   for (const [key, item] of entries.slice(0, 100)) {
-    const label = autopsyReportLabels[key] || autopsyLabel(key);
+    const label = Array.isArray(value) ? key : autopsyReportFieldLabel(key);
     body.append(node("dt", { text: label }));
     const detail = node("dd");
     if (item !== null && typeof item === "object") {
       const expand = node("details", {}, node("summary", { text: Array.isArray(item) ? SOCifyLocale.template`عناصر مسجلة: ${item.length}` : SOCifyLocale.text("عرض التفاصيل") }));
       expand.addEventListener("toggle", () => { if (expand.open && expand.children.length === 1) expand.append(autopsyReportPreview(item, depth + 1)); });
       detail.append(expand);
-    } else detail.append(autopsyReportPreview(item, depth + 1));
+    } else detail.append(autopsyReportPreview(item, depth + 1, key));
     body.append(detail);
   }
   if (entries.length > 100) body.append(node("dd", { text: SOCifyLocale.text("تُعرض أول 100 نتيجة؛ الملف الكامل متاح للتنزيل.") }));

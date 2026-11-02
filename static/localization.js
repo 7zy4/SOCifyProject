@@ -13,6 +13,20 @@
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
   document.cookie = `socify-language=${language}; Path=/; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
   const english = {
+  "العنصر": "Item",
+  "السجل الزمني للأدلة": "Evidence timeline",
+  "قرارات الإغلاق السابقة": "Previous closure decisions",
+  "الملاحظات المشتركة": "Shared notes",
+  "إدارة المصدر": "Manage source",
+  "الإجراءات": "Actions",
+  "تعديل المصدر": "Edit source",
+  "تجديد مفتاح الإرسال": "Rotate delivery key",
+  "انسخ مفتاح الإرسال الجديد": "Copy the new delivery key",
+  "إيقاف استقبال السجلات": "Stop receiving records",
+  "استئناف استقبال السجلات": "Resume receiving records",
+  "رمز مصادقة جديد للسحب (اختياري)": "New pull credential (optional)",
+  "سيتوقف المفتاح السابق فورًا. تجديد مفتاح الإرسال؟": "The previous key will stop working immediately. Rotate the delivery key?",
+  "إيقاف الاستقبال من هذا المصدر؟ ستبقى السجلات السابقة محفوظة.": "Stop receiving from this source? Previously received records will be retained.",
   "أعدّه العضو": "Prepared by member",
   "اعتمده العضو": "Approved by member",
   "أسئلة السبب الجذري": "Root cause questions",

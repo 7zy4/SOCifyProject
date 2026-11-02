@@ -205,6 +205,10 @@ def test_source_crud_validation_and_explicit_connector_status(client: FlaskClien
     assert tested.status_code == 200
     assert tested.json["status"] == "connected"
     assert client.delete(f"/api/sources/{source_id}").status_code == 204
+    resumed = client.patch(f"/api/sources/{source_id}", json={"is_active": True})
+    assert resumed.json["is_active"] == 1 and resumed.json["status"] == "not_tested"
+    stopped = client.patch(f"/api/sources/{source_id}", json={"is_active": False})
+    assert stopped.json["is_active"] == 0 and stopped.json["status"] == "disabled"
     assert client.patch("/api/sources/999999", json={"name": "Missing"}).status_code == 404
 
 

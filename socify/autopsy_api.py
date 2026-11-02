@@ -288,6 +288,7 @@ def case_get(case_id: int):
 def catalog():
     from zoneinfo import available_timezones
 
+    from .autopsy_report_render import LABELS
     from .autopsy_reports import STATES
     from .security import ROLE_PERMISSIONS
 
@@ -315,6 +316,7 @@ def catalog():
             "network_policy": "offline-only",
             "case_transitions": {key: sorted(value) for key, value in STATES.items()},
             "record_schemas": KINDS,
+            "report_labels": LABELS,
             "roles": [role for role in ROLE_PERMISSIONS if role not in {"instructor", "analyst", "auditor"}],
             "reasons": ["alert_review", "suspicious_activity", "threat_hunt", "user_report", "forensic_review", "other"],
             "classifications": ["internal", "confidential", "restricted"],
