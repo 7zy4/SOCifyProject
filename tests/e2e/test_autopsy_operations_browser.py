@@ -1,6 +1,5 @@
 import base64
 import json
-import shutil
 import threading
 from pathlib import Path
 
@@ -9,6 +8,7 @@ from playwright.sync_api import sync_playwright
 from werkzeug.serving import make_server
 
 from socify.security import totp_code
+from tests.e2e.test_browser import launch_browser
 
 
 @pytest.mark.e2e
@@ -19,7 +19,7 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
     thread.start()
     try:
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
+            browser = launch_browser(playwright)
             page = browser.new_page(locale="ar-SA", viewport={"width": 1440, "height": 1000})
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
@@ -207,7 +207,7 @@ def test_restricted_batch_browser_retains_case_navigation_without_indirect_discl
     thread.start()
     try:
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
+            browser = launch_browser(playwright)
             page = browser.new_page(locale="ar-SA", viewport={"width": 390, "height": 900})
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))

@@ -2,6 +2,11 @@
 
 autopsyLabels.event_id = SOCifyLocale.text("السجل المعتمد كدليل");
 
+function autopsyImportStatus(value) {
+  const label = { queued: "بانتظار المعالجة", processing: "تجري المعالجة", completed_with_errors: "اكتمل مع استثناءات", interrupted: "توقفت المعالجة" }[value];
+  return label ? SOCifyLocale.text(label) : autopsyLabel(value);
+}
+
 function autopsyImportForm(caseId) {
   const file = node("input", { type: "file", name: "file", required: true, accept: ".csv,.json,.jsonl,.ndjson,.txt,.log,.xml,.evtx,.pcap,.pcapng,.cef" });
   const source = node("input", { name: "source_label", maxlength: 100, value: "file-import", required: true });
@@ -160,10 +165,10 @@ async function autopsyLogsPanel(caseId) {
   }
   if (autopsy.current.can_update && autopsy.current.status !== "closed") root.append(panel(SOCifyLocale.text("استيراد مرتبط بالقضية"), node("div", { class: "panel-body" }, autopsyImportForm(caseId)), true));
   root.append(autopsySiemConnectorPanel(caseId, connectors));
-  const jobColumns = [{ label: SOCifyLocale.text("الملف"), value: (job) => job.original_filename || job.filename }, { label: SOCifyLocale.text("الحالة"), value: "status" }, { label: SOCifyLocale.text("مقبول"), value: "accepted" }, { label: SOCifyLocale.text("مرفوض"), value: "rejected" }, { label: SOCifyLocale.text("متكرر"), value: "skipped" }, { label: SOCifyLocale.text("الأصل"), value: (job) => permission("evidence.download") ? linkedButton(SOCifyLocale.text("تنزيل الأصل"), `/api/cases/${caseId}/imports/${job.id}/original`) : "—" }, { label: SOCifyLocale.text("التفاصيل"), value: (job) => button(SOCifyLocale.text("حالة الاستيراد"), async () => {
+  const jobColumns = [{ label: SOCifyLocale.text("الملف"), value: (job) => job.original_filename || job.filename }, { label: SOCifyLocale.text("الحالة"), value: (job) => autopsyImportStatus(job.status) }, { label: SOCifyLocale.text("مقبول"), value: "accepted" }, { label: SOCifyLocale.text("مرفوض"), value: "rejected" }, { label: SOCifyLocale.text("متكرر"), value: "skipped" }, { label: SOCifyLocale.text("الأصل"), value: (job) => permission("evidence.download") ? linkedButton(SOCifyLocale.text("تنزيل الأصل"), `/api/cases/${caseId}/imports/${job.id}/original`) : "—" }, { label: SOCifyLocale.text("التفاصيل"), value: (job) => button(SOCifyLocale.text("حالة الاستيراد"), async () => {
     try {
       const result = await api(`/api/cases/${caseId}/imports/${job.id}`);
-      const content = node("div", {}, [node("p", { text: SOCifyLocale.template`الحالة ${result.status} · ${result.accepted} مقبول · ${result.rejected} مرفوض` }), node("p", { text: `SHA-256: ${result.content_hash}` }), node("pre", { text: JSON.stringify(result.errors, null, 2) })]);
+      const content = node("div", {}, [node("p", { text: SOCifyLocale.template`الحالة ${autopsyImportStatus(result.status)} · ${result.accepted} مقبول · ${result.rejected} مرفوض` }), node("p", { text: `SHA-256: ${result.content_hash}` }), node("pre", { text: JSON.stringify(result.errors, null, 2) })]);
       if (autopsy.current.can_update && ["queued", "processing", "interrupted"].includes(result.status)) content.append(button(SOCifyLocale.text("إلغاء الاستيراد"), async () => { try { await api(`/api/cases/${caseId}/imports/${job.id}/cancel`, { method: "POST", body: {} }); await autopsyCase(caseId); } catch (error) { handleError(error); } }));
       if (autopsy.current.can_update && ["failed", "interrupted", "cancelled"].includes(result.status)) content.append(button(SOCifyLocale.text("استئناف الاستيراد"), async () => { try { await api(`/api/cases/${caseId}/imports/${job.id}/resume`, { method: "POST", body: {} }); await autopsyCase(caseId); } catch (error) { handleError(error); } }));
       autopsyModal(SOCifyLocale.text("حالة الأصل ومهمة المعالجة"), content);

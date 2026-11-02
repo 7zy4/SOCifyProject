@@ -41,6 +41,7 @@ SCENARIOS = [
     "stale-case-context",
     "untouched-library",
     "background-report-change",
+    "root-cause-branch",
 ]
 
 
@@ -51,7 +52,26 @@ def test_user_can_recover_drafts_without_silent_loss(app, language, scenario):
     with review_session(app, language, scenario) as (j, manager, result):
         page = j.page
         note = "Correlate identity records before reaching a final assessment."
-        if scenario == "untouched-library":
+        if scenario == "root-cause-branch":
+            j.click("link", "التحقيق والخط الزمني")
+            label = page.evaluate("() => SOCifyLocale.template`إضافة ${autopsyLabel('root_cause')}`")
+            page.get_by_role("button", name=label, exact=True).click()
+            j.settle()
+            dialog = page.get_by_role("dialog")
+            dialog.locator("input[name=category]").fill(j.text("غير معروف"))
+            dialog.locator("textarea[name=conclusion]").fill("Evidence does not establish initial access yet.")
+            j.click("button", "إضافة سؤال لماذا", dialog)
+            j.click("button", "إضافة سؤال لماذا", dialog)
+            whys = dialog.locator("fieldset.why-step")
+            whys.nth(0).get_by_label(j.text("الإجابة"), exact=True).fill("Initial hypothesis awaiting identity records")
+            whys.nth(1).get_by_label(j.text("الإجابة"), exact=True).fill("Branch hypothesis awaiting approval records")
+            whys.nth(1).locator("select[name=why_parent]").select_option(index=1)
+            j.click("button", "حفظ", dialog)
+            expect(dialog).not_to_be_visible()
+            expect(page.get_by_text("Branch hypothesis awaiting approval records", exact=False)).to_be_visible()
+            assert not page.evaluate("SOCifyDrafts.hasChanges()")
+            result["outcomes"] = ["documented linked hypotheses saved", "unmodified adjacent forms do not block refresh"]
+        elif scenario == "untouched-library":
             manager.login("manager@socify.local")
             manager.nav("مكتبة التحليل المحلي")
             assert not manager.page.evaluate("SOCifyDrafts.hasChanges()")

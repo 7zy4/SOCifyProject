@@ -80,6 +80,7 @@ def test_200_percent_zoom_keyboard_modal_and_searchable_choices(app, tmp_path, z
             choice.press("Enter")
             page.keyboard.press("Tab")
             assert choice.input_value() == label
+            page.once("dialog", lambda confirmation: confirmation.accept())
             page.keyboard.press("Escape")
             assert page.get_by_role("dialog").count() == 0
             assert add.evaluate("el => el === document.activeElement")

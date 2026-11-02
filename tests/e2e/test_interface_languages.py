@@ -33,7 +33,7 @@ def test_language_toggle_persists_and_preserves_case_content(app, tmp_path):
             assert page.locator("[data-language-toggle]").count() == 0
             page.evaluate("localStorage.setItem('socify-interface-language', 'en')")
             page.reload()
-            page.wait_for_function("document.documentElement.lang === 'en'")
+            page.wait_for_function("() => document.documentElement.lang === 'en'")
             assert page.locator("html").get_attribute("dir") == "ltr"
             page.get_by_label("Email", exact=True).fill("manager@socify.local")
             page.get_by_label("Password", exact=True).fill(DEMO_LOGIN_VALUE)
@@ -66,7 +66,7 @@ def test_language_toggle_persists_and_preserves_case_content(app, tmp_path):
             assert page.locator("html").get_attribute("dir") == "ltr"
             page.screenshot(path=str(output / "case-en-mobile.png"), full_page=True)
             page.get_by_role("button", name="تغيير لغة الواجهة إلى العربية").click()
-            page.wait_for_function("document.documentElement.lang === 'ar'")
+            page.wait_for_function("() => document.documentElement.lang === 'ar'")
             page.get_by_role("heading", name="القضايا", exact=True).first.wait_for()
             assert page.locator("html").get_attribute("dir") == "rtl"
             assert parse_qs(urlparse(page.url).query)["tab"] == ["investigation"]

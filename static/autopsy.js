@@ -27,6 +27,7 @@ function autopsyBadge(value, context = "") {
 
 Object.assign(autopsyLabels, { identity_provider: SOCifyLocale.text("مزود الهوية"), email_gateway: SOCifyLocale.text("بوابة البريد"), mobile_device: SOCifyLocale.text("جهاز محمول"), storage: SOCifyLocale.text("نظام تخزين"), virtual_machine: SOCifyLocale.text("آلة افتراضية"), industrial_device: SOCifyLocale.text("جهاز صناعي"), unpatched_software: SOCifyLocale.text("برمجيات غير محدثة"), weak_authentication: SOCifyLocale.text("مصادقة ضعيفة"), insecure_remote_access: SOCifyLocale.text("وصول بعيد غير آمن"), insufficient_segmentation: SOCifyLocale.text("تقسيم شبكي غير كاف"), data_exposure: SOCifyLocale.text("انكشاف بيانات"), process_gap: SOCifyLocale.text("فجوة في الإجراءات") });
 autopsyLabels.reason = SOCifyLocale.text("السبب");
+autopsyLabels.address = SOCifyLocale.text("عنوان الشبكة");
 Object.assign(autopsyLabels, { handoff_to: SOCifyLocale.text("العضو البديل للمسؤوليات"), assignee: SOCifyLocale.text("المحلل المسؤول"), instructions: SOCifyLocale.text("المطلوب تحليله وتسليمه"), email: SOCifyLocale.text("البريد الإلكتروني الداخلي"), task_id: SOCifyLocale.text("المهمة المرتبطة"), decision: SOCifyLocale.text("القرار الموثق") });
 Object.assign(autopsyLabels, { previous_shift: SOCifyLocale.text("المناوبة السابقة"), responsibility: SOCifyLocale.text("مسؤولية العضو") });
 
@@ -130,10 +131,14 @@ function autopsyChoice(name, values, current = "", required = false) {
 
 function autopsyModal(title, content) {
   const previous = document.activeElement;
-  const dialog = node("dialog", { class: "autopsy-modal", "aria-label": title }, [node("div", { class: "workspace-head" }, [node("h2", { text: title }), button(SOCifyLocale.text("إغلاق"), () => { if (SOCifyDrafts.confirmDiscard(dialog)) dialog.close(); })]), content]);
+  const saving = () => Boolean(dialog.querySelector('form[data-saving="true"]'));
+  const closeButton = button(SOCifyLocale.text("إغلاق"), () => { if (!saving() && SOCifyDrafts.confirmDiscard(dialog)) dialog.close(); });
+  const dialog = node("dialog", { class: "autopsy-modal", "aria-label": title }, [node("div", { class: "workspace-head" }, [node("h2", { text: title }), closeButton]), content]);
   document.body.append(dialog);
-  dialog.addEventListener("cancel", event => { if (!SOCifyDrafts.confirmDiscard(dialog)) event.preventDefault(); });
-  dialog.addEventListener("close", () => { dialog.remove(); previous?.focus(); }, { once: true });
+  const observer = new MutationObserver(() => { closeButton.disabled = saving(); });
+  observer.observe(dialog, { subtree: true, attributes: true, attributeFilter: ["data-saving"] });
+  dialog.addEventListener("cancel", event => { if (saving() || !SOCifyDrafts.confirmDiscard(dialog)) event.preventDefault(); });
+  dialog.addEventListener("close", () => { observer.disconnect(); dialog.remove(); previous?.focus(); }, { once: true });
   dialog.showModal();
   return dialog;
 }
