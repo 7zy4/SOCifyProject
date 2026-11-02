@@ -69,6 +69,8 @@ def _detect_format(filename: str, content: bytes) -> str:
         return "pcapng" if content[:4] == b"\x0a\x0d\x0d\x0a" else "pcap"
     suffix = Path(filename).suffix.lower()
     sample = content[:4096].lstrip()
+    if sample.startswith(b"\xef\xbb\xbf"):
+        sample = sample[3:].lstrip()
     if sample.startswith(b"ElfFile\x00"):
         return "evtx"
     if sample.startswith(b"#separator"):

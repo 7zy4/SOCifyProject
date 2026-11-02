@@ -65,6 +65,8 @@ def profile(record: dict[str, Any]) -> dict[str, Any]:
     fields: dict[str, Any] = {}
     result: dict[str, Any] = {}
     if all(key in record for key in ("uid", "id.orig_h", "id.resp_h")):
+        if not isinstance(record["uid"], str) or not record["uid"]:
+            raise ValueError("Zeek UID must be a nonempty string")
         connection = any(key in record for key in ("conn_state", "orig_bytes", "orig_pkts"))
         kind = "conn" if connection else "dns" if "query" in record else "http" if "method" in record else "tls" if "server_name" in record else "event"
         fields = {
@@ -96,6 +98,13 @@ def profile(record: dict[str, Any]) -> dict[str, Any]:
             "title": f"Zeek {kind} · {record['id.orig_h']} → {record['id.resp_h']}",
         }
     elif all(key in record for key in ("flow_id", "src_ip", "dest_ip", "event_type")):
+        if (
+            isinstance(record["flow_id"], bool)
+            or not isinstance(record["flow_id"], (str, int))
+            or not str(record["flow_id"]).isascii()
+            or not str(record["flow_id"]).isdecimal()
+        ):
+            raise ValueError("Suricata flow_id must be an unsigned integer identifier")
         kind = record["event_type"]
         flow = section("flow")
         alert = section("alert")

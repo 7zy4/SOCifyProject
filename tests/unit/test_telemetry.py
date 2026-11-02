@@ -80,6 +80,19 @@ def test_network_grouping_fields_have_explicit_bounds(extra):
         profile(zeek(**extra))
 
 
+@pytest.mark.parametrize("identifier", [None, True, {}, "", -1])
+def test_invalid_flow_identifiers_cannot_correlate_unrelated_records(identifier):
+    with pytest.raises(ValueError):
+        profile(zeek(uid=identifier))
+    with pytest.raises(ValueError):
+        profile({"flow_id": identifier, "src_ip": "10.0.0.2", "dest_ip": "203.0.113.9", "event_type": "flow"})
+
+
+def test_utf8_bom_does_not_hide_native_log_format():
+    assert _detect_format("conn.log", b"\xef\xbb\xbf#separator \\x09\n") == "zeek_tsv"
+    assert _detect_format("eve.log", b'\xef\xbb\xbf{"event_type":"flow"}\n') == "json"
+
+
 def test_osquery_expansion_has_distinct_ids_and_source_pointers(app):
     original = {
         "hostIdentifier": "host-1",
