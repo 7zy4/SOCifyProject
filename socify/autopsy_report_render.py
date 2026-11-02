@@ -16,6 +16,15 @@ FORMATS = {
     "pdf": "application/pdf",
 }
 LABELS = {
+    "payload": "تفاصيل التحقيق",
+    "notes": "ملاحظات التحقيق",
+    "body": "الملاحظة أو القرار",
+    "five_whys": "أسئلة السبب الجذري",
+    "prepared_by": "أعدّه العضو",
+    "manager_decision": "قرار المدير",
+    "manager_comment": "تعليق المدير",
+    "acknowledged_by": "اعتمده العضو",
+    "acknowledged_at": "وقت الاعتماد",
     "logon_events": "تسجيل الدخول",
     "outcome": "النتيجة",
     "windows_event_id": "معرف حدث Windows",
@@ -313,6 +322,8 @@ def lines(value, depth=0):
             for item in value:
                 if isinstance(item, dict):
                     yield depth, record_heading(item)
+                    heading_key = record_heading_key(item)
+                    item = {key: cell for key, cell in item.items() if key != heading_key}
                 yield from lines(item, depth + 1)
     else:
         yield depth, display(value)
@@ -327,10 +338,17 @@ def network_report_content(value):
     }
 
 
-def record_heading(item):
+def record_heading_key(item):
     for key in ("event_id", "reference", "title", "name", "id"):
         if item.get(key) not in (None, ""):
-            return f"{LABELS.get(key, key)}: {display(item[key])}"
+            return key
+    return None
+
+
+def record_heading(item):
+    key = record_heading_key(item)
+    if key:
+        return f"{LABELS.get(key, key)}: {display(item[key])}"
     if item.get("source_ip") and item.get("destination_ip"):
         return f"{item['source_ip']} → {item['destination_ip']}"
     return "تفاصيل العنصر"
@@ -378,6 +396,9 @@ def report_table(value, *, localize=False):
             else:
                 for cell in item:
                     group(record_heading(cell) if isinstance(cell, dict) else label, cell if isinstance(cell, dict) else None)
+                    if isinstance(cell, dict):
+                        heading_key = record_heading_key(cell)
+                        cell = {key: value for key, value in cell.items() if key != heading_key}
                     walk(cell, label)
         else:
             row(label, item)
@@ -417,7 +438,10 @@ def sections(payload):
     ):
         records = payload.get("records", {}).get(kind, [])
         if records:
-            yield LABELS[kind], records
+            yield (
+                LABELS[kind],
+                [{**record.get("payload", {}), **{key: value for key, value in record.items() if key not in {"payload", "kind"}}} for record in records],
+            )
     for title, key in (
         ("فحص المحتوى والترميزات", "content_inspection"),
         ("تحليل الشبكة", "network_analysis"),
