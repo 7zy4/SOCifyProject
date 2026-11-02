@@ -64,7 +64,7 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
     if (data.has_next ?? (page * 50 < data.total)) pages.append(button(SOCifyLocale.text("التالي"), () => load(page + 1).catch(handleError)));
     const views = node("div", { class: "action-row" });
     for (const view of data.views) views.append(button(view.payload.title, () => { scope.value = view.payload.scope || "logs"; query.value = view.payload.query || ""; severity.value = view.payload.severity || ""; start.value = localTime(view.payload.start); end.value = localTime(view.payload.end); load().catch(handleError); }));
-    viewport.replaceChildren(views, node("p", { class: "notice", text: data.limits }), timeline, pages);
+    viewport.replaceChildren(views, node("details", {}, [node("summary", { text: SOCifyLocale.text("حدود العرض") }), node("p", { text: SOCifyLocale.text(data.limits) })]), timeline, pages);
   };
   filters.addEventListener("submit", (event) => { event.preventDefault(); load().catch(handleError); });
   if (autopsy.current.can_update && autopsy.current.status !== "closed") filters.append(button(SOCifyLocale.text("حفظ منظر البحث"), () => {
@@ -75,7 +75,7 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
   root.append(panel(SOCifyLocale.text("الخط الزمني الموحد للسجلات"), node("div", { class: "panel-body" }, [filters, viewport]), true));
   await load(Math.max(1, Number(saved.get("timeline_page")) || 1));
   const graph = await api(`/api/cases/${caseId}/graph?limit=30`);
-  const graphBody = node("div", { class: "panel-body" }, node("p", { text: SOCifyLocale.template`${graph.event_count} سجل · ${graph.nodes.length} كيان · ${graph.edges.length} علاقة. ${graph.limitations}${graph.truncated ? SOCifyLocale.text(" عرض محدود؛ لا يمثل كل السجلات.") : ""}` }));
+  const graphBody = node("div", { class: "panel-body" }, node("p", { text: SOCifyLocale.template`${graph.event_count} سجل · ${graph.nodes.length} كيان · ${graph.edges.length} علاقة. ${SOCifyLocale.text(graph.limitations)}${graph.truncated ? SOCifyLocale.text(" عرض محدود؛ لا يمثل كل السجلات.") : ""}` }));
   const graphNodes = graph.nodes.slice(0, 180);
   const canvas = node("div", { class: "graph-canvas", tabindex: "0", "aria-label": SOCifyLocale.text("علاقات الأدلة؛ يوجد جدول بديل أسفل الرسم") });
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");

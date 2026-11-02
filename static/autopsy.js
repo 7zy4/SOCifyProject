@@ -170,7 +170,7 @@ function autopsyForm(schema, submit, initial = {}) {
         row.whyParent = parent;
         const refresh = () => [...rows.children].forEach((item) => {
           const selected = item.whyParent.value || item.whyInitialParent || "";
-          item.whyParent.replaceChildren(node("option", { value: "", text: SOCifyLocale.text("جذر مستقل") }), ...[...rows.children].filter((other) => other !== item).map((other, index) => node("option", { value: other.whyId, text: SOCifyLocale.template`السبب ${index + 1} · ${other.whyId}`, selected: other.whyId === selected })));
+          item.whyParent.replaceChildren(node("option", { value: "", text: SOCifyLocale.text("جذر مستقل") }), ...[...rows.children].flatMap((other, index) => other === item ? [] : [node("option", { value: other.whyId, text: SOCifyLocale.template`السؤال ${index + 1}`, selected: other.whyId === selected })]));
         });
         row.whyInitialParent = value.parent_id;
         parent.addEventListener("change", () => { row.whyInitialParent = parent.value; });
@@ -290,11 +290,17 @@ function autopsyRecordCard(record) {
   const values = node("dl");
   Object.entries(record.payload).forEach(([key, value]) => {
     if (value === null || value === "") return;
-    let display = Array.isArray(value) ? value.map((item) => typeof item === "object" && item !== null ? (item.question ? `${item.question}: ${item.answer || ""} · ${item.assessment || ""}${item.evidence_id ? SOCifyLocale.template` · دليل ${item.evidence_id}` : ""}${item.parent_id ? SOCifyLocale.template` · فرع ${item.parent_id}` : ""}` : JSON.stringify(item)) : item).join("\n") : typeof value === "object" ? JSON.stringify(value) : autopsyLabel(value);
+    let display = Array.isArray(value) ? value.map((item, index) => {
+      if (typeof item !== "object" || item === null) return item;
+      if (!item.question) return JSON.stringify(item);
+      const parent = value.findIndex(other => other?.id === item.parent_id);
+      const assessment = item.assessment === "hypothesis" ? SOCifyLocale.text("الفرضية") : autopsyLabel(item.assessment);
+      return `${index + 1}. ${item.question}: ${item.answer || ""} · ${assessment || ""}${item.evidence_id ? SOCifyLocale.template` · دليل ${item.evidence_id}` : ""}${item.parent_id && parent >= 0 ? SOCifyLocale.template` · مرتبط بالسؤال ${parent + 1}` : ""}`;
+    }).join("\n") : typeof value === "object" ? JSON.stringify(value) : autopsyLabel(value);
     if (key.endsWith("_at") || key === "event_time") display = formatTime(value);
     values.append(node("dt", { text: autopsyLabel(key) }), node("dd", { text: display }));
   });
-  const card = node("article", { class: "card record-card" }, [node("h3", { text: record.payload.title || record.payload.name || autopsyLabel(record.kind) }), values, node("small", { text: SOCifyLocale.template`الإصدار ${record.version} · ${formatTime(record.updated_at)}` })]);
+  const card = node("article", { class: "card record-card" }, [node("h3", { text: record.payload.title || record.payload.name || autopsyLabel(record.kind) }), values, node("p", { text: formatTime(record.updated_at) })]);
   if (autopsy.current.can_update && autopsy.current.status !== "closed" && autopsy.catalog.record_schemas[record.kind]) card.append(button(SOCifyLocale.text("تعديل"), () => autopsyEditRecord(record.kind, record)));
   if (record.kind === "analysis" && record.payload.analysis_type === "local_detection" && record.payload.next_after_id && autopsy.current.can_update && autopsy.current.status !== "closed") card.append(autopsyAction(SOCifyLocale.text("استكمال فحص الدفعة التالية"), async () => { await api(`/api/cases/${autopsy.current.id}/detection`, { method: "POST", body: { version: autopsy.current.version, mode: record.payload.mode, after_id: record.payload.next_after_id } }); await autopsyCase(autopsy.current.id); }));
   return card;

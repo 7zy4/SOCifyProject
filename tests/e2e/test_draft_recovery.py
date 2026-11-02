@@ -69,6 +69,12 @@ def test_user_can_recover_drafts_without_silent_loss(app, language, scenario):
             j.click("button", "حفظ", dialog)
             expect(dialog).not_to_be_visible()
             expect(page.get_by_text("Branch hypothesis awaiting approval records", exact=False)).to_be_visible()
+            expect(page.locator(".record-card")).to_contain_text(j.text("لم يُتحقق منه"))
+            assert "why-" not in page.locator(".record-card").inner_text()
+            if language == "en":
+                expect(page.locator("main")).not_to_contain_text("علاقات ملاحظة")
+                page.get_by_text("Display limitations", exact=True).click()
+                expect(page.locator("main")).to_contain_text("Unknown times appear last")
             assert not page.evaluate("SOCifyDrafts.hasChanges()")
             result["outcomes"] = ["documented linked hypotheses saved", "unmodified adjacent forms do not block refresh"]
         elif scenario == "untouched-library":
