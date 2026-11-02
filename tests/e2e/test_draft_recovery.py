@@ -32,7 +32,16 @@ def fill_answers(journey, note):
     journey.page.locator("input[name=executive_note]").fill(note)
 
 
-SCENARIOS = ["leave-assessment", "close-draft-dialog", "reload-case-context", "switch-language", "network-save-retry", "stale-case-context"]
+SCENARIOS = [
+    "leave-assessment",
+    "close-draft-dialog",
+    "reload-case-context",
+    "switch-language",
+    "network-save-retry",
+    "stale-case-context",
+    "untouched-library",
+    "background-report-change",
+]
 
 
 @pytest.mark.e2e
@@ -42,7 +51,37 @@ def test_user_can_recover_drafts_without_silent_loss(app, language, scenario):
     with review_session(app, language, scenario) as (j, manager, result):
         page = j.page
         note = "Correlate identity records before reaching a final assessment."
-        if scenario == "close-draft-dialog":
+        if scenario == "untouched-library":
+            manager.login("manager@socify.local")
+            manager.nav("مكتبة التحليل المحلي")
+            assert not manager.page.evaluate("SOCifyDrafts.hasChanges()")
+            manager.nav("إدارة القضايا")
+            result["outcomes"] = ["untouched source and rule forms do not interrupt navigation"]
+        elif scenario == "background-report-change":
+            j.assessment("Review in progress", escalate=False)
+            j.click("button", "إعداد تقرير جديد")
+            expect(page.locator(".report-status")).to_contain_text(j.text("بانتظار المعالجة"))
+            field = page.locator("input[name=executive_note]")
+            field.fill(note)
+            manager.login("manager@socify.local")
+            manager.page.goto(j.case_url + "?tab=reports")
+            manager.settle()
+            manager.click("button", "إلغاء المعالجة")
+            seen = []
+            page.on("dialog", lambda dialog: (seen.append(dialog.type), dialog.dismiss()))
+            page.wait_for_timeout(5500)
+            expect(field).to_have_value(note)
+            assert seen == []
+            j.click("button", "حفظ إجابات التقرير")
+            expect(field).to_have_value(note)
+            assert not page.get_by_role("button", name=j.text("إلغاء المعالجة"), exact=True).count()
+            expect(page.locator(".report-status")).to_contain_text(j.text("أُلغيت المعالجة"))
+            result["outcomes"] = [
+                "teammate cancelled a queued report",
+                "background refresh did not erase assessment or interrupt typing",
+                "saved work reveals updated report status",
+            ]
+        elif scenario == "close-draft-dialog":
             j.nav("إدارة القضايا")
             j.click("button", "إنشاء قضية")
             dialog = page.get_by_role("dialog")

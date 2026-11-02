@@ -22,7 +22,7 @@ window.SOCifyDrafts = (() => {
     event.returnValue = "";
   });
   return Object.freeze({
-    track: (form) => { forms.set(form, snapshot(form)); return form; },
+    track: (form) => { forms.set(form, snapshot(form)); queueMicrotask(() => saved(form)); return form; },
     saved,
     hasChanges: (scope = document) => dirty(scope).length > 0,
     confirmDiscard,

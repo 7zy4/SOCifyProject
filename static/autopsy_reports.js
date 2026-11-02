@@ -100,6 +100,10 @@ function autopsyQuickReportLabel(value) {
   return SOCifyLocale.text({ draft: "مسودة", escalated: "أُحيل للمراجعة", acknowledged: "تمت المراجعة", approved: "معتمد", needs_followup: "يتطلب متابعة", closed: "مغلقة" }[value] || "—");
 }
 
+function autopsyReportProcessingLabel(value) {
+  return SOCifyLocale.text({ queued: "بانتظار المعالجة", processing: "تجري المعالجة", completed: "جاهز للتنزيل", failed: "تعذرت المعالجة", cancelled: "أُلغيت المعالجة" }[value] || "غير متاحة");
+}
+
 async function autopsyQuickDropdownReportPanel(caseId) {
   const data = await api(`/api/cases/${caseId}/quick-report`);
   const savedAnswers = data.report?.answers || data.default_answers || {};
@@ -253,7 +257,13 @@ window.SOCifyAutopsy.reports = async (caseId) => {
   for (const item of current.reports) {
     const report = await api(`/api/cases/${caseId}/reports/${item.id}`);
     const stale = report.source_version !== current.version;
-    const card = node("article", { class: "card report-revision" }, [node("h3", { text: SOCifyLocale.template`تقرير الإصدار ${report.revision}` }), node("p", { text: SOCifyLocale.template`الحالة: ${report.state} · المعالجة: ${report.job.state || SOCifyLocale.text("غير متاحة")} · بيانات القضية: ${report.source_version}${stale ? SOCifyLocale.text(" · نسخة تاريخية؛ تغيرت القضية بعدها") : SOCifyLocale.text(" · مطابق للإصدار الحالي")}` }), node("p", { text: SOCifyLocale.template`أُعد: ${formatTime(report.created_at)}${report.approved_at ? SOCifyLocale.template` · اعتُمد: ${formatTime(report.approved_at)}` : ""}` }), node("p", { text: `SHA-256: ${report.sha256}` })]);
+    const card = node("article", { class: "card report-revision" }, [
+      node("h3", { text: SOCifyLocale.template`تقرير ${report.revision}` }),
+      node("p", { class: "report-status", text: `${autopsyQuickReportLabel(report.state)} · ${autopsyReportProcessingLabel(report.job.state)}` }),
+      node("p", { text: SOCifyLocale.text(stale ? "تغيرت القضية بعد إعداد هذا التقرير" : "يتضمن أحدث بيانات القضية") }),
+      node("p", { text: SOCifyLocale.template`أُعد: ${formatTime(report.created_at)}${report.approved_at ? SOCifyLocale.template` · اعتُمد: ${formatTime(report.approved_at)}` : ""}` }),
+      node("details", {}, [node("summary", { text: SOCifyLocale.text("بصمة الملف") }), node("bdi", { text: `SHA-256: ${report.sha256}` })]),
+    ]);
     const links = node("div", { class: "action-row report-downloads" });
     if (report.formats.length) {
       const formats = node("select", { "aria-label": SOCifyLocale.text("صيغة التقرير") }, report.formats.map((format) => node("option", { value: format, selected: format === "pdf", text: format.toUpperCase() })));

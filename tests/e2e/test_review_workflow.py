@@ -293,6 +293,7 @@ def test_complete_review_closes_alert_and_reopening_preserves_report(app, langua
         open_manager_review(manager)
         manager.click("button", "مراجعة واعتماد النسخة")
         manager.click("button", "حفظ", manager.page.get_by_role("dialog"))
+        expect(manager.page.locator(".report-status")).to_have_text(manager.text("معتمد") + " · " + manager.text("جاهز للتنزيل"))
         with manager.page.expect_download() as download:
             manager.page.get_by_role("link", name=download_pdf, exact=True).click()
         report_bytes = Path(download.value.path()).read_bytes()
