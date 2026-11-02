@@ -22,7 +22,7 @@ code { font:500 14px/1.7 "JetBrains Mono","Cairo",monospace; overflow-wrap:anywh
 .section-title { font-size:19px; font-weight:900; color:#191D20; border-block:2px solid #252A26; background-color:#DED8C8; background-image:repeating-linear-gradient(135deg,transparent 0 7px,#292D2515 7px 8px); padding:10px 12px; margin:28px 0 16px; }
 .qa-table,.evidence-table { width:100%; border-collapse:collapse; table-layout:fixed; font-size:14px; margin-bottom:20px; }
 .qa-col-topic { width:38%; }
-.qa-table th,.qa-table td,.evidence-table th,.evidence-table td { border:1px solid #898C7F; padding:12px; text-align:right; vertical-align:top; overflow-wrap:anywhere; }
+.qa-table th,.qa-table td,.evidence-table th,.evidence-table td { border:1px solid #898C7F; padding:12px; text-align:start; vertical-align:top; overflow-wrap:anywhere; }
 .qa-table thead th,.evidence-table thead th { background:#DED8C8; color:#191D20; font-size:14px; font-weight:900; border-bottom:2px solid #252A26; }
 .qa-table tbody th { background:#E9E3D4; font-weight:800; }
 .report-facts th[scope="row"],.report-facts thead th:first-child { width:34%; }

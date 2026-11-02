@@ -336,15 +336,29 @@ def record_heading(item):
     return "تفاصيل العنصر"
 
 
-def report_table(value):
+def report_table(value, *, localize=False):
     """Render structured evidence as labelled cells, never ordinal-only rows."""
     rows = []
 
-    def row(label, cell):
-        rows.append(f'<tr><th scope="row">{html.escape(display(label))}</th><td><bdi dir="auto">{html.escape(display(cell))}</bdi></td></tr>')
+    def row(label, cell, translate_value=False):
+        label_copy = " data-ui-copy" if localize and label in LABELS.values() else ""
+        value_copy = " data-ui-copy" if localize and translate_value else ""
+        rows.append(
+            f'<tr><th scope="row"{label_copy}>{html.escape(display(label))}</th><td><bdi dir="auto"{value_copy}>{html.escape(display(cell))}</bdi></td></tr>'
+        )
 
-    def group(label):
-        rows.append(f'<tr class="report-group"><th colspan="2">{html.escape(display(label))}</th></tr>')
+    def group(label, record=None):
+        content = html.escape(display(label))
+        if localize:
+            if record:
+                for key in ("event_id", "reference", "title", "name", "id"):
+                    if record.get(key) not in (None, ""):
+                        caption = html.escape(LABELS.get(key, key))
+                        content = f'<span data-ui-copy>{caption}</span>: <bdi dir="auto">{html.escape(display(record[key]))}</bdi>'
+                        break
+            elif label in LABELS.values() or label == "تفاصيل العنصر":
+                content = f"<span data-ui-copy>{content}</span>"
+        rows.append(f'<tr class="report-group"><th colspan="2">{content}</th></tr>')
 
     def walk(item, label="التفاصيل"):
         if isinstance(item, dict):
@@ -357,19 +371,20 @@ def report_table(value):
                     walk(cell, caption)
                 else:
                     text = next(lines({key: cell}))[1][len(caption) + 2 :]
-                    row(caption, text)
+                    row(caption, text, cell is None or (text != display(cell) and text in ENUM_LABELS.values()))
         elif isinstance(item, list):
             if all(not isinstance(cell, (dict, list)) for cell in item):
                 row(label, "، ".join(display(cell) for cell in item) if item else "—")
             else:
                 for cell in item:
-                    group(record_heading(cell) if isinstance(cell, dict) else label)
+                    group(record_heading(cell) if isinstance(cell, dict) else label, cell if isinstance(cell, dict) else None)
                     walk(cell, label)
         else:
             row(label, item)
 
     walk(value)
-    return '<table class="qa-table report-facts"><thead><tr><th>الحقل</th><th>القيمة</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>"
+    copy = " data-ui-copy" if localize else ""
+    return f'<table class="qa-table report-facts"><thead><tr><th{copy}>الحقل</th><th{copy}>القيمة</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>"
 
 
 def sections(payload):

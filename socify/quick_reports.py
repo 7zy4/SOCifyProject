@@ -500,11 +500,12 @@ def _esc(value: object) -> str:
 
 def _fmt_bilingual(value: object) -> str:
     raw = str(value if value is not None else "—")
-    if raw.endswith(")") and " (" in raw:
-        ar_part, en_inner = raw.rsplit(" (", 1)
-        en_part = "(" + en_inner
-        if all(ch.isascii() and (ch.isalnum() or ch in " ()&/,._:-+") for ch in en_part):
-            return f'{_esc(ar_part)} <span class="en-sub" dir="ltr">{_esc(en_part)}</span>'
+    parts = re.fullmatch(r"(.*)\s+\(([^()]*)\)", raw)
+    if parts:
+        language = request.headers.get("X-SOCify-Language", request.cookies.get("socify-language")) or request.accept_languages.best_match(
+            ("ar", "en"), default="ar"
+        )
+        return _esc(parts[2] if language == "en" else parts[1])
     return _esc(raw)
 
 
@@ -545,9 +546,9 @@ def print_quick_report(case_id: int):
         return error_response("REPORT_CONTENT_LIMIT", str(exc), 422)
     inspection_html = ""
     if inspected:
-        parts = ['<h2 class="section-title">فحص المحتوى والترميزات</h2>']
+        parts = ['<h2 class="section-title" data-ui-copy>فحص المحتوى والترميزات</h2>']
         for item in inspected:
-            parts.append(f'<div class="content-inspection-report">{report_table(item)}</div>')
+            parts.append(f'<div class="content-inspection-report">{report_table(item, localize=True)}</div>')
         inspection_html = "".join(parts)
     for title, key in (
         ("تحليل الشبكة", "network_analysis"),
@@ -557,29 +558,30 @@ def print_quick_report(case_id: int):
         ("تسجيل الدخول", "logon_events"),
     ):
         if telemetry[key]:
-            inspection_html += f'<h2 class="section-title">{title}</h2>'
+            inspection_html += f'<h2 class="section-title" data-ui-copy>{title}</h2>'
             readable = network_report_content(telemetry[key]) if key == "network_analysis" else telemetry[key]
-            inspection_html += report_table(readable)
+            inspection_html += report_table(readable, localize=True)
     qa_rows_html = "".join(
         f"<tr><th>{_fmt_bilingual(item['question'])}</th><td><strong>{_fmt_bilingual(item['answer_label'])}</strong></td></tr>"
         for item in report["resolved_questions"]
     )
     status_label = {"draft": "مسودة", "escalated": "أُحيل للمراجعة", "acknowledged": "تمت المراجعة"}.get(report["status"], report["status"])
     status_tone = _badge_tone(report["status"])
-    note_html = f'<div class="note-box"><strong>ملاحظة المحقق المختصرة:</strong> {_esc(report["executive_note"])}</div>' if report["executive_note"] else ""
+    note_html = f'<div class="note-box"><strong data-ui-copy>خلاصة المحقق</strong>: {_esc(report["executive_note"])}</div>' if report["executive_note"] else ""
+    manager_label = {"approved": "معتمد", "needs_followup": "يتطلب متابعة", "closed": "تم الحل"}.get(report["manager_decision"], "")
     manager_html = (
-        f'<div class="note-box manager-box"><strong>قرار واعتماد المدير (<span class="mono" dir="ltr">{_esc(report["manager_decision"])}</span>):</strong> {_esc(report["manager_comment"] or "تم الاعتماد")} · <span class="mono" dir="ltr">{_esc(report["acknowledged_at"])}</span></div>'
+        f'<div class="note-box manager-box"><strong data-ui-copy>قرار المدير</strong>: <span data-ui-copy>{manager_label}</span> · {_esc(report["manager_comment"])} · <span class="mono" dir="ltr">{_esc(report["acknowledged_at"])}</span></div>'
         if report["manager_decision"]
         else ""
     )
 
     if summary["alerts"]:
         alerts_rows_html = "".join(
-            f'<tr><td><code dir="ltr">{_esc(a["alert_id"])}</code></td><td><span class="badge {_badge_tone(a["severity"])}">{_esc(ENUM_LABELS.get(a["severity"], a["severity"]))}</span></td><td>{_esc(a["reason"])}</td><td><span class="mono" dir="ltr">{_esc(a["detected_at"])}</span></td></tr>'
+            f'<tr><td><code dir="ltr">{_esc(a["alert_id"])}</code></td><td><span class="badge {_badge_tone(a["severity"])}" data-ui-copy>{_esc(ENUM_LABELS.get(a["severity"], a["severity"]))}</span></td><td>{_esc(a["reason"])}</td><td><span class="mono" dir="ltr">{_esc(a["detected_at"])}</span></td></tr>'
             for a in summary["alerts"]
         )
     else:
-        alerts_rows_html = '<tr><td colspan="4">لا توجد تنبيهات مسجلة في القضية حتى لحظة التقرير.</td></tr>'
+        alerts_rows_html = '<tr><td colspan="4" data-ui-copy>لا توجد تنبيهات مسجلة في القضية حتى لحظة التقرير.</td></tr>'
 
     if summary["static_triage_items"]:
         triage_rows_html = "".join(
@@ -587,7 +589,7 @@ def print_quick_report(case_id: int):
             for t in summary["static_triage_items"]
         )
     else:
-        triage_rows_html = '<tr><td colspan="4">لم تُفحص ملفات أو رسائل بريد ساكنة في هذه القضية.</td></tr>'
+        triage_rows_html = '<tr><td colspan="4" data-ui-copy>لم تُفحص ملفات أو رسائل بريد ساكنة في هذه القضية.</td></tr>'
 
     document = f"""<!doctype html>
 <html lang="ar" dir="rtl">
@@ -595,10 +597,11 @@ def print_quick_report(case_id: int):
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/svg+xml" href="/static/brand-mark.svg">
-  <title>تقرير فرز وتحقيق فوري · {_esc(cmeta["reference"])}</title>
+  <title data-ui-copy>تقرير التحقيق | {_esc(cmeta["reference"])}</title>
   <link rel="stylesheet" href="/static/fonts.css">
   <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/quick-report-print.css">
+  <script src="/static/localization.js" defer></script>
   <script src="/static/quick-report-print.js" defer></script>
 </head>
 <body>
@@ -608,8 +611,8 @@ def print_quick_report(case_id: int):
       <span><strong dir="ltr">SOCify</strong></span>
     </div>
     <div class="toolbar-actions">
-      <button type="button" id="trigger-print-btn">طباعة التقرير / حفظ PDF</button>
-      <a class="secondary" href="/cases/{case_id}?tab=reports">العودة للقضية</a>
+      <button type="button" id="trigger-print-btn" data-ui-copy>طباعة التقرير / حفظ PDF</button>
+      <a class="secondary" href="/cases/{case_id}?tab=reports" data-ui-copy>العودة للقضية</a>
     </div>
   </div>
   <main class="report-sheet">
@@ -618,36 +621,36 @@ def print_quick_report(case_id: int):
         <div class="brand-kicker"><img src="/static/brand-mark.svg" width="20" height="20" alt=""><span dir="ltr">SOCify</span></div>
         <h1 class="report-title"><span class="mono" dir="ltr">{_esc(cmeta["reference"])}</span> — {_esc(cmeta["title"])}</h1>
       </div>
-      <div><span class="badge {status_tone}" dir="ltr">{_esc(status_label)}</span></div>
+      <div><span class="badge {status_tone}" data-ui-copy>{_esc(status_label)}</span></div>
     </header>
 
-    <section class="meta-grid" aria-label="بيانات القضية الأساسية">
-      <div class="meta-item"><strong>مرجع القضية</strong><span class="mono" dir="ltr">{_esc(cmeta["reference"])}</span></div>
-      <div class="meta-item"><strong>المسؤول عن التحقيق</strong>{_esc(cmeta["owner_name"])}</div>
-      <div class="meta-item"><strong>الخطورة والحالة</strong><span>{_esc(ENUM_LABELS.get(cmeta["severity"], cmeta["severity"]))} · {_esc(ENUM_LABELS.get(cmeta["status"], cmeta["status"]))}</span></div>
-      <div class="meta-item"><strong>إجمالي السجلات المفحوصة</strong>{_esc(summary["logs_count"])} سجل</div>
-      <div class="meta-item"><strong>التنبيهات وتطابقات المراقبة</strong>{_esc(summary["alerts_count"])} تنبيه (<span class="mono" dir="ltr">{_esc(summary["watchlist_hits_count"])} Watchlist</span>)</div>
-      <div class="meta-item"><strong>وقت التوليد (UTC)</strong><span class="mono" dir="ltr">{_esc(iso_now()[:19].replace("T", " "))}</span></div>
+    <section class="meta-grid" aria-label="بيانات القضية الأساسية" data-ui-attributes>
+      <div class="meta-item"><strong data-ui-copy>مرجع القضية</strong><span class="mono" dir="ltr">{_esc(cmeta["reference"])}</span></div>
+      <div class="meta-item"><strong data-ui-copy>المسؤول عن التحقيق</strong>{_esc(cmeta["owner_name"])}</div>
+      <div class="meta-item"><strong data-ui-copy>الخطورة والحالة</strong><span><span data-ui-copy>{_esc(ENUM_LABELS.get(cmeta["severity"], cmeta["severity"]))}</span> · <span data-ui-copy>{_esc(ENUM_LABELS.get(cmeta["status"], cmeta["status"]))}</span></span></div>
+      <div class="meta-item"><strong data-ui-copy>إجمالي السجلات المفحوصة</strong>{_esc(summary["logs_count"])}</div>
+      <div class="meta-item"><strong data-ui-copy>التنبيهات وتطابقات المراقبة</strong><span>{_esc(summary["alerts_count"])} <span data-ui-copy>تنبيه</span> · {_esc(summary["watchlist_hits_count"])} <span data-ui-copy>تطابق مراقبة</span></span></div>
+      <div class="meta-item"><strong data-ui-copy>وقت التوليد (UTC)</strong><span class="mono" dir="ltr">{_esc(iso_now()[:19].replace("T", " "))}</span></div>
     </section>
 
     {note_html}
     {manager_html}
 
-    <h2 class="section-title">أولًا: خلاصة التحقيق الموجهة</h2>
+    <h2 class="section-title" data-ui-copy>قرارات التحقيق</h2>
     <table class="qa-table">
-      <thead><tr><th class="qa-col-topic">محور التقييم</th><th>النتيجة المعتمدة</th></tr></thead>
+      <thead data-ui-copy><tr><th class="qa-col-topic">محور التقييم</th><th>النتيجة المعتمدة</th></tr></thead>
       <tbody>{qa_rows_html}</tbody>
     </table>
 
-    <h2 class="section-title">ثانيًا: تنبيهات القواعد المدمجة وقائمة المراقبة</h2>
+    <h2 class="section-title" data-ui-copy>التنبيهات</h2>
     <table class="evidence-table">
-      <thead><tr><th>المعرف</th><th>الخطورة</th><th>القاعدة / سبب التنبيه</th><th>وقت الرصد</th></tr></thead>
+      <thead data-ui-copy><tr><th>المعرف</th><th>الخطورة</th><th>القاعدة / سبب التنبيه</th><th>وقت الرصد</th></tr></thead>
       <tbody>{alerts_rows_html}</tbody>
     </table>
 
-    <h2 class="section-title">ثالثًا: نتائج الفحص الساكن الآمن للملفات والبريد</h2>
+    <h2 class="section-title" data-ui-copy>فحص الملفات والبريد</h2>
     <table class="evidence-table">
-      <thead><tr><th>الملف / الرسالة</th><th>الحكم الأولي</th><th>SHA-256</th><th>الملاحظات الفنية</th></tr></thead>
+      <thead data-ui-copy><tr><th>الملف / الرسالة</th><th>الحكم الأولي</th><th>SHA-256</th><th>الملاحظات الفنية</th></tr></thead>
       <tbody>{triage_rows_html}</tbody>
     </table>
 

@@ -71,14 +71,25 @@ def test_account_language_and_labelled_network_report(app, language, width):
             page.evaluate(
                 """async id => {
                 const guide=await api(`/api/cases/${id}/quick-report`);
-                await api(`/api/cases/${id}/quick-report`,{method:'PUT',body:{answers:Object.fromEntries(guide.questions.map(q=>[q.id,q.options[0].value]))}});
+                await api(`/api/cases/${id}/quick-report`,{method:'PUT',body:{answers:Object.fromEntries(guide.questions.map(q=>[q.id,q.options[0].value])),executive_note:'حفظ'}});
             }""",
                 case["id"],
             )
             page.goto(base + f"/cases/{case['id']}/quick-report/print")
             page.locator(".report-facts").first.wait_for()
             assert first in page.locator(".meta-grid").inner_text()
-            assert "معرف قاعدة الرصد" in page.locator(".report-sheet").inner_text()
+            assert page.locator("html").get_attribute("lang") == language
+            assert ("معرف قاعدة الرصد" if language == "ar" else "Sensor rule ID") in page.locator(".report-sheet").inner_text()
+            decisions = page.locator(".qa-table").first.inner_text()
+            assert ("تصنيف الحادثة" if language == "ar" else "Incident Classification") in decisions
+            assert ("Incident Classification" if language == "ar" else "تصنيف الحادثة") not in decisions
+            assert "نورة — مراجعة تنبيه الشبكة" in page.locator(".report-title").inner_text()
+            assert page.locator(".note-box").inner_text().endswith("حفظ")
+            if language == "en":
+                authored = page.locator("[data-ui-copy]").all_inner_texts()
+                untranslated = [text for text in authored if re.search(r"[\u0600-\u06ff]", text)]
+                assert not untranslated, untranslated
+                assert page.get_by_role("button", name="Print report / Save PDF", exact=True).is_visible()
             for text in page.locator(".report-facts tr").all_inner_texts():
                 assert not re.fullmatch(r"[\d\s—]+", text)
             assert page.evaluate(

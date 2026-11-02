@@ -5,6 +5,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def test_printable_evidence_labels_have_english_translations():
+    from socify.autopsy_report_render import ENUM_LABELS, LABELS
+
+    script = (ROOT / "static" / "localization.js").read_text(encoding="utf-8")
+    catalog = json.JSONDecoder().raw_decode(script.split("const english = ", 1)[1])[0]
+    labels = set(LABELS.values()) | set(ENUM_LABELS.values())
+    missing = [label for label in labels if not label.isascii() and label not in catalog]
+    assert not missing, missing
+
+
 def test_all_authored_operational_labels_have_english_translations():
     script = (ROOT / "static" / "localization.js").read_text(encoding="utf-8")
     catalog = json.JSONDecoder().raw_decode(script.split("const english = ", 1)[1])[0]
