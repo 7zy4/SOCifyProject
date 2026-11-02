@@ -26,7 +26,7 @@ def migrate(connection):
     # Only rows present during migration are grandfathered. Every subsequent create records a pending request.
     if not connection.execute("SELECT 1 FROM schema_meta WHERE key='v4_case_approval_migrated'").fetchone():
         connection.execute("""INSERT OR IGNORE INTO case_approvals(case_id,state,requested_by,source,reason)
-            SELECT id,'approved',creator,'v3_migration','Retained V3 case access' FROM incident_cases""")
+            SELECT id,'approved',creator,'v3_migration','Retained case access' FROM incident_cases""")
         connection.execute("INSERT INTO schema_meta(key,value,updated_at) VALUES ('v4_case_approval_migrated','1',?)", (iso_now(),))
 
 

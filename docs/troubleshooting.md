@@ -32,7 +32,7 @@
 `flask_wtf.csrf` و`csrf_rejected` نصان للبحث داخل السجل، وليسا أمرين للتنفيذ. إذا كان `/tmp/socify-gunicorn.log` فارغًا، فقد يكون الخادم شُغّل يدويًا وتظهر رسائله في طرفيته. بعد إيقاف الخادم الحالي بـ Ctrl+C في طرفيته، شغّل:
 
 ```bash
-git pull --ff-only origin socify-version-2
+git pull --ff-only origin final
 SOCIFY_HOST=0.0.0.0 python -m scripts.start_codespace 2>&1 | tee /tmp/socify-login-debug.log
 ```
 

@@ -19,7 +19,7 @@
       "visibility": "private"
     },
     "5001": {
-      "label": "SOCify Development",
+      "label": "SOCify",
       "onAutoForward": "openBrowser",
       "visibility": "private"
     }

@@ -154,7 +154,7 @@ def run(output: Path, bulk_count: int, import_count: int, samples: int) -> dict[
 
         result: dict[str, Any] = {
             "schema_version": 1,
-            "benchmark_scope": "archived V2 training workflow; does not establish V3 capacity",
+            "benchmark_scope": "archived training workflow; does not establish capacity",
             "commit": git_revision(),
             "command": f"python -m scripts.benchmark_reference --bulk-events {bulk_count} --import-events {import_count} --samples {samples}",
             "fixture_seed": 20261023,

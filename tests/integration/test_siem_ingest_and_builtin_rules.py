@@ -9,7 +9,7 @@ def test_builtin_brand_refresh_preserves_rule_identity_and_history(database):
     name = BUILTIN_RULES[0]["name"]
     before = dict(database.execute("SELECT * FROM rules WHERE workspace_id = 1 AND name = ?", (name,)).fetchone())
     history = [dict(row) for row in database.execute("SELECT * FROM rule_versions WHERE rule_id = ?", (before["id"],))]
-    legacy_name = name.replace("[SOCify]", "[SOCify V6]", 1)
+    legacy_name = name.replace("[SOCify]", "[SOCify legacy]", 1)
     database.execute("UPDATE rules SET name = ? WHERE id = ?", (legacy_name, before["id"]))
     assert seed_builtin_rules(database) == 0
     assert dict(database.execute("SELECT * FROM rules WHERE id = ?", (before["id"],)).fetchone()) == before
@@ -20,7 +20,7 @@ def test_builtin_brand_refresh_preserves_rule_identity_and_history(database):
 def test_builtin_rules_auto_seeded_into_every_workspace(app, client, database, login_as):
     app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
     new_ws = database.execute(
-        "INSERT INTO training_workspaces(public_id, name, created_at) VALUES ('v6-fresh-ws', 'Fresh SOC Workspace', '2026-11-01T00:00:00Z')"
+        "INSERT INTO training_workspaces(public_id, name, created_at) VALUES ('fresh-soc-ws', 'Fresh SOC Workspace', '2026-11-01T00:00:00Z')"
     ).lastrowid
     ensure_schema(database)
 
@@ -29,7 +29,7 @@ def test_builtin_rules_auto_seeded_into_every_workspace(app, client, database, l
             "SELECT COUNT(*) FROM rules WHERE workspace_id = ? AND is_active = 1 AND name LIKE '[SOCify]%'",
             (ws_id,),
         ).fetchone()[0]
-        assert count >= 16, f"Expected >=16 built-in V6 rules in workspace {ws_id}, got {count}"
+        assert count >= 16, f"Expected >=16 built-in rules in workspace {ws_id}, got {count}"
 
     login_as("analyst")
     resp = client.get("/api/autopsy/detection/builtin-rules")

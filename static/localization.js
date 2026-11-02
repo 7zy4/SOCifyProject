@@ -293,7 +293,7 @@
   "تحديث حالة التقارير": "Refresh report status",
   "إصدارات ثابتة تجمع نتائج التحقيق والأدلة والإجراءات. الملاحظات الخاصة مستبعدة. لا يعني إنشاء التقرير اعتماده أو إغلاق القضية.": "Immutable versions collect investigation findings, evidence and actions. Private notes are excluded. Creating a report does not approve it or close the case.",
   "يتطلب الإغلاق: أدلة، تحليل سبب جذري أو سبب عدم تحديده، تحقق من الاستجابة، إكمال المهام والخطوات الإلزامية، وتقرير كامل معتمد يطابق آخر إصدار للقضية.": "Closure requires evidence, a root-cause finding or a documented reason it remains unknown, verified response, completed mandatory tasks and steps, and an approved full report matching the latest case version.",
-  "أرشيف تقارير V2 · النسخ الأصلية محفوظة دون إعادة توليد": "V2 report archive · Original files retained without regeneration",
+  "أرشيف التقارير": "Report archive",
   "الصيغة": "Format",
   "البصمة": "Hash",
   "الملف": "File",

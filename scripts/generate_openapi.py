@@ -149,7 +149,7 @@ def generate() -> dict[str, object]:
                 )
             elif path.endswith("/approval"):
                 operation["description"] = (
-                    "Manager/admin with cases.override only. Each new case, including a restored capsule, starts pending. A versioned decision is atomic, final, audited and recorded in custody. Case work is blocked until approval. Existing V3 cases retain grandfathered access after one-time migration."
+                    "Manager/admin with cases.override only. When case approval is required, each new case starts pending. A versioned decision is atomic, final, audited and recorded in custody. With this policy enabled, case work is blocked until approval. Existing cases retain their recorded access after migration."
                 )
             elif path.startswith("/api/demo/"):
                 operation["description"] = (
@@ -160,7 +160,7 @@ def generate() -> dict[str, object]:
         "openapi": "3.1.0",
         "info": {
             "title": "SOCify Tactical Workbench API",
-            "version": "6.0.0",
+            "version": "current",
             "description": "Fast-triage SOC workbench API for SIEM log ingestion, built-in detection rules, safe static file and email inspection, suspicious IP and email watchlists, direct case ownership, and guided printable reporting with manager escalation. All writes require an authenticated session, permission and CSRF token.",
         },
         "servers": [{"url": "/"}],

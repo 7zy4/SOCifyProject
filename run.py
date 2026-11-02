@@ -9,7 +9,7 @@ from socify import create_app
 
 def main() -> None:
     if "--demo" in sys.argv[1:]:
-        from scripts.start_v4_demo import main as start_demo
+        from scripts.start_demo import main as start_demo
 
         start_demo([argument for argument in sys.argv[1:] if argument != "--demo"])
         return

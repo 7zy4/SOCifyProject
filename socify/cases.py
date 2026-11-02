@@ -1219,7 +1219,7 @@ def get_report(case_id: int):
     )
     if not row:
         if operational_mode():
-            return error_response("REPORT_NOT_FOUND", "لا نسخة مؤرشفة؛ أعد تقرير V3 من مساحة القضية", 404)
+            return error_response("REPORT_NOT_FOUND", "لا يوجد تقرير مؤرشف؛ أنشئ تقريرًا من مساحة القضية", 404)
         if revision is not None:
             return error_response("REPORT_NOT_FOUND", "إصدار التقرير غير موجود", 404)
         if case["status"] != "closed":

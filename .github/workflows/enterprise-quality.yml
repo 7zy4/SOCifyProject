@@ -5,12 +5,7 @@ on:
   pull_request:
   push:
     branches:
-      - socify-version-2
-      - socify-version-3
-      - V4
-      - V5
-      - V6
-      - 'feat/v6-*'
+      - final
 
 permissions:
   contents: read
@@ -29,9 +24,9 @@ jobs:
       - run: python -m ruff check .
       - name: Validate Bash launchers
         run: |
-          bash -n scripts/start_v4_analysis.sh
+          bash -n scripts/start_analysis.sh
           bash -n scripts/try_codespace.sh
-          bash -n scripts/try_v4_demo.sh
+          bash -n scripts/try_demo.sh
       - run: python -m mypy socify scripts app.py run.py
       - run: python -m scripts.generate_interface_tokens --check
       - run: python -m scripts.audit_brand --tokens-only
@@ -92,7 +87,7 @@ jobs:
       - run: npm install --no-save --ignore-scripts axe-core@4.14.0
       - uses: ./.github/actions/analysis-backend
       - run: xvfb-run --auto-servernum --server-args="-screen 0 1600x1200x24" python -m pytest -m e2e tests/e2e --junitxml=artifacts/browser-junit.xml
-      - name: Audit real V4 pages in both languages, editions and viewport sizes
+      - name: Audit operational pages in both languages, editions and viewport sizes
         run: python -m scripts.audit_brand
       - name: Publish browser failure details in the job summary
         if: always()

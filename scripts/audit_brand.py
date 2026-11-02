@@ -1,4 +1,4 @@
-"""Validate shared V4 tokens and render real bilingual operational pages."""
+"""Validate shared tokens and render real bilingual operational pages."""
 
 import argparse
 import json
@@ -61,12 +61,12 @@ def audit_pages(output: Path) -> list[dict]:
     from playwright.sync_api import sync_playwright
     from werkzeug.serving import make_server
 
-    from scripts.prepare_v4_demo import provision
+    from scripts.prepare_demo import provision
     from socify import create_app
     from socify.db import get_db
     from socify.seeding import _user
 
-    with tempfile.TemporaryDirectory(prefix="socify-v4-brand-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="socify-brand-") as temporary:
         directory = Path(temporary) / "demo"
         manifest = provision(directory)
         keys = dict(line.split("=", 1) for line in (directory / "runtime.env").read_text().splitlines())

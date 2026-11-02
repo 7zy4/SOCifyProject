@@ -14,18 +14,18 @@ The bundled ATT&CK reference records and optional STIX snapshot loader use mater
 
 ## Python dependencies
 
-Runtime dependencies and pinned versions are listed in `requirements.txt`. CI generates a CycloneDX SBOM and performs vulnerability review with `pip-audit`. Each dependency remains under its own upstream license.
+Runtime dependencies and pinned versions are listed in `requirements.txt`. Each dependency remains under its own upstream license.
 
-V3 adds local defensive processing/reporting dependencies: WeasyPrint (BSD, `https://github.com/Kozea/WeasyPrint`), python-docx (MIT, `https://github.com/python-openxml/python-docx`), dpkt (BSD, `https://github.com/kbandla/dpkt`), PyYAML (MIT, `https://github.com/yaml/pyyaml`), yara-python (Apache 2.0 binding with the upstream YARA engine's own notices, `https://github.com/VirusTotal/yara-python`), and maxminddb (Apache 2.0, `https://github.com/maxmind/MaxMind-DB-Reader-python`). These libraries do not imply an installed GeoIP database, threat feed, YARA rule collection, sandbox, or external VirusTotal integration. Any separately imported intelligence, GeoIP or rule data retains its own license and version requirements.
+Local defensive processing/reporting dependencies: WeasyPrint (BSD, `https://github.com/Kozea/WeasyPrint`), python-docx (MIT, `https://github.com/python-openxml/python-docx`), dpkt (BSD, `https://github.com/kbandla/dpkt`), PyYAML (MIT, `https://github.com/yaml/pyyaml`), yara-python (Apache 2.0 binding with the upstream YARA engine's own notices, `https://github.com/VirusTotal/yara-python`), and maxminddb (Apache 2.0, `https://github.com/maxmind/MaxMind-DB-Reader-python`). These libraries do not imply an installed GeoIP database, threat feed, YARA rule collection, sandbox, or external VirusTotal integration. Any separately imported intelligence, GeoIP or rule data retains its own license and version requirements.
 
 ## Brand fonts
 
-Baloo Bhaijaan 2 and IBM Plex Sans Arabic are self-hosted from the Google Fonts repository under the SIL Open Font License 1.1. Copyright notices and complete license terms are retained beside the original fonts in `static/fonts/`. WOFF2 files are lossless format conversions using fonttools 4.60.1 and Brotli 1.2.1; glyph content is unchanged. Printable HTML embeds the WOFF2 fonts for offline use.
+Baloo Bhaijaan 2 and IBM Plex Sans Arabic are self-hosted from the Google Fonts repository under the SIL Open Font License 1.1. Copyright notices and complete license terms are retained beside the original fonts in `static/fonts/`. Printable HTML embeds the WOFF2 fonts for offline use.
 
-## Interface fonts (previous 2026 redesign)
+## Additional bundled fonts
 
-The previous interface used Almarai and IBM Plex Sans. Sources: https://github.com/google/fonts/tree/main/ofl/almarai and https://github.com/google/fonts/tree/main/ofl/ibmplexsans. Both are distributed under SIL OFL 1.1; licenses are in `static/fonts/Almarai-OFL.txt` and `static/fonts/IBMPlexSans-OFL.txt`. Original WOFF2 builds are recorded in `static/fonts/interface-manifest.json`. IBM Plex Sans fixes the width axis at 100 and retains the variable weight axis. Earlier font assets remain for historical report compatibility.
+Bundled fonts include Almarai and IBM Plex Sans. Sources: https://github.com/google/fonts/tree/main/ofl/almarai and https://github.com/google/fonts/tree/main/ofl/ibmplexsans. Both are distributed under SIL OFL 1.1; licenses are in `static/fonts/Almarai-OFL.txt` and `static/fonts/IBMPlexSans-OFL.txt`. Original WOFF2 builds are recorded in `static/fonts/interface-manifest.json`. IBM Plex Sans fixes the width axis at 100 and retains the variable weight axis.
 
-## V4 noir interface and reports
+## Interface and report fonts
 
-The current type system uses Bangers, Comic Neue, Cairo, Tajawal, IBM Plex Sans Arabic, IBM Plex Sans and JetBrains Mono. Fonts are bundled locally under SIL OFL 1.1 with the corresponding license beside each family. The added upstream sources, input hashes and converted WOFF2 hashes are recorded in `static/fonts/sources.json`; the retained IBM Plex Sans face uses the preceding interface manifest. The new faces were converted with fontTools without changing glyph designs. `static/design-tokens.json` selects the active families. No runtime request to a font provider is required.
+The current type system uses Bangers, Comic Neue, Cairo, Tajawal, IBM Plex Sans Arabic, IBM Plex Sans and JetBrains Mono. Fonts are bundled locally under SIL OFL 1.1 with the corresponding license beside each family. The added upstream sources, input hashes and converted WOFF2 hashes are recorded in `static/fonts/sources.json`; the retained IBM Plex Sans face uses the preceding interface manifest. `static/design-tokens.json` selects the active families. No runtime request to a font provider is required.

@@ -19,7 +19,7 @@ from socify.seeding import seed_demo_data
 
 def ensure(condition, stage):
     if not condition:
-        raise RuntimeError(f"Synthetic V3 capacity verification failed: {stage}")
+        raise RuntimeError(f"Synthetic capacity verification failed: {stage}")
 
 
 def seed_capacity(connection, case_id, actor, count):
@@ -30,7 +30,7 @@ def seed_capacity(connection, case_id, actor, count):
         connection.execute(
             """WITH RECURSIVE sequence(n) AS (VALUES(?) UNION ALL SELECT n+1 FROM sequence WHERE n<?)
             INSERT INTO security_events(event_id,external_id,idempotency_key,workspace_id,source,source_type,severity,category,event_type,title,description,event_time,ingested_at,timestamp,source_ip,hostname,raw_data,normalized_fields,tags,mitre_ids,status,created_by,parser_version,raw_hash,provenance,owner_case_id)
-            SELECT printf('V3-CAP-%09d',n),printf('V3-CAP-%09d',n),printf('v3-capacity:%09d',n),1,'capacity-synthetic','synthetic','medium','capacity','capacity_event','Capacity synthetic event','Storage-query seed, not parser throughput','2026-10-20T10:00:00Z','2026-10-20T10:00:00Z','2026-10-20T10:00:00Z',printf('192.0.2.%d',n%64+1),'capacity.example.test','{}','{"event_time_known":true}','[]','[]','open',?,'capacity-fixture/1','','{"synthetic":true}',? FROM sequence""",
+            SELECT printf('CAP-%09d',n),printf('CAP-%09d',n),printf('capacity:%09d',n),1,'capacity-synthetic','synthetic','medium','capacity','capacity_event','Capacity synthetic event','Storage-query seed, not parser throughput','2026-10-20T10:00:00Z','2026-10-20T10:00:00Z','2026-10-20T10:00:00Z',printf('192.0.2.%d',n%64+1),'capacity.example.test','{}','{"event_time_known":true}','[]','[]','open',?,'capacity-fixture/1','','{"synthetic":true}',? FROM sequence""",
             (offset + 1, offset + batch, actor, case_id),
         )
         connection.execute(
@@ -46,7 +46,7 @@ def seed_capacity(connection, case_id, actor, count):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Synthetic V3 case capacity and 20-user API benchmark; never use company data")
+    parser = argparse.ArgumentParser(description="Synthetic case capacity and 20-user API benchmark; never use company data")
     parser.add_argument("--events", type=int, default=1000000)
     parser.add_argument("--concurrency", type=int, default=20)
     parser.add_argument("--requests", type=int, default=100)
@@ -55,7 +55,7 @@ def main():
     if not 1000 <= options.events <= 1000000 or not 1 <= options.concurrency <= 20 or not 20 <= options.requests <= 1000:
         parser.error("events:1000..1000000 concurrency:1..20 requests:20..1000")
     started, cpu = time.monotonic(), resource.getrusage(resource.RUSAGE_SELF)
-    with tempfile.TemporaryDirectory(prefix="socify-v3-capacity-") as folder:
+    with tempfile.TemporaryDirectory(prefix="socify-capacity-") as folder:
         path = Path(folder) / "synthetic.db"
         app = create_app(
             {
@@ -85,7 +85,7 @@ def main():
         client = client_for_actor()
         case = client.post(
             "/api/cases",
-            json={"title": "Synthetic capacity investigation", "reason": "forensic_review", "objective": "Measure bounded V3 APIs against synthetic case data"},
+            json={"title": "Synthetic capacity investigation", "reason": "forensic_review", "objective": "Measure bounded APIs against synthetic case data"},
         )
         ensure(case.status_code == 201, "case creation")
         case_id, base = case.json["id"], f"/api/cases/{case.json['id']}"
@@ -150,7 +150,7 @@ def main():
         connection.close()
         usage = resource.getrusage(resource.RUSAGE_SELF)
         result = {
-            "schema": "socify-v3-capacity/1",
+            "schema": "socify-capacity/1",
             "revision": git_revision(),
             "environment": {
                 "python": platform.python_version(),

@@ -159,7 +159,7 @@ def _ingest_records_for_source(
                    (job_id, workspace_id, source_id, training_run_id, case_id, filename, original_filename, format,
                     content_hash, evidence_ciphertext, raw_size, estimated_total, source_name, status,
                     parser_version, active_version, autopsy_options, created_by, executor_id, created_at, updated_at, available_at, completed_at, progress)
-                   VALUES (?, ?, ?, NULL, ?, 'siem-stream.log', 'siem-stream.log', ?, ?, ?, ?, ?, ?, 'completed', 'socify-siem-v6', 1, '{}', ?, ?, ?, ?, ?, ?, 1)""",
+                   VALUES (?, ?, ?, NULL, ?, 'siem-stream.log', 'siem-stream.log', ?, ?, ?, ?, ?, ?, 'completed', 'socify-siem', 1, '{}', ?, ?, ?, ?, ?, ?, 1)""",
                 (
                     public_id("IMP"),
                     ws_id,

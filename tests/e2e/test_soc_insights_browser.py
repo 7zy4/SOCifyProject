@@ -28,6 +28,8 @@ def test_uploaded_case_dashboard_dossier_and_explicit_report_answers(app, langua
             page.on("pageerror", lambda error: errors.append(str(error)))
             base = f"http://127.0.0.1:{server.server_port}"
             page.goto(base + "/login")
+            page.evaluate("document.fonts.ready")
+            page.screenshot(path=str(output / f"login-{language}-{theme}-{width}.png"), full_page=True)
             page.locator("input[name=email]").fill("manager@socify.local")
             page.locator("input[name=password]").fill(DEMO_LOGIN_VALUE)
             page.locator("button[type=submit]").click()

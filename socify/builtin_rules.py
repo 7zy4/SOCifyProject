@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from typing import Any
 
@@ -411,7 +412,7 @@ def seed_builtin_rules(connection: sqlite3.Connection) -> int:
             continue
         creator = int(creator_row[0])
         for spec in BUILTIN_RULES:
-            legacy_name = spec["name"].replace("[SOCify]", "[SOCify V6]", 1)
+            legacy_name = next((name for name in sorted(existing_names) if re.sub(r"^\[SOCify [^\]]+\]", "[SOCify]", name) == spec["name"]), None)
             if legacy_name in existing_names and spec["name"] not in existing_names:
                 connection.execute(
                     "UPDATE rules SET name = ? WHERE workspace_id = ? AND name = ? AND archived_at IS NULL",

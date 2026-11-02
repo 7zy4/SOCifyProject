@@ -52,7 +52,7 @@
   async function monitoring() {
     const version = ++requestVersion;
     begin("monitoring");
-    if(window.SOCifyV4?.selection.required && !window.SOCifyV4.selection.case_ids.length) {
+    if(window.SOCifyWorkspace?.selection.required && !window.SOCifyWorkspace.selection.case_ids.length) {
       finish(emptyState(t("اختر قضية لبدء العمل"),null,[linkedButton(t("اختيار نطاق التحقيق"),"/cases")])); return;
     }
     const params = new URLSearchParams(location.search);
@@ -115,7 +115,7 @@
     finish(root);
   }
   async function chooseCase(section, selected) {
-    if (window.SOCifyV4?.selection.required) {
+    if (window.SOCifyWorkspace?.selection.required) {
       const root = node("section",{class:"case-switcher","aria-label":t("سياق القضية")});
       if (!selected) root.append(linkedButton(t("اختيار نطاق التحقيق"),"/cases"));
       return root;
@@ -359,11 +359,11 @@
     if(section==="monitoring")return monitoring();
     const version=++requestVersion;
     begin(section);
-    const value=new URLSearchParams(location.search).get("case_id") || window.SOCifyV4?.selection.case_ids[0];
+    const value=new URLSearchParams(location.search).get("case_id") || window.SOCifyWorkspace?.selection.case_ids[0];
     const current=value?await api(`/api/cases/${encodeURIComponent(value)}`):null;
     if(version!==requestVersion)return;
     const root=node("div",{class:"tool-view"},pageHead(...names[section]));
-    if (current && window.SOCifyV4?.intake(current)) return;
+    if (current && window.SOCifyWorkspace?.intake(current)) return;
     root.append(await chooseCase(section,current));
     if(section==="threat-intel")root.append(await watchlistPanel(current?.id));
     if(section==="reports")root.append(await managerEscalatedReportsPanel());
