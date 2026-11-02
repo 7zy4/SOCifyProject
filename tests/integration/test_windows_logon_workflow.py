@@ -114,3 +114,9 @@ def test_missing_target_never_inherits_the_reporting_account(autopsy_case, clien
     raw = json.loads(event["raw_data"])
     assert raw["raw_payload"]["SubjectUserName"] == "SYSTEM"
     assert "auth_target" not in event["raw_data"]
+
+
+def test_timestamp_upper_boundary_does_not_abort_import(autopsy_case, client, database):
+    rows = [*(logon_xml(i, minute=54 + i) for i in range(5)), logon_xml(5, 4624, minute=59)]
+    upload_logons(client, autopsy_case, [row.replace("2026-11-02T02:", "9999-12-31T23:") for row in rows])
+    assert len(correlated(database, autopsy_case)) == 1

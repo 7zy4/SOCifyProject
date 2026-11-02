@@ -2,7 +2,7 @@
 
 import ipaddress
 import json
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from .timeutils import parse_timestamp
 
@@ -89,7 +89,8 @@ def reconcile_logons(connection, job):
     ).fetchone()
     if not bounds[0]:
         return
-    end = (parse_timestamp(bounds[1]) + timedelta(seconds=600)).isoformat().replace("+00:00", "Z")
+    latest = min(parse_timestamp(bounds[1]), datetime.max.replace(tzinfo=UTC) - timedelta(seconds=600))
+    end = (latest + timedelta(seconds=600)).isoformat().replace("+00:00", "Z")
     candidates = connection.execute(
         """SELECT e.id FROM security_events e
         WHERE e.workspace_id=? AND e.owner_case_id=? AND e.training_run_id IS ? AND e.autopsy_active=1
