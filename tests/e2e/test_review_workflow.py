@@ -223,6 +223,7 @@ def test_removed_assessment_note_stays_removed_after_escalation(app, language):
 @pytest.mark.parametrize("language", ["ar", "en"])
 def test_complete_review_closes_alert_and_reopening_preserves_report(app, language):
     app.config.update(LEGACY_TRAINING_TESTS=False)
+    download_pdf = "تنزيل PDF" if language == "ar" else "Download PDF"
     with local_worker_services(app.config), review_session(app, language, "complete-case-closure") as (analyst, manager, result):
         analyst.click("link", "السجلات والأدلة")
         content = [
@@ -264,15 +265,15 @@ def test_complete_review_closes_alert_and_reopening_preserves_report(app, langua
             analyst.settle()
         analyst.click("link", "التقارير والمراجعة")
         analyst.click("button", "إعداد تقرير جديد")
-        analyst.page.get_by_role("link", name="PDF", exact=False).filter(has_text=analyst.text("تنزيل PDF")).first.wait_for(timeout=60000)
+        analyst.page.get_by_role("link", name=download_pdf, exact=True).wait_for(timeout=60000)
         open_manager_review(manager)
         manager.click("button", "مراجعة واعتماد النسخة")
         manager.click("button", "حفظ", manager.page.get_by_role("dialog"))
         with manager.page.expect_download() as download:
-            manager.page.get_by_role("link", name=manager.text("تنزيل PDF"), exact=True).click()
+            manager.page.get_by_role("link", name=download_pdf, exact=True).click()
         report_bytes = Path(download.value.path()).read_bytes()
         assert report_bytes.startswith(b"%PDF-")
-        report_url = manager.page.get_by_role("link", name=manager.text("تنزيل PDF"), exact=True).get_attribute("href")
+        report_url = manager.page.get_by_role("link", name=download_pdf, exact=True).get_attribute("href")
         manager.decision("closed", "All retained evidence and the complete report were reviewed.")
         closed = manager.state()
         assert closed["status"] == "closed" and closed["closed_at"]
