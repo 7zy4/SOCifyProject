@@ -9,6 +9,9 @@
   document.documentElement.lang = language;
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
   const english = {
+  "قرارات التحقيق": "Investigation decisions",
+  "اختر الإجابة": "Choose an answer",
+  "الأداء": "Performance",
   "النشاط": "Activity",
   "ستظهر عمليات المصادقة والقواعد والمصادر والتحقيقات هنا.": "Authentication, rule, source and investigation activity will appear here.",
   "الحوكمة والصلاحيات": "Governance and permissions",

@@ -18,7 +18,7 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
     {
         "id": "incident_classification",
         "label": "1. تصنيف الحادثة (Incident Classification)",
-        "default": "phishing_bec",
+        "default": "",
         "options": [
             {"value": "phishing_bec", "label": "تصيد احتيالي / انتحال بريد (Phishing / BEC)"},
             {"value": "malware_execution", "label": "برمجية خبيثة / ملف مشبوه (Malware / Suspicious File)"},
@@ -33,7 +33,7 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
     {
         "id": "initial_vector",
         "label": "2. مدخل الهجوم أو مصدر التنبيه (Initial Vector & Source)",
-        "default": "siem_builtin_rule",
+        "default": "",
         "options": [
             {"value": "email_attachment_or_link", "label": "مرفق أو رابط في بريد إلكتروني (Email Attachment / Link)"},
             {"value": "siem_builtin_rule", "label": "تنبيه قواعد SIEM المدمجة (Built-in SIEM Detection Rule)"},
@@ -47,7 +47,7 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
     {
         "id": "triage_verdict",
         "label": "3. حكم الفرز والتحقيق الأولي (Triage Determination)",
-        "default": "suspicious_needs_deep_forensics",
+        "default": "",
         "options": [
             {"value": "confirmed_true_positive", "label": "حادثة أمنية مؤكدة (Confirmed True Positive)"},
             {"value": "suspicious_needs_deep_forensics", "label": "اشتباه مرتفع يتطلب أدوات جنائية ثقيلة (Suspicious — Needs Deep Forensics)"},
@@ -58,7 +58,7 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
     {
         "id": "impact_scope",
         "label": "4. نطاق التأثير المرصود (Observed Impact Scope)",
-        "default": "single_user_or_host",
+        "default": "",
         "options": [
             {"value": "no_compromise_blocked", "label": "لم يحدث اختراق — تم الرصد أو الإحباط مبكرًا (Blocked / No Compromise)"},
             {"value": "single_user_or_host", "label": "محصور في مستخدم واحد أو جهاز واحد (Single User / Host)"},
@@ -70,7 +70,7 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
     {
         "id": "data_exposure",
         "label": "5. تأثر البيانات الحساسة (Sensitive Data Exposure)",
-        "default": "none_observed",
+        "default": "",
         "options": [
             {"value": "none_observed", "label": "لا توجد مؤشرات تسريب بيانات (No Exposure Observed)"},
             {"value": "credentials_at_risk", "label": "احتمالية انكشاف بيانات اعتماد تتطلب التدوير (Credentials at Risk)"},
@@ -82,7 +82,7 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
     {
         "id": "file_and_email_assessment",
         "label": "6. نتيجة الفحص الساكن للملفات والبريد (File & Email Static Assessment)",
-        "default": "no_files_involved",
+        "default": "",
         "options": [
             {"value": "malicious_artifact_identified", "label": "رُصد ملف/مرفق خبيث أو متنكر بالفحص الساكن (Malicious / Disguised Artifact)"},
             {"value": "suspicious_headers_or_links", "label": "انتحال مرسل أو روابط تصيد مشبوهة في البريد (Spoofed Headers / Phishing URLs)"},
@@ -93,7 +93,7 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
     {
         "id": "containment_status",
         "label": "7. إجراء الاحتواء المنفذ (Containment Action Taken)",
-        "default": "indicators_added_to_watchlist_and_block",
+        "default": "",
         "options": [
             {"value": "indicators_added_to_watchlist_and_block", "label": "أُضيفت المؤشرات لقائمة المراقبة وأوصي بالحظر الفوري (Watchlisted & Block Requested)"},
             {"value": "host_isolated_or_account_disabled", "label": "تم عزل الجهاز أو تجميد الحساب المتأثر (Host Isolated / Account Disabled)"},
@@ -105,7 +105,7 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
     {
         "id": "recommended_next_step",
         "label": "8. التوصية والخطوة التالية (Recommended Next Step)",
-        "default": "block_iocs_and_reset_credentials",
+        "default": "",
         "options": [
             {"value": "escalate_ir_deep_dive", "label": "تصعيد لفريق الاستجابة للحوادث للتحليل الجنائي العميق (Escalate to Deep DFIR)"},
             {"value": "block_iocs_and_reset_credentials", "label": "حظر المؤشرات المشبوهة وإعادة تعيين كلمات المرور (Block IOCs & Reset Credentials)"},
@@ -116,7 +116,7 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
     {
         "id": "urgency_level",
         "label": "9. مستوى الاستعجال للتصعيد الإداري (Manager Escalation Urgency)",
-        "default": "high_p2",
+        "default": "",
         "options": [
             {"value": "immediate_p1", "label": "فوري وحرج (P1 — Immediate Executive Action)"},
             {"value": "high_p2", "label": "عالٍ خلال المناوبة الحالية (P2 — High Shift Priority)"},
@@ -127,7 +127,7 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
 ]
 
 QUESTION_OPTION_MAP: dict[str, dict[str, str]] = {q["id"]: {opt["value"]: opt["label"] for opt in q["options"]} for q in QUICK_REPORT_QUESTIONS}
-DEFAULT_ANSWERS: dict[str, str] = {q["id"]: q["default"] for q in QUICK_REPORT_QUESTIONS}
+DEFAULT_ANSWERS: dict[str, str] = {}
 MANAGER_DECISIONS = {"approved", "needs_followup", "closed"}
 
 
@@ -529,28 +529,20 @@ def print_quick_report(case_id: int):
     summary = _collect_case_auto_summary(case)
     cmeta = summary["case"]
 
-    if report:
-        qa_rows_html = "".join(
-            f"<tr><th>{_fmt_bilingual(item['question'])}</th><td><strong>{_fmt_bilingual(item['answer_label'])}</strong></td></tr>"
-            for item in report["resolved_questions"]
-        )
-        status_label = report["status"].upper()
-        status_tone = _badge_tone(report["status"])
-        note_html = f'<div class="note-box"><strong>ملاحظة المحقق المختصرة:</strong> {_esc(report["executive_note"])}</div>' if report["executive_note"] else ""
-        manager_html = (
-            f'<div class="note-box manager-box"><strong>قرار واعتماد المدير (<span class="mono" dir="ltr">{_esc(report["manager_decision"])}</span>):</strong> {_esc(report["manager_comment"] or "تم الاعتماد")} · <span class="mono" dir="ltr">{_esc(report["acknowledged_at"])}</span></div>'
-            if report["manager_decision"]
-            else ""
-        )
-    else:
-        qa_rows_html = "".join(
-            f"<tr><th>{_fmt_bilingual(q['label'])}</th><td>{_fmt_bilingual(QUESTION_OPTION_MAP[q['id']][q['default']])} <em>(قيمة افتراضية — لم يُعتمد بعد)</em></td></tr>"
-            for q in QUICK_REPORT_QUESTIONS
-        )
-        status_label = "UNSAVED PREVIEW"
-        status_tone = "medium"
-        note_html = ""
-        manager_html = ""
+    if not report:
+        return error_response("REPORT_ANSWERS_REQUIRED", "احفظ إجابات التحقيق قبل طباعة التقرير", 409)
+    qa_rows_html = "".join(
+        f"<tr><th>{_fmt_bilingual(item['question'])}</th><td><strong>{_fmt_bilingual(item['answer_label'])}</strong></td></tr>"
+        for item in report["resolved_questions"]
+    )
+    status_label = report["status"].upper()
+    status_tone = _badge_tone(report["status"])
+    note_html = f'<div class="note-box"><strong>ملاحظة المحقق المختصرة:</strong> {_esc(report["executive_note"])}</div>' if report["executive_note"] else ""
+    manager_html = (
+        f'<div class="note-box manager-box"><strong>قرار واعتماد المدير (<span class="mono" dir="ltr">{_esc(report["manager_decision"])}</span>):</strong> {_esc(report["manager_comment"] or "تم الاعتماد")} · <span class="mono" dir="ltr">{_esc(report["acknowledged_at"])}</span></div>'
+        if report["manager_decision"]
+        else ""
+    )
 
     if summary["alerts"]:
         alerts_rows_html = "".join(

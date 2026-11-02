@@ -9,7 +9,10 @@ import pytest
 from cryptography.fernet import Fernet
 
 from socify import autopsy_samples
-from socify.quick_reports import DEFAULT_ANSWERS
+from socify.quick_reports import QUICK_REPORT_QUESTIONS
+
+# Explicit fixture decisions; production forms start unanswered.
+TEST_ANSWERS = {q["id"]: q["options"][0]["value"] for q in QUICK_REPORT_QUESTIONS}
 
 
 @pytest.fixture
@@ -30,13 +33,13 @@ def test_report_validation_and_manager_decision(case_base, client, login_as, dat
     assert client.post(path + "/escalate", json={}).status_code == 422
     assert client.post(path + "/escalate", json=[1]).status_code == 400
     for verb, endpoint in ((client.put, path), (client.post, path + "/escalate")):
-        assert verb(endpoint, json={"answers": DEFAULT_ANSWERS, "executive_note": "x" * 281}).status_code == 422
-    assert client.get(case_base.replace("/api", "") + "/quick-report/print").status_code == 200
-    assert client.post(path + "/escalate", json={"answers": DEFAULT_ANSWERS, "executive_note": "Initial"}).status_code == 200
-    updated = client.put(path, json={"answers": DEFAULT_ANSWERS, "executive_note": "Updated evidence"})
+        assert verb(endpoint, json={"answers": TEST_ANSWERS, "executive_note": "x" * 281}).status_code == 422
+    assert client.get(case_base.replace("/api", "") + "/quick-report/print").status_code == 409
+    assert client.post(path + "/escalate", json={"answers": TEST_ANSWERS, "executive_note": "Initial"}).status_code == 200
+    updated = client.put(path, json={"answers": TEST_ANSWERS, "executive_note": "Updated evidence"})
     assert updated.json["report"]["status"] == "escalated"
     assert updated.json["report"]["executive_note"] == "Updated evidence"
-    assert client.post(path + "/escalate", json={"answers": DEFAULT_ANSWERS}).status_code == 200
+    assert client.post(path + "/escalate", json={"answers": TEST_ANSWERS}).status_code == 200
     login_as("soc_manager")
     assert client.post(path + "/acknowledge", json=[]).status_code == 400
     assert client.post(path + "/acknowledge", json={"decision": "invalid"}).status_code == 422
@@ -47,33 +50,33 @@ def test_report_validation_and_manager_decision(case_base, client, login_as, dat
     assert client.get(case_base).json["status"] == "resolved"
     printed = client.get(case_base.replace("/api", "") + "/quick-report/print").get_data(as_text=True)
     assert "Reviewed retained evidence" in printed
-    revised = client.put(path, json={"answers": DEFAULT_ANSWERS}).json["report"]
+    revised = client.put(path, json={"answers": TEST_ANSWERS}).json["report"]
     assert revised["status"] == "draft"
     assert revised["manager_decision"] is None and revised["acknowledged_at"] is None
     assert "Reviewed retained evidence" not in client.get(case_base.replace("/api", "") + "/quick-report/print").get_data(as_text=True)
-    for payload in ({}, {"answers": DEFAULT_ANSWERS}):
+    for payload in ({}, {"answers": TEST_ANSWERS}):
         assert client.post(path + "/acknowledge", json={"decision": "approved"}).status_code == 200
         resubmitted = client.post(path + "/escalate", json=payload).json["report"]
         assert resubmitted["status"] == "escalated"
         assert resubmitted["manager_decision"] is None and resubmitted["acknowledged_by"] is None
     case_id = int(case_base.rsplit("/", 1)[1])
     database.execute("UPDATE incident_cases SET status='closed' WHERE id=?", (case_id,))
-    assert client.put(path, json={"answers": DEFAULT_ANSWERS}).status_code == 409
+    assert client.put(path, json={"answers": TEST_ANSWERS}).status_code == 409
     assert client.post(path + "/escalate", json={}).status_code == 409
 
 
 def test_report_inbox_respects_case_membership(case_base, client, login_as):
-    assert client.post(case_base + "/quick-report/escalate", json={"answers": DEFAULT_ANSWERS}).status_code == 200
+    assert client.post(case_base + "/quick-report/escalate", json={"answers": TEST_ANSWERS}).status_code == 200
     login_as("soc_manager")
     private = client.post("/api/cases", json={"title": "Restricted manager evidence", "classification": "restricted"}).json["id"]
     private_base = f"/api/cases/{private}"
     assert client.post(private_base + "/quick-report/acknowledge", json={"decision": "approved"}).status_code == 404
-    assert client.post(private_base + "/quick-report/escalate", json={"answers": DEFAULT_ANSWERS}).status_code == 200
+    assert client.post(private_base + "/quick-report/escalate", json={"answers": TEST_ANSWERS}).status_code == 200
     assert private in {r["case_id"] for r in client.get("/api/reports/escalated").json["items"]}
     login_as("analyst")
     assert private not in {r["case_id"] for r in client.get("/api/reports/escalated").json["items"]}
     for method, route in (("GET", "/quick-report"), ("PUT", "/quick-report"), ("POST", "/quick-report/escalate")):
-        assert client.open(private_base + route, method=method, json={"answers": DEFAULT_ANSWERS}).status_code == 404
+        assert client.open(private_base + route, method=method, json={"answers": TEST_ANSWERS}).status_code == 404
     assert client.get(f"/cases/{private}/quick-report/print").status_code == 404
     login_as("soc_manager")
     assert client.post("/api/cases/999999/quick-report/acknowledge", json={"decision": "approved"}).status_code == 404

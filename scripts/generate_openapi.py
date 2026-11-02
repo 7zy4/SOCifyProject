@@ -36,7 +36,32 @@ def generate() -> dict[str, object]:
                 operation["parameters"] = parameters
             if method in {"POST", "PUT", "PATCH"}:
                 operation["requestBody"] = {"required": False, "content": {"application/json": {"schema": {"type": "object", "additionalProperties": True}}}}
-            if path == "/api/soc/monitoring":
+            if path == "/api/soc/performance":
+                operation["summary"] = "Team and personal operational performance"
+                operation["description"] = (
+                    "Current authorized backlog and period completions. Team/member selection is manager-only; analysts can select themselves. Missing evidenced times remain null. Excludes training, archived, unapproved and restricted-batch cases. Returns 422 above 2000 scoped cases; never silently samples."
+                )
+                operation["parameters"] = [
+                    {"name": "days", "in": "query", "schema": {"type": "string", "enum": ["7", "30", "90", "all"], "default": "30"}},
+                    {"name": "member", "in": "query", "schema": {"type": "string"}, "description": "me, team, or an authorized workspace member ID"},
+                ]
+                operation["responses"]["422"] = {"description": "Invalid filters or scope exceeds the bounded dashboard size"}
+            elif path.endswith("/dossier"):
+                operation["summary"] = "Retained alert investigation dossier"
+                operation["description"] = (
+                    "Full case scope required. Includes alert review, up to 50 linked events, case decisions, tasks and shared notes. Private notes are excluded. Case decisions are distinct from the alert verdict."
+                )
+            elif path.endswith("/observed-hosts"):
+                operation["summary"] = "Hosts and process observations from active uploaded logs"
+                operation["parameters"] = parameters + [
+                    {"name": "q", "in": "query", "schema": {"type": "string", "maxLength": 200}},
+                    {"name": "host", "in": "query", "schema": {"type": "string", "maxLength": 512}},
+                    {"name": "page", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 1000000}},
+                ]
+                operation["description"] = (
+                    "25 grouped hostnames per page; latest 50 events for an exact selected hostname. Event evidence is retained log data, not a live endpoint inventory."
+                )
+            elif path == "/api/soc/monitoring":
                 operation["summary"] = "Authorized SOC monitoring queue"
                 operation["description"] = (
                     "Counts and rows are restricted to the server-session investigation selection, approved cases, workspace membership and full batch-scope authorization. No selection yields zero rows. Channels derive from linked case status. Search matches rule, alert ID or case reference/title."

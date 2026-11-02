@@ -26,7 +26,7 @@ window.SOCifyV4 = (() => {
         try {
           const data = await api("/api/demo/accounts");
           if (!data.enabled) {
-            const form = document.querySelector(".user-menu form");
+            const form = document.querySelector(".account-menu form");
             form.requestSubmit();
             return;
           }
@@ -35,7 +35,7 @@ window.SOCifyV4 = (() => {
             try { await api("/api/demo/switch", {method:"POST",body:{user_id:user.id}}); location.assign("/cases"); }
             catch (error) { handleError(error); }
           }));
-          content.append(button(t("خروج"), () => document.querySelector(".user-menu form").requestSubmit()));
+          content.append(button(t("خروج"), () => document.querySelector(".account-menu form").requestSubmit()));
           autopsyModal(t("تبديل الحساب"),content);
         } catch (error) { handleError(error); }
       });

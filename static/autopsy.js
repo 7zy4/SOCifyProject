@@ -265,7 +265,7 @@ async function autopsyCases(page = null, query = null) {
     ], claimable.items), true));
   }
   if (window.SOCifyV4?.selection.required) root.append(window.SOCifyV4.chooser(data.items));
-  if (!window.SOCifyV4?.selection.required) root.append(data.items.length ? table([{ label: SOCifyLocale.text("المرجع"), value: (row) => node("bdi", { class: "case-reference", text: row.reference }) }, { label: SOCifyLocale.text("القضية"), value: (row) => node("a", { class: "case-link", href: autopsyCaseURL(row.id, { list_q: query, list_page: page }), text: row.title }) }, { label: SOCifyLocale.text("الحالة"), value: (row) => autopsyBadge(row.status) }, { label: SOCifyLocale.text("الخطورة"), value: (row) => autopsyBadge(row.severity) }, { label: SOCifyLocale.text("الأدلة"), value: "evidence_count" }, { label: SOCifyLocale.text("المسؤول"), value: "assignee_name" }, { label: SOCifyLocale.text("فتح"), value: (row) => linkedButton(SOCifyLocale.text("فتح القضية"), autopsyCaseURL(row.id, { list_q: query, list_page: page })) }], data.items) : emptyState(SOCifyLocale.text("لا توجد قضايا في النطاق المصرح"), SOCifyLocale.text("أنشئ القضية باسم وسبب وهدف، ثم أضف الأدلة إلى مساحة التحقيق.")));
+  if (!window.SOCifyV4?.selection.required) root.append(data.items.length ? table([{ label: SOCifyLocale.text("المرجع"), value: (row) => node("bdi", { class: "case-reference", text: row.reference }) }, { label: SOCifyLocale.text("القضية"), value: (row) => node("a", { class: "case-link", href: autopsyCaseURL(row.id, { list_q: query, list_page: page }), text: row.title }) }, { label: SOCifyLocale.text("الحالة"), value: (row) => autopsyBadge(row.status) }, { label: SOCifyLocale.text("الخطورة"), value: (row) => autopsyBadge(row.severity) }, { label: SOCifyLocale.text("الأدلة"), value: "evidence_count" }, { label: SOCifyLocale.text("المسؤول"), value: "assignee_name" }, { label: SOCifyLocale.text("فتح"), value: (row) => linkedButton(SOCifyLocale.text("فتح القضية"), autopsyCaseURL(row.id, { list_q: query, list_page: page })) }], data.items) : emptyState(SOCifyLocale.text("لا توجد قضايا في النطاق المصرح"),null));
   root.querySelector(".table-wrap")?.classList.add("case-table");
   const pages = node("div", { class: "action-row pagination" }, node("p", { text: SOCifyLocale.template`${data.total} قضية · الصفحة ${page}` }));
   if (page > 1) pages.append(button(SOCifyLocale.text("السابق"), () => autopsyCases(page - 1, query).catch(handleError)));
@@ -311,7 +311,7 @@ async function autopsyEditRecord(kind, record = null) {
 async function autopsyRecordPanel(kind) {
   const base = `/api/cases/${autopsy.current.id}/records?kind=${kind}&limit=25`;
   const data = await api(base);
-  const content = data.items.length ? node("div", { class: "record-grid" }, data.items.map(autopsyRecordCard)) : emptyState(SOCifyLocale.text("لا سجلات بعد"), SOCifyLocale.text("أضف نتيجة موثقة من أدلة القضية، وميّز الحقائق عن الفرضيات."));
+  const content = data.items.length ? node("div", { class: "record-grid" }, data.items.map(autopsyRecordCard)) : emptyState(SOCifyLocale.text("لا سجلات بعد"),null);
   let cursor = data.next_before;
   const more = button(SOCifyLocale.text("عرض المزيد"), async () => {
     more.disabled = true;
@@ -366,10 +366,10 @@ async function autopsyCase(caseId) {
       content.append(autopsyEditPanel(SOCifyLocale.text("تحديد مسؤولية عضو"), node("div", { class: "panel-body" }, autopsyForm({ user_id: { required: true, user: true }, responsibility: { required: true, choices: ["monitoring", "l1", "l2", "investigator", "reviewer", "owner"] } }, async (body) => { await api(`/api/cases/${caseId}/members`, { method: "POST", body }); await autopsyCase(caseId); }))));
       if (current.status !== "closed") content.append(autopsyEditPanel(SOCifyLocale.text("تسليم المناوبة"), node("div", { class: "panel-body" }, [node("p", { text: SOCifyLocale.text("ينقل المسؤوليات والمهام المفتوحة والتصعيد والإسناد مع حفظ تاريخ المسؤول السابق. يبقى حسابه ووصوله الحالي فعالين؛ سحب الوصول يتم من إدارة الفريق.") }), autopsyForm({ from_user: { required: true, user: true, case_member: true }, to_user: { required: true, user: true }, reason: { required: true, max: 1000 } }, async (body) => { await api(`/api/cases/${caseId}/handoff`, { method: "POST", body: { ...body, version: current.version } }); await autopsyCase(caseId); })])));
     }
-    content.append(panel(SOCifyLocale.text("مهام القضية"), current.tasks.length ? table([{ label: SOCifyLocale.text("المهمة"), value: "title" }, { label: SOCifyLocale.text("الحالة"), value: "status" }, { label: SOCifyLocale.text("إكمال"), value: (row) => current.can_update && row.status !== "completed" ? button(SOCifyLocale.text("إكمال المهمة"), async () => { try { await api(`/api/incidents/${caseId}/tasks/${row.id}`, { method: "PATCH", body: { status: "completed" } }); await autopsyCase(caseId); } catch (error) { handleError(error); } }) : "—" }], current.tasks) : emptyState(SOCifyLocale.text("لا مهام"), SOCifyLocale.text("تظهر هنا المهام المرتبطة بالقضية."))));
+    content.append(panel(SOCifyLocale.text("مهام القضية"), current.tasks.length ? table([{ label: SOCifyLocale.text("المهمة"), value: "title" }, { label: SOCifyLocale.text("الحالة"), value: "status" }, { label: SOCifyLocale.text("إكمال"), value: (row) => current.can_update && row.status !== "completed" ? button(SOCifyLocale.text("إكمال المهمة"), async () => { try { await api(`/api/incidents/${caseId}/tasks/${row.id}`, { method: "PATCH", body: { status: "completed" } }); await autopsyCase(caseId); } catch (error) { handleError(error); } }) : "—" }], current.tasks) : emptyState(SOCifyLocale.text("لا مهام"),null)));
   } else if (selected === "logs") {
     if (window.SOCifyAutopsy.logs) content.append(await window.SOCifyAutopsy.logs(caseId));
-    content.append(panel(SOCifyLocale.text("أدلة القضية"), current.evidence.length ? table([{ label: SOCifyLocale.text("الدليل"), value: "title" }, { label: SOCifyLocale.text("النوع"), value: "evidence_type" }, { label: "SHA-256", value: (row) => node("bdi", { text: row.sha256 }) }, { label: SOCifyLocale.text("أضيف"), value: (row) => formatTime(row.added_at) }], current.evidence) : emptyState(SOCifyLocale.text("لا أدلة مرتبطة"), SOCifyLocale.text("احتفظ بالأصل ومصدره واربطه بالقضية قبل استخلاص النتائج.")), true));
+    content.append(panel(SOCifyLocale.text("أدلة القضية"), current.evidence.length ? table([{ label: SOCifyLocale.text("الدليل"), value: "title" }, { label: SOCifyLocale.text("النوع"), value: "evidence_type" }, { label: "SHA-256", value: (row) => node("bdi", { text: row.sha256 }) }, { label: SOCifyLocale.text("أضيف"), value: (row) => formatTime(row.added_at) }], current.evidence) : emptyState(SOCifyLocale.text("لا أدلة مرتبطة"),null), true));
   } else if (selected === "analysis") {
     for (const kind of ["asset", "indicator", "hypothesis", "foothold"]) content.append(await autopsyRecordPanel(kind));
     if (window.SOCifyAutopsy.analysis) content.append(await window.SOCifyAutopsy.analysis(caseId));
@@ -406,7 +406,7 @@ async function autopsyStart() {
     const allowed = permission(state.section === "audit" ? "audit.read" : "users.read");
     if (!allowed) {
       begin(state.section);
-      finish(emptyState(SOCifyLocale.text("هذا القسم غير متاح لدورك"), SOCifyLocale.text("تطبق المنصة صلاحيات الخادم حتى عند فتح الرابط مباشرة."), [linkedButton(SOCifyLocale.text("الملف والأمان"), "/profile")]));
+      finish(emptyState(SOCifyLocale.text("هذا القسم غير متاح لدورك"),null, [linkedButton(SOCifyLocale.text("الملف والأمان"), "/profile")]));
       return;
     }
     return state.section === "audit" ? renderAudit() : renderAdmin();
@@ -416,12 +416,13 @@ async function autopsyStart() {
     return window.SOCifyAutopsy.profile();
   }
   if (!permission("cases.read") && !["profile", "team"].includes(state.section)) {
-    finish(emptyState(SOCifyLocale.text("هذا القسم غير متاح لدورك"), SOCifyLocale.text("تطبق المنصة صلاحيات الخادم حتى عند فتح الرابط مباشرة."), [linkedButton(SOCifyLocale.text("الملف والأمان"), "/profile")])); return;
+    finish(emptyState(SOCifyLocale.text("هذا القسم غير متاح لدورك"),null, [linkedButton(SOCifyLocale.text("الملف والأمان"), "/profile")])); return;
   }
   [autopsy.catalog, autopsy.team] = await Promise.all([permission("cases.read") ? api("/api/autopsy/catalog") : Promise.resolve({}), api("/api/team")]);
   if (permission("cases.read")) await window.SOCifyV4?.initialize();
   window.SOCifyWorkbench?.navigation();
   const caseId = document.querySelector('meta[name="case-id"]')?.content;
+  if (state.section === "performance") return window.SOCifyInsights.performance();
   if (caseId) return autopsyCase(Number(caseId));
   if (window.SOCifyWorkbench?.sections.includes(state.section)) return window.SOCifyWorkbench.start(state.section);
   if (state.section === "profile" && window.SOCifyAutopsy.profile) return window.SOCifyAutopsy.profile();
@@ -431,9 +432,9 @@ async function autopsyStart() {
   if (state.section === "my-tasks") {
     begin("my-tasks");
     if(window.SOCifyV4?.selection.required && !window.SOCifyV4.selection.case_ids.length) {
-      finish(emptyState(SOCifyLocale.text("اختر قضية لبدء العمل"),SOCifyLocale.text("تظهر المهام ضمن نطاق القضايا المختارة"),[linkedButton(SOCifyLocale.text("اختيار نطاق التحقيق"),"/cases")])); return;
+      finish(emptyState(SOCifyLocale.text("اختر قضية لبدء العمل"),null,[linkedButton(SOCifyLocale.text("اختيار نطاق التحقيق"),"/cases")])); return;
     }
-    finish(panel(SOCifyLocale.text("مهامي داخل القضايا"), autopsy.team.assignments.length ? table([{ label: SOCifyLocale.text("القضية"), value: (row) => linkedButton(row.case_title, `/cases/${row.case_id}`) }, { label: SOCifyLocale.text("المهمة"), value: "instructions" }, { label: SOCifyLocale.text("الحالة"), value: "task_status" }], autopsy.team.assignments) : emptyState(SOCifyLocale.text("لا دفعات مسندة"), SOCifyLocale.text("تظهر مهام تحليل السجلات التي يسندها مدير الفريق إليك هنا.")), true));
+    finish(panel(SOCifyLocale.text("مهامي داخل القضايا"), autopsy.team.assignments.length ? table([{ label: SOCifyLocale.text("القضية"), value: (row) => linkedButton(row.case_title, `/cases/${row.case_id}`) }, { label: SOCifyLocale.text("المهمة"), value: "instructions" }, { label: SOCifyLocale.text("الحالة"), value: "task_status" }], autopsy.team.assignments) : emptyState(SOCifyLocale.text("لا دفعات مسندة"),null), true));
     return;
   }
   if (state.section === "profile") {

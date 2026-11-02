@@ -104,8 +104,8 @@ td small,.rule-cell small,.autopsy-shell td small { font-size:14px; color:var(--
 .monitoring-surface .table-wrap { border:0; }
 .monitoring-table { min-width:940px; }
 .monitoring-table time { font-size:14px; white-space:normal; min-width:132px; }
-.monitoring-table th:last-child,.monitoring-table td:last-child { width:144px; min-width:144px; white-space:normal; }
-.monitoring-table td:last-child .button { white-space:normal; word-break:normal; overflow-wrap:normal; font-size:14px; }
+.monitoring-table > thead > tr > th:last-child,.monitoring-table > tbody > tr > td:last-child { width:144px; min-width:144px; white-space:normal; }
+.monitoring-table > tbody > tr > td:last-child .button { white-space:normal; word-break:normal; overflow-wrap:normal; font-size:14px; }
 .row-expand { width:34px; height:34px; border:2px solid var(--line); border-radius:2px; color:var(--text); background:var(--panel-2); font-size:20px; }
 .alert-details { background:var(--panel-2); }
 .alert-details h3 { font-size:18px; }
@@ -237,18 +237,18 @@ dialog::backdrop { background:rgb(10 13 15 / .78); }
 .console-step-main small { color:var(--terminal-text); font-size:14px; }
 @media (max-width:760px) {
  .monitoring-table { width:100%; min-width:0; border:0; }
- .monitoring-table thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
- .monitoring-table tbody { display:block; padding:14px; }
- .monitoring-table tr[data-alert-row] { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); border:2px solid var(--line); border-radius:2px 6px 2px 4px; margin:0 0 18px; background:var(--panel); box-shadow:3px 3px 0 var(--ink-black); }
- .monitoring-table tr[data-alert-row] td { display:block; min-width:0; padding:12px; border:0; overflow-wrap:anywhere; }
- .monitoring-table tr[data-alert-row] td::before { content:attr(data-label); display:block; margin-bottom:7px; font-size:14px; font-weight:800; color:var(--muted); }
- .monitoring-table tr[data-alert-row] td:nth-child(4) { grid-column:1/-1; grid-row:1; background:var(--panel-2); border-bottom:2px solid var(--line); }
- .monitoring-table tr[data-alert-row] td:nth-child(1) { grid-row:2; }
- .monitoring-table tr[data-alert-row] td:nth-child(8) { grid-column:1/-1; border-top:1px solid var(--line-soft); }
- .monitoring-table tr[data-alert-row] td:nth-child(8)::before { content:none; }
- .monitoring-table tr[data-alert-row] td:nth-child(8) .button { width:100%; }
- .monitoring-table tr:not([data-alert-row]):not([hidden]) { display:block; margin-bottom:18px; }
- .monitoring-table tr:not([data-alert-row])>td { display:block; }
+ .monitoring-table > thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+ .monitoring-table > tbody { display:block; padding:14px; }
+ .monitoring-table > tbody > tr[data-alert-row] { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); border:2px solid var(--line); border-radius:2px 6px 2px 4px; margin:0 0 18px; background:var(--panel); box-shadow:3px 3px 0 var(--ink-black); }
+ .monitoring-table > tbody > tr[data-alert-row] td { display:block; min-width:0; padding:12px; border:0; overflow-wrap:anywhere; }
+ .monitoring-table > tbody > tr[data-alert-row] td::before { content:attr(data-label); display:block; margin-bottom:7px; font-size:14px; font-weight:800; color:var(--muted); }
+ .monitoring-table > tbody > tr[data-alert-row] td:nth-child(4) { grid-column:1/-1; grid-row:1; background:var(--panel-2); border-bottom:2px solid var(--line); }
+ .monitoring-table > tbody > tr[data-alert-row] td:nth-child(1) { grid-row:2; }
+ .monitoring-table > tbody > tr[data-alert-row] td:nth-child(8) { grid-column:1/-1; border-top:1px solid var(--line-soft); }
+ .monitoring-table > tbody > tr[data-alert-row] td:nth-child(8)::before { content:none; }
+ .monitoring-table > tbody > tr[data-alert-row] td:nth-child(8) .button { width:100%; }
+ .monitoring-table > tbody > tr:not([data-alert-row]):not([hidden]) { display:block; margin-bottom:18px; }
+ .monitoring-table > tbody > tr:not([data-alert-row])>td { display:block; }
  .monitoring-table time { min-width:0; white-space:normal; }
  .monitoring-table .alert-details { grid-template-columns:1fr; }
 }
@@ -261,20 +261,20 @@ dialog::backdrop { background:rgb(10 13 15 / .78); }
 @media (max-width:760px) {
  .autopsy-shell .account-menu .avatar { width:34px; height:36px; }
  .table-wrap .monitoring-table { display:block; min-width:0; width:100%; }
- .monitoring-table tbody { width:100%; }
+ .monitoring-table > tbody { width:100%; }
  .monitoring-table .rule-cell { min-width:0; max-width:none; }
- .monitoring-table tr[data-alert-row] td:first-child,.monitoring-table tr[data-alert-row] td:last-child { width:auto; }
- .monitoring-table tr[data-alert-row] td:last-child { min-width:0; }
+ .monitoring-table > tbody > tr[data-alert-row] td:first-child,.monitoring-table > tbody > tr[data-alert-row] td:last-child { width:auto; }
+ .monitoring-table > tbody > tr[data-alert-row] td:last-child { min-width:0; }
  .monitoring-table .case-link { white-space:normal; }
 }
 /* Keep the full action column visible on desktop; cards keep their natural width on mobile. */
 @media (min-width:761px) {
- .monitoring-table th,.monitoring-table td { min-width:0; padding:12px 10px; }
+ .monitoring-table > thead > tr > th,.monitoring-table > tbody > tr > td { min-width:0; padding:12px 10px; }
  .monitoring-table .rule-cell { min-width:176px; max-width:270px; }
  .monitoring-table time { min-width:110px; }
- .monitoring-table th:last-child,.monitoring-table td:last-child { width:120px; min-width:120px; }
+ .monitoring-table > thead > tr > th:last-child,.monitoring-table > tbody > tr > td:last-child { width:120px; min-width:120px; }
  .monitoring-table .case-link { white-space:normal; }
- .monitoring-table td:last-child .button { padding-inline:10px; }
+ .monitoring-table > tbody > tr > td:last-child .button { padding-inline:10px; }
 }
 .row-expand[aria-expanded="true"] svg { transform:rotate(180deg); }
 .pagination p,.autopsy-shell dt,.context-summary p,.attack-chain b { font-size:14px; color:var(--text); }
@@ -283,3 +283,28 @@ dialog::backdrop { background:rgb(10 13 15 / .78); }
  .autopsy-shell .topbar .topbar-brand .brand-mark { display:block; }
  .autopsy-shell .topbar .topbar-brand .brand-wordmark { display:none; }
 }
+/* Operational performance and expandable investigation evidence. */
+.insight-counters { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin:24px 0; }
+.insight-counter { background:var(--panel);border:2px solid var(--border-ink);padding:20px;box-shadow:4px 4px 0 var(--border-ink);display:flex;flex-direction:column;gap:10px; }
+.insight-counter strong { font-size:32px;font-variant-numeric:tabular-nums; }
+.insight-columns { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px; }
+.insight-columns > * { min-width:0; }
+.insight-bar-row { display:grid;grid-template-columns:100px minmax(30px,1fr) 45px;align-items:center;gap:12px;margin-bottom:16px; }
+.insight-bar-row progress { width:100%;height:13px;accent-color:var(--primary-fill); }
+.insight-facts { display:grid;grid-template-columns:minmax(130px,1fr) minmax(0,2fr);gap:12px 24px; }
+.insight-facts dt { font-weight:800; }
+.insight-facts dd { margin:0;overflow-wrap:anywhere; }
+.insight-method { margin:18px 0;padding:16px;border:2px solid var(--border-ink);background:var(--panel); }
+.insight-method summary,.evidence-event summary { cursor:pointer;font-weight:800; }
+.dossier-view { display:grid;gap:18px;padding:20px 0; }
+.dossier-view pre { white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto;font-size:14px; }
+.evidence-event { border:2px solid var(--border-ink);padding:16px; }
+.dossier-view blockquote { margin:0;padding:16px;border-inline-start:4px solid var(--primary-fill); }
+@media(max-width:1000px){.insight-columns{grid-template-columns:1fr}.insight-counters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.insight-facts{grid-template-columns:1fr;gap:6px}.insight-facts dd{margin-bottom:12px}.insight-counter{padding:14px}.insight-bar-row{grid-template-columns:85px minmax(20px,1fr) 30px}}
+
+.insight-columns > .wide { grid-column:auto; }
+.dossier-content { min-width:0; }
+
+.insight-columns table { min-width:0;width:100%; }
+.insight-columns th { white-space:normal; }

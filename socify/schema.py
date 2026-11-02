@@ -974,7 +974,7 @@ def _migrate_legacy_incidents(connection: sqlite3.Connection) -> None:
 def seed_reference_data(connection: sqlite3.Connection) -> None:
     now = iso_now()
     connection.execute(
-        "INSERT OR IGNORE INTO training_workspaces (id, public_id, name, created_at) VALUES (1, 'workspace-default', 'SOCify Training', ?)", (now,)
+        "INSERT OR IGNORE INTO training_workspaces (id, public_id, name, created_at) VALUES (1, 'workspace-default', 'SOCify Workspace', ?)", (now,)
     )
     existing_catalog = connection.execute("SELECT value FROM schema_meta WHERE key = 'attack_version'").fetchone()
     if existing_catalog:

@@ -37,6 +37,7 @@ from .request_limits import BoundedRequest, NumericInputError, StructureLimitErr
 from .schema import ensure_schema
 from .scoring import scoring_api
 from .security import correlation_id, error_response
+from .soc_insights import soc_insights_api
 from .sources import sources_api
 from .teams import teams_api
 from .training import training_api
@@ -74,6 +75,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         autopsy_reports_api,
         autopsy_samples_api,
         autopsy_soc_api,
+        soc_insights_api,
         autopsy_email_api,
         autopsy_intel_api,
         autopsy_capsules_api,

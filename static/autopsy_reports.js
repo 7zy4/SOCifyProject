@@ -3,6 +3,7 @@
 let autopsyReportTimer = null;
 
 const autopsyReportLabels = {
+  investigation_assessment: SOCifyLocale.text("قرارات التحقيق"),
   summary: SOCifyLocale.text("الملخص التنفيذي"),
   case: SOCifyLocale.text("بيانات القضية ونطاق التحقيق"),
   context: SOCifyLocale.text("الهدف وقرار التنبيه ونتيجة الهجوم"),
@@ -104,8 +105,8 @@ async function autopsyQuickDropdownReportPanel(caseId) {
   for (const q of data.questions) {
     const sel = node(
       "select",
-      { name: q.id, disabled: !autopsy.current.can_update || autopsy.current.status === "closed" },
-      q.options.map((opt) => node("option", { value: opt.value, selected: opt.value === (savedAnswers[q.id] || q.default), text: SOCifyLocale.text(opt.label) })),
+      { name: q.id, required:true, disabled: !autopsy.current.can_update || autopsy.current.status === "closed" },
+      [node("option", {value:"", selected:!savedAnswers[q.id], disabled:true, text:SOCifyLocale.text("اختر الإجابة")}), ...q.options.map((opt) => node("option", { value: opt.value, selected: opt.value === savedAnswers[q.id], text: SOCifyLocale.text(opt.label) }))],
     );
     selects[q.id] = sel;
     grid.append(field(SOCifyLocale.text(q.label), sel));
@@ -136,10 +137,11 @@ async function autopsyQuickDropdownReportPanel(caseId) {
   printLink.target = "_blank";
   printLink.rel = "noopener";
 
-  const actions = node("div", { class: "action-row span-2" }, [printLink]);
+  const actions = node("div", { class: "action-row span-2" }, data.report ? [printLink] : []);
   if (autopsy.current.can_update && autopsy.current.status !== "closed") {
     const saveBtn = node("button", { type: "submit", class: "button ghost", text: SOCifyLocale.text("حفظ إجابات التقرير") });
     const escalateBtn = button(SOCifyLocale.text("حفظ وتصعيد مباشر للمدير"), async () => {
+      if (!grid.reportValidity()) return;
       escalateBtn.disabled = true;
       try {
         await api(`/api/cases/${caseId}/quick-report/escalate`, { method: "POST", body: collectPayload() });

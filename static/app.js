@@ -118,11 +118,12 @@ function finish(content) {
 }
 
 function pageHead(title, description, actions = []) {
+  if (document.querySelector('meta[name="product-mode"]')?.content === "autopsy") description = null;
   return node("div", { class: "workspace-head" }, [node("div", {}, [node("h2", { text: title }), ...(description ? [node("p", { text: description })] : [])]), node("div", { class: "action-row" }, actions)]);
 }
 
 function emptyState(title, description, actions = []) {
-  return node("div", { class: "empty" }, [node("strong", { text: title }), node("p", { text: description }), node("div", { class: "action-row" }, actions)]);
+  return node("div", { class: "empty" }, [node("strong", { text: title }), ...(description ? [node("p", { text: description })] : []), node("div", { class: "action-row" }, actions)]);
 }
 
 function table(columns, rows) {

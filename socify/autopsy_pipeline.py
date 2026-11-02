@@ -55,6 +55,7 @@ def migrate(connection: sqlite3.Connection) -> None:
     )
     connection.execute("CREATE INDEX IF NOT EXISTS idx_autopsy_events_job ON security_events(import_job_id, autopsy_active, event_time, id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_autopsy_events_active_time ON security_events(owner_case_id, autopsy_active, event_time, id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_autopsy_events_host ON security_events(owner_case_id, autopsy_active, hostname, event_time, id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_autopsy_case_events_order ON case_events(case_id, active_event, event_time, event_id)")
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_autopsy_case_events_time_known ON case_events(case_id, active_event, time_known DESC, event_time, event_id)"

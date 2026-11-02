@@ -21,6 +21,7 @@
   {% if operational %}<link rel="stylesheet" href="{{ url_for('static', filename='autopsy.css') }}">{% endif %}
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
   {% if operational %}<script src="{{ url_for('static', filename='soc-workbench.js') }}" defer></script>{% endif %}
+  {% if operational %}<script src="{{ url_for('static', filename='soc-insights.js') }}" defer></script>{% endif %}
   {% if operational %}<script src="{{ url_for('static', filename='autopsy.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_data.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_procedures.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_reports.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_analysis.js') }}" defer></script>{% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='design-system.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='comic-workspace.css') }}">
@@ -34,6 +35,7 @@
     <nav id="primary-nav">
       {% if operational %}
       <a data-section="monitoring" data-nav-permission="cases.read" href="/monitoring" data-ui-copy>{{ nav_icon("monitoring") }}المراقبة</a>
+      <a data-section="performance" data-nav-permission="cases.read" href="/performance" data-ui-copy>{{ nav_icon("dashboard") }}الأداء</a>
       <a data-section="log-management" data-nav-permission="cases.read" href="/log-management" data-ui-copy>{{ nav_icon("log-management") }}إدارة السجلات</a>
       <a data-section="cases" data-nav-permission="cases.read" href="/cases" data-ui-copy>{{ nav_icon("cases") }}إدارة القضايا</a>
       <a data-section="endpoint-security" data-nav-permission="cases.read" href="/endpoint-security" data-ui-copy>{{ nav_icon("endpoint-security") }}أمن الأجهزة والأصول</a>

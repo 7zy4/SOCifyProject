@@ -53,7 +53,7 @@
     const version = ++requestVersion;
     begin("monitoring");
     if(window.SOCifyV4?.selection.required && !window.SOCifyV4.selection.case_ids.length) {
-      finish(emptyState(t("اختر قضية لبدء العمل"),t("تبقى السجلات والأدلة والإجراءات مرتبطة بقضيتها وصلاحياتها."),[linkedButton(t("اختيار نطاق التحقيق"),"/cases")])); return;
+      finish(emptyState(t("اختر قضية لبدء العمل"),null,[linkedButton(t("اختيار نطاق التحقيق"),"/cases")])); return;
     }
     const params = new URLSearchParams(location.search);
     const data = await api("/api/soc/monitoring?" + params);
@@ -75,8 +75,8 @@
     const sort = node("select",{name:"sort"}, [["detected_at",t("الأحدث أولًا")],["severity",t("الأعلى خطورة")],["rule_name",t("اسم القاعدة")]].map(([value,label])=>node("option",{value,selected:value===(params.get("sort")||"detected_at"),text:label})));
     const form = node("form",{class:"monitoring-toolbar","aria-label":t("مرشحات التنبيهات")},[field(t("بحث التنبيهات"),search),field(t("الخطورة"),severity),field(t("المسؤول"),mine),field(t("ترتيب التنبيهات"),sort),node("button",{type:"submit",class:"button primary",text:t("تطبيق")}),button(t("تحديث"),()=>monitoring().catch(handleError),"ghost")]);
     form.addEventListener("submit",event=>{event.preventDefault();change({q:search.value,severity:severity.value,mine:mine.value,sort:sort.value,direction:sort.value==="rule_name"?"asc":"desc"});});
-    const surface = node("section",{class:"monitoring-surface","aria-label":t("نتائج التنبيهات")},[form,node("div",{class:"monitoring-caption"},[node("p",{text:t("القنوات تعكس حالة القضية المرتبطة؛ الإغلاق يخضع للمراجعة والاعتماد.")}),node("p",{text:t("آخر تحديث")+": "+formatTime(data.fetched_at)})])]);
-    if (!data.items.length) surface.append(emptyState(t("لا توجد تنبيهات تطابق هذا النطاق"),t("عدّل المرشحات أو استورد سجلات وشغّل الكشف من داخل القضية."),[linkedButton(t("فتح إدارة القضايا"),"/cases")]));
+    const surface = node("section",{class:"monitoring-surface","aria-label":t("نتائج التنبيهات")},[form,node("div",{class:"monitoring-caption"},[node("p",{text:t("آخر تحديث")+": "+formatTime(data.fetched_at)})])]);
+    if (!data.items.length) surface.append(emptyState(t("لا توجد تنبيهات تطابق هذا النطاق"),null,[linkedButton(t("فتح إدارة القضايا"),"/cases")]));
     else {
       const body=node("tbody");
       const head=node("thead",{},node("tr",{},[t("التفاصيل"),t("الخطورة"),t("وقت الاكتشاف"),t("اسم القاعدة"),t("معرف التنبيه"),t("القضية"),t("المسؤول"),t("الإجراء")].map(label=>node("th",{scope:"col",text:label}))));
@@ -86,7 +86,18 @@
           node("div",{},[node("h3",{text:t("سبب الكشف")}),node("p",{"data-user-content":"true",text:item.reason}),node("p",{class:"cell-meta",text:t("إصدار القاعدة")+": "+item.rule_version})]),
           node("div",{},[node("dl",{},[node("dt",{text:t("السجلات المرتبطة")}),node("dd",{text:number(item.evidence_events)}),node("dt",{text:t("قرار التنبيه")}),node("dd",{text:autopsyLabel(item.verdict||"undetermined")}),node("dt",{text:t("حالة القضية")}),node("dd",{text:autopsyLabel(item.case_status)})]),node("div",{class:"action-row"},[linkedButton(t("مراجعة التنبيه"),url(`/cases/${item.case_id}`,{tab:"analysis"})),linkedButton(t("السجلات والأدلة"),url(`/cases/${item.case_id}`,{tab:"logs"})),linkedButton(t("التقارير"),url("/reports",{case_id:item.case_id}))])])
         ])));
-        const expand=button("",()=>{detail.hidden=!detail.hidden;expand.setAttribute("aria-expanded",String(!detail.hidden));},"row-expand");
+        const expandedContent=node("div",{class:"dossier-content"});
+        detail.querySelector("td").append(expandedContent);
+        let loaded=false;
+        const expand=button("",async()=>{
+          detail.hidden=!detail.hidden;expand.setAttribute("aria-expanded",String(!detail.hidden));
+          if(!detail.hidden&&!loaded){
+            expand.disabled=true;
+            try{await window.SOCifyInsights.dossier(item,expandedContent);loaded=true;}
+            catch(error){expandedContent.replaceChildren(node("p",{role:"alert",text:error.message}));}
+            finally{expand.disabled=false;}
+          }
+        },"row-expand");
         expand.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
         expand.className="row-expand"; expand.setAttribute("aria-label",t("تفاصيل التنبيه")+" "+item.alert_id);expand.setAttribute("aria-expanded","false");expand.setAttribute("aria-controls",detailId);
         const cells=[expand,node("span",{class:`severity ${item.severity}`,text:autopsyLabel(item.severity)}),node("time",{datetime:item.detected_at,text:formatTime(item.detected_at)}),node("div",{class:"rule-cell"},[node("strong",{"data-user-content":"true",text:item.rule_name||item.reason}),node("small",{text:t("إصدار القاعدة")+" "+item.rule_version})]),node("bdi",{dir:"ltr",text:item.alert_id}),node("div",{},[node("a",{class:"case-link",href:`/cases/${item.case_id}`,text:item.reference}),node("span",{class:"cell-meta",text:autopsyLabel(item.case_status)})]),node("span",{"data-user-content":"true",text:item.assignee_name||t("غير مسند")}),linkedButton(t("فتح التحقيق"),`/cases/${item.case_id}`)];
@@ -104,7 +115,6 @@
   async function chooseCase(section, selected) {
     if (window.SOCifyV4?.selection.required) {
       const root = node("section",{class:"case-switcher","aria-label":t("سياق القضية")});
-      root.append(node("p",{class:"scope-note",text:t("تعمل الأدوات على القضية النشطة من النطاق الذي حددته في البداية")}));
       if (!selected) root.append(linkedButton(t("اختيار نطاق التحقيق"),"/cases"));
       return root;
     }
@@ -150,7 +160,6 @@
   async function watchlistPanel(caseId) {
     const wl = await api("/api/watchlist");
     const body = node("div", { class: "panel-body" });
-    body.append(node("p", { class: "scope-note", text: t("أضف الإيميلات والعناوين الشبكية (IP / CIDR) والنطاقات والبصمات المشبوهة ليتم مطابقتها تلقائيًا مع أي سجلات واردة أو فحص القضية بأثر رجعي.") }));
     if (permission("cases.update")) {
       const typeSel = node("select", { name: "indicator_type" }, [
         ["email", "Email"],
@@ -216,7 +225,7 @@
         },
       ], wl.items));
     } else {
-      body.append(emptyState(t("قائمة المراقبة فارغة"), t("أضف عناوين IP أو نطاقات CIDR أو إيميلات مشبوهة لتوليد تنبيهات تلقائية عند ظهورها في السجلات.")));
+      body.append(emptyState(t("قائمة المراقبة فارغة"),null));
     }
     return panel(t("قائمة مراقبة الإيميلات والـ IPs المشبوهة (Watchlist)"), body, true);
   }
@@ -224,7 +233,7 @@
     const inbox = await api("/api/reports/escalated");
     const body = node("div", { class: "panel-body" });
     if (!inbox.items.length) {
-      body.append(emptyState(t("لا توجد تقارير مصعّدة حاليًا"), t("عندما يحفظ المحقق تقرير القوائم المنسدلة ويصعّده للمدير سيظهر هنا للمراجعة والطباعة الفورية.")));
+      body.append(emptyState(t("لا توجد تقارير مصعّدة حاليًا"),null));
       return panel(t("صندوق التقارير المصعّدة لمدير مركز العمليات"), body, false);
     }
     body.append(table([
@@ -257,7 +266,6 @@
   }
   async function email(caseId) {
     const root=node("div",{class:"tool-results email-review"});
-    root.append(node("p",{class:"scope-note",text:t("فحص أولي ساكن وآمن بضغطة زر للرؤوس والروابط والمرفقات دون تشغيل أي محتوى. رؤوس SPF/DKIM نص مصدر غير موثوق شبكيًا.")}));
     if(autopsy.current.can_update&&permission("evidence.add")&&autopsy.current.status!=="closed") {
       const file=node("input",{type:"file",name:"email",accept:".eml,message/rfc822",required:true});
       const submit=node("button",{type:"submit",class:"button primary",text:t("فحص البريد ومرفقاته بضغطة زر")});
@@ -301,7 +309,7 @@
       ],mail.attachments));
       root.append(panel(mail.title,body,true));
     }
-    if(!mails.length)root.append(emptyState(t("لا توجد رسائل محللة بعد"),t("أضف رسالة EML إلى هذه القضية، ثم راجع رؤوسها ومرفقاتها.")));
+    if(!mails.length)root.append(emptyState(t("لا توجد رسائل محللة بعد"),null));
     if(before)root.append(linkedButton(t("الأحدث"),url("/email-security",{case_id:caseId})));
     if(records.next_before)root.append(linkedButton(t("رسائل أقدم"),url("/email-security",{case_id:caseId,email_before:records.next_before})));
     return root;
@@ -319,7 +327,7 @@
       {label:t("الأهمية"),value:record=>autopsyLabel(record.payload.importance||"unknown")},
       {label:t("التفاصيل"),value:record=>button(t("عرض الأصل"),()=>autopsyModal(record.payload.name,node("div",{},[autopsyRecordCard(record),linkedButton(t("توثيق إجراءات الاستجابة"),url(`/cases/${caseId}`,{tab:"response"}))])))}
     ],records.items));
-    else root.append(emptyState(t("لا سجلات بعد"),t("أضف أصلًا موثقًا ضمن نطاق التحقيق.")));
+    else root.append(emptyState(t("لا سجلات بعد"),null));
     const pages=node("div",{class:"pagination"});
     if(before)pages.append(linkedButton(t("الأحدث"),url("/endpoint-security",{case_id:caseId})));
     if(records.next_before)pages.append(linkedButton(t("التالي"),url("/endpoint-security",{case_id:caseId,asset_before:records.next_before})));
@@ -328,7 +336,7 @@
   async function intelligence(caseId) {
     const page=Math.max(1,Number(new URLSearchParams(location.search).get("intel_page"))||1);
     const data=await api(`/api/cases/${caseId}/observables?page=${page}`);
-    const root=node("div",{class:"panel-body"},node("p",{class:"scope-note",text:t("الإثراء من مصادر محلية فقط؛ غياب التطابق لا يثبت سلامة المؤشر.")}));
+    const root=node("div",{class:"panel-body"});
     if(data.items.length)root.append(table([
       {label:t("القيمة"),value:"value"},{label:t("النوع"),value:"type"},{label:t("السجلات المرتبطة"),value:"occurrences"},
       {label:t("نتيجة الإثراء"),value:item=>autopsyLabel(item.enrichment.verdict||"unknown")},
@@ -339,7 +347,7 @@
         autopsyModal(t("مصدر نتيجة الإثراء وحدودها"),content);
       })}
     ],data.items));
-    else root.append(emptyState(t("لا مؤشرات مرصودة في السجلات"),t("استورد سجلات القضية لاستخراج القيم المرصودة؛ تبقى مؤشرات المحقق منفصلة.")));
+    else root.append(emptyState(t("لا مؤشرات مرصودة في السجلات"),null));
     const pages=node("div",{class:"pagination"},node("p",{text:number(data.total)+" · "+t("الصفحة")+" "+number(page)}));
     if(page>1)pages.append(linkedButton(t("السابق"),url("/threat-intel",{case_id:caseId,intel_page:page-1})));
     if(page*data.limit<data.total)pages.append(linkedButton(t("التالي"),url("/threat-intel",{case_id:caseId,intel_page:page+1})));
@@ -357,19 +365,19 @@
     root.append(await chooseCase(section,current));
     if(section==="threat-intel")root.append(await watchlistPanel(current?.id));
     if(section==="reports")root.append(await managerEscalatedReportsPanel());
-    if(!current){root.append(emptyState(t("اختر قضية لبدء العمل"),t("تبقى السجلات والأدلة والإجراءات مرتبطة بقضيتها وصلاحياتها.")));finish(root);return;}
+    if(!current){root.append(emptyState(t("اختر قضية لبدء العمل"),null));finish(root);return;}
     autopsy.current=current;bindCase(current);
     if(current.full_case_access===false&&section!=="log-management"){
-      root.append(emptyState(t("هذه الأداة تحتاج نطاق القضية الكامل"),t("صلاحيتك الحالية تخص دفعات محددة. يمكنك متابعة السجلات المصرح بها."),[linkedButton(t("إدارة السجلات"),url("/log-management",{case_id:current.id}))]));finish(root);return;
+      root.append(emptyState(t("هذه الأداة تحتاج نطاق القضية الكامل"),null,[linkedButton(t("إدارة السجلات"),url("/log-management",{case_id:current.id}))]));finish(root);return;
     }
     autopsy.assets=current.full_case_access===false?[]:(await api(`/api/cases/${current.id}/records?kind=asset&limit=100`)).items;
     const content=node("div",{class:"tool-results"});
     if(section==="log-management") {
       content.append(await window.SOCifyAutopsy.logs(current.id));
-      content.append(panel(t("أدلة القضية"),current.evidence.length ? table([{label:t("الدليل"),value:"title"},{label:t("النوع"),value:"evidence_type"},{label:"SHA-256",value:"sha256"}],current.evidence) : emptyState(t("لا أدلة مرتبطة"),t("احتفظ بالأصل ومصدره واربطه بالقضية قبل استخلاص النتائج."))));
+      content.append(panel(t("أدلة القضية"),current.evidence.length ? table([{label:t("الدليل"),value:"title"},{label:t("النوع"),value:"evidence_type"},{label:"SHA-256",value:"sha256"}],current.evidence) : emptyState(t("لا أدلة مرتبطة"),null)));
     }
     else if(section==="endpoint-security") {
-      content.append(node("p",{class:"scope-note",text:t("جرد وتحقيق للأصول المسجلة؛ لا اتصال EDR حي ولا عزل تلقائي للأجهزة.")}));
+      content.append(await window.SOCifyInsights.hosts(current.id));
       content.append(await assetInventory(current.id));
       content.append(linkedButton(t("توثيق إجراءات الاستجابة"),url(`/cases/${current.id}`,{tab:"response"})));
     }else if(section==="threat-intel") {

@@ -138,7 +138,7 @@ function autopsySiemConnectorPanel(caseId, connectors) {
     ];
     body.append(table(cols, items));
   } else {
-    body.append(emptyState(SOCifyLocale.text("لا توجد موصلات SIEM مرتبطة"), SOCifyLocale.text("اربط Splunk HEC أو Elastic أو جامع CEF/Syslog لتوليد تنبيهات تلقائية فور وصول السجلات.")));
+    body.append(emptyState(SOCifyLocale.text("لا توجد موصلات SIEM مرتبطة"),null));
   }
   return panel(SOCifyLocale.text("ربط SIEM مباشر بالقضية"), body, Boolean(items.length));
 }
@@ -171,7 +171,7 @@ async function autopsyLogsPanel(caseId) {
     autopsyModal(SOCifyLocale.text("نطاق الدفعة وتفعيل النسخة؛ أعد فحص القواعد بعد التفعيل"), content);
   }) });
   if (selectedJob) root.append(node("p", { text: SOCifyLocale.text("تعرض سجلات نسخة محددة، وقد تكون تاريخية.") }), linkedButton(SOCifyLocale.text("عرض النسخ الفعالة"), autopsyCaseURL(caseId, { tab: "logs", job_id: null, page: null })));
-  root.append(panel(SOCifyLocale.text("أصول الاستيراد والمعالجة"), imports.items.length ? table(jobColumns, imports.items) : emptyState(SOCifyLocale.text("لا استيرادات بعد"), SOCifyLocale.text("الأصل وبصمته ومصدره محفوظة منفصلة عن السجلات المطبّعة.")), true));
+  root.append(panel(SOCifyLocale.text("أصول الاستيراد والمعالجة"), imports.items.length ? table(jobColumns, imports.items) : emptyState(SOCifyLocale.text("لا استيرادات بعد"),null), true));
   const search = node("input", { type: "search", name: "q", value: query, maxlength: 200 });
   const form = node("form", { class: "filter-row", "aria-label": SOCifyLocale.text("بحث سجلات القضية") }, [field(SOCifyLocale.text("عنوان أو عنوان شبكة أو مستخدم أو مضيف"), search), node("button", { type: "submit", class: "button ghost", text: SOCifyLocale.text("بحث السجلات") })]);
   form.addEventListener("submit", (event) => { event.preventDefault(); window.location.assign(autopsyCaseURL(caseId, { tab: "logs", q: search.value, page: null })); });
@@ -181,7 +181,7 @@ async function autopsyLogsPanel(caseId) {
     if (permission("evidence.download")) exports.append(linkedButton(SOCifyLocale.template`${format.toUpperCase()} · غير منقّح`, `/api/cases/${caseId}/logs/export?format=${format}&redacted=0&q=${encodeURIComponent(query)}${jobFilter}`));
   }
   const columns = [{ label: SOCifyLocale.text("وقت الحدث"), value: (row) => row.normalized_fields.event_time_known === false ? SOCifyLocale.text("غير متوفر؛ محفوظ وقت الإدخال") : formatTime(row.event_time) }, { label: SOCifyLocale.text("العنوان"), value: "title" }, { label: SOCifyLocale.text("المصدر"), value: "source" }, { label: SOCifyLocale.text("الخطورة"), value: (row) => autopsyLabel(row.severity) }, { label: SOCifyLocale.text("فحص"), value: (row) => button(SOCifyLocale.text("تفاصيل السجل"), async () => { try { const detail = await api(`/api/cases/${caseId}/logs/${row.id}`); autopsyModal(SOCifyLocale.text("السجل الخام والمطبع"), node("pre", { text: JSON.stringify(detail, null, 2) })); } catch (error) { handleError(error); } }) }];
-  const tableContent = node("div", { class: "panel-body" }, [form, exports, node("p", { text: SOCifyLocale.template`${data.total_relation === "gte" ? SOCifyLocale.text("على الأقل ") : ""}${data.total} سجل في نطاق البحث${data.total_relation === "gte" ? SOCifyLocale.text(" · الحد الأدنى للعدد يحافظ على سرعة البحث؛ تستمر الصفحات التالية") : ""}` }), data.items.length ? table(columns, data.items) : emptyState(SOCifyLocale.text("لا سجلات في النطاق"), SOCifyLocale.text("أضف ملفًا أو غيّر مرشح البحث داخل القضية."))]);
+  const tableContent = node("div", { class: "panel-body" }, [form, exports, node("p", { text: SOCifyLocale.template`${data.total_relation === "gte" ? SOCifyLocale.text("على الأقل ") : ""}${data.total} سجل في نطاق البحث${data.total_relation === "gte" ? SOCifyLocale.text(" · الحد الأدنى للعدد يحافظ على سرعة البحث؛ تستمر الصفحات التالية") : ""}` }), data.items.length ? table(columns, data.items) : emptyState(SOCifyLocale.text("لا سجلات في النطاق"),null)]);
   if (page > 1) tableContent.append(linkedButton(SOCifyLocale.text("السجلات السابقة"), autopsyCaseURL(caseId, { tab: "logs", page: page - 1 })));
   if (data.has_next ?? (page * data.limit < data.total)) tableContent.append(linkedButton(SOCifyLocale.text("السجلات التالية"), autopsyCaseURL(caseId, { tab: "logs", page: page + 1 })));
   if (data.items.length && autopsy.current.can_update && autopsy.current.status !== "closed") {

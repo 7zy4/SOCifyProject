@@ -160,6 +160,11 @@ def build_snapshot(case, revision: int, profile: str):
         (case_id,),
         2000,
     )
+    from .quick_reports import _report_view
+
+    payload["investigation_assessment"] = _report_view(get_db().execute("SELECT * FROM case_quick_reports WHERE case_id=?", (case_id,)).fetchone())
+    for alert in payload["alerts"]:
+        alert["review"] = json.loads(alert["review"]) if alert["review"] else None
     payload["observables"] = bounded_rows(
         "SELECT o.type,o.value,o.enrichment,(SELECT COUNT(*) FROM autopsy_observable_links l JOIN security_events e ON e.id=l.event_id WHERE l.observable_id=o.id AND e.autopsy_active=1) AS active_occurrences FROM autopsy_observables o WHERE o.case_id=? ORDER BY o.id",
         (case_id,),

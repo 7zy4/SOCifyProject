@@ -199,6 +199,15 @@ def lines(value, depth=0):
 
 
 def sections(payload):
+    assessment = payload.get("investigation_assessment")
+    if assessment:
+        yield "قرارات التحقيق", {"status": assessment["status"], "updated_at": assessment["updated_at"], "prepared_by": assessment["prepared_by"]}
+        for question in assessment["resolved_questions"]:
+            yield question["question"], question["answer_label"]
+        if assessment.get("executive_note"):
+            yield "خلاصة المحقق", assessment["executive_note"]
+        if assessment.get("manager_decision"):
+            yield "مراجعة المدير", {key: assessment[key] for key in ("manager_decision", "manager_comment", "acknowledged_by", "acknowledged_at")}
     for key in ("summary", "case", "context", "metrics", "scope", "members", "alerts"):
         if payload.get(key):
             yield LABELS[key], payload[key]

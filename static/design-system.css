@@ -249,9 +249,9 @@ bdi,.mono,time { font-variant-numeric:tabular-nums; }
 input,select,textarea,.choice-control { max-width:100%; }
 .filter-row > label { min-width:0; }
 @media(max-width:700px) { .tool-results .filter-row > label { flex-basis:100%; } }
-.monitoring-table th:first-child,.monitoring-table td:first-child { min-width:44px; width:44px; padding-inline:6px; }
+.monitoring-table > thead > tr > th:first-child,.monitoring-table > tbody > tr > td:first-child { min-width:44px; width:44px; padding-inline:6px; }
 .monitoring-table .case-link { white-space:nowrap; font-size:12px; }
-.monitoring-table td:last-child { white-space:nowrap; }
+.monitoring-table > tbody > tr > td:last-child { white-space:nowrap; }
 .asset-table small { display:block; font-size:12px; color:var(--muted); }
 .sidebar-logout { display:none; }
 @media(max-width:700px) { .sidebar-logout { display:block; } .sidebar-logout .button { width:100%; } }

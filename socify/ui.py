@@ -37,6 +37,7 @@ def test_redirect():
 @ui.get("/profile")
 @ui.get("/team")
 @ui.get("/monitoring")
+@ui.get("/performance")
 @ui.get("/log-management")
 @ui.get("/endpoint-security")
 @ui.get("/threat-intel")
@@ -55,6 +56,7 @@ def dashboard(case_id: int | None = None):
 
         if request.path in {
             "/monitoring",
+            "/performance",
             "/log-management",
             "/endpoint-security",
             "/threat-intel",
@@ -79,6 +81,7 @@ def dashboard(case_id: int | None = None):
                 "/audit",
                 "/admin",
                 "/monitoring",
+                "/performance",
                 "/log-management",
                 "/endpoint-security",
                 "/threat-intel",

@@ -1,5 +1,5 @@
 {
-  "name": "SOCify V6 Tactical Workbench",
+  "name": "SOCify Workbench",
   "build": {
     "dockerfile": "Dockerfile"
   },
@@ -19,7 +19,7 @@
       "visibility": "private"
     },
     "5001": {
-      "label": "SOCify V4 Demo",
+      "label": "SOCify Development",
       "onAutoForward": "openBrowser",
       "visibility": "private"
     }
