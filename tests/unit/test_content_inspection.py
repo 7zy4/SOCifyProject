@@ -68,6 +68,18 @@ def test_recursive_and_powershell_decoding():
     assert result["decoded_threat_count"] == 1
 
 
+def test_encodings_and_financial_values_embedded_in_log_fields():
+    payload = encode("Investigate /etc/passwd")
+    result = inspect_content({"message": "status=denied payload=" + payload + " user=analyst"})
+    assert result["decoded"][0]["layers"][0]["text"] == "Investigate /etc/passwd"
+    assert result["decoded_threat_count"] == 1
+    value = "SA03 8000 0000 6080 1016 7519"
+    result = inspect_content({"message": "IBAN=" + value + " USER=JOE"})
+    match = next(item for item in result["findings"] if item["kind"] == "iban")
+    assert match["offset"] == 5 and match["length"] == len(value)
+    assert not inspect_content({"message": "%00%00%00"})["decoded"]
+
+
 def test_secret_redaction_covers_nested_encoding_and_private_key_body():
     credential = "Ab3!Cd4@Ef5#Gh6"
     text = "api_key=" + credential

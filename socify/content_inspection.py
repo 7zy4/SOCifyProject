@@ -23,7 +23,7 @@ PRIVATE_KEY = re.compile(
 )
 CARD = re.compile(r"(?<![0-9])(?:[0-9][ -]?){12,18}[0-9](?![0-9])")
 IBAN = re.compile(r"\b[A-Z]{2}[0-9]{2}(?:[ ]?[A-Z0-9]){11,30}\b")
-TOKEN = re.compile(r"(?<![A-Za-z0-9+/=_-])[A-Za-z0-9+/_-]{16,4096}={0,6}(?![A-Za-z0-9+/=_-])")
+TOKEN = re.compile(r"(?<![A-Za-z0-9+/_-])[A-Za-z0-9+/_-]{16,4096}={0,6}(?![A-Za-z0-9+/=_-])")
 POWERSHELL = re.compile(r"(?:powershell(?:\.exe)?|pwsh(?:\.exe)?).*?\s-(?:e|en|enc|enco|encodedcommand)\s+[\"']?([A-Za-z0-9+/]{8,4096}={0,2})", re.I)
 THREAT = re.compile(r"downloadstring\s*\(|invoke-expression\b|\biex\s*\(|/etc/(?:passwd|shadow)\b|vssadmin\s+delete\s+shadows|sekurlsa\b", re.I)
 
@@ -75,8 +75,11 @@ def sensitive_matches(text, field=""):
     ):
         for match in pattern.finditer(text):
             value = match.group(group)
+            # Uppercase words following a spaced IBAN are not part of its checksum.
+            while kind == "iban" and not check(value) and " " in value:
+                value = value.rsplit(" ", 1)[0]
             if check(value):
-                matches.append((match.start(group), match.end(group), kind))
+                matches.append((match.start(group), match.start(group) + len(value), kind))
             if len(matches) > FINDING_LIMIT:
                 break
     if SECRET_NAME.fullmatch(field.rsplit(".", 1)[-1]) and plausible_secret(text.strip()):
