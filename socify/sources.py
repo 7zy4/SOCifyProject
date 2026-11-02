@@ -482,7 +482,8 @@ def source_webhook_ingest(source_id: int):
     if query_case:
         if not query_case.isdecimal():
             return error_response("INVALID_CASE", "معرف القضية غير صالح", 422)
-        target_case = int(query_case)
+        if target_case is None or int(query_case) != target_case:
+            return error_response("SOURCE_CASE_MISMATCH", "مفتاح المصدر لا يخول الإرسال إلى هذه القضية", 403)
     try:
         result = _ingest_records_for_source(row, raw_bytes, request.content_type or "", target_case, None)
     except ValueError as exc:
@@ -573,7 +574,7 @@ def create_case_siem_connector(case_id: int):
             """INSERT INTO event_sources
             (workspace_id, name, type, endpoint, api_key, credential_ciphertext, credential_configured, status,
             is_active, rows_ingested, error_rate, default_case_id, ingest_token_hash, created_at, updated_at)
-            VALUES (?, ?, ?, ?, NULL, ?, ?, 'connected', 1, 0, 0, ?, ?, ?, ?)""",
+            VALUES (?, ?, ?, ?, NULL, ?, ?, 'not_tested', 1, 0, 0, ?, ?, ?, ?)""",
             (
                 workspace_id(),
                 data["name"],

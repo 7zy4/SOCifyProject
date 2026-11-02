@@ -129,6 +129,7 @@ function autopsySiemConnectorPanel(caseId, connectors) {
     const cols = [
       { label: SOCifyLocale.text("المصدر"), value: "name" },
       { label: SOCifyLocale.text("النوع"), value: "type" },
+      { label: SOCifyLocale.text("الحالة"), value: (item) => SOCifyLocale.text(item.status === "connected" ? "تم استقبال السجلات" : item.status === "failed" ? "تعذر استقبال السجلات" : "بانتظار السجلات") },
       { label: SOCifyLocale.text("السجلات المستقبلة"), value: "rows_ingested" },
       { label: SOCifyLocale.text("نقطة الاستقبال"), value: (item) => `/api/sources/${item.id}/ingest` },
       {
