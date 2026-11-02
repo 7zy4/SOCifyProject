@@ -54,6 +54,7 @@ def test_runtime_context_typography_and_case_report(app, language, width):
             page.locator("[data-alert-toggle]").first.click()
             page.locator(".dossier-view").wait_for()
             assert version not in page.locator(".dossier-view").inner_text()
+            assert "telemetry_schema" not in page.locator(".dossier-view").inner_text()
             assert page.locator(".dossier-view table").count() == 1
             assert "payments" in page.locator(".dossier-view").inner_text()
             assert "checkout-7" in page.locator(".dossier-view").inner_text()
