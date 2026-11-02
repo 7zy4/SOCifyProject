@@ -222,6 +222,8 @@ function autopsyForm(schema, submit, initial = {}) {
     try {
       const values = Object.fromEntries(Object.entries(getters).map(([key, getter]) => [key, getter()]).filter(([, value]) => value !== null));
       await submit(values);
+      errors.hidden = true;
+      errors.textContent = "";
       SOCifyDrafts.saved(form);
     } catch (error) { errors.hidden = false; errors.textContent = error.message; }
     finally { delete form.dataset.saving; save.disabled = false; save.removeAttribute("aria-busy"); save.textContent = SOCifyLocale.text("حفظ"); }

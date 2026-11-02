@@ -1524,6 +1524,7 @@
   "اختر قضية واحدة أو قضيتين مرتبطتين ثم ابدأ التحقيق": "Choose one case or two related cases, then start investigating",
   "بدء التحقيق بالنطاق المحدد": "Start investigation with selected cases",
   "القضايا المختارة": "Selected cases",
+  "إلغاء الاختيار": "Remove selection",
   "تم ربط القضيتين؛ يمكنك اختيارهما من صفحة القضايا": "Cases linked. Select both from Case Management.",
   "ربط قضية ذات صلة": "Link a related case",
   "أدخل رقم القضية الداخلي وسبب الربط؛ تبقى أدلة كل قضية مستقلة": "Enter the internal case ID and the reason. Each case retains its own evidence.",
