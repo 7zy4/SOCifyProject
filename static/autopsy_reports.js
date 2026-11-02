@@ -157,6 +157,7 @@ async function autopsyQuickDropdownReportPanel(caseId) {
       escalateBtn.disabled = true;
       try {
         await api(`/api/cases/${caseId}/quick-report/escalate`, { method: "POST", body: collectPayload() });
+        SOCifyDrafts.saved(grid);
         await autopsyCase(caseId);
       } catch (error) {
         statusNotice.replaceChildren(node("p", { class: "notice", role: "alert", text: error.message }));
@@ -172,12 +173,14 @@ async function autopsyQuickDropdownReportPanel(caseId) {
     event.preventDefault();
     try {
       await api(`/api/cases/${caseId}/quick-report`, { method: "PUT", body: collectPayload() });
+      SOCifyDrafts.saved(grid);
       await autopsyCase(caseId);
     } catch (error) {
       statusNotice.replaceChildren(node("p", { class: "notice", role: "alert", text: error.message }));
     }
   });
 
+  SOCifyDrafts.track(grid);
   const container = node("div", { class: "panel-body" }, [grid]);
   if (data.report?.manager_decision) {
     container.prepend(node("div", { class: "notice review-decision", role: "status" }, [
@@ -211,6 +214,7 @@ async function autopsyQuickDropdownReportPanel(caseId) {
       event.preventDefault();
       try {
         await api(`/api/cases/${caseId}/quick-report/acknowledge`, { method: "POST", body: { decision: decSelect.value, comment: mgrComment.value.trim(), case_version: data.case_version } });
+        SOCifyDrafts.saved(mgrForm);
         await autopsyCase(caseId);
       } catch (error) {
         statusNotice.replaceChildren(node("p", { class: "notice", role: "alert", text: error.message }));
@@ -220,7 +224,7 @@ async function autopsyQuickDropdownReportPanel(caseId) {
         }
       }
     });
-    container.append(mgrForm);
+    container.append(SOCifyDrafts.track(mgrForm));
   }
   return panel(SOCifyLocale.text("قرارات التحقيق"), container, true);
 }
@@ -238,6 +242,7 @@ window.SOCifyAutopsy.reports = async (caseId) => {
   const profiles = permission("evidence.download") ? [{ value: "full", label: SOCifyLocale.text("كامل للاستخدام الداخلي المصرح") }, { value: "metadata_only_v1", label: SOCifyLocale.text("منقح: بيانات إحصائية وحالة فقط") }] : [{ value: "metadata_only_v1", label: SOCifyLocale.text("منقح: بيانات إحصائية وحالة فقط") }];
   const choice = autopsyChoice("profile", profiles, profiles[0].value, true);
   const create = button(SOCifyLocale.text("إعداد تقرير جديد"), async () => {
+    if (!SOCifyDrafts.confirmDiscard(workspace)) return;
     create.disabled = true;
     try { await api(`/api/cases/${caseId}/reports`, { method: "POST", body: { version: current.version, profile: choice.input.autopsyValue() } }); await autopsyCase(caseId); }
     catch (error) { handleError(error); create.disabled = false; }
@@ -278,6 +283,7 @@ window.SOCifyAutopsy.reports = async (caseId) => {
     let updates = 0;
     const poll = async () => {
       if (!body.isConnected || ++updates > 40) return;
+      if (SOCifyDrafts.hasChanges(workspace)) { autopsyReportTimer = setTimeout(poll, 2500); return; }
       try {
         const latest = await api(`/api/cases/${caseId}`);
         const statuses = await Promise.all(latest.reports.slice(0, 20).map((item) => api(`/api/cases/${caseId}/reports/${item.id}`)));

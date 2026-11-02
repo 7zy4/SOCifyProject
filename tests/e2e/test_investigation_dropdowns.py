@@ -1,10 +1,11 @@
-import shutil
 import threading
 
 import pytest
 from conftest import DEMO_LOGIN_VALUE
 from playwright.sync_api import sync_playwright
 from werkzeug.serving import make_server
+
+from tests.e2e.test_browser import launch_browser
 
 
 @pytest.mark.e2e
@@ -15,7 +16,7 @@ def test_branded_choices_and_documented_why_answers(app, tmp_path):
     thread.start()
     try:
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
+            browser = launch_browser(playwright)
             page = browser.new_page(locale="ar-SA", viewport={"width": 390, "height": 844})
             page.goto(f"http://127.0.0.1:{server.server_port}/login")
             page.locator("input[name=email]").fill("analyst@socify.local")
@@ -39,6 +40,7 @@ def test_branded_choices_and_documented_why_answers(app, tmp_path):
             assert dialog.is_visible()
             assert classification.input_value()
             page.screenshot(path=str(tmp_path / "investigation-dropdown-mobile.png"), full_page=True)
+            page.once("dialog", lambda confirmation: confirmation.accept())
             dialog.get_by_role("button", name="إغلاق", exact=True).click()
             page.evaluate('autopsyModal("Why answers", autopsyForm({whys: {whys: true}}, async () => {}))')
             dialog = page.get_by_role("dialog")

@@ -16,6 +16,8 @@
   "متطلبات الإغلاق": "Closure requirements",
   "مراجعة التقرير": "Review report",
   "صلاحيات الأدوار": "Role permissions",
+  "لديك تعديلات غير محفوظة. هل تريد مغادرتها؟": "You have unsaved changes. Leave without saving?",
+  "تعذر الاتصال. أعد المحاولة.": "Unable to connect. Try again.",
   "المناوبة السابقة": "Previous shift",
   "مسؤولية العضو": "Member responsibility",
   "مسلّم المناوبة": "Outgoing shift member",
@@ -1631,6 +1633,7 @@
       toggle.lang = language === "ar" ? "en" : "ar";
       toggle.setAttribute("aria-label", language === "ar" ? "Switch interface to English" : "تغيير لغة الواجهة إلى العربية");
       toggle.addEventListener("click", () => {
+        if (window.SOCifyDrafts && !SOCifyDrafts.confirmDiscard()) return;
         const next = language === "ar" ? "en" : "ar";
         try { localStorage.setItem(storageKey, next); } catch (_) { return; }
         window.location.reload();

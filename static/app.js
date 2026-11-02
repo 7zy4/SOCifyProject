@@ -73,7 +73,12 @@ async function api(path, options = {}) {
     config.body = JSON.stringify(config.body);
   }
   if (config.method && !["GET", "HEAD"].includes(config.method.toUpperCase())) config.headers["X-CSRFToken"] = state.csrf;
-  const response = await fetch(path, config);
+  let response;
+  try { response = await fetch(path, config); }
+  catch (error) {
+    if (error.name === "AbortError") throw error;
+    throw new Error(SOCifyLocale.text("تعذر الاتصال. أعد المحاولة."));
+  }
   if (response.status === 401) {
     window.location.assign("/login");
     throw new Error(SOCifyLocale.text("انتهت الجلسة"));

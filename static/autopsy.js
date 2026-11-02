@@ -130,8 +130,9 @@ function autopsyChoice(name, values, current = "", required = false) {
 
 function autopsyModal(title, content) {
   const previous = document.activeElement;
-  const dialog = node("dialog", { class: "autopsy-modal", "aria-label": title }, [node("div", { class: "workspace-head" }, [node("h2", { text: title }), button(SOCifyLocale.text("إغلاق"), () => dialog.close())]), content]);
+  const dialog = node("dialog", { class: "autopsy-modal", "aria-label": title }, [node("div", { class: "workspace-head" }, [node("h2", { text: title }), button(SOCifyLocale.text("إغلاق"), () => { if (SOCifyDrafts.confirmDiscard(dialog)) dialog.close(); })]), content]);
   document.body.append(dialog);
+  dialog.addEventListener("cancel", event => { if (!SOCifyDrafts.confirmDiscard(dialog)) event.preventDefault(); });
   dialog.addEventListener("close", () => { dialog.remove(); previous?.focus(); }, { once: true });
   dialog.showModal();
   return dialog;
@@ -212,19 +213,22 @@ function autopsyForm(schema, submit, initial = {}) {
     save.disabled = true;
     save.setAttribute("aria-busy", "true");
     save.textContent = SOCifyLocale.text("جارٍ الحفظ…");
+    form.dataset.saving = "true";
     try {
       const values = Object.fromEntries(Object.entries(getters).map(([key, getter]) => [key, getter()]).filter(([, value]) => value !== null));
       await submit(values);
+      SOCifyDrafts.saved(form);
     } catch (error) { errors.hidden = false; errors.textContent = error.message; }
-    finally { save.disabled = false; save.removeAttribute("aria-busy"); save.textContent = SOCifyLocale.text("حفظ"); }
+    finally { delete form.dataset.saving; save.disabled = false; save.removeAttribute("aria-busy"); save.textContent = SOCifyLocale.text("حفظ"); }
   });
-  return form;
+  return SOCifyDrafts.track(form);
 }
 
 function autopsyNewCase(unassigned = false, destination = "overview") {
   const form = autopsyForm({ title: { required: true, max: 255 }, reason: { required: true, choices: autopsy.catalog.reasons }, objective: { required: true, max: 2000 }, classification: { required: true, choices: autopsy.catalog.classifications } }, async (body) => {
     const payload = unassigned ? { ...body, assignee: null } : body;
     const created = await api("/api/cases", { method: "POST", body: payload });
+    SOCifyDrafts.saved(form);
     window.location.assign(unassigned ? "/cases" : `/cases/${created.id}${destination === "logs" ? "?tab=logs" : ""}`);
   }, { reason: "alert_review", objective: SOCifyLocale.text("التحقيق الأولي السريع وتحديد المؤشرات والإجراء المناسب"), classification: "confidential" });
   autopsyModal(unassigned ? SOCifyLocale.text("إيداع قضية مفتوحة في طابور الفريق") : SOCifyLocale.text("إنشاء قضية سريعة وبدء التحقيق"), form);
@@ -326,6 +330,7 @@ async function autopsyRecordPanel(kind) {
 }
 
 async function autopsyCase(caseId) {
+  if (!SOCifyDrafts.confirmDiscard(workspace, true)) return;
   if (window.SOCifyWorkbench?.sections.includes(state.section)) { await window.SOCifyWorkbench.start(state.section); return; }
   begin("case");
   let selected = new URLSearchParams(window.location.search).get("tab") || "summary";

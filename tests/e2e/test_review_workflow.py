@@ -201,6 +201,7 @@ def test_followup_is_visible_and_stale_review_cannot_overwrite_the_analyst(app, 
         conflict = manager.page.evaluate("() => SOCifyLocale.error('CASE_VERSION_CONFLICT', 'تغيرت القضية؛ حدّث قبل الاعتماد')")
         expect(manager.page.get_by_role("alert")).to_contain_text(conflict)
         expect(manager.page.locator("input[name=comment]")).to_have_value("Stale review must not replace the newer work")
+        manager.page.once("dialog", lambda dialog: dialog.accept())
         manager.page.reload()
         manager.settle()
         expect(manager.page.locator("input[name=executive_note]")).to_have_value("Approval CHG-204 verified; process evidence retained.")

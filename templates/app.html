@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
   {% if operational %}<link rel="stylesheet" href="{{ url_for('static', filename='autopsy.css') }}">{% endif %}
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  {% if operational %}<script src="{{ url_for('static', filename='drafts.js') }}" defer></script>{% endif %}
   {% if operational %}<script src="{{ url_for('static', filename='soc-workbench.js') }}" defer></script>{% endif %}
   {% if operational %}<script src="{{ url_for('static', filename='soc-insights.js') }}" defer></script>{% endif %}
   {% if operational %}<script src="{{ url_for('static', filename='autopsy.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_data.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_procedures.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_reports.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_analysis.js') }}" defer></script>{% endif %}
