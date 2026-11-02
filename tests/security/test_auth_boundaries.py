@@ -2,9 +2,27 @@ from socify.auth import re_email
 from tests.conftest import DEMO_LOGIN_VALUE
 
 
+def test_rejected_invitation_form_retains_only_bounded_fields_without_echoing_password(app, client, login_as, database):
+    app.config["LEGACY_TRAINING_TESTS"] = False
+    login_as("soc_manager")
+    token = client.post("/api/team/invitations", json={"email": "invitee@example.test", "role": "analyst"}).json["invitation_token"]
+    with client.session_transaction() as session:
+        session.clear()
+    payload = {"name": 'Layan"><svg onload=alert(1)>', "email": "other@example.test", "invitation_token": token, "password": DEMO_LOGIN_VALUE}
+    rejected = client.post("/register", data=payload)
+    assert rejected.status_code == 422 and rejected.headers["Cache-Control"] == "no-store"
+    assert f'value="{token}"' in rejected.text and 'value="other@example.test"' in rejected.text
+    assert "<svg onload" not in rejected.text and DEMO_LOGIN_VALUE not in rejected.text
+    assert token not in rejected.headers.get("Set-Cookie", "")
+    assert database.execute("SELECT consumed_at FROM team_invitations WHERE email='invitee@example.test'").fetchone()[0] is None
+    accepted = client.post("/register", data={**payload, "name": "Layan", "email": "invitee@example.test"})
+    assert accepted.status_code == 302 and accepted.headers["Location"].endswith("/login")
+
+
 def test_browser_forms_redirect_and_register_without_privilege_escalation(client, database):
     assert client.get("/register").status_code == 200
-    assert client.post("/register", data={}).headers["Location"].endswith("/register")
+    invalid = client.post("/register", data={})
+    assert invalid.status_code == 422 and 'id="register-form"' in invalid.text
     payload = {"email": "form-user@example.test", "name": "Form Trainee", "password": DEMO_LOGIN_VALUE, "role": "admin"}
     created = client.post("/register", data=payload)
     assert created.status_code == 302

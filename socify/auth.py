@@ -314,12 +314,17 @@ def re_email(value: str) -> bool:
 
 @auth_api.post("/register")
 def register_form():
-    response = _register(_payload())
+    data = _payload()
+    response = _register(data)
     if request.is_json:
         return response
     if isinstance(response, tuple) and response[1] >= 400:
-        flash("تعذر إنشاء الحساب. تحقق من البيانات", "error")
-        return redirect(url_for("auth.register_page"))
+        fields = {
+            key: value
+            for key, limit in {"name": 120, "email": 254, "team_name": 120, "invitation_token": 200}.items()
+            if isinstance(value := data.get(key), str) and len(value) <= limit
+        }
+        return render_template("register.html", csrf_token=generate_csrf(), form_values=fields, registration_error=response[0].get_json()["error"]), response[1]
     flash("تم إنشاء الحساب. يمكنك تسجيل الدخول الآن", "success")
     return redirect(url_for("auth.login_page"))
 

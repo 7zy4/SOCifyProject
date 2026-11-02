@@ -1,5 +1,8 @@
 "use strict";
 
+const registrationError = document.querySelector("[data-registration-error]");
+if (registrationError) registrationError.textContent = SOCifyLocale.error(registrationError.dataset.registrationError, registrationError.textContent.trim());
+
 const invitationField = document.getElementById("invitation_token");
 const invitationUrl = new URL(window.location.href);
 const invitationFragment = new URLSearchParams(invitationUrl.hash.slice(1));

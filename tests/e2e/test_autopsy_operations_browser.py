@@ -106,7 +106,7 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
             handoff.locator("input[name=to_user]").fill(analyst_name + " · محلل")
             handoff.locator("input[name=reason]").fill("Scheduled shift transfer with retained prior access")
             handoff.get_by_role("button", name="حفظ", exact=True).click()
-            page.get_by_role("cell", name="previous_shift", exact=True).wait_for()
+            page.get_by_role("cell", name="المناوبة السابقة", exact=True).wait_for()
             page.evaluate(
                 "id => api(`/api/cases/${id}/imports`,{method:'POST',body:{filename:'browser.json',content:JSON.stringify([{title:'Browser suspicious log',source_ip:'192.0.2.8'}])}})",
                 case_id,
