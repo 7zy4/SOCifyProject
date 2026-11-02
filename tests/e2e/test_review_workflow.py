@@ -3,6 +3,7 @@
 import json
 import re
 import threading
+import time
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -31,14 +32,34 @@ ARTIFACTS = Path("artifacts/review-journeys")
 class ReviewJourney:
     def __init__(self, page, base, steps):
         self.page, self.base, self.steps = page, base, steps
+        self.pending = set()
+        self.last_request = time.monotonic()
+
+        def started(request):
+            self.pending.add(request)
+            self.last_request = time.monotonic()
+
+        def finished(request):
+            self.pending.discard(request)
+            self.last_request = time.monotonic()
+
+        page.on("request", started)
+        page.on("requestfinished", finished)
+        page.on("requestfailed", finished)
 
     def text(self, text):
         return self.page.evaluate("s => SOCifyLocale.text(s)", text)
 
     def settle(self):
         self.page.wait_for_load_state("networkidle")
-        if self.page.locator("#workspace").count():
-            self.page.locator('#workspace[aria-busy="false"]').wait_for()
+        deadline = time.monotonic() + 25
+        while time.monotonic() < deadline:
+            self.page.wait_for_timeout(75)
+            workspace = self.page.locator("#workspace")
+            if not self.pending and time.monotonic() - self.last_request > 0.3:
+                if not workspace.count() or workspace.get_attribute("aria-busy") == "false":
+                    return
+        raise AssertionError("The interface did not finish loading")
 
     def click(self, role, name, within=None):
         self.steps.append({"action": "activate", "label": name})
@@ -140,6 +161,7 @@ def review_session(app, language, name):
             finally:
                 for who, page in zip(("analyst", "manager"), pages, strict=True):
                     if page.url != "about:blank":
+                        page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
                         page.screenshot(path=str(ARTIFACTS / f"{name}-{language}-{who}.png"), full_page=True)
                         result[who + "_visible_text"] = page.locator("main").inner_text()
                 (ARTIFACTS / f"{name}-{language}.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -260,9 +282,11 @@ def test_complete_review_closes_alert_and_reopening_preserves_report(app, langua
             },
         )
         analyst.transition("awaiting_review")
+        analyst.page.get_by_role("button", name=analyst.text("إكمال المهمة"), exact=True).first.wait_for()
         while analyst.page.get_by_role("button", name=analyst.text("إكمال المهمة"), exact=True).count():
             analyst.page.get_by_role("button", name=analyst.text("إكمال المهمة"), exact=True).first.click()
             analyst.settle()
+        assert all(task["status"] in {"completed", "reviewed"} for task in analyst.state()["tasks"] if task["required"])
         analyst.click("link", "التقارير والمراجعة")
         analyst.click("button", "إعداد تقرير جديد")
         analyst.page.get_by_role("link", name=download_pdf, exact=True).wait_for(timeout=60000)

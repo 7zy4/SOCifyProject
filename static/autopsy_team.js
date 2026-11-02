@@ -1,31 +1,45 @@
 "use strict";
 
+const teamPermissionLabels = {
+  "alerts.read": "عرض التنبيهات", "alerts.triage": "فرز التنبيهات",
+  "audit.read": "عرض سجل التدقيق", "cases.create": "إنشاء القضايا",
+  "cases.export": "تصدير القضايا", "cases.read": "عرض القضايا", "cases.update": "تعديل القضايا",
+  "events.create": "استيراد السجلات", "events.read": "عرض السجلات",
+  "evidence.add": "إضافة الأدلة", "evidence.download": "تنزيل الأدلة",
+  "graph.read": "عرض علاقات الأدلة", "hunt.execute": "تنفيذ بحث التحقيق",
+  "hunt.save": "حفظ بحث التحقيق", "hunt.share": "مشاركة بحث التحقيق",
+  "notes.add": "إضافة الملاحظات", "playbooks.request": "طلب تشغيل إجراءات الاستجابة",
+  "reports.approve": "اعتماد التقارير", "rules.read": "عرض قواعد الكشف", "sources.read": "عرض مصادر السجلات"
+};
+
 window.SOCifyAutopsy.team = async () => {
   begin("team");
   const data = await api("/api/team");
   autopsy.team = data;
   const root = node("div", {}, pageHead(SOCifyLocale.text("فريق التحقيق الداخلي"), null));
   root.append(panel(SOCifyLocale.text("أعضاء الفريق"), table([{ label: SOCifyLocale.text("الاسم"), value: "name" }, { label: SOCifyLocale.text("البريد"), value: "email" }, { label: SOCifyLocale.text("الدور"), value: (row) => autopsyLabel(row.role) }, { label: SOCifyLocale.text("الحالة"), value: (row) => row.is_active ? SOCifyLocale.text("نشط") : SOCifyLocale.text("موقوف") }, { label: SOCifyLocale.text("إدارة"), value: (row) => data.can_manage && row.is_active && row.role !== "admin" ? button(SOCifyLocale.text("إدارة العضو"), () => {
-    const roleForm = autopsyForm({ role: { required: true, choices: data.roles.map((role) => role.role) } }, async (body) => { await api(`/api/team/members/${row.id}`, { method: "PATCH", body }); dialog.close(); await window.SOCifyAutopsy.team(); }, row);
+    const roleForm = autopsyForm({ role: { label: SOCifyLocale.text("الدور"), required: true, choices: data.roles.map((role) => role.role) } }, async (body) => { await api(`/api/team/members/${row.id}`, { method: "PATCH", body }); dialog.close(); await window.SOCifyAutopsy.team(); }, row);
     const handoff = autopsyForm({ handoff_to: { user: true }, reason: { required: true, max: 1000 } }, async (body) => { await api(`/api/team/members/${row.id}/deactivate`, { method: "POST", body }); dialog.close(); await window.SOCifyAutopsy.team(); });
     const dialog = autopsyModal(SOCifyLocale.template`إدارة ${row.name}`, node("div", {}, [panel(SOCifyLocale.text("تغيير الدور وسحب الجلسات الحالية"), roleForm, true), panel(SOCifyLocale.text("إيقاف الوصول وتسليم المسؤوليات"), handoff, true)]));
   }) : "—" }], data.members), true));
   if (data.can_manage) {
-    root.append(panel(SOCifyLocale.text("دعوة عضو جديد"), node("div", { class: "panel-body" }, autopsyForm({ email: { required: true, max: 254 }, role: { required: true, choices: data.roles.map((role) => role.role) } }, async (body) => {
+    root.append(panel(SOCifyLocale.text("دعوة عضو جديد"), node("div", { class: "panel-body" }, autopsyForm({ email: { required: true, max: 254 }, role: { label: SOCifyLocale.text("الدور"), required: true, choices: data.roles.map((role) => role.role) } }, async (body) => {
       const invitation = await api("/api/team/invitations", { method: "POST", body });
       const url = new URL("/register", window.location.origin);
       url.hash = new URLSearchParams({ invitation_token: invitation.invitation_token }).toString();
       autopsyModal(SOCifyLocale.text("رابط دعوة سري؛ سلّمه داخليًا لصاحب البريد المحدد"), node("div", {}, [node("p", { text: SOCifyLocale.template`ينتهي: ${formatTime(invitation.expires_at)}` }), field(SOCifyLocale.text("رابط التسجيل بالدعوة"), node("input", { readonly: true, value: url.toString(), dir: "ltr" }))]));
     })), true));
+    const policies = node("div", { class: "panel-body" });
     for (const role of data.roles.filter((item) => item.role !== "soc_manager")) {
       const choices = node("div", { class: "form-grid" });
       const inputs = role.available.map((value) => {
         const input = node("input", { type: "checkbox", checked: role.permissions.includes(value), value });
-        choices.append(field(value, input));
+        choices.append(field(SOCifyLocale.text(teamPermissionLabels[value] || value), input));
         return input;
       });
-      root.append(panel(SOCifyLocale.template`صلاحيات ${autopsyLabel(role.role)}`, node("div", { class: "panel-body" }, [choices, button(SOCifyLocale.text("حفظ حدود الدور"), async () => { try { await api(`/api/team/roles/${role.role}`, { method: "PUT", body: { permissions: inputs.filter((input) => input.checked).map((input) => input.value) } }); await window.SOCifyAutopsy.team(); } catch (error) { handleError(error); } })])));
+      policies.append(node("details", { class: "team-role-policy", "data-role": role.role }, [node("summary", { text: SOCifyLocale.template`صلاحيات ${autopsyLabel(role.role)}` }), node("div", { class: "panel-body" }, [choices, button(SOCifyLocale.text("حفظ حدود الدور"), async () => { try { await api(`/api/team/roles/${role.role}`, { method: "PUT", body: { permissions: inputs.filter((input) => input.checked).map((input) => input.value) } }); await window.SOCifyAutopsy.team(); } catch (error) { handleError(error); } })])]));
     }
+    root.append(panel(SOCifyLocale.text("صلاحيات الأدوار"), policies, true));
     const cases = (await api("/api/cases?page_size=100")).items.filter((item) => item.status !== "closed" && (!window.SOCifyWorkspace?.selection.required || window.SOCifyWorkspace.selection.case_ids.includes(item.id)));
     const selected = autopsyChoice("case_id", cases.map((item) => ({ value: item.id, label: `${item.reference} · ${item.title}` })), "", true);
     const batchHolder = node("div");

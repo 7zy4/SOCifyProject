@@ -200,7 +200,7 @@ function autopsyForm(schema, submit, initial = {}) {
       control = input;
       getters[key] = () => !input.value ? null : spec.integer ? Number(input.value) : spec.list ? input.value.split(",").map((value) => value.trim()).filter(Boolean) : input.value;
     }
-    form.append(field(`${autopsyLabel(key)}${spec.required ? " *" : ""}${spec.timestamp ? SOCifyLocale.text(" · وقت المتصفح") : ""}`, control, (spec.max || 0) > 1000));
+    form.append(field(`${spec.label || autopsyLabel(key)}${spec.required ? " *" : ""}${spec.timestamp ? SOCifyLocale.text(" · وقت المتصفح") : ""}`, control, (spec.max || 0) > 1000));
   }
   const errors = node("p", { class: "notice span-2", role: "alert", hidden: true });
   const save = node("button", { type: "submit", class: "button primary", text: SOCifyLocale.text("حفظ") });
