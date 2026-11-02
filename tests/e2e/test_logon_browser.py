@@ -64,7 +64,8 @@ def test_logon_investigation_and_report_layout(app, language, width):
             page.goto(base + f"/cases/{case['id']}/quick-report/print")
             report = page.locator(".report-facts").last
             report.wait_for()
-            assert "0x98c1" in report.inner_text() and "النتيجة" in report.inner_text()
+            assert "0x98c1" in report.inner_text()
+            assert ("النتيجة" if language == "ar" else "Outcome") in report.inner_text()
             assert "auth_target" not in report.inner_text()
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             assert_accessible(page)
