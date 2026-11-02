@@ -39,3 +39,15 @@ def test_number_only_record_identity_is_labelled_once():
     table = report_table(records)
     assert table.count("52") == 1
     assert "المعرف: 52" in table
+
+
+def test_report_questions_precede_answers_even_after_canonical_key_sorting():
+    records = [{"answer": "An expired exception remained active.", "question": "Why was access allowed?"}]
+    text = "\n".join(text for _, text in lines(records))
+    assert text.startswith("السؤال: Why was access allowed?\nالإجابة:")
+    table = report_table(records, localize=True)
+    assert table.index("Why was access allowed?") < table.index("An expired exception remained active.")
+    assert table.count("Why was access allowed?") == 1
+    assert "<span data-ui-copy>السؤال</span>" in table
+    imports = [{"accepted_records": 12, "original_filename": "collected.jsonl"}]
+    assert list(lines(imports))[0] == (0, "اسم الأصل: collected.jsonl")

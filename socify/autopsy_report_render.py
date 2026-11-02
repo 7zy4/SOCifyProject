@@ -206,7 +206,7 @@ LABELS = {
     "conclusion": "الاستنتاج",
     "limitations_text": "حدود الاستنتاج",
     "event_time": "وقت الحدث",
-    "question": "لماذا؟",
+    "question": "السؤال",
     "answer": "الإجابة",
     "reference": "مرجع القضية",
     "revision": "إصدار التقرير",
@@ -339,7 +339,7 @@ def network_report_content(value):
 
 
 def record_heading_key(item):
-    for key in ("event_id", "reference", "title", "name", "id"):
+    for key in ("event_id", "reference", "title", "name", "question", "original_filename", "id"):
         if item.get(key) not in (None, ""):
             return key
     return None
@@ -369,11 +369,10 @@ def report_table(value, *, localize=False):
         content = html.escape(display(label))
         if localize:
             if record:
-                for key in ("event_id", "reference", "title", "name", "id"):
-                    if record.get(key) not in (None, ""):
-                        caption = html.escape(LABELS.get(key, key))
-                        content = f'<span data-ui-copy>{caption}</span>: <bdi dir="auto">{html.escape(display(record[key]))}</bdi>'
-                        break
+                key = record_heading_key(record)
+                if key:
+                    caption = html.escape(LABELS.get(key, key))
+                    content = f'<span data-ui-copy>{caption}</span>: <bdi dir="auto">{html.escape(display(record[key]))}</bdi>'
             elif label in LABELS.values() or label == "تفاصيل العنصر":
                 content = f"<span data-ui-copy>{content}</span>"
         rows.append(f'<tr class="report-group"><th colspan="2">{content}</th></tr>')
@@ -477,15 +476,19 @@ def render_html(payload) -> str:
     outline = []
     for index, (title, value) in enumerate(sections(payload), 1):
         outline.append(f'<li><a href="#report-section-{index}">{html.escape(title)}</a></li>')
-        rows = "".join(f'<p class="report-line depth-{min(depth, 3)}">{line_html(text)}</p>' for depth, text in lines(value))
-        content.append(f'<section id="report-section-{index}" class="report-section"><h2>{html.escape(title)}</h2>{rows}</section>')
+        content_lines = list(lines(value))
+        rows = []
+        for line_index, (depth, text) in enumerate(content_lines):
+            heading = " report-group-heading" if line_index + 1 < len(content_lines) and content_lines[line_index + 1][0] > depth else ""
+            rows.append(f'<p class="report-line depth-{min(depth, 3)}{heading}">{line_html(text)}</p>')
+        content.append(f'<section id="report-section-{index}" class="report-section"><h2>{html.escape(title)}</h2>{"".join(rows)}</section>')
     digest = hashlib.sha256(canonical(payload).encode()).hexdigest()
     title_class = ' class="report-title-long"' if len(case["title"]) > 100 else ""
     cover = f'<header class="report-cover"><p class="report-wordmark" lang="en" dir="ltr">SOCify</p><p dir="ltr">TACTICAL WORKBENCH</p><p>تقرير فرز وتحقيق سريع في حادثة أمنية</p><h1{title_class}><bdi dir="auto">{html.escape(display(case["title"]))}</bdi></h1><p><bdi dir="ltr">{html.escape(case["reference"])}</bdi> · الإصدار {payload["revision"]}</p></header><p class="report-note">نسخة ثابتة من بيانات القضية عند إعدادها. اعتماد هذه النسخة محفوظ منفصلًا في سجل المنصة. البصمة أدناه تخص JSON المعياري، لا بايتات PDF.</p><p dir="ltr">SHA-256: <bdi>{digest}</bdi></p>'
     navigation = '<nav class="report-outline" aria-label="أقسام التقرير"><h2>محتويات التقرير</h2><ul>' + "".join(outline) + "</ul></nav>"
     style = (
         report_style()
-        + ".report-cover{break-inside:avoid}.report-cover h1.report-title-long{font-size:20pt;line-height:1.5}.report-section{break-before:auto}.report-section:first-of-type{break-before:page}.report-line{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 10pt;font-size:14pt}.depth-1{padding-inline-start:10pt}.depth-2,.depth-3{padding-inline-start:18pt}"
+        + ".report-cover{break-inside:avoid}.report-cover h1.report-title-long{font-size:20pt;line-height:1.5}.report-section{break-before:auto}.report-section:first-of-type{break-before:page}.report-line{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 10pt;font-size:14pt}.report-group-heading{break-after:avoid;font-weight:700}.depth-1{padding-inline-start:10pt}.depth-2,.depth-3{padding-inline-start:18pt}"
     )
     return f'<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{html.escape(case["reference"])}</title><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; font-src data:; img-src data:"><style>{style}</style></head><body>{cover}{navigation}{"".join(content)}</body></html>'
 
@@ -542,9 +545,14 @@ def render_docx(payload) -> bytes:
     document.add_paragraph("نسخة ثابتة؛ راجع سجل الاعتماد في المنصة. تعرض الأوقات كما سجلت، ولا يعني وقت إعداد التقرير وقت اكتشاف الحادث.")
     for title, value in sections(payload):
         document.add_heading(title, 1)
-        for depth, text in lines(value):
+        content_lines = list(lines(value))
+        for line_index, (depth, text) in enumerate(content_lines):
             paragraph = document.add_paragraph(text)
             paragraph.paragraph_format.left_indent = Pt(min(depth, 3) * 8)
+            if line_index + 1 < len(content_lines) and content_lines[line_index + 1][0] > depth:
+                paragraph.paragraph_format.keep_with_next = True
+                for run in paragraph.runs:
+                    run.bold = True
             bidi = OxmlElement("w:bidi")
             bidi.set(qn("w:val"), "1")
             paragraph._p.get_or_add_pPr().append(bidi)
