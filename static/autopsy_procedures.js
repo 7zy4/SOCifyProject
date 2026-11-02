@@ -68,7 +68,28 @@ window.SOCifyAutopsy.procedures = async (caseId) => {
     const card = node("article", { class: "card" }, node("h3", { text: SOCifyLocale.template`${record.payload.template_name} · الإصدار ${record.payload.template_version}` }));
     record.payload.steps.forEach((step, index) => {
       const row = node("div", { class: "procedure-step" }, [node("h4", { text: `${index + 1}. ${step.title}` }), node("p", { text: step.description }), node("p", { text: `${autopsyLabel(step.status)} · ${autopsyLabel(step.role)}${step.required ? SOCifyLocale.text(" · إلزامية") : ""}${step.approval_required ? SOCifyLocale.text(" · اعتماد المدير") : ""}` })]);
-      if (autopsy.current.can_update && autopsy.current.status !== "closed") row.append(button(SOCifyLocale.text("تحديث الخطوة"), () => {
+      const outcome = node("dl", { class: "procedure-result" });
+      if (step.notes) outcome.append(node("dt", { text: autopsyLabel("notes") }), node("dd", {}, node("bdi", { text: step.notes, "data-user-content": "true" })));
+      if (step.evidence_id) {
+        const evidence = autopsy.current.evidence.find(item => item.id === step.evidence_id);
+        const openEvidence = button(evidence?.title || SOCifyLocale.text("الدليل المرتبط"), async () => {
+          try {
+            const item = await api(`/api/incidents/${caseId}/evidence/${step.evidence_id}`);
+            const details = node("dl", { class: "procedure-result" }, [
+              node("dt", { text: SOCifyLocale.text("الدليل") }), node("dd", {}, node("bdi", { text: item.title })),
+              node("dt", { text: "SHA-256" }), node("dd", {}, node("bdi", { text: item.sha256 })),
+              node("dt", { text: SOCifyLocale.text("أضيف") }), node("dd", { text: formatTime(item.added_at) }),
+            ]);
+            if (item.content_available && permission("evidence.download")) details.append(node("dt", { text: SOCifyLocale.text("الأصل") }), node("dd", {}, linkedButton(SOCifyLocale.text("تنزيل الأصل"), `/api/incidents/${caseId}/evidence/${step.evidence_id}/content`)));
+            autopsyModal(SOCifyLocale.text("الدليل المرتبط"), details);
+          } catch (error) { handleError(error); }
+        });
+        outcome.append(node("dt", { text: SOCifyLocale.text("الدليل المرتبط") }), node("dd", {}, openEvidence));
+      }
+      if (outcome.children.length) row.append(outcome);
+      const role = { analyst: "l1", l1_analyst: "l1", l2_responder: "l2", investigator: "investigator", reviewer: "reviewer" }[state.user.role];
+      const editable = autopsy.current.can_manage || (["any", role].includes(step.role) && !["completed", "not_applicable"].includes(step.status));
+      if (autopsy.current.can_update && autopsy.current.status !== "closed" && editable) row.append(button(SOCifyLocale.text("تحديث الخطوة"), () => {
         let dialog;
         const form = autopsyForm({ status: { required: true, choices: ["pending", "in_progress", "completed", "failed", "not_applicable"] }, evidence_id: { evidence: true }, notes: { max: 2000 } }, async (payload) => {
           await api(`/api/cases/${caseId}/procedures/${record.id}/steps/${index + 1}`, { method: "PATCH", body: { ...payload, version: record.version } });
