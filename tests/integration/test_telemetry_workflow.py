@@ -120,12 +120,15 @@ def test_reports_include_real_telemetry_and_remain_immutable(autopsy_case, clien
     assert full["network_analysis"]["periodic_count"] == 1 and len(full["endpoint_results"]) == 2
     assert "network_analysis" not in redacted and "endpoint_results" not in redacted
     assert "تحليل الشبكة" in render_html(full) and "نتائج الأجهزة" in render_html(full)
+    assert full["network_analysis"]["items"][0]["key"] not in render_html(full)
+    assert "socify-connections-1" not in render_html(full)
     base = f"/api/cases/{autopsy_case}"
     guide = client.get(base + "/quick-report").json
     answers = {question["id"]: question["options"][0]["value"] for question in guide["questions"]}
     assert client.put(base + "/quick-report", json={"answers": answers}).status_code == 200
     printed = client.get(f"/cases/{autopsy_case}/quick-report/print")
     assert printed.status_code == 200 and "تحليل الشبكة" in printed.text and "station-9" in printed.text
+    assert "socify-connections-1" not in printed.text and "انتظام الفواصل" in printed.text
     upload(client, autopsy_case, [zeek(8)], "later.json")
     assert full["network_analysis"]["connection_count"] == 6
 

@@ -531,7 +531,7 @@ def print_quick_report(case_id: int):
 
     if not report:
         return error_response("REPORT_ANSWERS_REQUIRED", "احفظ إجابات التحقيق قبل طباعة التقرير", 409)
-    from .autopsy_report_render import lines
+    from .autopsy_report_render import lines, network_report_content
     from .content_inspection import inspection_snapshot
     from .network_insights import telemetry_report
 
@@ -551,7 +551,8 @@ def print_quick_report(case_id: int):
     for title, key in (("تحليل الشبكة", "network_analysis"), ("نتائج الأجهزة", "endpoint_results")):
         if telemetry[key]:
             inspection_html += f'<h2 class="section-title">{title}</h2><table class="qa-table"><tbody>'
-            inspection_html += "".join(f'<tr><td dir="auto">{_esc(text)}</td></tr>' for _, text in lines(telemetry[key]))
+            readable = network_report_content(telemetry[key]) if key == "network_analysis" else telemetry[key]
+            inspection_html += "".join(f'<tr><td dir="auto">{_esc(text)}</td></tr>' for _, text in lines(readable))
             inspection_html += "</tbody></table>"
     qa_rows_html = "".join(
         f"<tr><th>{_fmt_bilingual(item['question'])}</th><td><strong>{_fmt_bilingual(item['answer_label'])}</strong></td></tr>"

@@ -28,7 +28,20 @@ LABELS = {
     "periodic": "اتصال دوري",
     "bytes_sent": "البايتات المرسلة",
     "bytes_received": "البايتات المستقبلة",
-    "timed_connections": "الاتصالات المؤقتة",
+    "timed_connections": "الاتصالات ذات الوقت المعروف",
+    "items": "النتائج",
+    "event_count": "عدد السجلات",
+    "event_ids": "مراجع الأدلة",
+    "source_type": "نوع المصدر",
+    "destination_port": "منفذ الوجهة",
+    "protocol": "البروتوكول",
+    "first_seen": "أول اتصال",
+    "last_seen": "آخر اتصال",
+    "events_truncated": "روابط الأدلة مقتصرة على أول ٥٠ سجلًا",
+    "names": "النطاقات",
+    "byte_measurements": "الاتصالات ذات قياس حجم",
+    "longest_connection_seconds": "أطول اتصال بالثواني",
+    "action": "الإجراء",
     "query": "الاستعلام",
     "columns": "الحقول",
     "event_id": "معرف السجل",
@@ -237,6 +250,15 @@ def lines(value, depth=0):
         yield depth, display(value)
 
 
+def network_report_content(value):
+    """Retain engine and grouping identities in the snapshot, not the reader's tables."""
+    return {
+        key: [{field: cell for field, cell in item.items() if field != "key"} for item in entry] if key == "items" else entry
+        for key, entry in value.items()
+        if key != "engine"
+    }
+
+
 def sections(payload):
     assessment = payload.get("investigation_assessment")
     if assessment:
@@ -281,7 +303,7 @@ def sections(payload):
         ("نتائج الإغلاق الموروثة محفوظة بتاريخها", "legacy_closure"),
     ):
         if payload.get(key):
-            yield title, payload[key]
+            yield title, network_report_content(payload[key]) if key == "network_analysis" else payload[key]
     for key in ("tasks", "evidence", "imports", "custody", "history", "limitations"):
         if payload.get(key):
             yield LABELS[key], payload[key]
