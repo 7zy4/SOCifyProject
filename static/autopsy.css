@@ -93,3 +93,5 @@
 .report-revision > p:last-of-type { overflow-wrap: anywhere; }
 @media (max-width: 600px) { .report-data { display: block; } .report-data > dd { padding-inline-start: .6rem; } .report-downloads > * { flex: 1 1 100%; } }
 .choice-control .search-choice::-webkit-calendar-picker-indicator { opacity: 0; }
+.email-review > .panel[id] { scroll-margin-block-start: calc(var(--header-height, 72px) + 16px); }
+.email-record { grid-column: 1 / -1; }

@@ -142,9 +142,9 @@ td small,.rule-cell small,.autopsy-shell td small { font-size:14px; color:var(--
 .account-options .button { justify-content:start; min-height:46px; }
 dialog { border:3px solid var(--border-ink); border-radius:3px 8px 3px 5px; box-shadow:9px 9px 0 var(--ink-black); color:var(--text); background:var(--panel); }
 dialog::backdrop { background:rgb(10 13 15 / .78); }
-.email-review dl { display:grid; grid-template-columns:minmax(120px,.28fr) minmax(0,1fr); gap:8px 16px; }
-.email-review dd { margin:0; overflow-wrap:anywhere; }
-.email-review .email-body { background:var(--panel-2); color:var(--text); border:2px solid var(--line); }
+.email-result dl { display:grid; grid-template-columns:minmax(120px,.28fr) minmax(0,1fr); gap:8px 16px; }
+.email-result dd { margin:0; overflow-wrap:anywhere; }
+.email-result .email-body { background:var(--panel-2); color:var(--text); border:2px solid var(--line); }
 .pagination,.pagination p { font-size:14px; color:var(--text); }
 /* Only the mark, account tabs and account fields live on authentication pages. */
 .auth-shell { position:relative; display:grid; place-items:center; min-height:100dvh; padding:48px 20px; overflow-x:hidden; }
@@ -215,7 +215,7 @@ dialog::backdrop { background:rgb(10 13 15 / .78); }
  .channel-tab { min-height:100px; padding:12px 6px; font-size:14px; line-height:1.5; }
  .panel-body,.panel-head { padding:16px; }
  .case-selection-grid { grid-template-columns:minmax(0,1fr); }
- .email-review dl { grid-template-columns:minmax(0,1fr); }
+ .email-result dl { grid-template-columns:minmax(0,1fr); }
  .auth-shell { padding:36px 20px; }
  .auth-layout.auth-focused { gap:28px; }
  .auth-logo .brand-wordmark { font-size:58px; }

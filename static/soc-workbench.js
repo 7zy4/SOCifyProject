@@ -266,15 +266,25 @@
   }
   async function email(caseId) {
     const root=node("div",{class:"tool-results email-review"});
+    async function showReview(result) {
+      const address=new URL(location.href);
+      address.searchParams.delete("email_before");
+      if(result.duplicate)address.searchParams.set("email_before",String(result.id+1));
+      history.replaceState(history.state,"",address.pathname+address.search);
+      await start("email-security");
+      const review=document.getElementById(`email-review-${result.id}`);
+      if(review){review.focus({preventScroll:true});review.scrollIntoView({block:"start"});}
+    }
     if(autopsy.current.can_update&&permission("evidence.add")&&autopsy.current.status!=="closed") {
       const file=node("input",{type:"file",name:"email",accept:".eml,message/rfc822",required:true});
       const submit=node("button",{type:"submit",class:"button primary",text:t("فحص البريد ومرفقاته بضغطة زر")});
-      const form=node("form",{class:"filter-row"},[field(t("رسالة EML · حتى 5MiB (شامل فحص المرفقات ساكنًا)"),file),submit]);
+      const errors=node("p",{role:"alert",class:"notice",hidden:true});
+      const form=node("form",{class:"filter-row"},[field(t("رسالة EML · حتى 5MiB (شامل فحص المرفقات ساكنًا)"),file),submit,errors]);
       form.addEventListener("submit",async e=>{
-        e.preventDefault();const chosen=file.files[0];if(!chosen||chosen.size>5*1024*1024||!chosen.name.toLowerCase().endsWith(".eml")){showMessage(t("اختر رسالة EML لا تتجاوز 5MiB"));return;}
+        e.preventDefault();errors.hidden=true;const chosen=file.files[0];if(!chosen||chosen.size>5*1024*1024||!chosen.name.toLowerCase().endsWith(".eml")){errors.textContent=t("اختر رسالة EML لا تتجاوز 5MiB");errors.hidden=false;return;}
         submit.disabled=true;submit.textContent=t("جارٍ فحص الرسالة والمرفقات…");
-        try{const data=new FormData();data.set("file",chosen);await api(`/api/cases/${caseId}/email-triage`,{method:"POST",body:data});await start("email-security");}
-        catch(error){handleError(error);submit.disabled=false;submit.textContent=t("فحص البريد ومرفقاته بضغطة زر");}
+        try{const data=new FormData();data.set("file",chosen);await showReview(await api(`/api/cases/${caseId}/email-triage`,{method:"POST",body:data}));}
+        catch(error){errors.textContent=error.message;errors.hidden=false;submit.disabled=false;submit.textContent=t("فحص البريد ومرفقاته بضغطة زر");}
       });
       root.append(panel(t("فحص رسالة بريد ومرفقاتها بضغطة زر"),node("div",{class:"panel-body"},form),true));
     }
@@ -285,29 +295,11 @@
     const mails=records.items;
     for(const record of mails) {
       const mail=record.payload;
-      const headers=node("dl");for(const [key,value] of Object.entries(mail.headers))if(value)headers.append(node("dt",{dir:"ltr",text:key}),node("dd",{"data-user-content":"true",text:value}));
-      const body=node("div",{class:"panel-body"});
-      if (mail.email_verdict) {
-        body.append(node("p", { class: "notice", text: `${t("الحكم الساكن")}: ${mail.email_verdict} (${mail.email_risk_score || 0}/100)` }));
-      }
-      const wlActions = node("div", { class: "email-sender-row" });
-      if (mail.sender_email) wlActions.append(node("span", { class: "email-sender-chip" }, [node("bdi", { class: "mono", dir: "ltr", text: `From: ${mail.sender_email}` }), quickWatchlistBtn("email", mail.sender_email, caseId, "Suspicious EML sender")]));
-      if (mail.reply_to_email && mail.reply_to_email !== mail.sender_email) wlActions.append(node("span", { class: "email-sender-chip" }, [node("bdi", { class: "mono", dir: "ltr", text: `Reply-To: ${mail.reply_to_email}` }), quickWatchlistBtn("email", mail.reply_to_email, caseId, "Mismatched EML Reply-To")]));
-      if (wlActions.children.length) body.append(wlActions);
-      if (mail.header_flags?.length) {
-        body.append(node("ul", {}, mail.header_flags.map(f => node("li", { text: `[${f.severity}] ${f.detail}` }))));
-      }
-      body.append(headers,node("p",{class:"cell-meta mono",dir:"ltr",text:"SHA-256: "+mail.sha256}),node("h4",{text:t("نص الرسالة")}),node("pre",{class:"email-body",tabindex:0,"data-user-content":"true",text:mail.body||t("لا يوجد نص متاح")}));
-      if(mail.body_truncated)body.append(node("p",{class:"notice",text:t("النص المعروض مختصر؛ الأصل محفوظ في الحجر.")}));
-      body.append(node("details",{},[node("summary",{text:t("الروابط المرصودة")+" · "+number(mail.urls.length)}),node("ul",{class:"email-links"},mail.urls.map(value=>node("li",{},[node("bdi",{dir:"ltr","data-user-content":"true",text:value}), " ", quickWatchlistBtn("url", value, caseId, "Extracted EML URL")])))]));
-      body.append(table([
-        {label:t("المرفق"),value:att=>att.original_filename||att.filename},
-        {label:t("النوع المعلن"),value:"content_type"},
-        {label:t("الفحص الساكن (بدون تشغيل)"),value:att=>att.triage?`${att.triage.verdict} (${att.triage.risk_score}/100) · ${att.triage.detected_magic}${att.triage.extension_mismatch?" · "+t("تعارض امتداد"):""}`:t("بصمة فقط")},
-        {label:t("الحجم"),value:"size"},
-        {label:"SHA-256",value:att=>node("div",{},[node("bdi",{dir:"ltr",text:att.sha256})," ",quickWatchlistBtn("sha256",att.sha256,caseId,`Attachment ${att.original_filename||att.filename}`)])},
-      ],mail.attachments));
-      root.append(panel(mail.title,body,true));
+      const body=autopsyEmailView(mail,(kind,value,note)=>quickWatchlistBtn(kind,value,caseId,note));
+      const review=panel(mail.title,body,true);
+      review.id=`email-review-${record.id}`;
+      review.tabIndex=-1;
+      root.append(review);
     }
     if(!mails.length)root.append(emptyState(t("لا توجد رسائل محللة بعد"),null));
     if(before)root.append(linkedButton(t("الأحدث"),url("/email-security",{case_id:caseId})));

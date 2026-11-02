@@ -369,7 +369,7 @@ def inspect_email_with_attachment_triage(content: bytes) -> dict:
 @autopsy_email_api.post("/api/cases/<int:case_id>/email-triage")
 @require_permission("evidence.add")
 def quick_email_triage(case_id: int):
-    from .autopsy_domain import custody, text_value
+    from .autopsy_domain import canonical, custody, text_value
     from .autopsy_samples import quarantine_or_get_sample
 
     case = _case_row(case_id)
@@ -405,13 +405,25 @@ def quick_email_triage(case_id: int):
             return error_response("CASE_CLOSED", "القضية مغلقة", 409)
         sample_id, evidence_id, digest, duplicate_sample = quarantine_or_get_sample(case_id, original_name, content, "email_static_triage")
         payload = {
-            "title": parsed["headers"]["Subject"][:255] or original_name,
+            "title": parsed["headers"]["Subject"][:255] or get_db().execute("SELECT filename FROM autopsy_samples WHERE id=?", (sample_id,)).fetchone()[0],
             "method": "email_static_triage",
             "sample_id": sample_id,
             "evidence_id": evidence_id,
             "sha256": digest,
             **parsed,
         }
+        prior = (
+            get_db()
+            .execute(
+                "SELECT id FROM autopsy_records WHERE case_id=? AND kind='analysis' AND payload=? ORDER BY id DESC LIMIT 1",
+                (case_id, canonical(payload)),
+            )
+            .fetchone()
+        )
+        if prior:
+            return jsonify(
+                {"id": prior["id"], "sample_id": sample_id, "evidence_id": evidence_id, "duplicate_sample": True, "duplicate": True, "payload": payload}
+            )
         analysis_id = insert_record(case_id, "analysis", payload)
         custody(
             case_id,

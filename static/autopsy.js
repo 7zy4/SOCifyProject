@@ -290,6 +290,9 @@ async function autopsyCases(page = null, query = null) {
 }
 
 function autopsyRecordCard(record) {
+  if (record.kind === "analysis" && (/^(email_static_triage|eml_static_v1|v[0-9]+_email_static_triage)$/.test(record.payload.method))) {
+    return node("article", { class: "card record-card email-record" }, [node("h3", { text: record.payload.title }), autopsyEmailView(record.payload), node("p", { text: formatTime(record.updated_at) })]);
+  }
   const values = node("dl");
   Object.entries(record.payload).forEach(([key, value]) => {
     if (value === null || value === "") return;

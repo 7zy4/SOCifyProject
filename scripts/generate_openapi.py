@@ -67,6 +67,10 @@ def generate() -> dict[str, object]:
                     {"name": "page_size", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 200, "default": 100}},
                 ]
                 operation["responses"]["422"] = {"description": "Search or filter exceeds its length limit"}
+            elif path == "/api/cases/{case_id}/email-triage" and method == "POST":
+                operation["description"] = (
+                    "Inspects an uploaded EML without executing attachments or visiting URLs. An identical current result in the same case returns 200 with duplicate=true and preserves the evidence, case version and report snapshots. New content or changed inspection findings create a new result."
+                )
             elif path == "/api/team/assignments" and method == "POST":
                 operation["description"] = (
                     "Assigns a completed batch in an open case to an active operational investigator. The recipient must have cases.read, cases.update and events.read, and access to the batch. Restricted access is never granted implicitly. Rejection creates no assignment or task."

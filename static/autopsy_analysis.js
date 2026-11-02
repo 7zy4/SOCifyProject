@@ -1,5 +1,42 @@
 "use strict";
 
+function autopsyStaticVerdict(value) {
+  const labels = { high_risk: "مؤشرات خطورة مرتفعة", suspicious: "يحتاج إلى مراجعة", low_signal_static_only: "لا مؤشرات بارزة في الفحص الساكن" };
+  return SOCifyLocale.text(labels[value] || value);
+}
+
+function autopsyStaticFileType(value) {
+  const labels = { pe_executable: "ملف Windows تنفيذي", dos_executable: "توقيع DOS تنفيذي", elf_executable: "ملف ELF تنفيذي", mach_o_executable: "ملف Mach-O تنفيذي", pdf: "مستند PDF", ole2_compound: "مستند OLE مركب", zip_container: "حاوية ZIP أو Office", rar_archive: "أرشيف RAR", "7z_archive": "أرشيف 7-Zip", gzip_archive: "أرشيف GZIP", rtf_document: "مستند RTF", lnk_shortcut: "اختصار Windows", html_document: "محتوى HTML", xml_document: "مستند XML", text_or_script: "نص أو برنامج نصي", unknown_binary: "نوع ثنائي غير معروف" };
+  return SOCifyLocale.text(labels[value] || value || "لم يُحدد النوع");
+}
+
+function autopsyEmailView(mail, watch = () => null) {
+  const t = SOCifyLocale.text;
+  const body = node("div", { class: "panel-body email-result" });
+  if (mail.email_verdict) body.append(node("p", { class: "notice", text: `${t("الحكم الساكن")}: ${autopsyStaticVerdict(mail.email_verdict)} · ${mail.email_risk_score || 0}/100` }));
+  const summary = [];
+  for (const [label, value] of [["المرسل", mail.sender_email || mail.headers?.From], ["عنوان الرد", mail.reply_to_email || mail.headers?.["Reply-To"]]]) {
+    if (value) summary.push({ label: t(label), value: node("div", { class: "action-row" }, [node("bdi", { dir: "ltr", "data-user-content": "true", text: value }), watch("email", value, "Retained email address")]) });
+  }
+  if (summary.length) body.append(table([{ label: t("الحقل"), value: "label" }, { label: t("القيمة"), value: "value" }], summary));
+  const flags = { reply_to_domain_mismatch: "نطاق الرد يختلف عن نطاق المرسل", return_path_domain_mismatch: "نطاق مسار العودة يختلف عن نطاق المرسل", auth_failure_claimed: "رأس المصادقة يذكر فشلًا؛ لم يُتحقق منه مستقلًا", urgent_lure_subject: "صياغة استعجال في عنوان الرسالة", suspicious_url_host: "رابط بعنوان IP مباشر أو نطاق Punycode" };
+  if (mail.header_flags?.length) body.append(node("ul", { class: "email-findings" }, mail.header_flags.map(flag => node("li", { text: `${autopsyLabel(flag.severity)} · ${t(flags[flag.code] || flag.detail)}` }))));
+  const headers = node("dl");
+  for (const [key, value] of Object.entries(mail.headers || {})) if (value) headers.append(node("dt", { dir: "ltr", text: key }), node("dd", { "data-user-content": "true", text: value }));
+  body.append(node("details", {}, [node("summary", { text: t("رؤوس الرسالة") }), headers, node("p", { dir: "ltr", class: "cell-meta", text: `SHA-256: ${mail.sha256}` })]));
+  body.append(node("h4", { text: t("نص الرسالة") }), node("pre", { class: "email-body", tabindex: 0, "data-user-content": "true", text: mail.body || t("لا يوجد نص متاح") }));
+  if (mail.body_truncated) body.append(node("p", { class: "notice", text: t("النص المعروض مختصر؛ الأصل محفوظ في الحجر.") }));
+  if (mail.urls?.length) body.append(node("details", {}, [node("summary", { text: `${t("الروابط المرصودة")} · ${mail.urls.length}` }), node("ul", { class: "email-links" }, mail.urls.map(value => node("li", {}, [node("bdi", { dir: "ltr", "data-user-content": "true", text: value }), watch("url", value, "Retained email URL")])))]));
+  if (mail.attachments?.length) body.append(table([
+    { label: t("المرفق"), value: item => item.original_filename || item.filename },
+    { label: t("النوع المعلن"), value: "content_type" },
+    { label: t("الفحص الساكن (بدون تشغيل)"), value: item => item.triage ? `${autopsyStaticVerdict(item.triage.verdict)} (${item.triage.risk_score}/100) · ${autopsyStaticFileType(item.triage.detected_magic)}${item.triage.extension_mismatch ? " · " + t("تعارض امتداد") : ""}` : t("بصمة فقط") },
+    { label: t("الحجم"), value: "size" },
+    { label: "SHA-256", value: item => node("div", {}, [node("bdi", { dir: "ltr", text: item.sha256 }), watch("sha256", item.sha256, `Attachment ${item.original_filename || item.filename}`)]) },
+  ], mail.attachments));
+  return body;
+}
+
 window.SOCifyAutopsy.analysis = async (caseId) => {
   const samples = await api(`/api/cases/${caseId}/samples`);
   const indicators = (await api(`/api/cases/${caseId}/records?kind=indicator&limit=100`)).items;
@@ -49,10 +86,7 @@ window.SOCifyAutopsy.analysis = async (caseId) => {
         data.set("file", emlFile.files[0]);
         const res = await api(`/api/cases/${caseId}/email-triage`, { method: "POST", body: data });
         const p = res.payload;
-        autopsyModal(SOCifyLocale.text("نتيجة فحص البريد والمرفقات (ساكن وآمن)"), node("div", {}, [
-          node("p", { text: SOCifyLocale.template`الحكم: ${p.email_verdict} · درجة الخطورة: ${p.email_risk_score}/100 · المرفقات المفحوصة: ${p.attachments.length}` }),
-          node("pre", { text: JSON.stringify({ sender: p.sender_email, reply_to: p.reply_to_email, header_flags: p.header_flags, urls: p.urls, attachments: p.attachments.map((a) => ({ name: a.original_filename, verdict: a.triage.verdict, magic: a.triage.detected_magic, mismatch: a.triage.extension_mismatch })) }, null, 2) }),
-        ]));
+        autopsyModal(SOCifyLocale.text("نتيجة فحص البريد والمرفقات (ساكن وآمن)"), autopsyEmailView(p));
         await autopsyCase(caseId);
       } catch (error) { handleError(error); }
     });

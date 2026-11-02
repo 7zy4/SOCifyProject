@@ -2095,7 +2095,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Inspects an uploaded EML without executing attachments or visiting URLs. An identical current result in the same case returns 200 with duplicate=true and preserves the evidence, case version and report snapshots. New content or changed inspection findings create a new result."
       }
     },
     "/api/cases/{case_id}/endpoint-queries": {

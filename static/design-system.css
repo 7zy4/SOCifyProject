@@ -144,11 +144,11 @@ bdi,.mono,time { font-variant-numeric:tabular-nums; }
 .empty strong { font:700 17px/1.6 var(--font-ui); color:var(--text); }
 .empty p { font-size:14px; max-width:64ch; }
 .loading span { border:2px solid var(--line-soft); border-top-color:var(--blue); background:transparent; }
-.email-review .email-body { max-height:360px; overflow:auto; padding:16px; border:1px solid var(--line-soft); border-radius:6px; background:var(--panel-2); }
-.email-review .email-links { list-style:none; padding:0; max-height:240px; overflow:auto; }
+.email-result .email-body { max-height:360px; overflow:auto; padding:16px; border:1px solid var(--line-soft); border-radius:6px; background:var(--panel-2); }
+.email-result .email-links { list-style:none; padding:0; max-height:240px; overflow:auto; }
 .email-links li { padding:8px 0; border-bottom:1px solid var(--line-soft); overflow-wrap:anywhere; unicode-bidi:plaintext; }
-.email-review details { margin-block:16px; }
-.email-review summary { color:var(--blue); cursor:pointer; font-weight:700; }
+.email-result details { margin-block:16px; }
+.email-result summary { color:var(--blue); cursor:pointer; font-weight:700; }
 .tool-results { display:grid; gap:20px; min-width:0; }
 .tool-results .case-content { margin:0; }
 .autopsy-modal { padding:24px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--text); box-shadow:0 24px 80px var(--ink-wash-67); overscroll-behavior:contain; }
