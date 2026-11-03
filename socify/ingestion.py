@@ -403,19 +403,21 @@ def _auth_records(text: str, source_name: str, content_hash: str) -> Iterator[di
         )
 
 
-CEF_KEY_PATTERN = re.compile(r"(?<!\S)([A-Za-z][A-Za-z0-9_.-]*)=")
-
-
 def _cef_extension(text: str) -> dict[str, str]:
-    """Find key boundaries once; whitespace in a value never rescans its suffix."""
+    """Scan disjoint words for keys, then slice each value exactly once."""
     result: dict[str, str] = {}
-    previous = None
-    for match in CEF_KEY_PATTERN.finditer(text):
+    previous: tuple[str, int] | None = None
+    for match in re.finditer(r"\S+", text):
+        key, separator, _ = match.group().partition("=")
+        if not separator or not key or not ("a" <= key[0] <= "z" or "A" <= key[0] <= "Z"):
+            continue
+        if any(not ("a" <= char <= "z" or "A" <= char <= "Z" or "0" <= char <= "9" or char in "_.-") for char in key):
+            continue
         if previous is not None:
-            result[previous.group(1)] = text[previous.end() : match.start()].replace("\\=", "=").strip()
-        previous = match
+            result[previous[0]] = text[previous[1] : match.start()].replace("\\=", "=").strip()
+        previous = key, match.start() + len(key) + 1
     if previous is not None:
-        result[previous.group(1)] = text[previous.end() :].replace("\\=", "=").strip()
+        result[previous[0]] = text[previous[1] :].replace("\\=", "=").strip()
     return result
 
 

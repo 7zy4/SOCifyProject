@@ -6,6 +6,7 @@ import json
 import math
 import re
 from collections import Counter
+from string import ascii_letters, ascii_uppercase, digits
 from typing import Any
 from urllib.parse import unquote
 
@@ -17,6 +18,8 @@ TEXT_LIMIT = 32768
 FINDING_LIMIT = 40
 TOKEN_LIMIT = 12
 DEPTH_LIMIT = 4
+BASE32_ALPHABET = frozenset(ascii_uppercase + "234567")
+BASE64_ALPHABET = frozenset(ascii_letters + digits + "+/_-")
 SECRET_NAME = re.compile(r"(?:password|passwd|pwd|api[_-]?key|access[_-]?token|client[_-]?secret|secret[_-]?key)", re.I)
 ASSIGNMENT = re.compile(r"\b(?:password|passwd|pwd|api[_-]?key|access[_-]?token|client[_-]?secret|secret[_-]?key)\s*[=:]\s*[\"']?([^\s\"'&,;]{8,256})", re.I)
 BEARER = re.compile(r"\bBearer[ \t]+([A-Za-z0-9_.~+/-]{20,512}=*)", re.I)
@@ -126,9 +129,9 @@ def decode_layer(text, powershell=False):
         variants.append(("hex", lambda: bytes.fromhex(raw)))
     unpadded = raw.rstrip("=")
     padding = len(raw) - len(unpadded)
-    if len(raw) >= 16 and padding <= 6 and unpadded and all(char in "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567" for char in unpadded):
+    if len(raw) >= 16 and padding <= 6 and unpadded and all(char in BASE32_ALPHABET for char in unpadded):
         variants.append(("base32", lambda: base64.b32decode(raw + "=" * (-len(raw) % 8))))
-    if len(raw) >= 8 and padding <= 2 and unpadded and all(char in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/_-" for char in unpadded):
+    if len(raw) >= 8 and padding <= 2 and unpadded and all(char in BASE64_ALPHABET for char in unpadded):
         variants.append(
             ("base64url" if "-" in raw or "_" in raw else "base64", lambda: base64.b64decode(raw + "=" * (-len(raw) % 4), altchars=b"-_", validate=True))
         )

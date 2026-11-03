@@ -550,7 +550,7 @@ def _execute_source_pull(row: sqlite3.Row, target_case_id: int | None) -> tuple[
         body, content_type = _fetch_remote_events_bytes(str(row["endpoint"]), headers)
         result = _ingest_records_for_source(row, body, content_type, target_case_id, actor_id())
     except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
-        return error_response("SIEM_PULL_FAILED", f"تعذر سحب السجلات من المصدر: {exc}", 422)
+        return error_response("SIEM_PULL_FAILED", public_error_message(exc, "تعذر سحب السجلات من المصدر؛ تحقق من الاتصال والصلاحيات"), 422)
     return jsonify(result), 200
 
 

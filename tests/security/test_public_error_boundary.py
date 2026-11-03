@@ -1,6 +1,7 @@
 import io
 import sqlite3
 from importlib import import_module
+from urllib.error import URLError
 
 import pytest
 
@@ -80,6 +81,21 @@ def test_record_validation_still_identifies_the_missing_field(autopsy_case, clie
     response = client.post(f"/api/cases/{autopsy_case}/records/asset", json={})
     assert response.status_code == 422
     assert response.json["error"]["message"] == "الحقل name مطلوب"
+
+
+@pytest.mark.parametrize("error_type", [URLError, OSError, TimeoutError, ValueError])
+def test_remote_source_failure_keeps_connection_details_private(autopsy_case, client, monkeypatch, error_type):
+    monkeypatch.setenv("SOCIFY_SOURCE_ALLOWLIST", "siem.corp.example")
+    monkeypatch.setattr("socify.sources.safe_external_endpoint", lambda *_: (True, "ok"))
+    created = client.post(
+        f"/api/cases/{autopsy_case}/siem-connectors",
+        json={"name": "Case gateway", "type": "http", "endpoint": "https://siem.corp.example/events"},
+    )
+    assert created.status_code == 201, created.json
+    monkeypatch.setattr("socify.sources._fetch_remote_events_bytes", fail_with(error_type(PRIVATE_DETAIL)))
+    response = client.post(f"/api/cases/{autopsy_case}/siem-connectors/{created.json['id']}/pull", json={})
+    assert_safe_failure(response, "SIEM_PULL_FAILED")
+    assert client.get(f"/api/cases/{autopsy_case}/logs").json["total"] == 0
 
 
 @pytest.mark.parametrize(

@@ -105,7 +105,7 @@ def test_performance_supports_the_next_user_decision(app, monkeypatch, language,
             row = j.page.locator("tr").filter(has=j.page.get_by_role("cell", name="Review the retained identity batch", exact=True))
             expect(row.get_by_role("button", name=j.text("إكمال المهمة"), exact=True)).to_be_visible()
             assert j.page.evaluate("document.activeElement.closest('tr')?.textContent.includes('Review the retained identity batch')")
-            assert j.page.locator(".assignment-table").evaluate("el => el.scrollWidth <= el.clientWidth")
+            assert j.page.locator(".assignment-table").evaluate_all("tables => tables.length > 0 && tables.every(el => el.scrollWidth <= el.clientWidth)")
             assert row.get_by_role("button").evaluate("el => {const r=el.getBoundingClientRect(); return r.left>=0 && r.right<=innerWidth;}")
             j.page.screenshot(path=str(ARTIFACTS / f"{scenario}-{language}-task.png"))
             j.click("button", "إكمال المهمة", row)
