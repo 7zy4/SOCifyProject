@@ -15,6 +15,7 @@ from playwright.sync_api import expect, sync_playwright
 from werkzeug.serving import make_server
 
 from scripts.local_services import local_worker_services
+from tests.e2e.document_requests import DocumentRequests
 from tests.e2e.test_browser import assert_accessible, launch_browser
 
 ANSWERS = {
@@ -32,52 +33,14 @@ ARTIFACTS = Path("artifacts/review-journeys")
 
 
 class ReviewJourney:
-    def __init__(self, page, base, steps):
+    def __init__(self, page, base, steps, *, network_session=None):
         self.page, self.base, self.steps = page, base, steps
-        self.pending = set()
-        self.request_order = {}
-        self.request_sequence = 0
-        self.main_navigation = None
-        self.navigation_retirements = []
-        self.last_request = time.monotonic()
+        self.network = DocumentRequests(page, network_session)
+        self.navigation_retirements = self.network.retirements
 
-        def started(request):
-            self.request_sequence += 1
-            self.request_order[request] = self.request_sequence
-            self.pending.add(request)
-            if request.is_navigation_request() and request.frame == page.main_frame:
-                self.main_navigation = (request, self.request_sequence)
-            self.last_request = time.monotonic()
-
-        def finished(request):
-            self.pending.discard(request)
-            self.request_order.pop(request, None)
-            if request.failure and self.main_navigation and self.main_navigation[0] == request:
-                self.main_navigation = None
-            self.last_request = time.monotonic()
-
-        def committed():
-            if self.main_navigation is None:
-                return
-            navigation, sequence = self.main_navigation
-            if navigation.url.split("#", 1)[0] != page.url.split("#", 1)[0]:
-                return
-            # A completed document navigation retires requests owned by the
-            # previous document, even if its cancellation event was not delivered.
-            # Same-document and failed navigations never discard current work.
-            retired = [request for request in self.pending if self.request_order[request] < sequence]
-            if retired:
-                self.navigation_retirements.append(sorted(urlsplit(request.url).path for request in retired))
-            for request in retired:
-                self.pending.discard(request)
-                self.request_order.pop(request, None)
-            self.main_navigation = None
-            self.last_request = time.monotonic()
-
-        page.on("request", started)
-        page.on("requestfinished", finished)
-        page.on("requestfailed", finished)
-        page.on("domcontentloaded", committed)
+    @property
+    def pending(self):
+        return tuple(self.network.pending.values())
 
     def text(self, text):
         return self.page.evaluate("s => SOCifyLocale.text(s)", text)
@@ -88,7 +51,11 @@ class ReviewJourney:
         while time.monotonic() < deadline:
             self.page.wait_for_timeout(75)
             workspace = self.page.locator("#workspace")
-            if not self.pending and time.monotonic() - self.last_request > 0.3 and (not workspace.count() or workspace.get_attribute("aria-busy") == "false"):
+            if (
+                not self.pending
+                and time.monotonic() - self.network.last_request > 0.3
+                and (not workspace.count() or workspace.get_attribute("aria-busy") == "false")
+            ):
                 return
         pending = sorted((request.method, urlsplit(request.url).path, request.resource_type) for request in self.pending)
         busy = workspace.get_attribute("aria-busy") if workspace.count() else None
@@ -193,6 +160,8 @@ def review_session(app, language, name):
                 raise
             finally:
                 result["navigation_retirements"] = {"analyst": analyst.navigation_retirements, "manager": manager.navigation_retirements}
+                if result["status"] != "completed":
+                    result["network_observer"] = {"analyst": analyst.network.diagnostics(), "manager": manager.network.diagnostics()}
                 for who, page in zip(("analyst", "manager"), pages, strict=True):
                     if page.url != "about:blank":
                         page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")

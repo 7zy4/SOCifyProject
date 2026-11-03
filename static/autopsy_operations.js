@@ -52,6 +52,23 @@ function autopsyEnrichmentDetails(result) {
 
 Object.assign(autopsyLabels, { source: SOCifyLocale.text("المصدر"), license: SOCifyLocale.text("الرخصة وحق الاستخدام"), version: SOCifyLocale.text("الإصدار"), format: SOCifyLocale.text("الصيغة"), minutes: SOCifyLocale.text("ميزانية SLA بالدقائق"), mode: SOCifyLocale.text("تقويم الاحتساب"), timezone: SOCifyLocale.text("المنطقة الزمنية"), start_hour: SOCifyLocale.text("ساعة بدء العمل"), end_hour: SOCifyLocale.text("ساعة انتهاء العمل"), weekdays: SOCifyLocale.text("أيام العمل"), mon_fri: SOCifyLocale.text("الاثنين إلى الجمعة"), sun_thu: SOCifyLocale.text("الأحد إلى الخميس"), "24x7": SOCifyLocale.text("كل ساعات الأسبوع"), business: SOCifyLocale.text("ساعات العمل"), recipe_id: SOCifyLocale.text("وصفة الجمع"), collector_id: SOCifyLocale.text("الجامع المخول"), tool: SOCifyLocale.text("أداة الجمع وإصدارها"), collected_at: SOCifyLocale.text("وقت الجمع"), executive_summary: SOCifyLocale.text("الملخص التنفيذي المراجع"), lessons: SOCifyLocale.text("الدروس والتوصيات"), override_reason: SOCifyLocale.text("سبب استثناء المراجعة المستقلة للمدير"), unverified: SOCifyLocale.text("لم يُتحقق منه"), group: SOCifyLocale.text("مجموعة التنبيهات"), suppressed_until: SOCifyLocale.text("إخفاء الإشعار حتى") });
 
+function autopsySigmaSummary(compiled, fixtures, caption = SOCifyLocale.text("نتيجة اختبار القاعدة")) {
+  const t = SOCifyLocale.text;
+  const value = item => node("bdi", { dir: "auto", "data-user-content": "true", text: String(item) });
+  const operators = { equals: "يساوي", contains: "يحتوي على", starts_with: "يبدأ بـ", ends_with: "ينتهي بـ", cidr: "ضمن الشبكة", exists: "وجود الحقل" };
+  const condition = item => {
+    if (item.logic) return node("div", {}, [node("strong", { text: t({ and: "جميع الشروط", or: "أحد الشروط", not: "استبعاد الشرط" }[item.logic]) }), node("ul", {}, item.conditions.map(child => node("li", {}, condition(child))))]);
+    return node("div", {}, [node("strong", { text: autopsyLabel(item.field) }), document.createTextNode(` ${t(operators[item.operator] || item.operator)} `), value(typeof item.value === "boolean" ? t(item.value ? "نعم" : "لا") : item.value)]);
+  };
+  const source = compiled.logsource.category === "socify_normalized" ? t("سجلات القضية") : compiled.logsource.service === "sysmon" ? "Windows Sysmon" : "Linux auth";
+  const rows = [[t("الاسم"), value(compiled.title)], [t("الخطورة"), value(autopsyLabel(compiled.level))], [t("المصدر"), value(source)], [t("شروط المطابقة"), condition(compiled.dsl.condition)]];
+  if (fixtures) rows.push([t("أمثلة مطابقة اجتازت الاختبار"), value(fixtures.positive.length)], [t("أمثلة غير مطابقة اجتازت الاختبار"), value(fixtures.negative.length)]);
+  if (compiled.dsl.mitre_ids.length) rows.push(["MITRE ATT&CK", value(compiled.dsl.mitre_ids.join(" · "))]);
+  return node("div", { class: "sigma-summary" }, node("table", { class: "alert-property-table" }, [node("caption", { text: caption }), node("tbody", {}, rows.map(([label, content]) => node("tr", {}, [node("th", { scope: "row", text: label }), node("td", {}, content)])))]));
+}
+
+autopsyLabels.rule_id = SOCifyLocale.text("القاعدة المنشورة");
+
 window.SOCifyAutopsy.library = async () => {
   begin("analysis-library");
   const root = node("div", {}, pageHead(SOCifyLocale.text("مكتبة التحليل المحلي"), null));
@@ -65,24 +82,62 @@ window.SOCifyAutopsy.library = async () => {
   }
   if (permission("rules.manage")) {
     const rules = await api("/api/autopsy/sigma/rules");
-    root.append(panel(SOCifyLocale.text("قواعد Sigma المنشورة"), table([{ label: SOCifyLocale.text("الاسم"), value: "name" }, { label: SOCifyLocale.text("الإصدار"), value: "version" }, { label: SOCifyLocale.text("المترجم"), value: "compiler" }, { label: "SHA-256", value: "sha256" }], rules.items), true));
+    root.append(panel(SOCifyLocale.text("قواعد Sigma المنشورة"), table([{ label: SOCifyLocale.text("الاسم"), value: "name" }, { label: SOCifyLocale.text("الوصف"), value: row => row.description || "—" }, { label: SOCifyLocale.text("الحالة"), value: row => SOCifyLocale.text(row.is_active ? "مفعّلة" : "غير مفعّلة") }], rules.items), true));
     const source = node("input", { type: "file", accept: ".yml,.yaml,text/yaml", required: true, "aria-label": SOCifyLocale.text("ملف Sigma") });
     const fixtures = node("input", { type: "file", accept: ".json,application/json", required: true, "aria-label": SOCifyLocale.text("اختبارات القاعدة") });
-    const preview = node("div", { "aria-live": "polite" });
-    const rule = autopsyChoice("rule_id", rules.items.map((item) => ({ value: item.id, label: `${item.name} · ${item.id}` })));
+    const preview = node("div", { "aria-live": "polite", class: "span-2 sigma-preview" });
+    const previewError = node("p", { class: "notice span-2", role: "alert", hidden: true });
+    const currentPreview = node("div", { class: "span-2" });
+    let revision = 0;
+    const rule = autopsyChoice("rule_id", rules.items.map((item) => ({ value: item.id, label: item.name })));
+    const invalidate = () => { revision += 1; preview.replaceChildren(); previewError.hidden = true; previewError.textContent = ""; };
+    source.addEventListener("change", invalidate);
+    fixtures.addEventListener("change", invalidate);
+    rule.input.addEventListener("input", () => { invalidate(); currentPreview.replaceChildren(); refresh.hidden = true; });
     const compile = async () => {
       if (!source.files[0] || source.files[0].size > 65536) throw new Error(SOCifyLocale.text("ملف Sigma مطلوب وبحد 64 KiB"));
-      return { source: await source.files[0].text(), fixtures: await autopsyReadJSON(fixtures, 512 * 1024) };
+      const selectedSource = source.files[0];
+      const selectedFixtures = fixtures.files[0];
+      if (!selectedFixtures || selectedFixtures.size > 512 * 1024) throw new Error(SOCifyLocale.text("ملف اختبارات القاعدة مطلوب وبحد 512 KiB"));
+      try { return { source: await selectedSource.text(), fixtures: JSON.parse(await selectedFixtures.text()) }; }
+      catch (error) { if (error instanceof SyntaxError) throw new Error(SOCifyLocale.text("ملف اختبارات القاعدة ليس JSON صالحًا")); throw error; }
     };
     const form = autopsyForm({ reason: { required: true, max: 1000 } }, async (body) => {
       const id = rule.input.autopsyValue();
       const current = rules.items.find((item) => item.id === id);
-      await api("/api/autopsy/sigma/publish", { method: "POST", body: { ...body, ...await compile(), ...(current ? { rule_id: id, version: current.version } : {}) } });
+      const selectedRevision = revision;
+      const input = await compile();
+      if (selectedRevision !== revision) throw new Error(SOCifyLocale.text("تغيرت ملفات القاعدة؛ أعد التحقق قبل النشر"));
+      try { await api("/api/autopsy/sigma/publish", { method: "POST", body: { ...body, ...input, ...(current ? { rule_id: id, version: current.version } : {}) } }); }
+      catch (error) { if (error.code === "RULE_VERSION_CONFLICT") { invalidate(); refresh.hidden = false; } throw error; }
       await window.SOCifyAutopsy.library();
     });
-    form.prepend(field(SOCifyLocale.text("مصدر Sigma"), source), field(SOCifyLocale.text("fixtures JSON: positive وnegative، كل قائمة أحداث مطبّعة"), fixtures), field(SOCifyLocale.text("إصدار جديد لقاعدة موجودة · اتركه فارغًا لقاعدة جديدة"), rule.control));
-    form.append(autopsyAction(SOCifyLocale.text("تحقق من الترجمة والاختبارات دون نشر"), async () => { const result = await api("/api/autopsy/sigma/compile", { method: "POST", body: await compile() }); preview.replaceChildren(node("p", { text: SOCifyLocale.text("اجتازت الأمثلة الإيجابية والسلبية. التحقق لا يثبت تغطية جميع التهديدات.") }), node("pre", { text: JSON.stringify(result.compiled, null, 2) })); }), preview);
-    root.append(panel(SOCifyLocale.text("تحقق ونشر Sigma subset"), node("div", { class: "panel-body" }, [node("p", { text: SOCifyLocale.template`النطاق: ${rules.capabilities.conditions}. غير المدعوم يُرفض: ${rules.capabilities.unsupported.join(SOCifyLocale.text("، "))}. لا يثبت اجتياز fixtures دقة الكشف في بيانات الشركة.` }), form]), true));
+    const refresh = autopsyAction(SOCifyLocale.text("تحميل القاعدة الحالية"), async () => {
+      const id = rule.input.autopsyValue();
+      const selectedRevision = revision;
+      const latest = await api("/api/autopsy/sigma/rules");
+      const current = latest.items.find(item => item.id === id);
+      if (!current) throw new Error(SOCifyLocale.text("القاعدة غير متاحة"));
+      const result = await api("/api/autopsy/sigma/compile", { method: "POST", body: { source: current.source, fixtures: current.fixtures } });
+      if (selectedRevision !== revision) return;
+      rules.items = latest.items;
+      invalidate();
+      currentPreview.replaceChildren(autopsySigmaSummary(result.compiled, null, SOCifyLocale.text("القاعدة المنشورة حاليًا")));
+      form.querySelector('[role="alert"]').hidden = true;
+      refresh.hidden = true;
+    });
+    refresh.hidden = true;
+    form.prepend(field(SOCifyLocale.text("مصدر Sigma"), source), field(SOCifyLocale.text("اختبارات القاعدة · JSON"), fixtures), field(SOCifyLocale.text("تحديث قاعدة منشورة · اختياري"), rule.control));
+    form.append(autopsyAction(SOCifyLocale.text("تحقق من الترجمة والاختبارات دون نشر"), async () => {
+      invalidate();
+      const selectedRevision = revision;
+      try {
+        const input = await compile();
+        const result = await api("/api/autopsy/sigma/compile", { method: "POST", body: input });
+        if (selectedRevision === revision) preview.replaceChildren(node("p", { text: SOCifyLocale.text("اجتازت الأمثلة الإيجابية والسلبية. التحقق لا يثبت تغطية جميع التهديدات.") }), autopsySigmaSummary(result.compiled, input.fixtures));
+      } catch (error) { if (selectedRevision === revision) { previewError.textContent = error.message; previewError.hidden = false; } }
+    }), refresh, previewError, currentPreview, preview);
+    root.append(panel(SOCifyLocale.text("اختبار قاعدة ونشرها"), node("div", { class: "panel-body" }, form), true));
   }
   const yara = await api("/api/autopsy/yara");
   const yaraBody = node("div", { class: "panel-body" }, [node("p", { text: SOCifyLocale.text("حزم محلية ثابتة بإصدارات ورخص وبصمات. تنشر بعد تجميع معزول ونجاح أمثلة إيجابية وسلبية؛ لا تنزيل أو تحديث خارجي. لا يثبت غياب التطابق سلامة العينة.") }), table([{ label: SOCifyLocale.text("الاسم"), value: "name" }, { label: SOCifyLocale.text("الإصدار"), value: "version" }, { label: SOCifyLocale.text("المصدر والرخصة"), value: (row) => `${row.origin} · ${row.license}` }, { label: "SHA-256", value: "sha256" }], yara.items)]);

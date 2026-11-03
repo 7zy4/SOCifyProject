@@ -100,7 +100,7 @@ def test_detection_author_can_verify_and_correct_before_publication(app, languag
     with review_session(app, language, scenario) as (_analyst, j, result):
         j.login("manager@socify.local")
         j.nav("مكتبة التحليل المحلي")
-        area = panel(j, "تحقق ونشر Sigma subset")
+        area = panel(j, "اختبار قاعدة ونشرها")
         sigma = "title: Identity detection review\nlogsource:\n  category: socify_normalized\ndetection:\n  selected:\n    title|contains: Suspicious identity\n  condition: selected\nlevel: high\n"
         source = area.get_by_label(j.text("ملف Sigma"), exact=True)
         fixtures = area.locator("input[type=file]").nth(1)

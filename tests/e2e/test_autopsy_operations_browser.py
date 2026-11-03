@@ -50,7 +50,7 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
             feed.get_by_role("button", name="حفظ", exact=True).click()
             page.get_by_role("button", name="تفعيل الإصدار", exact=True).click()
             page.get_by_text("الإصدار المختار", exact=True).wait_for()
-            sigma_panel = page.locator("section.panel").filter(has=page.get_by_role("heading", name="تحقق ونشر Sigma subset", exact=True))
+            sigma_panel = page.locator("section.panel").filter(has=page.get_by_role("heading", name="اختبار قاعدة ونشرها", exact=True))
             sigma = "title: Browser synthetic rule\nlogsource:\n  category: socify_normalized\ndetection:\n  selected:\n    title|contains: Browser suspicious\n  condition: selected\nlevel: high\n"
             sigma_panel.get_by_label("ملف Sigma", exact=True).set_input_files({"name": "rule.yml", "mimeType": "text/yaml", "buffer": sigma.encode()})
             sigma_panel.locator("input[type=file]").nth(1).set_input_files(
