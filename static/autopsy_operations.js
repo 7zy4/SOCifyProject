@@ -79,7 +79,13 @@ window.SOCifyAutopsy.library = async ({ refresh = false, savedForm = null } = {}
   root.append(panel(SOCifyLocale.text("إصدارات مصادر TI وGeoIP"), table([{ label: SOCifyLocale.text("الاسم"), value: "name" }, { label: SOCifyLocale.text("الإصدار"), value: "version" }, { label: SOCifyLocale.text("المصدر والرخصة"), value: (row) => `${row.source} · ${row.license}` }, { label: SOCifyLocale.text("المؤشرات"), value: "entries" }, { label: SOCifyLocale.text("الصلاحية"), value: (row) => formatTime(row.expires_at) }, { label: SOCifyLocale.text("التفعيل"), value: (row) => row.active ? SOCifyLocale.text("الإصدار المختار") : permission("intel.manage") ? autopsyAction(SOCifyLocale.text("تفعيل الإصدار"), async () => { await api(`/api/autopsy/intelligence/${row.id}/activate`, { method: "POST", body: {} }); await window.SOCifyAutopsy.library({ refresh: true }); }) : SOCifyLocale.text("غير مختار") }], bundles.items), true));
   if (permission("intel.manage")) {
     const file = node("input", { type: "file", accept: ".json,application/json", required: true, "aria-label": SOCifyLocale.text("حزمة TI المحلية") });
-    const form = autopsyForm({ name: { required: true, max: 160 }, version: { required: true, max: 80 }, source: { required: true, max: 500 }, license: { required: true, max: 500 }, expires_at: { required: true, timestamp: true }, format: { required: true, choices: bundles.formats } }, async (body) => { await api("/api/autopsy/intelligence", { method: "POST", body: { ...body, content: await autopsyReadJSON(file) } }); await window.SOCifyAutopsy.library({ refresh: true, savedForm: form }); });
+    const form = autopsyForm({ name: { required: true, max: 160 }, version: { required: true, max: 80 }, source: { required: true, max: 500 }, license: { required: true, max: 500 }, expires_at: { required: true, timestamp: true }, format: { required: true, choices: bundles.formats } }, async (body) => {
+      const intent = await autopsyWriteIntent("intel-import", { ...body, content: await autopsyReadJSON(file) }, { preserveBaseVersion: false });
+      await api("/api/autopsy/intelligence", { method: "POST", headers: { "Idempotency-Key": intent.key }, body: intent.body });
+      try { await window.SOCifyAutopsy.library({ refresh: true, savedForm: form }); }
+      catch (_) { throw new Error(SOCifyLocale.text("حُفظ المصدر. تعذر تحديث القائمة؛ أعد المحاولة.")); }
+      intent.acknowledged();
+    });
     form.dataset.libraryForm = "intelligence";
     form.prepend(field(SOCifyLocale.text("ملف JSON محلي · حتى 2 MiB"), file));
     root.append(panel(SOCifyLocale.text("استيراد إصدار محلي جديد"), node("div", { class: "panel-body" }, [node("p", { text: SOCifyLocale.text("flat: قائمة type/value/verdict/confidence؛ geoip: CIDR مع country أو asn. STIX يدعم مساواة مؤشر مفرد، وMISP Attribute بأنواع معلنة. يلزم التفعيل بعد الاستيراد؛ لا تتضمن المنصة قاعدة سمعة مرخصة جاهزة.") }), form]), true));

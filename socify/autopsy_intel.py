@@ -16,6 +16,11 @@ from .timeutils import iso_now, iso_timestamp, parse_timestamp, utc_now
 autopsy_intel_api = Blueprint("autopsy_intel", __name__)
 VERDICTS = {"unknown": 0, "benign": 1, "suspicious": 2, "malicious": 3}
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS intelligence_import_receipts (
+ workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id), actor_id INTEGER NOT NULL REFERENCES users(id),
+ request_key TEXT NOT NULL, request_hash TEXT NOT NULL, response TEXT NOT NULL CHECK(json_valid(response)),
+ created_at TEXT NOT NULL, PRIMARY KEY(workspace_id,actor_id,request_key)
+);
 CREATE TABLE IF NOT EXISTS autopsy_intel_entries (
  id INTEGER PRIMARY KEY, bundle_id INTEGER NOT NULL REFERENCES autopsy_intel_bundles(id),
  type TEXT NOT NULL, value TEXT NOT NULL, verdict TEXT NOT NULL, confidence INTEGER NOT NULL,
@@ -194,9 +199,17 @@ def list_bundles():
 @require_permission("intel.manage")
 def import_bundle():
     data = request.get_json(silent=True)
+    request_key = request.headers.get("Idempotency-Key")
     try:
         if not isinstance(data, dict) or set(data) != {"name", "version", "source", "license", "expires_at", "format", "content"}:
             raise ValueError("حدد الاسم والإصدار والمصدر والرخصة والصلاحية والصيغة والمحتوى المحلي")
+        if request_key is not None and not re.fullmatch(r"[A-Za-z0-9_.:-]{8,128}", request_key):
+            raise ValueError("معرف إعادة المحاولة غير صالح")
+        request_hash = hashlib.sha256(canonical(data).encode()).hexdigest()
+        if request_key is not None:
+            receipt = _import_receipt(request_key, request_hash)
+            if receipt is not None:
+                return receipt
         name, version = text_value(data["name"], 160, True), text_value(data["version"], 80, True)
         source, license_name = text_value(data["source"], 500, True), text_value(data["license"], 500, True)
         if not isinstance(data["expires_at"], str) or not re.search(r"(?:Z|[+-]\d{2}:\d{2})$", data["expires_at"]):
@@ -211,6 +224,11 @@ def import_bundle():
     except (ValueError, TypeError, UnicodeError, RecursionError) as exc:
         return error_response("INVALID_LOCAL_INTELLIGENCE", str(exc), 422)
     with transaction():
+        # A concurrent retry can have committed while the source was being validated.
+        if request_key is not None:
+            receipt = _import_receipt(request_key, request_hash)
+            if receipt is not None:
+                return receipt
         duplicate = (
             get_db().execute("SELECT id FROM autopsy_intel_bundles WHERE workspace_id=? AND name=? AND version=?", (workspace_id(), name, version)).fetchone()
         )
@@ -241,7 +259,29 @@ def import_bundle():
                 for item in entries
             ],
         )
-    return jsonify({"id": identifier, "sha256": digest, "entries": len(entries), "state": "inactive"}), 201
+        result = {"id": identifier, "sha256": digest, "entries": len(entries), "state": "inactive"}
+        if request_key is not None:
+            get_db().execute(
+                "INSERT INTO intelligence_import_receipts(workspace_id,actor_id,request_key,request_hash,response,created_at) VALUES (?,?,?,?,?,?)",
+                (workspace_id(), actor_id(), request_key, request_hash, canonical(result), iso_now()),
+            )
+    return jsonify(result), 201
+
+
+def _import_receipt(request_key, request_hash):
+    receipt = (
+        get_db()
+        .execute(
+            "SELECT request_hash,response FROM intelligence_import_receipts WHERE workspace_id=? AND actor_id=? AND request_key=?",
+            (workspace_id(), actor_id(), request_key),
+        )
+        .fetchone()
+    )
+    if receipt is None:
+        return None
+    if receipt["request_hash"] != request_hash:
+        return error_response("INTELLIGENCE_REQUEST_CONFLICT", "تغير محتوى الطلب؛ أعد المحاولة كعملية جديدة", 409)
+    return jsonify(json.loads(receipt["response"])), 201
 
 
 @autopsy_intel_api.post("/api/autopsy/intelligence/<int:bundle_id>/activate")

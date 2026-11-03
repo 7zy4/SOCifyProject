@@ -344,8 +344,10 @@ function autopsyForm(schema, submit, initial = {}) {
 
 // Retain operation metadata and payload digests only; never persist draft contents.
 const autopsyWriteIntents = new Map();
-async function autopsyWriteIntent(scope, body) {
-  const { version, ...content } = body;
+async function autopsyWriteIntent(scope, body, { preserveBaseVersion = true } = {}) {
+  const { version: selectedVersion, ...withoutVersion } = body;
+  const version = preserveBaseVersion ? selectedVersion : undefined;
+  const content = preserveBaseVersion ? withoutVersion : body;
   const canonical = JSON.stringify(content, (_, value) => value && typeof value === "object" && !Array.isArray(value)
     ? Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]])) : value);
   const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical)))].map(byte => byte.toString(16).padStart(2, "0")).join("");

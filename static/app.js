@@ -113,14 +113,18 @@ async function api(path, options = {}) {
     if (error.name === "AbortError") throw error;
     throw new Error(SOCifyLocale.text("تعذر الاتصال. أعد المحاولة."));
   }
+  if (response.status === 401) {
+    recoverSession();
+    await response.text().catch(() => {});
+    throw new Error(SOCifyLocale.text("انتهت الجلسة"));
+  }
   let payload = null;
   if (response.status !== 204) {
     const contentType = response.headers.get("content-type") || "";
-    payload = contentType.includes("json") ? await response.json() : await response.text();
-  }
-  if (response.status === 401) {
-    recoverSession();
-    throw new Error(SOCifyLocale.text("انتهت الجلسة"));
+    try {
+      if (response.ok && !contentType.includes("json")) throw new Error();
+      payload = contentType.includes("json") ? await response.json() : await response.text();
+    } catch (_) { throw new Error(SOCifyLocale.text("تعذر قراءة الرد. أعد المحاولة.")); }
   }
   if (!response.ok) {
     const renewalRequired = ["CSRF_FAILED", "CSRF_VALIDATION_FAILED"].includes(payload?.error?.code);

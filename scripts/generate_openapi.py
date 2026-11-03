@@ -56,6 +56,25 @@ def generate() -> dict[str, object]:
                         "422": {"description": "Invalid creation data or retry key"},
                     }
                 )
+            elif path == "/api/autopsy/intelligence" and method == "POST":
+                operation["summary"] = "Import a local intelligence source or recover its acknowledgement"
+                operation["parameters"] = [
+                    {"name": "Idempotency-Key", "in": "header", "required": False, "schema": {"type": "string", "pattern": "^[A-Za-z0-9_.:-]{8,128}$"}}
+                ]
+                operation["description"] = (
+                    "An optional retry key is scoped to the authenticated author and workspace and bound to the complete import body. "
+                    "Identical retries return the original import receipt without adding entries or changing current activation. "
+                    "A changed body with the same key returns 409. Existing source versions remain immutable; a new intent cannot overwrite them. "
+                    "Current intel.manage permission is required on every request. The receipt commits atomically with the source. "
+                    "Acknowledging an import after expiry does not renew it or permit its activation."
+                )
+                operation["responses"].update(
+                    {
+                        "201": {"description": "Source imported or original acknowledgement recovered"},
+                        "409": {"description": "Conflicting request content or existing source version"},
+                        "422": {"description": "Invalid source data or retry key"},
+                    }
+                )
             elif path == "/api/profile/display-name":
                 operation["summary"] = "Save the authenticated user's display names"
                 operation["requestBody"] = {

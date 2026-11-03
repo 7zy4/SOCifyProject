@@ -17,6 +17,8 @@
   "توثيق قرار الاستجابة": "Document response decision",
   "معرف إعادة المحاولة أو بيانات القضية غير صالحة": "The retry identifier or case data is invalid",
   "حُفظت القاعدة. تعذر تحديث القائمة؛ أعد المحاولة.": "The rule was saved. The list could not refresh; try again.",
+  "حُفظ المصدر. تعذر تحديث القائمة؛ أعد المحاولة.": "The source was saved. The list could not refresh; try again.",
+  "تعذر قراءة الرد. أعد المحاولة.": "The response could not be read. Try again.",
   "معرف إعادة المحاولة غير صالح": "The retry identifier is invalid",
   "تغير محتوى الطلب؛ أعد المحاولة كعملية جديدة": "The request content changed; submit it as a new operation",
   "نتيجة اختبار القاعدة": "Rule test result",
