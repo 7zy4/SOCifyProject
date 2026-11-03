@@ -328,14 +328,16 @@ function autopsyForm(schema, submit, initial = {}) {
     save.setAttribute("aria-busy", "true");
     save.textContent = SOCifyLocale.text("جارٍ الحفظ…");
     form.dataset.saving = "true";
+    const frozen = form.dataset.libraryForm ? [...form.querySelectorAll("input,textarea,select,button")].filter(control => !control.disabled) : [];
     try {
       const values = Object.fromEntries(Object.entries(getters).map(([key, getter]) => [key, getter()]).filter(([, value]) => value !== null));
+      frozen.forEach(control => { control.disabled = true; });
       await submit(values);
       errors.hidden = true;
       errors.textContent = "";
       SOCifyDrafts.saved(form);
     } catch (error) { errors.hidden = false; errors.textContent = error.message; }
-    finally { delete form.dataset.saving; save.disabled = false; save.removeAttribute("aria-busy"); save.textContent = SOCifyLocale.text("حفظ"); }
+    finally { frozen.forEach(control => { control.disabled = false; }); delete form.dataset.saving; save.disabled = false; save.removeAttribute("aria-busy"); save.textContent = SOCifyLocale.text("حفظ"); }
   });
   return SOCifyDrafts.track(form);
 }

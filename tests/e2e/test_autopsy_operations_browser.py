@@ -64,7 +64,8 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
             sigma_panel.get_by_text("اجتازت الأمثلة الإيجابية والسلبية.", exact=False).wait_for()
             sigma_panel.locator("input[name=reason]").fill("Reviewed synthetic browser fixtures")
             sigma_panel.get_by_role("button", name="حفظ", exact=True).click()
-            page.get_by_role("cell", name="Browser synthetic rule", exact=True).wait_for()
+            published_rules = page.locator("section.panel").filter(has=page.get_by_role("heading", name="قواعد Sigma المنشورة", exact=True))
+            published_rules.get_by_role("cell", name="Browser synthetic rule", exact=True).wait_for()
             yara_panel = page.locator("section.panel").filter(has=page.get_by_role("heading", name="حزم YARA المحلية", exact=True))
             yara_panel.get_by_label("ملف قواعد YARA", exact=True).set_input_files(
                 {"name": "synthetic.yar", "mimeType": "text/plain", "buffer": b'rule Browser_Test { strings: $a = "SOCIFY_BROWSER_MARKER" condition: $a }'}
@@ -88,7 +89,13 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
                 ("license", "Synthetic test permission"),
             ):
                 yara_panel.locator(f"input[name={name}]").fill(value)
-            yara_panel.get_by_role("button", name="حفظ", exact=True).click()
+            invalid_fields = yara_panel.locator("form").evaluate(
+                "form=>[...form.elements].filter(control=>control.willValidate&&!control.validity.valid).map(control=>control.name||control.getAttribute('aria-label'))"
+            )
+            assert not invalid_fields, invalid_fields
+            with page.expect_response(lambda response: response.request.method == "POST" and response.url.endswith("/api/autopsy/yara")) as saved_pack:
+                yara_panel.get_by_role("button", name="حفظ", exact=True).click()
+            assert saved_pack.value.status == 201
             page.get_by_role("cell", name="Browser YARA pack", exact=True).wait_for()
             violations = page.evaluate("async () => (await axe.run(document)).violations.filter(item => ['serious', 'critical'].includes(item.impact))")
             assert not violations, violations

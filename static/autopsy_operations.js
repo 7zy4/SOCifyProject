@@ -68,15 +68,19 @@ function autopsySigmaSummary(compiled, fixtures, caption = SOCifyLocale.text("ن
 }
 
 autopsyLabels.rule_id = SOCifyLocale.text("القاعدة المنشورة");
+autopsyLabels.origin = SOCifyLocale.text("المصدر");
+let autopsyLibraryRequest = 0, autopsyLibraryRendered = 0;
 
-window.SOCifyAutopsy.library = async ({ refresh = false } = {}) => {
+window.SOCifyAutopsy.library = async ({ refresh = false, savedForm = null } = {}) => {
+  const request = ++autopsyLibraryRequest;
   if (!refresh) begin("analysis-library");
   const root = node("div", {}, pageHead(SOCifyLocale.text("مكتبة التحليل المحلي"), null));
   const bundles = await api("/api/autopsy/intelligence");
-  root.append(panel(SOCifyLocale.text("إصدارات مصادر TI وGeoIP"), table([{ label: SOCifyLocale.text("الاسم"), value: "name" }, { label: SOCifyLocale.text("الإصدار"), value: "version" }, { label: SOCifyLocale.text("المصدر والرخصة"), value: (row) => `${row.source} · ${row.license}` }, { label: SOCifyLocale.text("المؤشرات"), value: "entries" }, { label: SOCifyLocale.text("الصلاحية"), value: (row) => formatTime(row.expires_at) }, { label: SOCifyLocale.text("التفعيل"), value: (row) => row.active ? SOCifyLocale.text("الإصدار المختار") : permission("intel.manage") ? autopsyAction(SOCifyLocale.text("تفعيل الإصدار"), async () => { await api(`/api/autopsy/intelligence/${row.id}/activate`, { method: "POST", body: {} }); await window.SOCifyAutopsy.library(); }) : SOCifyLocale.text("غير مختار") }], bundles.items), true));
+  root.append(panel(SOCifyLocale.text("إصدارات مصادر TI وGeoIP"), table([{ label: SOCifyLocale.text("الاسم"), value: "name" }, { label: SOCifyLocale.text("الإصدار"), value: "version" }, { label: SOCifyLocale.text("المصدر والرخصة"), value: (row) => `${row.source} · ${row.license}` }, { label: SOCifyLocale.text("المؤشرات"), value: "entries" }, { label: SOCifyLocale.text("الصلاحية"), value: (row) => formatTime(row.expires_at) }, { label: SOCifyLocale.text("التفعيل"), value: (row) => row.active ? SOCifyLocale.text("الإصدار المختار") : permission("intel.manage") ? autopsyAction(SOCifyLocale.text("تفعيل الإصدار"), async () => { await api(`/api/autopsy/intelligence/${row.id}/activate`, { method: "POST", body: {} }); await window.SOCifyAutopsy.library({ refresh: true }); }) : SOCifyLocale.text("غير مختار") }], bundles.items), true));
   if (permission("intel.manage")) {
     const file = node("input", { type: "file", accept: ".json,application/json", required: true, "aria-label": SOCifyLocale.text("حزمة TI المحلية") });
-    const form = autopsyForm({ name: { required: true, max: 160 }, version: { required: true, max: 80 }, source: { required: true, max: 500 }, license: { required: true, max: 500 }, expires_at: { required: true, timestamp: true }, format: { required: true, choices: bundles.formats } }, async (body) => { await api("/api/autopsy/intelligence", { method: "POST", body: { ...body, content: await autopsyReadJSON(file) } }); await window.SOCifyAutopsy.library(); });
+    const form = autopsyForm({ name: { required: true, max: 160 }, version: { required: true, max: 80 }, source: { required: true, max: 500 }, license: { required: true, max: 500 }, expires_at: { required: true, timestamp: true }, format: { required: true, choices: bundles.formats } }, async (body) => { await api("/api/autopsy/intelligence", { method: "POST", body: { ...body, content: await autopsyReadJSON(file) } }); await window.SOCifyAutopsy.library({ refresh: true, savedForm: form }); });
+    form.dataset.libraryForm = "intelligence";
     form.prepend(field(SOCifyLocale.text("ملف JSON محلي · حتى 2 MiB"), file));
     root.append(panel(SOCifyLocale.text("استيراد إصدار محلي جديد"), node("div", { class: "panel-body" }, [node("p", { text: SOCifyLocale.text("flat: قائمة type/value/verdict/confidence؛ geoip: CIDR مع country أو asn. STIX يدعم مساواة مؤشر مفرد، وMISP Attribute بأنواع معلنة. يلزم التفعيل بعد الاستيراد؛ لا تتضمن المنصة قاعدة سمعة مرخصة جاهزة.") }), form]), true));
   }
@@ -113,7 +117,7 @@ window.SOCifyAutopsy.library = async ({ refresh = false } = {}) => {
         const payload = { ...body, ...input, ...(current ? { rule_id: id, version: current.version } : {}) };
         intent = await autopsyWriteIntent("sigma", payload);
         await api("/api/autopsy/sigma/publish", { method: "POST", headers: { "Idempotency-Key": intent.key }, body: intent.body });
-        try { await window.SOCifyAutopsy.library({ refresh: true }); }
+        try { await window.SOCifyAutopsy.library({ refresh: true, savedForm: form }); }
         catch (_) { throw new Error(SOCifyLocale.text("حُفظت القاعدة. تعذر تحديث القائمة؛ أعد المحاولة.")); }
         intent.acknowledged();
       } catch (error) { if (error.code === "RULE_VERSION_CONFLICT") { intent?.acknowledged(); invalidate(); refresh.hidden = false; } throw error; }
@@ -134,6 +138,7 @@ window.SOCifyAutopsy.library = async ({ refresh = false } = {}) => {
       refresh.hidden = true;
     });
     refresh.hidden = true;
+    form.dataset.libraryForm = "sigma";
     form.prepend(field(SOCifyLocale.text("مصدر Sigma"), source), field(SOCifyLocale.text("اختبارات القاعدة · JSON"), fixtures), field(SOCifyLocale.text("تحديث قاعدة منشورة · اختياري"), rule.control));
     form.append(autopsyAction(SOCifyLocale.text("تحقق من الترجمة والاختبارات دون نشر"), async () => {
       invalidate();
@@ -151,7 +156,8 @@ window.SOCifyAutopsy.library = async ({ refresh = false } = {}) => {
   if (permission("rules.manage")) {
     const packFile = node("input", { type: "file", accept: ".yar,.yara,text/plain", required: true, "aria-label": SOCifyLocale.text("ملف قواعد YARA") });
     const fixtureFile = node("input", { type: "file", accept: ".json,application/json", required: true, "aria-label": SOCifyLocale.text("أمثلة YARA الاصطناعية") });
-    const form = autopsyForm({ name: { required: true, max: 120 }, version: { required: true, integer: true, min: 1, max: 1000000 }, origin: { required: true, max: 1000 }, license: { required: true, max: 500 } }, async (body) => { if (!packFile.files[0] || packFile.files[0].size > 65536) throw new Error(SOCifyLocale.text("ملف YARA مطلوب بحد 64 KiB")); await api("/api/autopsy/yara", { method: "POST", body: { ...body, source: await packFile.files[0].text(), fixtures: await autopsyReadJSON(fixtureFile, 768 * 1024) } }); await window.SOCifyAutopsy.library(); });
+    const form = autopsyForm({ name: { required: true, max: 120 }, version: { required: true, integer: true, min: 1, max: 1000000 }, origin: { required: true, max: 1000 }, license: { required: true, max: 500 } }, async (body) => { if (!packFile.files[0] || packFile.files[0].size > 65536) throw new Error(SOCifyLocale.text("ملف YARA مطلوب بحد 64 KiB")); await api("/api/autopsy/yara", { method: "POST", body: { ...body, source: await packFile.files[0].text(), fixtures: await autopsyReadJSON(fixtureFile, 768 * 1024) } }); await window.SOCifyAutopsy.library({ refresh: true, savedForm: form }); });
+    form.dataset.libraryForm = "yara";
     form.prepend(field(SOCifyLocale.text("قواعد YARA محلية · حتى 64 KiB"), packFile), field(SOCifyLocale.text("fixtures JSON: positive وnegative، كل قائمة عينات base64 اصطناعية"), fixtureFile));
     yaraBody.append(form);
   }
@@ -161,9 +167,32 @@ window.SOCifyAutopsy.library = async ({ refresh = false } = {}) => {
     const errors = node("p", { class: "notice span-2", role: "alert", hidden: true });
     const form = node("form", { class: "form-grid" }, [field(SOCifyLocale.text("حزمة ZIP محلية · حتى 64 MiB موسعة"), file), errors, node("button", { type: "submit", class: "button primary", text: SOCifyLocale.text("استعادة كقضية جديدة") })]);
     form.addEventListener("submit", async (event) => { event.preventDefault(); const control = form.querySelector("button"); control.disabled = true; errors.hidden = true; try { if (!file.files[0] || file.files[0].size > 64 * 1024 * 1024 + 524288) throw new Error(SOCifyLocale.text("حجم الحزمة يتجاوز الحد")); const body = new FormData(); body.set("file", file.files[0]); const result = await api("/api/cases/import-capsule", { method: "POST", body }); window.location.assign(`/cases/${result.case_id}?tab=reports`); } catch (error) { errors.textContent = error.message; errors.hidden = false; control.disabled = false; } });
+    form.dataset.libraryForm = "capsule";
     root.append(panel(SOCifyLocale.text("استعادة حزمة قضية"), node("div", { class: "panel-body" }, [node("p", { text: SOCifyLocale.text("تُفحص البصمات والمسارات والحدود قبل الاستعادة. تحفظ إفادات واعتمادات المالك السابق في أرشيف ثابت للمراجعة ولا تمنح صلاحية أو اعتمادًا محليًا تلقائيًا.") }), form]), true));
   }
+  if (request < autopsyLibraryRendered) {
+    // A later completed refresh owns the lists. Finish only this saved form,
+    // if that exact form survived while its refresh was pending.
+    if (savedForm?.isConnected) {
+      const replacement = root.querySelector(`form[data-library-form="${savedForm.dataset.libraryForm}"]`);
+      if (replacement) savedForm.replaceWith(replacement);
+    }
+    return;
+  }
+  const active = document.activeElement;
+  let retainedFocus = false;
+  if (refresh) {
+    for (const form of document.querySelectorAll("#workspace form[data-library-form]")) {
+      if (form === savedForm || (!SOCifyDrafts.hasChanges(form) && form.dataset.saving !== "true")) continue;
+      const replacement = root.querySelector(`form[data-library-form="${form.dataset.libraryForm}"]`);
+      if (!replacement) continue;
+      retainedFocus ||= form.contains(active);
+      replacement.replaceWith(form);
+    }
+  }
   finish(root);
+  autopsyLibraryRendered = request;
+  if (retainedFocus && active?.isConnected) active.focus({ preventScroll: true });
 };
 
 function autopsyDetectionState(value) {
