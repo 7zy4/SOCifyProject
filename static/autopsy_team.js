@@ -64,13 +64,7 @@ async function autopsyAssignmentQueue(mine = false) {
       next.disabled = currentPage * data.page_size >= data.total;
       let content = emptyState(SOCifyLocale.text("لا مهام مطابقة"), null);
       if (data.items.length) {
-        content = table(columns, data.items);
-        content.classList.add("assignment-table");
-        content.querySelector("table").setAttribute("role", "table");
-        content.querySelectorAll("thead,tbody").forEach(group => group.setAttribute("role", "rowgroup"));
-        content.querySelectorAll("tr").forEach(row => row.setAttribute("role", "row"));
-        content.querySelectorAll("th").forEach(cell => cell.setAttribute("role", "columnheader"));
-        content.querySelectorAll("tbody tr").forEach(row => [...row.cells].forEach((cell, index) => { cell.setAttribute("role", "cell"); cell.prepend(node("span", { class: "assignment-cell-label", "aria-hidden": "true", text: columns[index].label })); }));
+        content = stackedTable(columns, data.items);
       }
       results.replaceChildren(content, node("div", { class: "action-row" }, [previous, node("span", { text: SOCifyLocale.template`الصفحة ${currentPage} من ${Math.max(1, Math.ceil(data.total / data.page_size))}` }), next]));
     } catch (error) { if (request === requestId) { notice.textContent = error.message; notice.hidden = false; } }

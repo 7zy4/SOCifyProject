@@ -183,6 +183,17 @@ function panel(title, content, wide = false, extra = null) {
   return node("section", { class: `panel${wide ? " wide" : ""}` }, [node("header", { class: "panel-head" }, [node("h3", { text: title }), extra]), content]);
 }
 
+function stackedTable(columns, rows) {
+  const content = table(columns, rows);
+  content.classList.add("assignment-table");
+  content.querySelector("table").setAttribute("role", "table");
+  content.querySelectorAll("thead,tbody").forEach(group => group.setAttribute("role", "rowgroup"));
+  content.querySelectorAll("tr").forEach(row => row.setAttribute("role", "row"));
+  content.querySelectorAll("th").forEach(cell => cell.setAttribute("role", "columnheader"));
+  content.querySelectorAll("tbody tr").forEach(row => [...row.cells].forEach((cell, index) => { cell.setAttribute("role", "cell"); cell.prepend(node("span", { class: "assignment-cell-label", "aria-hidden": "true", text: columns[index].label })); }));
+  return content;
+}
+
 function metric(label, value, style = "", detail = SOCifyLocale.text("من قاعدة البيانات")) {
   return node("article", { class: `metric ${style}` }, [node("span", { text: label }), node("strong", { text: Number(value || 0).toLocaleString("ar-SA") }), node("small", { text: detail })]);
 }

@@ -227,6 +227,9 @@ def performance():
     ):
         records[row["case_id"]][row["kind"]].append(json.loads(row["payload"]))
     tasks = [dict(row) for row in get_db().execute(f"SELECT * FROM case_tasks WHERE case_id IN ({marks})", ids)]
+    awaiting_decision = {
+        row["case_id"] for row in get_db().execute(f"SELECT case_id FROM case_quick_reports WHERE case_id IN ({marks}) AND status='escalated'", ids)
+    }
     alerts = [
         dict(row)
         for row in get_db().execute(
@@ -258,7 +261,7 @@ def performance():
             severity[case["severity"]] += 1
             if case["assignee"] in workload:
                 workload[case["assignee"]]["open"] += 1
-        if case["status"] == "awaiting_review":
+        if active and (case["status"] == "awaiting_review" or case["id"] in awaiting_decision):
             review_cases.append(case)
         if in_period(case["created_at"]):
             trend[moment(case["created_at"]).date().isoformat()]["opened"] += 1
