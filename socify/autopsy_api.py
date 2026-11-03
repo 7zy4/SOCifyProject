@@ -47,7 +47,7 @@ def record_view(row) -> dict[str, Any]:
     return {**dict(row), "payload": json.loads(row["payload"])}
 
 
-def records_for_case(case_id: int, kind: str | None = None, limit: int = 100, before: int | None = None):
+def records_for_case(case_id: int, kind: str | None = None, limit: int = 100, before: int | None = None, query: str = "", focus: int | None = None):
     clauses = ["case_id = ?"]
     args: list[Any] = [case_id]
     if kind:
@@ -56,6 +56,14 @@ def records_for_case(case_id: int, kind: str | None = None, limit: int = 100, be
     if before:
         clauses.append("id < ?")
         args.append(before)
+    if focus is not None:
+        clauses.append("id = ?")
+        args.append(focus)
+    if query:
+        clauses.append(
+            "LOWER(COALESCE(json_extract(payload, '$.title'), json_extract(payload, '$.conclusion'), json_extract(payload, '$.name'), '')) LIKE ? ESCAPE '\\'"
+        )
+        args.append("%" + query.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
     if not manager():
         clauses.append("(COALESCE(json_extract(payload, '$.visibility'), 'team') != 'private' OR created_by = ?)")
         args.append(actor_id())
@@ -455,20 +463,30 @@ def update_context(case_id: int):
 
 @autopsy_api.get("/api/cases/<int:case_id>/records")
 @require_permission("cases.read")
+@consistent_read
 def records_list(case_id: int):
     if not _case_row(case_id):
         return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
     try:
         limit = int(request.args.get("limit", 50))
         before = int(request.args["before"]) if "before" in request.args else None
-        if not 1 <= limit <= 100 or before is not None and before < 1:
+        focus = int(request.args["focus"]) if "focus" in request.args else None
+        query = request.args.get("q", "").strip()
+        if (
+            not 1 <= limit <= 100
+            or any(value is not None and not 1 <= value <= 2**63 - 1 for value in (before, focus))
+            or len(query) > 200
+            or any(len(request.args.getlist(key)) != 1 for key in request.args)
+        ):
             raise ValueError
     except ValueError:
         return error_response("INVALID_PAGINATION", "قيم الترقيم غير صالحة", 422)
     kind = request.args.get("kind")
     if kind and kind not in KINDS and kind not in {"playbook", "reputation", "analysis"}:
         return error_response("INVALID_RECORD_KIND", "نوع السجل غير صالح", 422)
-    items = records_for_case(case_id, kind, limit + 1, before)
+    items = records_for_case(case_id, kind, limit + 1, before, query, focus)
+    if focus is not None and not items:
+        return error_response("RECORD_NOT_FOUND", "مرجع نتيجة التحقيق غير متاح", 404)
     return jsonify({"items": items[:limit], "next_before": items[limit - 1]["id"] if len(items) > limit else None})
 
 
@@ -554,6 +572,16 @@ def record_update(case_id: int, record_id: int):
         except (ValueError, UnicodeError) as exc:
             return error_response("INVALID_RECORD", str(exc), 422)
         serialized = canonical(payload)
+        if row["kind"] == "root_cause":
+            branch_ids = {item["id"] for item in payload.get("whys", [])}
+            linked_branches = get_db().execute(
+                "SELECT json_extract(payload, '$.why_id') AS why_id FROM autopsy_records "
+                "WHERE case_id = ? AND kind = 'corrective' AND json_extract(payload, '$.root_cause_id') = ? "
+                "AND json_extract(payload, '$.why_id') IS NOT NULL",
+                (case_id, record_id),
+            )
+            if any(link["why_id"] not in branch_ids for link in linked_branches):
+                return error_response("CAUSE_BRANCH_IN_USE", "أعد ربط الإجراء التصحيحي أو أزل ارتباطه قبل حذف فرع السبب", 409)
         version = row["version"] + 1
         get_db().execute(
             "UPDATE autopsy_records SET payload = ?, version = ?, updated_by = ?, updated_at = ? WHERE id = ?",

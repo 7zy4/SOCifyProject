@@ -32,6 +32,7 @@ autopsyLabels.reason = SOCifyLocale.text("السبب");
 autopsyLabels.address = SOCifyLocale.text("عنوان الشبكة");
 Object.assign(autopsyLabels, { handoff_to: SOCifyLocale.text("العضو البديل للمسؤوليات"), assignee: SOCifyLocale.text("المحلل المسؤول"), instructions: SOCifyLocale.text("المطلوب تحليله وتسليمه"), email: SOCifyLocale.text("البريد الإلكتروني الداخلي"), task_id: SOCifyLocale.text("المهمة المرتبطة"), decision: SOCifyLocale.text("القرار الموثق") });
 Object.assign(autopsyLabels, { previous_shift: SOCifyLocale.text("المناوبة السابقة"), responsibility: SOCifyLocale.text("مسؤولية العضو") });
+Object.assign(autopsyLabels, { root_cause_id: SOCifyLocale.text("السبب الجذري المرتبط"), why_id: SOCifyLocale.text("فرع السبب المرتبط") });
 
 function autopsySelect(name, values, current = "") {
   return node("select", { name }, values.map((value) => node("option", { value, selected: value === current, text: autopsyLabel(value) })));
@@ -102,7 +103,7 @@ function autopsyChoice(name, values, current = "", required = false) {
     }));
     expanded(matches.length > 0);
   };
-  input.addEventListener("input", () => { if (choices.some((entry) => entry.label === input.value)) close(); else show(); });
+  input.addEventListener("input", () => { if (!input.value.trim() || choices.some((entry) => entry.label === input.value)) close(); else show(); });
   input.addEventListener("keydown", (event) => {
     if (["ArrowDown", "ArrowUp"].includes(event.key)) {
       event.preventDefault();
@@ -145,9 +146,109 @@ function autopsyModal(title, content) {
   return dialog;
 }
 
+function autopsyReferenceChoice(name, source, required = false) {
+  const id = `reference-${crypto.randomUUID()}`;
+  const entry = item => ({ value: item.id, label: `${source.kind === "task" ? item.title : item.payload.conclusion.slice(0, 160)} · ${item.id}`, record: item });
+  let chosen = source.initial ? entry(source.initial) : null, options = [], cursor = null, requestId = 0, timer;
+  let lastQuery = "", retryAction;
+  const input = node("input", { name, required, autocomplete: "off", class: "search-choice", value: chosen?.label || "", role: "combobox", "aria-controls": id, "aria-expanded": "false", "aria-autocomplete": "list" });
+  const list = node("div", { id, role: "listbox", "aria-label": autopsyLabel(name) });
+  const message = node("p", { role: "status", class: "notice", hidden: true });
+  const failure = node("p", { role: "alert", class: "notice", hidden: true });
+  const retry = button(SOCifyLocale.text("إعادة المحاولة"), () => retryAction?.()); retry.hidden = true;
+  const more = button(SOCifyLocale.text("عرض المزيد"), () => load(lastQuery, cursor, true)); more.hidden = true;
+  const popup = node("div", { class: "choice-menu", hidden: true }, [list, message, failure, retry, more]);
+  const close = () => { clearTimeout(timer); popup.hidden = true; input.setAttribute("aria-expanded", "false"); };
+  const open = () => { popup.hidden = false; input.setAttribute("aria-expanded", "true"); };
+  const select = value => {
+    chosen = value;
+    input.value = value.label;
+    source.onSelect?.(value.record);
+    close(); input.focus();
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  function render() {
+    list.replaceChildren(...options.map(value => {
+      const option = node("button", { type: "button", tabindex: "-1", role: "option", "aria-selected": String(chosen?.value === value.value), text: value.label });
+      option.addEventListener("mousedown", event => event.preventDefault());
+      option.addEventListener("click", () => select(value));
+      return option;
+    }));
+  }
+  async function load(query, next = null, append = false, focusFirst = false) {
+    clearTimeout(timer);
+    const request = ++requestId;
+    lastQuery = query;
+    failure.hidden = retry.hidden = more.hidden = true;
+    message.textContent = SOCifyLocale.text("جارٍ التحميل…"); message.hidden = false;
+    list.setAttribute("aria-busy", "true"); open();
+    if (!append) { options = []; render(); }
+    retryAction = () => load(query, next, append, focusFirst);
+    try {
+      const path = source.kind === "task"
+        ? `/api/cases/${source.caseId}/tasks?${new URLSearchParams({ q: query, page: String(next || 1) })}`
+        : `/api/cases/${source.caseId}/records?${new URLSearchParams({ kind: source.kind, q: query, limit: "25", ...(next ? { before: next } : {}) })}`;
+      const data = await api(path);
+      if (request !== requestId) return;
+      const incoming = data.items.map(entry);
+      options = append ? [...options, ...incoming.filter(value => !options.some(existing => existing.value === value.value))] : incoming;
+      cursor = source.kind === "task" ? data.page * data.page_size < data.total ? data.page + 1 : null : data.next_before;
+      render(); more.hidden = !cursor;
+      message.textContent = SOCifyLocale.text("لا نتائج مطابقة"); message.hidden = options.length > 0;
+      if (focusFirst && !popup.hidden) list.querySelector("[role=option]")?.focus();
+    } catch (error) {
+      if (request !== requestId) return;
+      failure.textContent = error.message; failure.hidden = retry.hidden = false; message.hidden = true;
+    } finally { if (request === requestId) list.setAttribute("aria-busy", "false"); }
+  }
+  input.autopsyValue = () => {
+    if (!input.value.trim() && !required) return null;
+    const found = chosen?.label === input.value ? chosen : options.find(value => value.label === input.value);
+    if (!found) throw new Error(SOCifyLocale.template`اختر قيمة معروفة للحقل ${autopsyLabel(name)}`);
+    return found.value;
+  };
+  input.addEventListener("input", () => {
+    requestId++; chosen = null; source.onSelect?.(null);
+    options = []; render(); more.hidden = true;
+    clearTimeout(timer);
+    if (input.value.trim()) timer = setTimeout(() => load(input.value.trim()), 200);
+    else close();
+  });
+  input.addEventListener("keydown", event => {
+    if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+      event.preventDefault(); load(chosen?.label === input.value ? "" : input.value.trim(), null, false, true);
+    } else if (event.key === "Escape") { event.preventDefault(); close(); }
+  });
+  list.addEventListener("keydown", event => {
+    const controls = [...list.querySelectorAll("[role=option]")], index = controls.indexOf(document.activeElement);
+    if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+      event.preventDefault();
+      const next = event.key === "Home" ? 0 : event.key === "End" ? controls.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + controls.length) % controls.length;
+      controls[next]?.focus();
+    } else if (event.key === "Escape") { event.preventDefault(); close(); input.focus(); }
+  });
+  const toggle = button("⌄", () => { if (popup.hidden) { input.focus(); load(""); } else close(); });
+  toggle.className = "choice-toggle"; toggle.setAttribute("aria-label", SOCifyLocale.text("عرض الخيارات"));
+  toggle.addEventListener("mousedown", event => event.preventDefault());
+  const control = node("span", { class: "choice-control" }, [input, toggle, popup]);
+  control.addEventListener("focusout", event => { if (!control.contains(event.relatedTarget)) close(); });
+  return { control, input };
+}
+
 function autopsyForm(schema, submit, initial = {}) {
   const form = node("form", { class: "form-grid" });
   const getters = {};
+  const choiceFields = new Map();
+  form.choiceValue = key => {
+    try { return getters[key]?.(); } catch (_) { return null; }
+  };
+  form.replaceChoice = (key, choices, selected = "") => {
+    const previous = choiceFields.get(key);
+    if (!previous) return;
+    const replacement = autopsyChoice(key, choices, selected, schema[key].required);
+    previous.control.replaceWith(replacement.control);
+    choiceFields.set(key, replacement); getters[key] = replacement.input.autopsyValue;
+  };
   for (const [key, spec] of Object.entries(schema)) {
     let control;
     if (spec.whys) {
@@ -191,9 +292,13 @@ function autopsyForm(schema, submit, initial = {}) {
     if (spec.user) choices = autopsy.team.members.filter((member) => member.is_active && (!(spec.case_member || key === "owner_id") || ["admin", "soc_manager"].includes(member.role) || autopsy.current?.members.some((item) => item.user_id === member.id))).map((member) => ({ value: member.id, label: `${member.name} · ${autopsyLabel(member.role)}` }));
     if (spec.evidence) choices = (autopsy.current?.evidence || []).map((evidence) => ({ value: evidence.id, label: `${evidence.title} · ${evidence.id}` }));
     if (spec.asset) choices = (autopsy.assets || []).map((record) => ({ value: record.id, label: `${record.payload.name} · ${record.id}` }));
-    if (spec.task) choices = (autopsy.current?.tasks || []).map((task) => ({ value: task.id, label: `${task.title} · ${task.id}` }));
-    if (choices) {
+    if (spec.reference || spec.task) {
+      const choice = autopsyReferenceChoice(key, { kind: "task", caseId: autopsy.current.id, ...spec.reference }, spec.required);
+      control = choice.control;
+      getters[key] = choice.input.autopsyValue;
+    } else if (choices) {
       const choice = autopsyChoice(key, choices, initial[key], spec.required);
+      choiceFields.set(key, choice);
       control = choice.control;
       getters[key] = choice.input.autopsyValue;
     } else if (spec.timestamp) {
@@ -297,7 +402,8 @@ function autopsyRecordCard(record) {
   if (record.kind === "analysis" && (/^(email_static_triage|eml_static_v1|v[0-9]+_email_static_triage)$/.test(record.payload.method))) {
     return node("article", { class: "card record-card email-record" }, [node("h3", { text: record.payload.title }), autopsyEmailView(record.payload), node("p", { text: formatTime(record.updated_at) })]);
   }
-  const values = node("dl");
+  const rows = node("tbody");
+  const values = node("table", { class: "alert-property-table", "aria-label": record.payload.title || record.payload.name || autopsyLabel(record.kind) }, rows);
   Object.entries(record.payload).forEach(([key, value]) => {
     if (value === null || value === "") return;
     let display = Array.isArray(value) ? value.map((item, index) => {
@@ -308,27 +414,70 @@ function autopsyRecordCard(record) {
       return `${index + 1}. ${item.question}: ${item.answer || ""} · ${assessment || ""}${item.evidence_id ? SOCifyLocale.template` · دليل ${item.evidence_id}` : ""}${item.parent_id && parent >= 0 ? SOCifyLocale.template` · مرتبط بالسؤال ${parent + 1}` : ""}`;
     }).join("\n") : typeof value === "object" ? JSON.stringify(value) : autopsyLabel(value);
     if (key.endsWith("_at") || key === "event_time") display = formatTime(value);
-    values.append(node("dt", { text: autopsyLabel(key) }), node("dd", { text: display }));
+    if (record.kind === "corrective" && key === "status" && value === "open") display = SOCifyLocale.text("مفتوح");
+    let content = node("td", {}, node("span", { dir: "auto", text: display }));
+    if (autopsy.catalog.record_schemas[record.kind]?.[key]?.user) content = node("td", { "data-user-content": true, text: autopsy.team.members.find(member => member.id === value)?.name || SOCifyLocale.text("المستخدم غير متاح") });
+    if (key === "task_id") content = node("td", {}, [node("a", { href: `/cases/${autopsy.current.id}?tab=summary#case-task-${value}`, text: SOCifyLocale.text("فتح المهمة") })]);
+    if (key === "root_cause_id" || key === "why_id") {
+      const caseId = autopsy.current.id;
+      content = node("td", {}, [autopsyAction(SOCifyLocale.text(key === "why_id" ? "عرض فرع السبب" : "عرض السبب الجذري"), async () => {
+        const linked = (await api(`/api/cases/${caseId}/records?kind=root_cause&focus=${record.payload.root_cause_id}`)).items[0];
+        const branches = linked.payload.whys || [];
+        const selected = key === "why_id" ? branches.filter(item => item.id === value) : branches;
+        if (key === "why_id" && !selected.length) throw new Error(SOCifyLocale.text("فرع السبب المرتبط غير متاح"));
+        const details = node("div", {}, [node("p", { dir: "auto", text: linked.payload.conclusion }), ...selected.map(item => node("section", {}, [
+          node("h3", { dir: "auto", text: item.question }), node("p", { dir: "auto", text: item.answer }), node("p", { text: autopsyLabel(item.assessment || "unverified") }),
+        ]))]);
+        autopsyModal(SOCifyLocale.text(key === "why_id" ? "فرع السبب المرتبط" : "السبب الجذري المرتبط"), details);
+      })]);
+    }
+    rows.append(node("tr", {}, [node("th", { scope: "row", text: autopsyLabel(key) }), content]));
   });
   const card = node("article", { class: "card record-card" }, [node("h3", { text: record.payload.title || record.payload.name || autopsyLabel(record.kind) }), values, node("p", { text: formatTime(record.updated_at) })]);
-  if (autopsy.current.can_update && autopsy.current.status !== "closed" && autopsy.catalog.record_schemas[record.kind]) card.append(button(SOCifyLocale.text("تعديل"), () => autopsyEditRecord(record.kind, record)));
+  if (autopsy.current.can_update && (autopsy.current.status !== "closed" || record.kind === "corrective") && autopsy.catalog.record_schemas[record.kind]) card.append(button(SOCifyLocale.text("تعديل"), () => autopsyEditRecord(record.kind, record)));
   if (record.kind === "analysis" && record.payload.analysis_type === "local_detection" && record.payload.next_after_id && autopsy.current.can_update && autopsy.current.status !== "closed") card.append(autopsyAction(SOCifyLocale.text("استكمال فحص الدفعة التالية"), async () => { await api(`/api/cases/${autopsy.current.id}/detection`, { method: "POST", body: { version: autopsy.current.version, mode: record.payload.mode, after_id: record.payload.next_after_id } }); await autopsyCase(autopsy.current.id); }));
   return card;
 }
 
 async function autopsyEditRecord(kind, record = null) {
   const schema = { ...autopsy.catalog.record_schemas[kind], evidence_id: { evidence: true } };
-  if (kind === "corrective") {
-    let causes = (await api(`/api/cases/${autopsy.current.id}/records?kind=root_cause&limit=100`)).items;
-    if (record?.payload.root_cause_id && !causes.some((item) => item.id === record.payload.root_cause_id)) {
-      const selected = (await api(`/api/cases/${autopsy.current.id}/records?kind=root_cause&limit=1&before=${record.payload.root_cause_id + 1}`)).items;
-      if (selected[0]?.id === record.payload.root_cause_id) causes = [...causes, selected[0]];
+  let cause = null;
+  try {
+    if (record?.payload.task_id) {
+      const data = await api(`/api/cases/${autopsy.current.id}/tasks?focus=${record.payload.task_id}`);
+      schema.task_id = { ...schema.task_id, reference: { initial: data.items.find(item => item.id === record.payload.task_id) } };
     }
-    schema.root_cause_id = { choices: causes.map((item) => ({ value: item.id, label: `${item.id} · ${item.payload.conclusion.slice(0, 80)}` })) };
-    schema.why_id = { choices: causes.flatMap((item) => (item.payload.whys || []).map((why) => ({ value: why.id, label: `${item.id} · ${why.question.slice(0, 80)} · ${why.id}` }))) };
+    if (kind === "corrective" && record?.payload.root_cause_id) {
+      cause = (await api(`/api/cases/${autopsy.current.id}/records?kind=root_cause&focus=${record.payload.root_cause_id}`)).items[0];
+    }
+  } catch (error) {
+    let recovery;
+    const retry = button(SOCifyLocale.text("إعادة المحاولة"), () => { recovery.close(); autopsyEditRecord(kind, record).catch(handleError); });
+    recovery = autopsyModal(SOCifyLocale.text("تعذر تحميل المرجع المرتبط"), node("div", {}, [node("p", { role: "alert", class: "notice", text: error.message }), retry]));
+    return;
+  }
+  let form;
+  if (kind === "corrective") {
+    const branches = item => {
+      const choices = (item?.payload.whys || []).map((why, index) => ({ value: why.id, label: `${index + 1}. ${why.question}` }));
+      const previous = record?.payload;
+      if (item && item.id === previous?.root_cause_id && previous.why_id && !choices.some(choice => choice.value === previous.why_id)) {
+        choices.push({ value: previous.why_id, label: SOCifyLocale.text("فرع السبب المرتبط غير متاح") });
+      }
+      return choices;
+    };
+    let selectedCause = cause?.id;
+    const selectedBranches = new Map(cause ? [[cause.id, record.payload.why_id || ""]] : []);
+    schema.root_cause_id = { reference: { kind: "root_cause", initial: cause, onSelect: item => {
+      if (selectedCause) selectedBranches.set(selectedCause, form.choiceValue("why_id") || "");
+      selectedCause = item?.id;
+      form.replaceChoice("why_id", branches(item), selectedBranches.get(selectedCause) || "");
+    } } };
+    schema.why_id = { choices: branches(cause) };
+    schema.status = { ...schema.status, choices: schema.status.choices.map(value => ({ value, label: value === "open" ? SOCifyLocale.text("مفتوح") : autopsyLabel(value) })) };
   }
   let dialog;
-  const form = autopsyForm(schema, async (payload) => {
+  form = autopsyForm(schema, async (payload) => {
     await api(`/api/cases/${autopsy.current.id}/records/${record ? record.id : kind}`, { method: record ? "PATCH" : "POST", body: record ? { version: record.version, payload } : payload });
     dialog.close();
     await autopsyCase(autopsy.current.id);
@@ -347,7 +496,7 @@ async function autopsyRecordPanel(kind) {
     catch (error) { handleError(error); } finally { more.disabled = false; }
   });
   more.hidden = !cursor;
-  return panel(autopsyLabel(kind), node("div", { class: "panel-body" }, [autopsy.current.can_update && autopsy.current.status !== "closed" ? button(SOCifyLocale.template`إضافة ${autopsyLabel(kind)}`, () => autopsyEditRecord(kind).catch(handleError), "primary") : null, content, more]), true);
+  return panel(autopsyLabel(kind), node("div", { class: "panel-body" }, [autopsy.current.can_update && (autopsy.current.status !== "closed" || kind === "corrective") ? button(SOCifyLocale.template`إضافة ${autopsyLabel(kind)}`, () => autopsyEditRecord(kind).catch(handleError), "primary") : null, content, more]), true);
 }
 
 async function autopsyCaseTasks(current) {

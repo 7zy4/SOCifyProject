@@ -13,6 +13,17 @@
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
   document.cookie = `socify-language=${language}; Path=/; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
   const english = {
+  "السبب الجذري المرتبط": "Linked root cause",
+  "فرع السبب المرتبط": "Linked cause branch",
+  "عرض فرع السبب": "View cause branch",
+  "عرض السبب الجذري": "View root cause",
+  "فرع السبب المرتبط غير متاح": "The linked cause branch is unavailable",
+  "المستخدم غير متاح": "User unavailable",
+  "تعذر تحميل المرجع المرتبط": "The linked reference could not be loaded",
+  "مرجع نتيجة التحقيق غير متاح": "The investigation reference is unavailable",
+  "لا نتائج مطابقة": "No matching results",
+    "مفتوح": "Open",
+    "أعد ربط الإجراء التصحيحي أو أزل ارتباطه قبل حذف فرع السبب": "Relink or unlink the corrective action before deleting its cause branch",
   "بحث مهام القضية": "Search case tasks",
   "عرض مهام القضية": "Show case tasks",
   "المهمة غير متاحة": "The task is unavailable",

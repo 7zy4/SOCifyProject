@@ -3395,6 +3395,12 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Case or focused record unavailable"
+          },
+          "422": {
+            "description": "Invalid filter or duplicate query parameter"
           }
         },
         "parameters": [
@@ -3405,8 +3411,53 @@
             "schema": {
               "type": "integer"
             }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9223372036854775807
+            }
+          },
+          {
+            "name": "focus",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9223372036854775807
+            }
           }
-        ]
+        ],
+        "summary": "Find accessible investigation records and resolve an exact reference",
+        "description": "Newest first with next_before cursor. Literal search matches the record title, conclusion or name. Private notes remain restricted to their author and managers. Exact references obey the same case, approval, investigation selection, batch and record visibility checks as the list."
       }
     },
     "/api/cases/{case_id}/records/{record_id}": {
@@ -3424,6 +3475,9 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "Stale record version, closed case, or cause branch still in use"
           }
         },
         "parameters": [
@@ -3454,7 +3508,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Updates an accessible record using its current version. Closed cases allow corrective follow-up only. A root cause branch linked to a corrective action must be relinked or unlinked before removal."
       }
     },
     "/api/cases/{case_id}/records/{kind}": {

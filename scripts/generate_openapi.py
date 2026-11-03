@@ -100,6 +100,29 @@ def generate() -> dict[str, object]:
                         "422": {"description": "Invalid, duplicate or unknown filter"},
                     }
                 )
+            elif path == "/api/cases/{case_id}/records" and method == "GET":
+                operation["summary"] = "Find accessible investigation records and resolve an exact reference"
+                operation["parameters"] = parameters + [
+                    {"name": "kind", "in": "query", "schema": {"type": "string"}},
+                    {"name": "q", "in": "query", "schema": {"type": "string", "maxLength": 200}},
+                    {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50}},
+                    {"name": "before", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}},
+                    {"name": "focus", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}},
+                ]
+                operation["description"] = (
+                    "Newest first with next_before cursor. Literal search matches the record title, conclusion or name. "
+                    "Private notes remain restricted to their author and managers. Exact references obey the same case, "
+                    "approval, investigation selection, batch and record visibility checks as the list."
+                )
+                operation["responses"].update(
+                    {"404": {"description": "Case or focused record unavailable"}, "422": {"description": "Invalid filter or duplicate query parameter"}}
+                )
+            elif path == "/api/cases/{case_id}/records/{record_id}" and method == "PATCH":
+                operation["description"] = (
+                    "Updates an accessible record using its current version. Closed cases allow corrective follow-up only. "
+                    "A root cause branch linked to a corrective action must be relinked or unlinked before removal."
+                )
+                operation["responses"]["409"] = {"description": "Stale record version, closed case, or cause branch still in use"}
             elif path == "/api/team/assignments" and method == "POST":
                 operation["description"] = (
                     "Assigns a completed batch in an open case to an active operational investigator. The recipient must have cases.read, cases.update and events.read, and access to the batch. Restricted access is never granted implicitly. Rejection creates no assignment or task."
