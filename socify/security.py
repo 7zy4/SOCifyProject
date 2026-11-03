@@ -2,23 +2,21 @@ import base64
 import functools
 import hashlib
 import hmac
-import ipaddress
 import json
 import re
 import secrets
-import socket
 import sqlite3
 import struct
 import time
 from collections.abc import Callable
 from datetime import timedelta
 from typing import Any, TypeVar, cast
-from urllib.parse import urlparse
 
 from cryptography.fernet import Fernet, InvalidToken
 from flask import current_app, g, jsonify, redirect, request, session, url_for
 
 from .db import get_db
+from .outbound import resolve_external_target
 from .timeutils import iso_now, utc_now
 from .validation import ValidationError
 
@@ -356,22 +354,10 @@ def password_error(password: object) -> str | None:
 
 
 def safe_external_endpoint(endpoint: str, allowed_hosts: set[str]) -> tuple[bool, str]:
-    parsed = urlparse(endpoint)
-    if parsed.scheme not in {"https"} or not parsed.hostname:
-        return False, "يلزم عنوان HTTPS صالح"
-    if parsed.username is not None or parsed.password is not None:
-        return False, "بيانات الاعتماد غير مسموحة داخل عنوان المصدر"
-    hostname = parsed.hostname.lower().rstrip(".")
-    if hostname not in allowed_hosts:
-        return False, "المضيف غير موجود في قائمة السماح"
     try:
-        addresses = {item[4][0] for item in socket.getaddrinfo(hostname, parsed.port or 443, type=socket.SOCK_STREAM)}
-    except OSError:
-        return False, "تعذر حل اسم المضيف"
-    for address in addresses:
-        ip = ipaddress.ip_address(address)
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
-            return False, "عنوان المضيف محجوب بواسطة سياسة الشبكة"
+        resolve_external_target(endpoint, allowed_hosts)
+    except ValidationError as exc:
+        return False, exc.public_message
     return True, "ok"
 
 

@@ -13,6 +13,14 @@
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
   document.cookie = `socify-language=${language}; Path=/; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
   const english = {
+  "انقطع رد المصدر قبل اكتماله؛ أعد المحاولة": "The source response ended before completion; try again",
+  "المصدر غير مصرح للسحب؛ راجع إعدادات الاتصال": "The source is not approved for retrieval; review its connection settings",
+  "يلزم عنوان HTTPS صالح": "Enter a valid HTTPS address",
+  "بيانات الاعتماد غير مسموحة داخل عنوان المصدر": "Credentials cannot be included in the source address",
+  "المضيف غير موجود في قائمة السماح": "The source host is not approved",
+  "تعذر حل اسم المضيف": "The source hostname could not be resolved",
+  "عنوان المضيف محجوب بواسطة سياسة الشبكة": "The source address is blocked by network policy",
+  "تعذر سحب السجلات من المصدر؛ تحقق من الاتصال والصلاحيات": "Could not retrieve source logs; check the connection and access permissions",
   "التحقق من الدليل الأساسي": "Validate primary evidence",
   "توثيق قرار الاستجابة": "Document response decision",
   "معرف إعادة المحاولة أو بيانات القضية غير صالحة": "The retry identifier or case data is invalid",

@@ -6,7 +6,6 @@ import os
 import secrets
 import sqlite3
 import urllib.error
-import urllib.request
 from typing import Any
 
 from flask import Blueprint, current_app, jsonify, request
@@ -15,6 +14,7 @@ from .audit import record_audit
 from .db import get_db, inserted_id, transaction
 from .events import ingest_event
 from .ingestion import _attach_import_result, parse_records
+from .outbound import fetch_source_bytes
 from .schema import public_id
 from .security import (
     actor_id,
@@ -35,20 +35,9 @@ MAX_REMOTE_PULL_BYTES = 5 * 1024 * 1024
 MAX_INGEST_BATCH_RECORDS = 5000
 
 
-class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
-        raise urllib.error.HTTPError(req.full_url, code, "Redirects are disabled for SIEM pull connectors", headers, fp)
-
-
 def _fetch_remote_events_bytes(url: str, headers: dict[str, str]) -> tuple[bytes, str]:
-    opener = urllib.request.build_opener(_NoRedirectHandler)
-    req = urllib.request.Request(url, headers={"Accept": "application/json, text/plain", **headers}, method="GET")  # noqa: S310
-    with opener.open(req, timeout=5) as resp:  # nosec B310
-        body = resp.read(MAX_REMOTE_PULL_BYTES + 1)
-        if len(body) > MAX_REMOTE_PULL_BYTES:
-            raise ValidationError("Remote SIEM response exceeds 5 MiB limit")
-        content_type = str(resp.headers.get("Content-Type", "application/octet-stream"))
-        return body, content_type
+    allowlist = {item.strip().lower() for item in os.environ.get("SOCIFY_SOURCE_ALLOWLIST", "").split(",") if item.strip()}
+    return fetch_source_bytes(url, headers, allowlist, MAX_REMOTE_PULL_BYTES)
 
 
 def _source_view(row: sqlite3.Row | None) -> dict[str, Any]:
@@ -537,7 +526,7 @@ def _execute_source_pull(row: sqlite3.Row, target_case_id: int | None) -> tuple[
         return error_response("SOURCE_PULL_UNSUPPORTED", "السحب المباشر متاح لمصادر HTTP المزودة بعنوان صالح", 422)
     allowlist = {item.strip().lower() for item in os.environ.get("SOCIFY_SOURCE_ALLOWLIST", "").split(",") if item.strip()}
     if not allowlist:
-        return error_response("SOURCE_ALLOWLIST_REQUIRED", "حدد SOCIFY_SOURCE_ALLOWLIST للسماح بالسحب المباشر من خادم SIEM", 422)
+        return error_response("SOURCE_ALLOWLIST_REQUIRED", "المصدر غير مصرح للسحب؛ راجع إعدادات الاتصال", 422)
     safe, reason = safe_external_endpoint(row["endpoint"], allowlist)
     if not safe:
         return error_response("UNSAFE_SOURCE_ENDPOINT", reason, 422)
