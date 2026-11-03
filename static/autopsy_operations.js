@@ -15,6 +15,41 @@ async function autopsyReadJSON(input, maximum = 2 * 1024 * 1024) {
   return JSON.parse(await file.text());
 }
 
+function autopsyIntelligenceVerdict(value) {
+  return SOCifyLocale.text({ malicious: "خبيث", benign: "حميد", suspicious: "مشتبه", unknown: "غير معروف" }[value] || "غير معروف");
+}
+
+function autopsyIntelligenceStatus(value) {
+  return SOCifyLocale.text({ matched: "تطابق مع المصادر", no_match: "لا يوجد تطابق", not_configured: "لا توجد مصادر مفعلة" }[value] || "غير معروف");
+}
+
+function autopsyEnrichmentDetails(result) {
+  const t = SOCifyLocale.text;
+  const value = item => node("bdi", { dir: "auto", "data-user-content": "true", text: item ?? "—" });
+  const facts = (caption, rows) => node("table", { class: "alert-property-table" }, [node("caption", { text: caption }), node("tbody", {}, rows.map(([label, item]) => node("tr", {}, [node("th", { scope: "row", text: label }), node("td", {}, value(item))])))]);
+  const confidence = item => item === null || item === undefined ? "—" : new Intl.NumberFormat(SOCifyLocale.language, { style: "percent" }).format(item / 100);
+  const matches = result.matches || [];
+  const root = node("div", { class: "enrichment-detail" }, facts(t("نتيجة الفحص"), [
+    [t("المؤشر"), result.value], [t("الحالة"), autopsyIntelligenceStatus(result.status)],
+    [t("تصنيف المصدر"), autopsyIntelligenceVerdict(result.verdict)], [t("الثقة"), confidence(result.confidence)],
+    [t("وقت الفحص"), result.checked_at ? formatTime(result.checked_at) : "—"]
+  ]));
+  if (new Set(matches.map(item => item.verdict).filter(item => item !== "unknown")).size > 1) root.append(node("p", { class: "notice", text: t("نتائج متعارضة") }));
+  for (const match of matches) {
+    const rows = [[t("المصدر"), match.source], [t("المؤشر"), match.value], [t("تصنيف المصدر"), autopsyIntelligenceVerdict(match.verdict)], [t("الثقة"), confidence(match.confidence)], [t("الرخصة وحق الاستخدام"), match.license]];
+    if (match.country) rows.push([t("الدولة"), match.country]);
+    if (match.asn) rows.push(["ASN", match.asn]);
+    if (match.valid_from) rows.push([t("بدء صلاحية المؤشر"), formatTime(match.valid_from)]);
+    if (match.valid_until) rows.push([t("انتهاء صلاحية المؤشر"), formatTime(match.valid_until)]);
+    if (match.expires_at) rows.push([t("انتهاء صلاحية المصدر"), formatTime(match.expires_at)]);
+    if (match.notes) rows.push([t("ملاحظة"), match.notes]);
+    root.append(facts(match.name, rows));
+    if (match.sha256) root.append(node("details", {}, [node("summary", { text: t("بصمة المصدر") }), node("p", {}, value(match.sha256))]));
+  }
+  if (result.matches_truncated) root.append(node("p", { class: "notice", text: t("تُعرض أول 100 نتيجة مطابقة") }));
+  return root;
+}
+
 Object.assign(autopsyLabels, { source: SOCifyLocale.text("المصدر"), license: SOCifyLocale.text("الرخصة وحق الاستخدام"), version: SOCifyLocale.text("الإصدار"), format: SOCifyLocale.text("الصيغة"), minutes: SOCifyLocale.text("ميزانية SLA بالدقائق"), mode: SOCifyLocale.text("تقويم الاحتساب"), timezone: SOCifyLocale.text("المنطقة الزمنية"), start_hour: SOCifyLocale.text("ساعة بدء العمل"), end_hour: SOCifyLocale.text("ساعة انتهاء العمل"), weekdays: SOCifyLocale.text("أيام العمل"), mon_fri: SOCifyLocale.text("الاثنين إلى الجمعة"), sun_thu: SOCifyLocale.text("الأحد إلى الخميس"), "24x7": SOCifyLocale.text("كل ساعات الأسبوع"), business: SOCifyLocale.text("ساعات العمل"), recipe_id: SOCifyLocale.text("وصفة الجمع"), collector_id: SOCifyLocale.text("الجامع المخول"), tool: SOCifyLocale.text("أداة الجمع وإصدارها"), collected_at: SOCifyLocale.text("وقت الجمع"), executive_summary: SOCifyLocale.text("الملخص التنفيذي المراجع"), lessons: SOCifyLocale.text("الدروس والتوصيات"), override_reason: SOCifyLocale.text("سبب استثناء المراجعة المستقلة للمدير"), unverified: SOCifyLocale.text("لم يُتحقق منه"), group: SOCifyLocale.text("مجموعة التنبيهات"), suppressed_until: SOCifyLocale.text("إخفاء الإشعار حتى") });
 
 window.SOCifyAutopsy.library = async () => {
@@ -83,7 +118,7 @@ window.SOCifyAutopsy.localDetection = async (caseId) => {
     if(nav.childNodes.length)root.append(nav);
   };
   root.append(linkedButton(SOCifyLocale.text("مكتبة المصادر والقواعد"), "/analysis-library"));
-  root.append(table([{ label: SOCifyLocale.text("القيمة"), value: "value" }, { label: SOCifyLocale.text("النوع"), value: "type" }, { label: SOCifyLocale.text("السجلات الفعالة"), value: "occurrences" }, { label: SOCifyLocale.text("نتيجة آخر فحص"), value: (row) => `${row.enrichment.status} · ${row.enrichment.verdict}` }, { label: SOCifyLocale.text("المصدر والتحقق"), value: (row) => autopsyAction(SOCifyLocale.text("تفاصيل الإثراء"), async () => { const content = node("div", {}, node("pre", { text: JSON.stringify(row.enrichment, null, 2) })); if (autopsy.current.can_update && autopsy.current.status !== "closed") content.append(autopsyAction(SOCifyLocale.text("إثراء محلي بالإصدارات الحالية"), async () => { await api(base + `/observables/${row.id}/enrich`, { method: "POST", body: {} }); await autopsyCase(caseId); })); autopsyModal(SOCifyLocale.text("مصدر نتيجة الإثراء وحدودها"), content); }) }], observables.items));
+  root.append(table([{ label: SOCifyLocale.text("القيمة"), value: "value" }, { label: SOCifyLocale.text("النوع"), value: "type" }, { label: SOCifyLocale.text("السجلات الفعالة"), value: "occurrences" }, { label: SOCifyLocale.text("نتيجة آخر فحص"), value: (row) => `${autopsyIntelligenceStatus(row.enrichment.status)} · ${autopsyIntelligenceVerdict(row.enrichment.verdict)}` }, { label: SOCifyLocale.text("المصدر والتحقق"), value: (row) => autopsyAction(SOCifyLocale.text("تفاصيل الإثراء"), async () => { const content = autopsyEnrichmentDetails(row.enrichment); if (autopsy.current.can_update && autopsy.current.status !== "closed") content.append(autopsyAction(SOCifyLocale.text("إثراء محلي بالإصدارات الحالية"), async () => { await api(base + `/observables/${row.id}/enrich`, { method: "POST", body: {} }); await autopsyCase(caseId); })); autopsyModal(SOCifyLocale.text("مصدر نتيجة الإثراء وحدودها"), content); }) }], observables.items));
   paging("observables_page",observables);
   if (autopsy.current.can_update && autopsy.current.status !== "closed") {
     root.append(autopsyForm({ mode: { required: true, choices: ["rules", "anomaly"] }, after_id: { integer: true, min: 0, max: Number.MAX_SAFE_INTEGER } }, async (body) => { const job = await api(base + "/detection", { method: "POST", body: { ...body, after_id: body.after_id || 0, version: autopsy.current.version } }); autopsyModal(SOCifyLocale.text("تحليل محلي في الطابور"), node("div", {}, [node("p", { text: SOCifyLocale.template`العمل ${job.id} · حد الدفعة 1000 سجل. نتائج الشذوذ تحتاج 20 سجلًا سابقًا صالحًا للـbaseline. استخدم next_after_id من النتيجة لاستكمال النطاق.` }), autopsyAction(SOCifyLocale.text("تحديث حالة العمل"), async () => { const status = await api(base + `/jobs/${job.id}`); autopsyModal(SOCifyLocale.text("حالة التحليل"), node("pre", { text: JSON.stringify(status, null, 2) })); }), linkedButton(SOCifyLocale.text("نتائج التحليل داخل القضية"), `/cases/${caseId}?tab=analysis`)])); }));

@@ -32,7 +32,7 @@ def test_soc_triage_case_tools_email_and_immediate_report_permissions(app, datab
             page.get_by_label("Password", exact=True).fill(DEMO_LOGIN_VALUE)
             page.get_by_role("button", name="Sign in", exact=True).click()
             page.wait_for_url("**/cases")
-            page.wait_for_function("() => document.querySelector('#workspace').getAttribute('aria-busy') === 'false'")
+            page.wait_for_function("() => document.querySelector('#workspace')?.getAttribute('aria-busy') === 'false'")
             case = page.evaluate("""async () => {
                 const c = await api('/api/cases',{method:'POST',body:{title:'Identity gateway access review',reason:'alert_review',objective:'Document retained evidence and response decisions.',severity:'high'}});
                 await api(`/api/cases/${c.id}/records/asset`,{method:'POST',body:{name:'Identity gateway',type:'identity_provider',role:'defender',address:'192.0.2.20',operating_system:'Linux',assessment:'suspected'}});
@@ -89,7 +89,9 @@ def test_soc_triage_case_tools_email_and_immediate_report_permissions(app, datab
             page.goto(base + "/monitoring")
             page.screenshot(path=str(output / "monitoring-en-light.png"), full_page=False)
             page.locator("[data-language-toggle]").click()
-            page.wait_for_function("() => document.documentElement.lang === 'ar' && document.querySelector('#workspace').getAttribute('aria-busy') === 'false'")
+            page.wait_for_function(
+                "() => document.documentElement.lang === 'ar' && document.querySelector('#workspace')?.getAttribute('aria-busy') === 'false'"
+            )
             page.locator('[data-theme-option="dark"]').click()
             assert_accessible(page)
             page.screenshot(path=str(output / "monitoring-ar-dark.png"), full_page=False)

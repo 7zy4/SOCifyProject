@@ -165,6 +165,7 @@
   async function watchlistPanel(caseId) {
     const wl = await api("/api/watchlist");
     const body = node("div", { class: "panel-body" });
+    const entries = node("div");
     if (permission("cases.update")) {
       const typeSel = node("select", { name: "indicator_type" }, [
         ["email", "Email"],
@@ -194,21 +195,22 @@
         } catch (error) { handleError(error); }
       });
       body.append(addForm);
-      if (caseId && autopsy.current?.can_update && autopsy.current?.status !== "closed") {
+      if (caseId && autopsy.current?.full_case_access !== false && autopsy.current?.can_update && autopsy.current?.status !== "closed") {
         const scanNotice = node("span", { "aria-live": "polite" });
         const scanBtn = button(t("فحص سجلات القضية مقابل قائمة المراقبة الآن"), async () => {
           scanBtn.disabled = true;
           try {
             const res = await api(`/api/cases/${caseId}/watchlist-scan`, { method: "POST", body: {} });
             scanNotice.textContent = ` · ${t("تم فحص")} ${number(res.events_scanned)} — ${t("تنبيهات جديدة")}: ${number(res.alerts_created)}`;
+            renderEntries((await api("/api/watchlist")).items);
           } catch (error) { handleError(error); }
           finally { scanBtn.disabled = false; }
         }, "ghost");
         body.append(node("div", { class: "action-row" }, [scanBtn, scanNotice]));
       }
     }
-    if (wl.items.length) {
-      body.append(table([
+    function renderEntries(items) {
+      if (items.length) entries.replaceChildren(table([
         { label: t("النوع"), value: item => item.indicator_type.toUpperCase() },
         { label: t("القيمة"), value: item => node("bdi", { dir: "ltr", "data-user-content": "true", text: item.value }) },
         { label: t("الخطورة"), value: item => autopsyLabel(item.severity) },
@@ -228,10 +230,11 @@
             }, "ghost"),
           ]) : "—",
         },
-      ], wl.items));
-    } else {
-      body.append(emptyState(t("قائمة المراقبة فارغة"),null));
+      ], items));
+      else entries.replaceChildren(emptyState(t("قائمة المراقبة فارغة"),null));
     }
+    renderEntries(wl.items);
+    body.append(entries);
     return panel(t("قائمة مراقبة الإيميلات والـ IPs المشبوهة (Watchlist)"), body, true);
   }
   async function managerEscalatedReportsPanel() {
@@ -331,10 +334,10 @@
     const root=node("div",{class:"panel-body"});
     if(data.items.length)root.append(table([
       {label:t("القيمة"),value:"value"},{label:t("النوع"),value:"type"},{label:t("السجلات المرتبطة"),value:"occurrences"},
-      {label:t("نتيجة الإثراء"),value:item=>autopsyLabel(item.enrichment.verdict||"unknown")},
+      {label:t("نتيجة الإثراء"),value:item=>autopsyIntelligenceVerdict(item.enrichment.verdict)},
       {label:t("مراقبة"),value:item=>["ip","domain","url","email","sha256"].includes(item.type)?quickWatchlistBtn(item.type,item.value,caseId,"Case observable"):"—"},
       {label:t("التفاصيل"),value:item=>button(t("تفاصيل الإثراء"),()=>{
-        const content=node("div",{},node("pre",{"data-user-content":"true",text:JSON.stringify(item.enrichment,null,2)}));
+        const content=autopsyEnrichmentDetails(item.enrichment);
         if(autopsy.current.can_update&&autopsy.current.status!=="closed")content.append(autopsyAction(t("إثراء محلي بالإصدارات الحالية"),async()=>{await api(`/api/cases/${caseId}/observables/${item.id}/enrich`,{method:"POST",body:{}});location.reload();}));
         autopsyModal(t("مصدر نتيجة الإثراء وحدودها"),content);
       })}
@@ -354,11 +357,12 @@
     if(version!==requestVersion)return;
     const root=node("div",{class:"tool-view"},pageHead(...names[section]));
     if (current && window.SOCifyWorkspace?.intake(current)) return;
+    autopsy.current=current;
     root.append(await chooseCase(section,current));
     if(section==="threat-intel")root.append(await watchlistPanel(current?.id));
     if(section==="reports")root.append(await managerEscalatedReportsPanel());
     if(!current){root.append(emptyState(t("اختر قضية لبدء العمل"),null));finish(root);return;}
-    autopsy.current=current;bindCase(current);
+    bindCase(current);
     if(current.full_case_access===false&&section!=="log-management"){
       root.append(emptyState(t("هذه الأداة تحتاج نطاق القضية الكامل"),null,[linkedButton(t("إدارة السجلات"),url("/log-management",{case_id:current.id}))]));finish(root);return;
     }
