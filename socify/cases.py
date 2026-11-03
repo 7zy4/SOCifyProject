@@ -1079,11 +1079,26 @@ def update_task(case_id: int, task_id: int):
         from .teams import update_assignment_status
 
         return update_assignment_status(assignment["id"], status, data.get("expected_status") if isinstance(data, dict) else None)
-    completed_at = iso_now() if status in {"completed", "reviewed"} else None
-    completed_by = actor_id() if completed_at else None
-    get_db().execute("UPDATE case_tasks SET status = ?, completed_by = ?, completed_at = ? WHERE id = ?", (status, completed_by, completed_at, task_id))
-    _history(get_db(), case_id, "task_updated", task["status"], status)
-    return jsonify({"id": task_id, "status": status})
+    with transaction():
+        case = _case_row(case_id)
+        if not case:
+            return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
+        if case["status"] == "closed":
+            return error_response("CASE_CLOSED", "المهام مقفلة بعد إغلاق القضية", 409)
+        task = get_db().execute("SELECT * FROM case_tasks WHERE id = ? AND case_id = ?", (task_id, case_id)).fetchone()
+        if not task:
+            return error_response("INVALID_TASK_UPDATE", "المهمة أو حالتها غير صالحة", 422)
+        if status == task["status"]:
+            return jsonify({"id": task_id, "status": status, "updated": False, "case_version_before": case["version"], "case_version": case["version"]})
+        expected = data.get("expected_status") if isinstance(data, dict) else None
+        if expected is not None and expected != task["status"]:
+            return error_response("TASK_CHANGED", "تغيرت المهمة. حدّث القائمة قبل المتابعة", 409)
+        completed_at = iso_now() if status in {"completed", "reviewed"} else None
+        completed_by = actor_id() if completed_at else None
+        get_db().execute("UPDATE case_tasks SET status = ?, completed_by = ?, completed_at = ? WHERE id = ?", (status, completed_by, completed_at, task_id))
+        _history(get_db(), case_id, "task_updated", task["status"], status)
+        version = get_db().execute("SELECT version FROM incident_cases WHERE id=?", (case_id,)).fetchone()[0]
+        return jsonify({"id": task_id, "status": status, "updated": True, "case_version_before": case["version"], "case_version": version})
 
 
 def _report_payload(case_id: int) -> dict[str, Any]:

@@ -7,6 +7,7 @@ import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 from conftest import DEMO_LOGIN_VALUE
@@ -59,7 +60,9 @@ class ReviewJourney:
             workspace = self.page.locator("#workspace")
             if not self.pending and time.monotonic() - self.last_request > 0.3 and (not workspace.count() or workspace.get_attribute("aria-busy") == "false"):
                 return
-        raise AssertionError("The interface did not finish loading")
+        pending = sorted((request.method, urlsplit(request.url).path, request.resource_type) for request in self.pending)
+        busy = workspace.get_attribute("aria-busy") if workspace.count() else None
+        raise AssertionError(f"The interface did not finish loading: aria-busy={busy!r}; pending={pending!r}")
 
     def click(self, role, name, within=None):
         self.steps.append({"action": "activate", "label": name})

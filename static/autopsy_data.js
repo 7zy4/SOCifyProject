@@ -186,7 +186,7 @@ function autopsySiemConnectorPanel(caseId, connectors) {
     if (permission("sources.manage")) cols.push({ label: SOCifyLocale.text("الإجراءات"), value: (item) => autopsySourceActions(caseId, item) });
     body.append(table(cols, items));
   }
-  return panel(SOCifyLocale.text("ربط SIEM مباشر بالقضية"), body, Boolean(items.length));
+  return body.childElementCount ? panel(SOCifyLocale.text("ربط SIEM مباشر بالقضية"), body, Boolean(items.length)) : null;
 }
 
 async function autopsyLogsPanel(caseId) {
@@ -205,7 +205,8 @@ async function autopsyLogsPanel(caseId) {
     ]));
   }
   if (autopsy.current.can_update && autopsy.current.status !== "closed") root.append(panel(SOCifyLocale.text("استيراد مرتبط بالقضية"), node("div", { class: "panel-body" }, autopsyImportForm(caseId)), true));
-  root.append(autopsySiemConnectorPanel(caseId, connectors));
+  const connectorPanel = autopsySiemConnectorPanel(caseId, connectors);
+  if (connectorPanel) root.append(connectorPanel);
   const jobColumns = [{ label: SOCifyLocale.text("الملف"), value: (job) => job.original_filename || job.filename }, { label: SOCifyLocale.text("الحالة"), value: (job) => autopsyImportStatus(job.status) }, { label: SOCifyLocale.text("مقبول"), value: "accepted" }, { label: SOCifyLocale.text("مرفوض"), value: "rejected" }, { label: SOCifyLocale.text("متكرر"), value: "skipped" }, { label: SOCifyLocale.text("الأصل"), value: (job) => permission("evidence.download") ? linkedButton(SOCifyLocale.text("تنزيل الأصل"), `/api/cases/${caseId}/imports/${job.id}/original`) : "—" }, { label: SOCifyLocale.text("التفاصيل"), value: (job) => button(SOCifyLocale.text("حالة الاستيراد"), async () => {
     try {
       const result = await api(`/api/cases/${caseId}/imports/${job.id}`);

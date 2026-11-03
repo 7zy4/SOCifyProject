@@ -322,7 +322,7 @@ def update_assignment_status(assignment_id, status, expected_status=None):
         row = (
             get_db()
             .execute(
-                "SELECT a.*, c.status AS case_status, t.status AS task_status FROM team_log_assignments a JOIN incident_cases c ON c.id = a.case_id JOIN case_tasks t ON t.id=a.task_id WHERE a.id = ? AND a.workspace_id = ?",
+                "SELECT a.*, c.status AS case_status, c.version AS case_version, t.status AS task_status FROM team_log_assignments a JOIN incident_cases c ON c.id = a.case_id JOIN case_tasks t ON t.id=a.task_id WHERE a.id = ? AND a.workspace_id = ?",
                 (assignment_id, workspace_id()),
             )
             .fetchone()
@@ -339,7 +339,9 @@ def update_assignment_status(assignment_id, status, expected_status=None):
         if row["case_status"] == "closed":
             return error_response("CASE_CLOSED", "المهمة مقفلة مع القضية", 409)
         if status == row["task_status"]:
-            return jsonify({"id": row["task_id"], "status": status, "updated": False})
+            return jsonify(
+                {"id": row["task_id"], "status": status, "updated": False, "case_version_before": row["case_version"], "case_version": row["case_version"]}
+            )
         if expected_status is not None and expected_status != row["task_status"]:
             return error_response("TASK_CHANGED", "تغيرت المهمة. حدّث القائمة قبل المتابعة", 409)
         completed = status in {"completed", "reviewed"}
@@ -354,7 +356,8 @@ def update_assignment_status(assignment_id, status, expected_status=None):
         )
         _history(get_db(), row["case_id"], "assigned_logs_updated", None, {"assignment_id": assignment_id, "status": status})
         record_audit(get_db(), "update", "team_logs", assignment_id, details={"status": status})
-    return jsonify({"id": row["task_id"], "status": status, "updated": True})
+        version = get_db().execute("SELECT version FROM incident_cases WHERE id=?", (row["case_id"],)).fetchone()[0]
+    return jsonify({"id": row["task_id"], "status": status, "updated": True, "case_version_before": row["case_version"], "case_version": version})
 
 
 @teams_api.post("/api/team/members/<int:user_id>/deactivate")

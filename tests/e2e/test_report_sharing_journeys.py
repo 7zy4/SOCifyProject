@@ -176,6 +176,7 @@ def test_report_reader_recovers_without_exposing_unshared_material(app, language
             j.settle()
             expect(j.page.locator(".report-revision")).to_have_count(0)
             expect(j.page.locator("main")).not_to_contain_text("Separately restricted retained identity")
+            expect(j.page.get_by_role("heading", name=j.text("ربط SIEM مباشر بالقضية"), exact=True)).to_have_count(0)
             # Reopen the previously saved report address as a reader would; never write through the API.
             response = j.page.goto(j.base + path)
             assert response.status == 403

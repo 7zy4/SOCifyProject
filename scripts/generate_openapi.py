@@ -79,6 +79,27 @@ def generate() -> dict[str, object]:
                 operation["description"] = (
                     "Inspects an uploaded EML without executing attachments or visiting URLs. An identical current result in the same case returns 200 with duplicate=true and preserves the evidence, case version and report snapshots. New content or changed inspection findings create a new result."
                 )
+            elif path == "/api/cases/{case_id}/tasks" and method == "GET":
+                operation["summary"] = "Find authorized case tasks and open the page containing an exact task"
+                operation["parameters"] = parameters + [
+                    {"name": "q", "in": "query", "schema": {"type": "string", "maxLength": 200}},
+                    {"name": "status", "in": "query", "schema": {"type": "string", "enum": ["", "pending", "in_progress", "completed", "reviewed"]}},
+                    {"name": "page", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 1000000, "default": 1}},
+                    {"name": "focus", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}},
+                ]
+                operation["description"] = (
+                    "25 tasks per page, newest first. Search is literal and filters apply before pagination. "
+                    "A focus identifier resolves only inside the authorized case and current filters, returning its page. "
+                    "Case membership, approval, investigation selection and full batch access are required. "
+                    "can_update reflects current role, assignment ownership and case status."
+                )
+                operation["responses"].update(
+                    {
+                        "404": {"description": "Case or focused task unavailable"},
+                        "409": {"description": "Case approval required"},
+                        "422": {"description": "Invalid, duplicate or unknown filter"},
+                    }
+                )
             elif path == "/api/team/assignments" and method == "POST":
                 operation["description"] = (
                     "Assigns a completed batch in an open case to an active operational investigator. The recipient must have cases.read, cases.update and events.read, and access to the batch. Restricted access is never granted implicitly. Rejection creates no assignment or task."

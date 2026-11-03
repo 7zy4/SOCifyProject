@@ -13,6 +13,9 @@
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
   document.cookie = `socify-language=${language}; Path=/; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
   const english = {
+  "بحث مهام القضية": "Search case tasks",
+  "عرض مهام القضية": "Show case tasks",
+  "المهمة غير متاحة": "The task is unavailable",
   "نوع غير محدد": "Unidentified type",
   "تعذر إكمال فحص قواعد YARA": "The YARA inspection could not finish",
   "الحزمة المختارة غير متاحة": "The selected package is unavailable",

@@ -195,6 +195,57 @@ def case_summary(case_id: int):
     return jsonify(result)
 
 
+@autopsy_api.get("/api/cases/<int:case_id>/tasks")
+@require_permission("cases.read")
+@consistent_read
+def case_task_list(case_id: int):
+    case = _case_row(case_id)
+    if not case:
+        return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+    try:
+        if set(request.args) - {"q", "status", "page", "focus"} or any(len(request.args.getlist(key)) != 1 for key in request.args):
+            raise ValueError
+        query, status = request.args.get("q", "").strip(), request.args.get("status", "")
+        page_text, focus_text = request.args.get("page", "1"), request.args.get("focus", "")
+        if len(query) > 200 or status not in {"", "pending", "in_progress", "completed", "reviewed"}:
+            raise ValueError
+        if len(page_text) > 7 or not page_text.isascii() or not page_text.isdecimal() or not 1 <= int(page_text) <= 1000000:
+            raise ValueError
+        if focus_text and (len(focus_text) > 19 or not focus_text.isascii() or not focus_text.isdecimal() or not 1 <= int(focus_text) <= 2**63 - 1):
+            raise ValueError
+        page, focus = int(page_text), int(focus_text) if focus_text else None
+    except ValueError:
+        return error_response("INVALID_TASK_FILTER", "حدد مرشحات المهام الصحيحة", 422)
+    where = "t.case_id=?"
+    args: list[object] = [case_id]
+    if status:
+        where += " AND t.status=?"
+        args.append(status)
+    if query:
+        where += " AND LOWER(t.title) LIKE ? ESCAPE '\\'"
+        args.append("%" + query.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
+    total = get_db().execute(f"SELECT COUNT(*) FROM case_tasks t WHERE {where}", args).fetchone()[0]
+    page_size = 25
+    if focus is not None:
+        if not get_db().execute(f"SELECT 1 FROM case_tasks t WHERE {where} AND t.id=?", (*args, focus)).fetchone():
+            return error_response("TASK_NOT_FOUND", "المهمة غير متاحة", 404)
+        preceding = get_db().execute(f"SELECT COUNT(*) FROM case_tasks t WHERE {where} AND t.id>?", (*args, focus)).fetchone()[0]
+        page = preceding // page_size + 1
+    else:
+        page = min(page, max(1, (total + page_size - 1) // page_size))
+    rows = (
+        get_db()
+        .execute(
+            f"SELECT t.*, a.id AS assignment_id, socify_user_name(u.name,u.name_ar,u.name_en) AS assignee_name FROM case_tasks t LEFT JOIN team_log_assignments a ON a.task_id=t.id LEFT JOIN users u ON u.id=t.assignee WHERE {where} ORDER BY t.id DESC LIMIT ? OFFSET ?",
+            (*args, page_size, (page - 1) * page_size),
+        )
+        .fetchall()
+    )
+    can_update = has_permission(current_user(), "cases.update") and case["status"] != "closed"
+    items = [{**dict(row), "can_update": bool(can_update and (not row["assignment_id"] or row["assignee"] == actor_id() or manager()))} for row in rows]
+    return jsonify({"items": items, "total": total, "page": page, "page_size": page_size, "focus": focus})
+
+
 @autopsy_api.get("/api/cases")
 @require_permission("cases.read")
 def cases_list():

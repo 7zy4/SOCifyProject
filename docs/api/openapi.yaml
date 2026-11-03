@@ -4247,6 +4247,87 @@
         }
       }
     },
+    "/api/cases/{case_id}/tasks": {
+      "get": {
+        "operationId": "autopsy_case_task_list_get__api_cases_case_id_tasks",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Case or focused task unavailable"
+          },
+          "409": {
+            "description": "Case approval required"
+          },
+          "422": {
+            "description": "Invalid, duplicate or unknown filter"
+          }
+        },
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "pending",
+                "in_progress",
+                "completed",
+                "reviewed"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "name": "focus",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9223372036854775807
+            }
+          }
+        ],
+        "summary": "Find authorized case tasks and open the page containing an exact task",
+        "description": "25 tasks per page, newest first. Search is literal and filters apply before pagination. A focus identifier resolves only inside the authorized case and current filters, returning its page. Case membership, approval, investigation selection and full batch access are required. can_update reflects current role, assignment ownership and case status."
+      }
+    },
     "/api/cases/{case_id}/timeline": {
       "get": {
         "operationId": "autopsy_investigation_case_timeline_get__api_cases_case_id_timeline",
