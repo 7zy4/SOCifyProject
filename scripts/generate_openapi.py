@@ -75,6 +75,38 @@ def generate() -> dict[str, object]:
                         "422": {"description": "Invalid source data or retry key"},
                     }
                 )
+            elif path == "/api/cases/{case_id}/members" and method == "POST":
+                operation["summary"] = "Assign a case member's responsibility"
+                operation["description"] = (
+                    "Requires cases.assign and an active member in the same workspace. "
+                    "An optional current case version prevents stale assignments from replacing newer work. "
+                    "A version conflict returns 409 without changing membership, ownership or audit history. "
+                    "The interface always supplies the reviewed version; older API clients may omit it."
+                )
+                operation["requestBody"] = {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "required": ["user_id", "responsibility"],
+                                "properties": {
+                                    "user_id": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+                                    "version": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+                                    "responsibility": {"type": "string", "enum": ["monitoring", "l1", "l2", "investigator", "reviewer", "owner"]},
+                                },
+                            }
+                        }
+                    },
+                }
+                operation["responses"].update(
+                    {
+                        "404": {"description": "Case or active workspace member unavailable"},
+                        "409": {"description": "Case changed since the assignment was prepared"},
+                        "422": {"description": "Invalid member, responsibility or case version"},
+                    }
+                )
             elif path == "/api/cases/{case_id}/members/{user_id}" and method == "DELETE":
                 operation["summary"] = "Revoke a member's access to one case"
                 operation["description"] = (

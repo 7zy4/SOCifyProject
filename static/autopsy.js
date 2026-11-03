@@ -329,7 +329,7 @@ function autopsyForm(schema, submit, initial = {}, { submitLabel = SOCifyLocale.
     save.setAttribute("aria-busy", "true");
     save.textContent = SOCifyLocale.text("جارٍ الحفظ…");
     form.dataset.saving = "true";
-    const frozen = form.dataset.libraryForm ? [...form.querySelectorAll("input,textarea,select,button")].filter(control => !control.disabled) : [];
+    const frozen = form.dataset.libraryForm || form.dataset.caseForm ? [...form.querySelectorAll("input,textarea,select,button")].filter(control => !control.disabled) : [];
     try {
       const values = Object.fromEntries(Object.entries(getters).map(([key, getter]) => [key, getter()]).filter(([, value]) => value !== null));
       frozen.forEach(control => { control.disabled = true; });
@@ -338,7 +338,7 @@ function autopsyForm(schema, submit, initial = {}, { submitLabel = SOCifyLocale.
       errors.textContent = "";
       SOCifyDrafts.saved(form);
     } catch (error) { errors.hidden = false; errors.textContent = error.message; }
-    finally { frozen.forEach(control => { control.disabled = false; }); delete form.dataset.saving; save.disabled = false; save.removeAttribute("aria-busy"); save.textContent = submitLabel; }
+    finally { if (!form.dataset.caseCommitted) frozen.forEach(control => { control.disabled = false; }); delete form.dataset.saving; save.disabled = Boolean(form.dataset.caseNeedsReview || form.dataset.caseUnavailable); save.removeAttribute("aria-busy"); save.textContent = form.dataset.caseCommitted ? SOCifyLocale.text("تحديث القضية") : submitLabel; }
   });
   return SOCifyDrafts.track(form);
 }
@@ -633,10 +633,81 @@ async function autopsyCaseTasks(current) {
   return panel(SOCifyLocale.text("مهام القضية"), body);
 }
 
-async function autopsyCase(caseId) {
-  if (!SOCifyDrafts.confirmDiscard(workspace, true)) return;
+let autopsySummaryRefresh = Promise.resolve();
+function autopsyRefreshSummary(caseId, savedForm) {
+  const next = autopsySummaryRefresh.catch(() => {}).then(() => autopsyCase(caseId, { refresh: true, savedForm }));
+  autopsySummaryRefresh = next;
+  return next;
+}
+
+function autopsySummaryForm(kind, schema, current, operation, initial = {}, afterRefresh = null, options = {}) {
+  const form = autopsyForm(schema, async body => {
+    if (form.dataset.caseNeedsReview || form.dataset.caseUnavailable) throw new Error(SOCifyLocale.text("راجع تحديثات القضية قبل متابعة الحفظ"));
+    if (!form.dataset.caseCommitted) {
+      try { await operation(body, form.caseVersion); }
+      catch (error) {
+        if (["CASE_VERSION_CONFLICT", "VERSION_CONFLICT"].includes(error.code)) {
+          form.dataset.caseConflict = "true";
+          try { await autopsyRefreshSummary(current.id, null); } catch (_) { /* Keep the draft and original conflict if refresh is unavailable. */ }
+          delete form.dataset.caseConflict;
+          if (form.dataset.caseNeedsReview) error.message = SOCifyLocale.text("راجع تحديثات القضية قبل متابعة الحفظ");
+        }
+        throw error;
+      }
+      form.dataset.caseCommitted = "true";
+      SOCifyDrafts.saved(form);
+    }
+    try { await autopsyRefreshSummary(current.id, form); }
+    catch (_) { throw new Error(SOCifyLocale.text("حُفظ الإجراء. تعذر تحديث القضية؛ أعد المحاولة.")); }
+    if (afterRefresh) afterRefresh();
+  }, initial, options);
+  form.dataset.caseForm = kind;
+  form.caseVersion = current.version;
+  form.caseContext = JSON.stringify(current.context);
+  return form;
+}
+
+function autopsyRetainSummaryDraft(form, replacement, current) {
+  const oldReview = form.querySelector(".case-form-review");
+  oldReview?.remove();
+  if (!replacement) {
+    form.dataset.caseUnavailable = "true";
+    form.querySelector('button[type="submit"]').disabled = true;
+    form.append(node("p", { class: "notice case-form-review span-2", role: "status", text: SOCifyLocale.text("مسودتك باقية؛ هذا الإجراء غير متاح في الحالة الحالية للقضية.") }));
+    return;
+  }
+  delete form.dataset.caseUnavailable;
+  if (form.dataset.caseForm === "context" && form.caseContext === JSON.stringify(current.context)) form.caseVersion = current.version;
+  if (form.caseVersion === current.version) {
+    delete form.dataset.caseNeedsReview;
+    if (form.dataset.saving !== "true") form.querySelector('button[type="submit"]').disabled = false;
+    return;
+  }
+  if (form.dataset.caseCommitted || (form.dataset.saving === "true" && !form.dataset.caseConflict)) return;
+  form.dataset.caseNeedsReview = "true";
+  form.querySelector('button[type="submit"]').disabled = true;
+  const facts = form.dataset.caseForm === "context"
+    ? Object.entries(current.context || {}).filter(([key]) => ["reason", "objective", "classification", "attack_outcome", "alert_verdict"].includes(key)).map(([key, value]) => ({ label: autopsyLabel(key), value: autopsyLabel(value) }))
+    : [{ label: SOCifyLocale.text("الحالة"), value: autopsyLabel(current.status) }, ...(current.members || []).map(member => ({ label: member.name, value: caseResponsibilityLabel(member.responsibility) }))];
+  const accept = button(SOCifyLocale.text("متابعة بعد المراجعة"), () => {
+    // Copy the visible draft into fresh controls, retaining current choices and
+    // an optimistic version from the reviewed response. Nothing is saved here.
+    for (const input of form.querySelectorAll("input[name],textarea[name],select[name]")) {
+      const target = [...replacement.querySelectorAll("input[name],textarea[name],select[name]")].find(item => item.name === input.name);
+      if (!target || input.type === "file") continue;
+      if (["checkbox", "radio"].includes(input.type)) target.checked = input.checked;
+      else target.value = input.value;
+    }
+    form.replaceWith(replacement);
+    replacement.querySelector("input,textarea,select")?.focus({ preventScroll: true });
+  });
+  form.append(node("details", { class: "case-form-review span-2" }, [node("summary", { text: SOCifyLocale.text("مراجعة تحديثات القضية") }), stackedTable([{ label: SOCifyLocale.text("الحقل"), value: "label" }, { label: SOCifyLocale.text("القيمة الحالية"), value: "value" }], facts), accept]));
+}
+
+async function autopsyCase(caseId, { refresh = false, savedForm = null } = {}) {
+  if (!refresh && !SOCifyDrafts.confirmDiscard(workspace, true)) return;
   if (window.SOCifyWorkbench?.sections.includes(state.section)) { await window.SOCifyWorkbench.start(state.section); return; }
-  begin("case");
+  if (!refresh) begin("case");
   let selected = new URLSearchParams(window.location.search).get("tab") || "summary";
   autopsy.current = await api(`/api/cases/${caseId}`);
   const current = autopsy.current;
@@ -648,7 +719,7 @@ async function autopsyCase(caseId) {
   if (restricted && !["summary", "logs"].includes(selected)) selected = "logs";
   const assetData = restricted ? { items: [] } : await api(`/api/cases/${caseId}/records?kind=asset&limit=100`);
   autopsy.assets = assetData.items;
-  const root = node("div", { class: "case-view" }, [pageHead(current.title, null, [linkedButton(SOCifyLocale.text("جميع القضايا"), autopsyCaseListURL()), ...(!restricted && window.SOCifyWorkbench ? [window.SOCifyWorkbench.reportButton(current)] : [])])]);
+  const root = node("div", { class: "case-view" }, [pageHead(current.title, null, [linkedButton(SOCifyLocale.text("جميع القضايا"), autopsyCaseListURL()), ...(selected === "summary" ? [button(SOCifyLocale.text("تحديث القضية"), () => autopsyRefreshSummary(caseId, null).catch(handleError))] : []), ...(!restricted && window.SOCifyWorkbench ? [window.SOCifyWorkbench.reportButton(current)] : [])])]);
   root.append(node("div", { class: "case-context-bar" }, [node("bdi", { class: "case-reference", text: current.reference }), autopsyBadge(current.status, "case"), autopsyBadge(current.severity)]));
   if (selected === "summary" && !restricted) {
     const fact = (label, value) => node("div", {}, [node("dt", { text: label }), node("dd", { text: value || "—" })]);
@@ -667,26 +738,22 @@ async function autopsyCase(caseId) {
   const content = node("div", { class: "case-content" });
   if (selected === "summary") {
     const relationship = window.SOCifyWorkspace?.relationship(current);
+    if (relationship) relationship.querySelector("form").dataset.caseForm = "relationship";
     if (relationship) content.append(relationship);
     const transitions = autopsy.catalog.case_transitions[current.status] || [];
-    if (current.can_update && transitions.length) content.append(panel(SOCifyLocale.text("حالة القضية"), node("div", { class: "panel-body" }, autopsyForm({ status: { required: true, choices: transitions.filter((value) => value !== "closed" || permission("cases.close")) }, reason: { required: true, max: 2000 } }, async (body) => { await api(`/api/cases/${caseId}/transitions`, { method: "POST", body: { ...body, version: current.version } }); await autopsyCase(caseId); })), true));
+    if (current.can_update && transitions.length) content.append(panel(SOCifyLocale.text("حالة القضية"), node("div", { class: "panel-body" }, autopsySummaryForm("status", { status: { required: true, choices: transitions.filter((value) => value !== "closed" || permission("cases.close")) }, reason: { required: true, max: 2000 } }, current, (body, version) => api(`/api/cases/${caseId}/transitions`, { method: "POST", body: { ...body, version } }))), true));
     const schema = { reason: { required: true, max: 500 }, objective: { required: true, max: 2000 }, classification: { choices: autopsy.catalog.classifications, required: true }, attack_outcome: { choices: autopsy.catalog.outcomes, required: true }, alert_verdict: { choices: autopsy.catalog.verdicts, required: true } };
-    if (current.can_update && current.status !== "closed") content.append(autopsyEditPanel(SOCifyLocale.text("سبب القضية وهدفها ونتيجتها"), node("div", { class: "panel-body" }, autopsyForm(schema, async (body) => { await api(`/api/cases/${caseId}/context`, { method: "PATCH", body: { ...body, version: current.version } }); await autopsyCase(caseId); }, current.context || { classification: "confidential", attack_outcome: "unknown", alert_verdict: "undetermined" })), true));
+    if (current.can_update && current.status !== "closed") content.append(autopsyEditPanel(SOCifyLocale.text("سبب القضية وهدفها ونتيجتها"), node("div", { class: "panel-body" }, autopsySummaryForm("context", schema, current, (body, version) => api(`/api/cases/${caseId}/context`, { method: "PATCH", body: { ...body, version } }), current.context || { classification: "confidential", attack_outcome: "unknown", alert_verdict: "undetermined" })), true));
     else content.append(panel(SOCifyLocale.text("ملخص القضية"), node("div", { class: "panel-body" }, [node("p", { text: current.context?.reason || SOCifyLocale.text("قضية موروثة؛ يتطلب ملخصها مراجعة") }), node("p", { text: current.context?.objective || "—" })]), true));
     const memberColumns = [{ label: SOCifyLocale.text("الاسم"), value: "name" }, { label: SOCifyLocale.text("الدور"), value: (row) => autopsyLabel(row.role) }, { label: SOCifyLocale.text("المسؤولية"), value: (row) => caseResponsibilityLabel(row.responsibility) }, { label: SOCifyLocale.text("أُسندت"), value: (row) => formatTime(row.assigned_at) }];
     if (current.can_manage && permission("cases.assign")) memberColumns.push({ label: SOCifyLocale.text("الإجراء"), value: row => ["admin", "soc_manager"].includes(row.role) ? "—" : button(SOCifyLocale.text("سحب الوصول"), () => {
-      const form = autopsyForm({ reason: { required: true, max: 1000 } }, async body => {
-        await api(`/api/cases/${caseId}/members/${row.user_id}`, { method: "DELETE", body: { ...body, version: current.version } });
-        SOCifyDrafts.saved(form);
-        await autopsyCase(caseId);
-        dialog.close();
-      }, {}, { submitLabel: SOCifyLocale.text("سحب الوصول") });
+      const form = autopsySummaryForm(`remove-${row.user_id}`, { reason: { required: true, max: 1000 } }, current, (body, version) => api(`/api/cases/${caseId}/members/${row.user_id}`, { method: "DELETE", body: { ...body, version } }), {}, () => dialog.close(), { submitLabel: SOCifyLocale.text("سحب الوصول") });
       const dialog = autopsyModal(SOCifyLocale.text("سحب الوصول إلى القضية"), node("div", {}, [node("p", { text: `${row.name} · ${current.reference}`, "data-user-content": "true" }), form]));
     }) });
     content.append(panel(SOCifyLocale.text("فريق القضية"), stackedTable(memberColumns, current.members)));
     if (current.can_manage && permission("cases.assign")) {
-      content.append(autopsyEditPanel(SOCifyLocale.text("تحديد مسؤولية عضو"), node("div", { class: "panel-body" }, autopsyForm({ user_id: { required: true, user: true }, responsibility: { required: true, choices: ["monitoring", "l1", "l2", "investigator", "reviewer", "owner"].map(value => ({ value, label: caseResponsibilityLabel(value) })) } }, async (body) => { await api(`/api/cases/${caseId}/members`, { method: "POST", body }); await autopsyCase(caseId); }))));
-      if (current.status !== "closed" && permission("cases.update")) content.append(autopsyEditPanel(SOCifyLocale.text("تسليم المناوبة"), node("div", { class: "panel-body" }, [node("p", { text: SOCifyLocale.text("التسليم ينقل العمل المفتوح ويبقي وصول العضو. لسحب وصوله، استخدم فريق القضية بعد التسليم.") }), autopsyForm({ from_user: { label: SOCifyLocale.text("مسلّم المناوبة"), required: true, user: true, case_member: true }, to_user: { label: SOCifyLocale.text("مستلم المناوبة"), required: true, user: true }, reason: { required: true, max: 1000 } }, async (body) => { await api(`/api/cases/${caseId}/handoff`, { method: "POST", body: { ...body, version: current.version } }); await autopsyCase(caseId); })])));
+      content.append(autopsyEditPanel(SOCifyLocale.text("تحديد مسؤولية عضو"), node("div", { class: "panel-body" }, autopsySummaryForm("members", { user_id: { required: true, user: true }, responsibility: { required: true, choices: ["monitoring", "l1", "l2", "investigator", "reviewer", "owner"].map(value => ({ value, label: caseResponsibilityLabel(value) })) } }, current, (body, version) => api(`/api/cases/${caseId}/members`, { method: "POST", body: { ...body, version } })))));
+      if (current.status !== "closed" && permission("cases.update")) content.append(autopsyEditPanel(SOCifyLocale.text("تسليم المناوبة"), node("div", { class: "panel-body" }, [node("p", { text: SOCifyLocale.text("التسليم ينقل العمل المفتوح ويبقي وصول العضو. لسحب وصوله، استخدم فريق القضية بعد التسليم.") }), autopsySummaryForm("handoff", { from_user: { label: SOCifyLocale.text("مسلّم المناوبة"), required: true, user: true, case_member: true }, to_user: { label: SOCifyLocale.text("مستلم المناوبة"), required: true, user: true }, reason: { required: true, max: 1000 } }, current, (body, version) => api(`/api/cases/${caseId}/handoff`, { method: "POST", body: { ...body, version } }))])));
     }
     if (!restricted) content.append(await autopsyCaseTasks(current));
   } else if (selected === "logs") {
@@ -715,7 +782,23 @@ async function autopsyCase(caseId) {
   }
   root.append(content);
   window.SOCifyWorkbench?.bindCase(current);
+  const active = document.activeElement;
+  let retainedFocus = false;
+  if (refresh && selected === "summary") {
+    for (const form of workspace.querySelectorAll("form[data-case-form]")) {
+      if (form === savedForm || (!SOCifyDrafts.hasChanges(form) && form.dataset.saving !== "true")) continue;
+      const replacement = root.querySelector(`form[data-case-form="${form.dataset.caseForm}"]`);
+      retainedFocus ||= form.contains(active);
+      const details = form.closest("details");
+      const expanded = details ? details.open : form.dataset.caseExpanded === "true";
+      form.dataset.caseExpanded = String(expanded);
+      if (form.dataset.caseForm !== "relationship") autopsyRetainSummaryDraft(form, replacement, current);
+      if (replacement) { if (expanded) replacement.closest("details")?.setAttribute("open", ""); replacement.replaceWith(form); }
+      else content.append(panel(SOCifyLocale.text("مسودة غير محفوظة"), form));
+    }
+  }
   finish(root);
+  if (retainedFocus && active?.isConnected) active.focus({ preventScroll: true });
   autopsyAcknowledgeCaseIntake([current.id]);
   if (selected === "summary" && /^#case-task-\d+$/.test(location.hash)) {
     const task = document.getElementById(location.hash.slice(1));

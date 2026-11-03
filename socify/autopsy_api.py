@@ -604,8 +604,10 @@ def case_member(case_id: int):
     data = request.get_json(silent=True)
     if (
         not isinstance(data, dict)
-        or set(data) - {"user_id", "responsibility"}
+        or set(data) - {"user_id", "responsibility", "version"}
         or type(data.get("user_id")) is not int
+        or not 1 <= data["user_id"] <= 9223372036854775807
+        or ("version" in data and (type(data["version"]) is not int or not 1 <= data["version"] <= 9223372036854775807))
         or not isinstance(data.get("responsibility"), str)
         or data.get("responsibility") not in {"monitoring", "l1", "l2", "investigator", "reviewer", "owner"}
     ):
@@ -617,6 +619,8 @@ def case_member(case_id: int):
         user = get_db().execute("SELECT id FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (data["user_id"], workspace_id())).fetchone()
         if not user:
             return error_response("MEMBER_NOT_FOUND", "العضو غير متاح", 404)
+        if "version" in data and case["version"] != data["version"]:
+            return error_response("CASE_VERSION_CONFLICT", "تغيرت القضية؛ حدّث قبل الحفظ", 409)
         get_db().execute(
             "INSERT INTO autopsy_case_members(case_id, user_id, responsibility, assigned_by, assigned_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(case_id, user_id) DO UPDATE SET responsibility = excluded.responsibility, assigned_by = excluded.assigned_by, assigned_at = excluded.assigned_at",
             (case_id, data["user_id"], data["responsibility"], actor_id(), iso_now()),
