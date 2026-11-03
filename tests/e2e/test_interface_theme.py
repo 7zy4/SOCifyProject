@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from conftest import DEMO_LOGIN_VALUE
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 from werkzeug.serving import make_server
 
 from tests.e2e.test_browser import assert_accessible, launch_browser
@@ -132,7 +132,8 @@ def test_mobile_operational_navigation_opens_inside_viewport(app, language):
             page.locator('#workspace[aria-busy="false"]').wait_for()
             page.locator("#menu-toggle").click()
             page.keyboard.press("Escape")
-            assert not page.locator(".sidebar").is_visible()
+            expect(page.locator(".sidebar")).not_to_be_visible()
+            assert page.locator(".sidebar").evaluate("element => element.inert")
             assert page.locator("#menu-toggle").get_attribute("aria-expanded") == "false"
             browser.close()
     finally:

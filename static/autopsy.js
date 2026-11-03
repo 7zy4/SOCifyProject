@@ -159,8 +159,8 @@ function autopsyReferenceChoice(name, source, required = false) {
   const retry = button(SOCifyLocale.text("إعادة المحاولة"), () => retryAction?.()); retry.hidden = true;
   const more = button(SOCifyLocale.text("عرض المزيد"), () => load(lastQuery, cursor, true)); more.hidden = true;
   const popup = node("div", { class: "choice-menu", hidden: true }, [list, message, failure, retry, more]);
-  const close = () => { clearTimeout(timer); popup.hidden = true; input.setAttribute("aria-expanded", "false"); };
-  const open = () => { popup.hidden = false; input.setAttribute("aria-expanded", "true"); };
+  const close = () => { clearTimeout(timer); popup.hidden = true; input.setAttribute("aria-expanded", "false"); toggle.setAttribute("aria-expanded", "false"); };
+  const open = () => { popup.hidden = false; input.setAttribute("aria-expanded", "true"); toggle.setAttribute("aria-expanded", "true"); };
   const select = value => {
     chosen = value;
     input.value = value.label;
@@ -232,6 +232,7 @@ function autopsyReferenceChoice(name, source, required = false) {
   });
   const toggle = button("⌄", () => { if (popup.hidden) { input.focus(); load(""); } else close(); });
   toggle.className = "choice-toggle"; toggle.setAttribute("aria-label", SOCifyLocale.text("عرض الخيارات"));
+  toggle.setAttribute("aria-controls", id); toggle.setAttribute("aria-expanded", "false");
   toggle.addEventListener("mousedown", event => event.preventDefault());
   const control = node("span", { class: "choice-control" }, [input, toggle, popup]);
   control.addEventListener("focusout", event => { if (!control.contains(event.relatedTarget)) close(); });

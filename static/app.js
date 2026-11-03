@@ -963,15 +963,43 @@ async function initialize() {
 }
 
 const menu = document.getElementById("menu-toggle");
+const navigationSidebar = document.querySelector(".sidebar");
+const navigationCompact = window.matchMedia(document.body.classList.contains("autopsy-shell") ? "(max-width:1099px)" : "(max-width:900px)");
+navigationSidebar.inert = navigationCompact.matches;
+const navigationShade = node("div", { class: "navigation-shade", hidden: true, "aria-hidden": "true" });
+document.body.append(navigationShade);
+const navigationHeader = document.querySelector(".topbar");
+new ResizeObserver(() => {
+  document.documentElement.style.setProperty("--navigation-top", `${navigationHeader.getBoundingClientRect().bottom}px`);
+}).observe(navigationHeader);
 menu.addEventListener("click", () => {
-  const sidebar = document.querySelector(".sidebar");
-  const open = sidebar.classList.toggle("open");
+  const open = navigationSidebar.classList.toggle("open");
   menu.setAttribute("aria-expanded", String(open));
+  navigationSidebar.inert = !open && navigationCompact.matches;
+  navigationShade.hidden = !open || !navigationCompact.matches;
+  if (open) document.querySelector(".account-menu")?.removeAttribute("open");
 });
 function closeNavigation() {
-  document.querySelector(".sidebar").classList.remove("open");
+  navigationSidebar.classList.remove("open");
+  navigationSidebar.inert = navigationCompact.matches;
+  navigationShade.hidden = true;
   menu.setAttribute("aria-expanded", "false");
 }
+menu.addEventListener("keydown", event => {
+  if (event.key !== "ArrowDown") return;
+  event.preventDefault();
+  if (menu.getAttribute("aria-expanded") !== "true") menu.click();
+  navigationSidebar.querySelector("nav a:not([hidden])")?.focus();
+});
+navigationCompact.addEventListener("change", () => {
+  const focused = navigationSidebar.contains(document.activeElement);
+  closeNavigation();
+  if (navigationCompact.matches && focused) menu.focus();
+});
+document.addEventListener("focusin", event => {
+  if (!event.target.closest(".sidebar, #menu-toggle")) closeNavigation();
+  if (!event.target.closest(".account-menu")) document.querySelector(".account-menu")?.removeAttribute("open");
+});
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && document.querySelector(".sidebar.open")) { closeNavigation(); menu.focus(); }
   const account = document.querySelector(".account-menu[open]");

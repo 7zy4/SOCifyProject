@@ -79,7 +79,7 @@ class ReviewJourney:
 
     def nav(self, name):
         menu = self.page.get_by_role("button", name=self.text("فتح القائمة"), exact=True)
-        if menu.count() and menu.is_visible() and not self.page.locator("#primary-nav").is_visible():
+        if menu.count() and menu.is_visible() and menu.get_attribute("aria-expanded") != "true":
             menu.click()
         self.click("link", name, self.page.locator("#primary-nav"))
 
