@@ -13,6 +13,9 @@
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
   document.cookie = `socify-language=${language}; Path=/; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
   const english = {
+  "حُفظت القاعدة. تعذر تحديث القائمة؛ أعد المحاولة.": "The rule was saved. The list could not refresh; try again.",
+  "معرف إعادة المحاولة غير صالح": "The retry identifier is invalid",
+  "تغير محتوى الطلب؛ أعد المحاولة كعملية جديدة": "The request content changed; submit it as a new operation",
   "نتيجة اختبار القاعدة": "Rule test result",
   "يساوي": "Equals",
   "يحتوي على": "Contains",

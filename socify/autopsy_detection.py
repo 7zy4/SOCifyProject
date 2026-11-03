@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from datetime import timedelta
 
 from flask import Blueprint, jsonify, request
@@ -17,6 +18,9 @@ autopsy_detection_api = Blueprint("autopsy_detection", __name__)
 
 
 def migrate(connection):
+    connection.execute(
+        "CREATE TABLE IF NOT EXISTS sigma_publication_receipts(workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id), actor_id INTEGER NOT NULL REFERENCES users(id), request_key TEXT NOT NULL, request_hash TEXT NOT NULL, response TEXT NOT NULL CHECK(json_valid(response)), created_at TEXT NOT NULL, PRIMARY KEY(workspace_id,actor_id,request_key))"
+    )
     connection.execute(
         "CREATE TABLE IF NOT EXISTS autopsy_sigma_sources(rule_id INTEGER NOT NULL REFERENCES rules(id), version INTEGER NOT NULL, source TEXT NOT NULL, sha256 TEXT NOT NULL, compiler TEXT NOT NULL, fixtures TEXT NOT NULL, PRIMARY KEY(rule_id,version))"
     )
@@ -80,9 +84,17 @@ def sigma_action(action):
     if action not in {"compile", "publish"}:
         return error_response("SIGMA_ACTION_NOT_FOUND", "إجراء Sigma غير متاح", 404)
     data = request.get_json(silent=True)
+    request_key = request.headers.get("Idempotency-Key") if action == "publish" else None
     try:
         if not isinstance(data, dict) or set(data) - {"source", "fixtures", "rule_id", "version", "reason"}:
             raise ValueError("حقول Sigma غير معروفة")
+        if request_key is not None and not re.fullmatch(r"[A-Za-z0-9_.:-]{8,128}", request_key):
+            raise ValueError("معرف إعادة المحاولة غير صالح")
+        request_hash = hashlib.sha256(canonical(data).encode()).hexdigest()
+        if request_key is not None:
+            receipt = _sigma_receipt(request_key, request_hash)
+            if receipt is not None:
+                return receipt
         compiled = compile_sigma(data.get("source"))
         validate_fixtures(compiled, data.get("fixtures"))
         if any(
@@ -98,6 +110,11 @@ def sigma_action(action):
     except (ValueError, TypeError, UnicodeError, RecursionError) as exc:
         return error_response("INVALID_SIGMA_SUBSET", str(exc), 422)
     with transaction():
+        # Repeat after acquiring the write lock: concurrent retries must share one commit.
+        if request_key is not None:
+            receipt = _sigma_receipt(request_key, request_hash)
+            if receipt is not None:
+                return receipt
         dsl, now = canonical(compiled["dsl"]), iso_now()
         alert_action = canonical({"severity": compiled["level"], "confidence": 0.5})
         if rule_id is None:
@@ -143,7 +160,29 @@ def sigma_action(action):
             rule_id,
             details={"version": version, "sha256": compiled["source_sha256"], "compiler": compiled["compiler"], "reason": reason},
         )
-    return jsonify({"id": rule_id, "version": version, "fixtures_passed": True, "compiled": compiled}), 201
+        result = {"id": rule_id, "version": version, "fixtures_passed": True, "compiled": compiled}
+        if request_key is not None:
+            get_db().execute(
+                "INSERT INTO sigma_publication_receipts(workspace_id,actor_id,request_key,request_hash,response,created_at) VALUES (?,?,?,?,?,?)",
+                (workspace_id(), actor_id(), request_key, request_hash, canonical(result), now),
+            )
+    return jsonify(result), 201
+
+
+def _sigma_receipt(request_key, request_hash):
+    receipt = (
+        get_db()
+        .execute(
+            "SELECT request_hash,response FROM sigma_publication_receipts WHERE workspace_id=? AND actor_id=? AND request_key=?",
+            (workspace_id(), actor_id(), request_key),
+        )
+        .fetchone()
+    )
+    if receipt is None:
+        return None
+    if receipt["request_hash"] != request_hash:
+        return error_response("RULE_REQUEST_CONFLICT", "تغير محتوى الطلب؛ أعد المحاولة كعملية جديدة", 409)
+    return jsonify(json.loads(receipt["response"])), 201
 
 
 def detection_job_view(job, case):

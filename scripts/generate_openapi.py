@@ -55,6 +55,24 @@ def generate() -> dict[str, object]:
                     "User-authored names are selected by interface language. Empty values fall back to the registered name. Account identity, email and role do not change."
                 )
                 operation["responses"]["422"] = {"description": "Invalid name or unknown field"}
+            elif path == "/api/autopsy/sigma/{action}" and method == "POST":
+                operation["summary"] = "Validate or publish a local detection rule"
+                operation["parameters"] = parameters + [
+                    {"name": "Idempotency-Key", "in": "header", "required": False, "schema": {"type": "string", "pattern": "^[A-Za-z0-9_.:-]{8,128}$"}}
+                ]
+                operation["description"] = (
+                    "Publication optionally accepts an opaque retry key scoped to the authenticated author and workspace. "
+                    "Identical retries return the original successful response without publishing or auditing again, even if the rule has since changed. "
+                    "A changed payload with the same key returns 409. Current rules.manage permission is always required. "
+                    "Only successful publications retain a receipt, atomically with the rule and audit entry. Compile ignores the key."
+                )
+                operation["responses"].update(
+                    {
+                        "201": {"description": "Publication committed or its original receipt recovered"},
+                        "409": {"description": "Conflicting content, stale rule or capacity limit"},
+                        "422": {"description": "Invalid rule, examples or retry key"},
+                    }
+                )
             elif path == "/api/audit":
                 operation["summary"] = "Search retained workspace activity"
                 operation["description"] = (

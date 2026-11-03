@@ -9,6 +9,28 @@ function autopsyAction(label, action, style = "ghost") {
   return control;
 }
 
+// Only opaque operation identifiers and payload digests survive a tab reload.
+// Rule contents and investigation drafts never enter browser storage.
+const sigmaPublicationIntents = new Map();
+async function sigmaPublicationIntent(body) {
+  const { version, ...content } = body;
+  const canonical = JSON.stringify(content, (_, value) => value && typeof value === "object" && !Array.isArray(value)
+    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]])) : value);
+  const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical)))].map(byte => byte.toString(16).padStart(2, "0")).join("");
+  const storageKey = `socify:sigma:${state.user.workspace_id}:${state.user.id}:${digest}`;
+  let intent = sigmaPublicationIntents.get(storageKey);
+  if (!intent) {
+    try { intent = JSON.parse(sessionStorage.getItem(storageKey)); } catch (_) { /* In-memory recovery remains available. */ }
+    if (!intent || !/^[a-f0-9-]{36}$/.test(intent.key) || (version !== undefined && !Number.isSafeInteger(intent.version))) intent = { key: crypto.randomUUID(), version };
+    sigmaPublicationIntents.set(storageKey, intent);
+    try { sessionStorage.setItem(storageKey, JSON.stringify(intent)); } catch (_) { /* Storage may be disabled. */ }
+  }
+  return { key: intent.key, body: { ...content, ...(version !== undefined ? { version: intent.version } : {}) }, acknowledged: () => {
+    sigmaPublicationIntents.delete(storageKey);
+    try { sessionStorage.removeItem(storageKey); } catch (_) { /* No draft data was stored. */ }
+  } };
+}
+
 async function autopsyReadJSON(input, maximum = 2 * 1024 * 1024) {
   const file = input.files?.[0];
   if (!file || file.size > maximum) throw new Error(SOCifyLocale.text("اختر ملف JSON محليًا ضمن حد الحجم المعلن"));
@@ -69,8 +91,8 @@ function autopsySigmaSummary(compiled, fixtures, caption = SOCifyLocale.text("ن
 
 autopsyLabels.rule_id = SOCifyLocale.text("القاعدة المنشورة");
 
-window.SOCifyAutopsy.library = async () => {
-  begin("analysis-library");
+window.SOCifyAutopsy.library = async ({ refresh = false } = {}) => {
+  if (!refresh) begin("analysis-library");
   const root = node("div", {}, pageHead(SOCifyLocale.text("مكتبة التحليل المحلي"), null));
   const bundles = await api("/api/autopsy/intelligence");
   root.append(panel(SOCifyLocale.text("إصدارات مصادر TI وGeoIP"), table([{ label: SOCifyLocale.text("الاسم"), value: "name" }, { label: SOCifyLocale.text("الإصدار"), value: "version" }, { label: SOCifyLocale.text("المصدر والرخصة"), value: (row) => `${row.source} · ${row.license}` }, { label: SOCifyLocale.text("المؤشرات"), value: "entries" }, { label: SOCifyLocale.text("الصلاحية"), value: (row) => formatTime(row.expires_at) }, { label: SOCifyLocale.text("التفعيل"), value: (row) => row.active ? SOCifyLocale.text("الإصدار المختار") : permission("intel.manage") ? autopsyAction(SOCifyLocale.text("تفعيل الإصدار"), async () => { await api(`/api/autopsy/intelligence/${row.id}/activate`, { method: "POST", body: {} }); await window.SOCifyAutopsy.library(); }) : SOCifyLocale.text("غير مختار") }], bundles.items), true));
@@ -103,14 +125,21 @@ window.SOCifyAutopsy.library = async () => {
       catch (error) { if (error instanceof SyntaxError) throw new Error(SOCifyLocale.text("ملف اختبارات القاعدة ليس JSON صالحًا")); throw error; }
     };
     const form = autopsyForm({ reason: { required: true, max: 1000 } }, async (body) => {
-      const id = rule.input.autopsyValue();
-      const current = rules.items.find((item) => item.id === id);
-      const selectedRevision = revision;
-      const input = await compile();
-      if (selectedRevision !== revision) throw new Error(SOCifyLocale.text("تغيرت ملفات القاعدة؛ أعد التحقق قبل النشر"));
-      try { await api("/api/autopsy/sigma/publish", { method: "POST", body: { ...body, ...input, ...(current ? { rule_id: id, version: current.version } : {}) } }); }
-      catch (error) { if (error.code === "RULE_VERSION_CONFLICT") { invalidate(); refresh.hidden = false; } throw error; }
-      await window.SOCifyAutopsy.library();
+      const controls = [...form.querySelectorAll("input,button")].filter(control => !control.disabled);
+      controls.forEach(control => { control.disabled = true; });
+      let intent;
+      try {
+        const id = rule.input.autopsyValue();
+        const current = rules.items.find((item) => item.id === id);
+        const input = await compile();
+        const payload = { ...body, ...input, ...(current ? { rule_id: id, version: current.version } : {}) };
+        intent = await sigmaPublicationIntent(payload);
+        await api("/api/autopsy/sigma/publish", { method: "POST", headers: { "Idempotency-Key": intent.key }, body: intent.body });
+        try { await window.SOCifyAutopsy.library({ refresh: true }); }
+        catch (_) { throw new Error(SOCifyLocale.text("حُفظت القاعدة. تعذر تحديث القائمة؛ أعد المحاولة.")); }
+        intent.acknowledged();
+      } catch (error) { if (error.code === "RULE_VERSION_CONFLICT") { intent?.acknowledged(); invalidate(); refresh.hidden = false; } throw error; }
+      finally { controls.forEach(control => { control.disabled = false; }); }
     });
     const refresh = autopsyAction(SOCifyLocale.text("تحميل القاعدة الحالية"), async () => {
       const id = rule.input.autopsyValue();
