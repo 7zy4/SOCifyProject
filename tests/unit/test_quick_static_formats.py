@@ -70,6 +70,6 @@ def test_static_limits_and_invalid_optional_yara():
         with pytest.raises(ValueError):
             inspect_static_bytes("sample.bin", content)
     for source in ("invalid yara source", "x" * 65537):
-        result = inspect_static_bytes("note.txt", b"Inert evidence with no executable content", yara_source=source)
-        assert result["yara_matches"] == []
-        assert result["verdict"] == "low_signal_static_only"
+        # An invalid selected rule must not become a reassuring negative result.
+        with pytest.raises(ValueError, match="YARA"):
+            inspect_static_bytes("note.txt", b"Inert evidence with no executable content", yara_source=source)

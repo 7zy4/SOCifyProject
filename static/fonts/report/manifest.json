@@ -1,0 +1,32 @@
+[
+  {
+    "file": "Cairo-Regular.ttf",
+    "source": "Cairo.woff2",
+    "weight": 400,
+    "sha256": "0465a9531abb8fa1392153d2548728d9a8bda69a2980e7c74178a77e2bb6d255"
+  },
+  {
+    "file": "Cairo-Bold.ttf",
+    "source": "Cairo.woff2",
+    "weight": 700,
+    "sha256": "64122b3e08dbb037c5ad7f814334bb35129826ef9dbb3fcfb8e869ada1e501ce"
+  },
+  {
+    "file": "IBMPlexSans-Regular.ttf",
+    "source": "IBMPlexSans.woff2",
+    "weight": 400,
+    "sha256": "2666f3ea32852074e383c796abb89d4a98b7f288dc7e35c7e4eb18b2b4dff4a2"
+  },
+  {
+    "file": "IBMPlexSans-Bold.ttf",
+    "source": "IBMPlexSans.woff2",
+    "weight": 700,
+    "sha256": "9afa6762fcfe3a481f4da3619a4aa0e90107b8499e720e80530677bafd01c598"
+  },
+  {
+    "file": "Bangers-Regular.ttf",
+    "source": "Bangers-Regular.woff2",
+    "weight": 400,
+    "sha256": "4925f764ba373550986dfc6d78a207f8c48c4d0f65d7605d9b0815a3a8660272"
+  }
+]

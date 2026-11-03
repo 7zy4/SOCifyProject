@@ -283,9 +283,14 @@ def display(value) -> str:
     return re.sub("[\u202a-\u202e\u2066-\u2069]", lambda match: f"\\u{ord(match[0]):04x}", text)
 
 
+INTERNAL_FIELDS = {"schema", "revision", "version", "source_version", "parser_version"}
+
+
 def lines(value, depth=0):
     if isinstance(value, dict):
         for key, item in value.items():
+            if key in INTERNAL_FIELDS:
+                continue
             if isinstance(item, list) and all(not isinstance(cell, (dict, list)) for cell in item):
                 yield depth, f"{LABELS.get(key, key)}: " + ("، ".join(display(cell) for cell in item) if item else "—")
             elif isinstance(item, (dict, list)):
@@ -380,6 +385,8 @@ def report_table(value, *, localize=False):
     def walk(item, label="التفاصيل"):
         if isinstance(item, dict):
             for key, cell in item.items():
+                if key in INTERNAL_FIELDS:
+                    continue
                 caption = LABELS.get(key) or str(key)
                 if isinstance(cell, dict):
                     group(caption)
@@ -514,48 +521,60 @@ def bundled_report_asset_fetcher(url, timeout=10, ssl_context=None):
 
 def render_docx(payload) -> bytes:
     from docx import Document
-    from docx.oxml import OxmlElement
-    from docx.oxml.ns import qn
-    from docx.shared import Pt, RGBColor
+    from docx.enum.table import WD_TABLE_DIRECTION
+    from docx.shared import Pt
+
+    from .report_docx import add_report_run, configure_style, embed_report_fonts, set_direction
 
     document = Document()
     section = document.sections[0]
     section.page_width, section.page_height = Pt(595), Pt(842)
     section.top_margin, section.bottom_margin = Pt(42), Pt(40)
     section.left_margin, section.right_margin = Pt(44), Pt(44)
-    normal = document.styles["Normal"]
     tokens = design_tokens()
     ink = tokens["colors"]["paper-text"][0].lstrip("#")
-    normal.font.name, normal.font.size, normal.font.color.rgb = tokens["typography"]["en"]["family"], Pt(14), RGBColor.from_string(ink)
-    for name in ("Title", "Heading 1", "Heading 2"):
-        document.styles[name].font.name = "IBM Plex Sans"
-        document.styles[name].font.color.rgb = RGBColor.from_string(ink)
-        document.styles[name].font.bold = True
-        document.styles[name].font.size = Pt({"Title": 28, "Heading 1": 24, "Heading 2": 18}[name])
-    for name in ("Normal", "Title", "Heading 1", "Heading 2"):
-        family = tokens["typography"]["ar"]["family"] if name == "Normal" else tokens["typography"]["display"]["ar"]
-        document.styles[name].element.get_or_add_rPr().get_or_add_rFonts().set(qn("w:cs"), family)
+    for name, size in [("Normal", 14), ("Title", 24), ("Heading 1", 20), ("Heading 2", 18)]:
+        configure_style(document.styles[name], tokens["typography"]["en"]["family"], tokens["typography"]["ar"]["family"], size, ink, name != "Normal")
+    embed_report_fonts(document)
     wordmark = document.add_paragraph().add_run("SOCify")
     wordmark.font.name = tokens["typography"]["display"]["en"]
     wordmark.font.size = Pt(26)
-    wordmark.bold = True
     document.add_heading("SOCify Tactical Workbench", 0)
-    document.add_heading(display(payload["case"]["title"]), 1)
-    document.add_paragraph(f"{payload['case']['reference']} · {payload['revision']}")
-    document.add_paragraph("نسخة ثابتة؛ راجع سجل الاعتماد في المنصة. تعرض الأوقات كما سجلت، ولا يعني وقت إعداد التقرير وقت اكتشاف الحادث.")
-    for title, value in sections(payload):
-        document.add_heading(title, 1)
+    title = document.add_paragraph(style="Heading 1")
+    set_direction(title)
+    add_report_run(title, display(payload["case"]["title"]), True)
+    document.add_paragraph(display(payload["case"]["reference"]))
+    notice = document.add_paragraph()
+    set_direction(notice)
+    add_report_run(notice, "نسخة ثابتة؛ راجع سجل الاعتماد في المنصة. تعرض الأوقات كما سجلت، ولا يعني وقت إعداد التقرير وقت اكتشاف الحادث.")
+    for section_index, (title, value) in enumerate(sections(payload)):
+        heading = document.add_paragraph(style="Heading 1")
+        set_direction(heading)
+        add_report_run(heading, title, True)
+        if section_index == 0:
+            heading.paragraph_format.page_break_before = True
         content_lines = list(lines(value))
+        table = document.add_table(rows=0, cols=2)
+        table.table_direction = WD_TABLE_DIRECTION.RTL
+        table.autofit = False
+        table.columns[0].width, table.columns[1].width = Pt(145), Pt(362)
         for line_index, (depth, text) in enumerate(content_lines):
-            paragraph = document.add_paragraph(text)
-            paragraph.paragraph_format.left_indent = Pt(min(depth, 3) * 8)
-            if line_index + 1 < len(content_lines) and content_lines[line_index + 1][0] > depth:
-                paragraph.paragraph_format.keep_with_next = True
-                for run in paragraph.runs:
-                    run.bold = True
-            bidi = OxmlElement("w:bidi")
-            bidi.set(qn("w:val"), "1")
-            paragraph._p.get_or_add_pPr().append(bidi)
+            is_heading = line_index + 1 < len(content_lines) and content_lines[line_index + 1][0] > depth
+            label, separator, value = text.partition(": ")
+            cells = table.add_row().cells
+            if is_heading or not separator or label not in LABELS.values():
+                cell = cells[0].merge(cells[1])
+                paragraph = cell.paragraphs[0]
+                set_direction(paragraph)
+                paragraph.paragraph_format.keep_with_next = is_heading
+                paragraph.paragraph_format.space_before = Pt(8)
+                add_report_run(paragraph, text, is_heading)
+            else:
+                for index, content in enumerate((label, value)):
+                    paragraph = cells[index].paragraphs[0]
+                    set_direction(paragraph, any("\u0600" <= character <= "\u06ff" for character in content))
+                    paragraph.paragraph_format.space_after = Pt(6)
+                    add_report_run(paragraph, content, index == 0)
     output = io.BytesIO()
     document.save(output)
     return output.getvalue()

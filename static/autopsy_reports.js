@@ -2,6 +2,21 @@
 
 let autopsyReportTimer = null;
 const autopsyReportProfiles = new Map();
+const autopsyReportViews = new Map();
+
+function autopsySavedReportProfile(key) {
+  if (autopsyReportProfiles.has(key)) return autopsyReportProfiles.get(key);
+  try { return localStorage.getItem(`socify-report-profile:${key}`); } catch (_) { return null; }
+}
+
+function autopsyRememberReportProfile(key, value) {
+  autopsyReportProfiles.set(key, value);
+  try { localStorage.setItem(`socify-report-profile:${key}`, value); } catch (_) { /* Keep this page's choice. */ }
+}
+
+function autopsyReportSharingLabel(profile) {
+  return SOCifyLocale.text(profile === "full" ? "كامل للاستخدام الداخلي المصرح" : "منقح: بيانات إحصائية وحالة فقط");
+}
 
 const autopsyReportLabels = {
   evidenced_timeline: SOCifyLocale.text("السجل الزمني للأدلة"),
@@ -84,7 +99,7 @@ function autopsyReportFieldLabel(key) {
   return autopsyReportLabels[key] || (autopsy.catalog.report_labels?.[key] ? SOCifyLocale.text(autopsy.catalog.report_labels[key]) : autopsyLabel(key));
 }
 
-function autopsyReportPreview(value, depth = 0, fieldKey = "") {
+function autopsyReportPreview(value, depth = 0, fieldKey = "", view = null, path = []) {
   if (value === null || typeof value !== "object") {
     let text = value === null ? "—" : String(value);
     if (fieldKey === "profile") text = value === "full" ? SOCifyLocale.text("كامل للاستخدام الداخلي المصرح") : value === "metadata_only_v1" ? SOCifyLocale.text("منقح: بيانات إحصائية وحالة فقط") : text;
@@ -98,13 +113,16 @@ function autopsyReportPreview(value, depth = 0, fieldKey = "") {
   }) : Object.entries(value).filter(([key]) => !["schema", "revision", "version", "source_version", "parser_version"].includes(key))).filter(([, item]) => autopsyReportHasContent(item));
   if (!entries.length) return node("p", { text: SOCifyLocale.text("لا توجد عناصر مسجلة") });
   const body = node("dl", { class: "report-data" });
-  for (const [key, item] of entries.slice(0, 100)) {
+  for (const [index, [key, item]] of entries.slice(0, 100).entries()) {
     const label = Array.isArray(value) ? key : autopsyReportFieldLabel(key);
     body.append(node("dt", { text: label }));
     const detail = node("dd");
     if (item !== null && typeof item === "object") {
-      const expand = node("details", {}, node("summary", { text: Array.isArray(item) ? SOCifyLocale.template`عناصر مسجلة: ${item.length}` : SOCifyLocale.text("عرض التفاصيل") }));
-      expand.addEventListener("toggle", () => { if (expand.open && expand.children.length === 1) expand.append(autopsyReportPreview(item, depth + 1)); });
+      const entryPath = [...path, index], identity = JSON.stringify(entryPath);
+      const expand = node("details", { open: view?.has(identity) || false }, node("summary", { text: Array.isArray(item) ? SOCifyLocale.template`عناصر مسجلة: ${item.length}` : SOCifyLocale.text("عرض التفاصيل") }));
+      const populate = () => { if (expand.open && expand.children.length === 1) expand.append(autopsyReportPreview(item, depth + 1, key, view, entryPath)); };
+      expand.addEventListener("toggle", () => { if (view && expand.isConnected) { if (expand.open) view.add(identity); else view.delete(identity); } populate(); });
+      populate();
       detail.append(expand);
     } else detail.append(autopsyReportPreview(item, depth + 1, key));
     body.append(detail);
@@ -283,19 +301,21 @@ window.SOCifyAutopsy.reports = async (caseId) => {
   const body = node("div", { class: "panel-body" });
   const profiles = permission("evidence.download") ? [{ value: "full", label: SOCifyLocale.text("كامل للاستخدام الداخلي المصرح") }, { value: "metadata_only_v1", label: SOCifyLocale.text("منقح: بيانات إحصائية وحالة فقط") }] : [{ value: "metadata_only_v1", label: SOCifyLocale.text("منقح: بيانات إحصائية وحالة فقط") }];
   const profileKey = `${state.user.id}:${caseId}`;
-  const retainedProfile = autopsyReportProfiles.get(profileKey);
+  const retainedProfile = autopsySavedReportProfile(profileKey);
   const choice = autopsyChoice("profile", profiles, profiles.some(item => item.value === retainedProfile) ? retainedProfile : profiles[0].value, true);
   choice.input.addEventListener("input", () => {
     const selected = profiles.find(item => item.label === choice.input.value);
-    if (selected) autopsyReportProfiles.set(profileKey, selected.value);
+    if (selected) autopsyRememberReportProfile(profileKey, selected.value);
   });
+  const createError = node("div", { class: "report-create-error" });
   const create = button(SOCifyLocale.text("إعداد تقرير جديد"), async () => {
     if (!SOCifyDrafts.confirmDiscard(workspace)) return;
     create.disabled = true;
+    createError.replaceChildren();
     try { await api(`/api/cases/${caseId}/reports`, { method: "POST", body: { version: current.version, profile: choice.input.autopsyValue() } }); await autopsyCase(caseId); }
-    catch (error) { handleError(error); create.disabled = false; }
+    catch (error) { createError.replaceChildren(node("p", { class: "notice", role: "alert", text: error.message })); create.disabled = false; }
   }, "primary");
-  body.append(field(SOCifyLocale.text("سياسة مشاركة التقرير"), choice.control), create, button(SOCifyLocale.text("تحديث حالة التقارير"), () => autopsyCase(caseId).catch(handleError)));
+  body.append(field(SOCifyLocale.text("سياسة مشاركة التقرير"), choice.control), create, button(SOCifyLocale.text("تحديث حالة التقارير"), () => autopsyCase(caseId).catch(handleError)), createError);
   let pending = false;
   const reportStates = new Map();
   if (current.archived_reports?.length) body.append(panel(SOCifyLocale.text("أرشيف التقارير"), table([{ label: SOCifyLocale.text("الإصدار"), value: "revision" }, { label: SOCifyLocale.text("الصيغة"), value: "format" }, { label: SOCifyLocale.text("البصمة"), value: "sha256" }, { label: SOCifyLocale.text("الملف"), value: (item) => permission("evidence.download") ? linkedButton(SOCifyLocale.text("تنزيل النسخة المؤرشفة"), `/api/incidents/${caseId}/report?format=${item.format}&revision=${item.revision}`) : SOCifyLocale.text("التنزيل يتطلب صلاحية مستقلة") }], current.archived_reports)));
@@ -303,8 +323,12 @@ window.SOCifyAutopsy.reports = async (caseId) => {
     const report = await api(`/api/cases/${caseId}/reports/${item.id}`);
     reportStates.set(report.id, autopsyReportSignature(report));
     const stale = report.source_version !== current.version;
+    const viewKey = `${profileKey}:${report.id}`;
+    if (!autopsyReportViews.has(viewKey)) autopsyReportViews.set(viewKey, new Set());
+    const view = autopsyReportViews.get(viewKey);
     const card = node("article", { class: "card report-revision" }, [
       node("h3", { text: SOCifyLocale.template`تقرير ${report.revision}` }),
+      node("p", { class: "report-sharing", text: autopsyReportSharingLabel(report.profile) }),
       node("p", { class: "report-status", text: `${autopsyQuickReportLabel(report.state)} · ${autopsyReportProcessingLabel(report.job.state)}` }),
       node("p", { text: SOCifyLocale.text(stale ? "تغيرت القضية بعد إعداد هذا التقرير" : "يتضمن أحدث بيانات القضية") }),
       node("p", { text: SOCifyLocale.template`أُعد: ${formatTime(report.created_at)}${report.approved_at ? SOCifyLocale.template` · اعتُمد: ${formatTime(report.approved_at)}` : ""}` }),
@@ -320,7 +344,8 @@ window.SOCifyAutopsy.reports = async (caseId) => {
     for (const format of report.formats) links.append(linkedButton(SOCifyLocale.template`تنزيل ${format.toUpperCase()}`, `/api/cases/${caseId}/reports/${report.id}/files/${format}`));
     card.append(links);
     if (report.payload) {
-      const preview = node("details", {}, [node("summary", { text: SOCifyLocale.text("عرض بيانات النسخة للمراجعة") }), node("div", { class: "report-preview" }, autopsyReportPreview(report.payload))]);
+      const preview = node("details", { open: view.has("preview") }, [node("summary", { text: SOCifyLocale.text("عرض بيانات النسخة للمراجعة") }), node("div", { class: "report-preview" }, autopsyReportPreview(report.payload, 0, "", view))]);
+      preview.addEventListener("toggle", () => { if (preview.isConnected) { if (preview.open) view.add("preview"); else view.delete("preview"); } });
       card.append(preview);
     }
     const issue = autopsyReportIssue(report.job);
@@ -343,9 +368,22 @@ window.SOCifyAutopsy.reports = async (caseId) => {
       if (SOCifyDrafts.hasChanges(workspace) || !profiles.some(item => item.label === choice.input.value)) { autopsyReportTimer = setTimeout(poll, 2500); return; }
       try {
         const latest = await api(`/api/cases/${caseId}`);
+        if (!body.isConnected) return;
+        if (latest.full_case_access === false || latest.version !== current.version) { await autopsyCase(caseId); return; }
         const statuses = await Promise.all(latest.reports.slice(0, 20).map((item) => api(`/api/cases/${caseId}/reports/${item.id}`)));
-        if (latest.version !== current.version || statuses.some(item => reportStates.get(item.id) !== autopsyReportSignature(item))) return autopsyCase(caseId);
-        if (!statuses.some((item) => ["queued", "processing"].includes(item.job.state))) return autopsyCase(caseId);
+        if (!body.isConnected) return;
+        if (statuses.some(item => reportStates.get(item.id) !== autopsyReportSignature(item)) || !statuses.some(item => ["queued", "processing"].includes(item.job.state))) {
+          if (SOCifyDrafts.hasChanges(workspace) || !profiles.some(item => item.label === choice.input.value)) { autopsyReportTimer = setTimeout(poll, 2500); return; }
+          const selectedProfile = choice.input.value;
+          autopsy.current = latest;
+          const replacement = await window.SOCifyAutopsy.reports(caseId);
+          if (!rootWrap.isConnected) return;
+          if (SOCifyDrafts.hasChanges(workspace) || choice.input.value !== selectedProfile) { autopsyReportTimer = setTimeout(poll, 2500); return; }
+          const position = { top: window.scrollY, left: window.scrollX, behavior: "instant" };
+          rootWrap.replaceWith(replacement);
+          window.scrollTo(position);
+          return;
+        }
         autopsyReportTimer = setTimeout(poll, 2500);
       } catch (error) { handleError(error); }
     };

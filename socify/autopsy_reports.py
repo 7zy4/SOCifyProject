@@ -309,8 +309,10 @@ def get_report(case_id: int, report_id: int):
         .fetchone()
         or {}
     )
-    if has_permission(current_user(), "evidence.download") or has_permission(current_user(), "reports.approve"):
-        result["payload"] = json.loads(row["payload"])
+    payload = json.loads(row["payload"])
+    result["profile"] = payload["profile"]
+    if payload["profile"] == "metadata_only_v1" or has_permission(current_user(), "evidence.download") or has_permission(current_user(), "reports.approve"):
+        result["payload"] = payload
     return jsonify(result)
 
 
