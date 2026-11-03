@@ -71,6 +71,7 @@ window.SOCifyInsights = (() => {
       const params = new URLSearchParams(location.search);
       const data = await api("/api/soc/performance?" + params);
       const personal = data.member !== "team";
+      const queueURL = (changes = {}, anchor = false) => `/performance?${new URLSearchParams({member:data.member, days:data.days, queue:data.queue_kind, page:String(data.queue_page), ...changes})}${anchor ? "#performance-cases" : ""}`;
       const title = personal ? t("أداء المحلل", "Analyst performance") : t("أداء الفريق", "Team performance");
       document.getElementById("section-title").textContent = title;
       document.title = `${title} | SOCify`;
@@ -78,30 +79,45 @@ window.SOCifyInsights = (() => {
       const nav = node("nav", {class:"channel-tabs", "aria-label":t("نطاق الأداء", "Performance scope")});
       const targets = [["me",t("أدائي", "My performance")]];
       if (data.can_manage) targets.unshift(["team",t("الفريق", "Team")]);
-      for (const [value, name] of targets) nav.append(node("a", {class:"channel-tab", href:`/performance?member=${value}&days=${data.days}`, "aria-current":value===data.member?"page":null, text:name}));
+      for (const [value, name] of targets) nav.append(node("a", {class:"channel-tab", href:queueURL({member:value,page:1}), "aria-current":value===data.member?"page":null, text:name}));
       root.append(nav);
       const days = node("select", {name:"days"}, [["7",t("آخر ٧ أيام", "Last 7 days")],["30",t("آخر ٣٠ يومًا", "Last 30 days")],["90",t("آخر ٩٠ يومًا", "Last 90 days")],["all",t("كل الفترات", "All time")]].map(([value,text])=>node("option", {value, selected:value===data.days, text})));
-      const form = node("form", {class:"filter-row"}, [field(t("فترة الإنجاز", "Completion period"),days),node("input",{type:"hidden",name:"member",value:data.member}),node("button",{class:"button primary",type:"submit",text:t("تطبيق", "Apply")})]);
+      const form = node("form", {class:"filter-row"}, [field(t("فترة الإنجاز", "Completion period"),days),node("input",{type:"hidden",name:"member",value:data.member}),node("input",{type:"hidden",name:"queue",value:data.queue_kind}),node("button",{class:"button primary",type:"submit",text:t("تطبيق", "Apply")})]);
       root.append(form);
-      root.append(node("div", {class:"insight-counters"}, [["open",t("قضايا نشطة", "Active cases")],["closed",t("أغلقت خلال الفترة", "Closed in period")],["awaiting_review",t("بانتظار المراجعة", "Awaiting review")],["pending_tasks",t("مهام معلقة", "Pending tasks")]].map(([key,text])=>node("div",{class:"insight-counter"},[node("span",{text}),node("strong",{text:n(data.counts[key])})]))));
+      root.append(node("div", {class:"insight-counters"}, [["open",t("قضايا نشطة", "Active cases")],["closed",t("أغلقت خلال الفترة", "Closed in period")],["awaiting_review",t("بانتظار المراجعة", "Awaiting review")],["pending_tasks",t("مهام معلقة", "Pending tasks")]].map(([key,text])=>node(key === "pending_tasks" ? "div" : "a",{class:"insight-counter",href:key === "pending_tasks" ? null : queueURL({queue:key,page:1},true),"aria-current":key === data.queue_kind ? "page" : null},[node("span",{text}),node("strong",{text:n(data.counts[key])})]))));
       const row = node("div",{class:"insight-columns"});
       const load = node("div",{class:"panel-body"});
       for(const severity of ["critical","high","medium","low"]) load.append(node("div",{class:"insight-bar-row"},[node("span",{class:`severity ${severity}`,text:label(severity)}),node("progress",{max:Math.max(data.counts.open,1),value:data.severity[severity]||0,"aria-label":label(severity)}),node("strong",{text:n(data.severity[severity]||0)})]));
       load.append(definition([[t("تنبيهات دون قرار", "Alerts without a verdict"),n(data.counts.unreviewed_alerts)],[t("قضايا دون مسؤول", "Unassigned cases"),n(data.counts.unassigned)],[t("تجاوزت موعد القضية", "Past case deadline"),n(data.counts.overdue)]]));
       row.append(panel(t("عبء العمل الحالي", "Current workload"),load,true));
       const metricTitles = {detection_delay_seconds:t("الرصد", "Detection"),acknowledgement_delay_seconds:t("إقرار الاستلام", "Acknowledgement"),containment_delay_seconds:t("الاحتواء", "Containment"),recovery_delay_seconds:t("التعافي", "Recovery"),closure_delay_seconds:t("الإغلاق", "Closure")};
-      row.append(panel(t("وسيط المدد الموثقة", "Median evidenced durations"),table([{label:t("المرحلة", "Stage"),value:r=>metricTitles[r.key]},{label:t("المدة", "Duration"),value:r=>duration(r.median_seconds)},{label:t("قابل للحساب / مغلق", "Measured / closed"),value:r=>`${n(r.included)} / ${n(r.included+r.excluded)}`}],Object.keys(metricTitles).map(key=>({key,...data.metrics[key]}))),true));
+      row.append(panel(t("وسيط المدد الموثقة", "Median evidenced durations"),table([{label:t("المرحلة", "Stage"),value:r=>metricTitles[r.key]},{label:t("المدة", "Duration"),value:r=>duration(r.median_seconds)},{label:t("حالات قابلة للحساب", "Cases measured"),value:r=>`${n(r.included)} ${t("من", "of")} ${n(r.included+r.excluded)}`}],Object.keys(metricTitles).map(key=>({key,...data.metrics[key]}))),true));
       root.append(row);
-      if(data.members.length) root.append(panel(t("الفريق والإنجاز", "Team delivery"),table([{label:t("المحلل", "Analyst"),value:r=>data.can_manage?node("a",{href:`/performance?member=${r.id}&days=${data.days}`,text:r.name}):userText(r.name)},{label:t("الدور", "Role"),value:r=>label(r.role)},{label:t("نشطة", "Active"),value:"open"},{label:t("مغلقة خلال الفترة", "Closed in period"),value:"closed"},{label:t("مهام أنجزها", "Tasks completed"),value:"tasks_completed"}],data.members),true));
+      if(data.members.length) root.append(panel(t("الفريق والإنجاز", "Team delivery"),table([{label:t("المحلل", "Analyst"),value:r=>data.can_manage?node("a",{href:queueURL({member:r.id,page:1}),text:r.name}):userText(r.name)},{label:t("الدور", "Role"),value:r=>label(r.role)},{label:t("نشطة", "Active"),value:"open"},{label:t("مغلقة خلال الفترة", "Closed in period"),value:"closed"},{label:t("مهام أنجزها", "Tasks completed"),value:"tasks_completed"}],data.members),true));
       if(data.trend.length) {
         const trend=node("details",{class:"insight-method"},node("summary",{text:t("حركة القضايا خلال الفترة", "Case activity during period")}));
         trend.append(table([{label:t("التاريخ", "Date"),value:"date"},{label:t("أنشئت", "Opened"),value:"opened"},{label:t("أغلقت", "Closed"),value:"closed"}],data.trend));root.append(trend);
       }
-      root.append(panel(`${t("قائمة المتابعة", "Work queue")} · ${n(data.queue_total)}`,data.queue.length?table([{label:t("القضية", "Case"),value:r=>node("a",{href:`/cases/${r.id}`,text:`${r.reference} · ${r.title}`})},{label:t("الخطورة", "Severity"),value:r=>node("span",{class:`severity ${r.severity}`,text:label(r.severity)})},{label:t("المسؤول", "Owner"),value:r=>userText(r.assignee_name)},{label:t("الحالة", "Status"),value:r=>label(r.status)},{label:t("الموعد", "Deadline"),value:r=>time(r.sla_due_at)}],data.queue):emptyState(t("لا قضايا نشطة", "No active cases"),null,[linkedButton(t("إدارة القضايا", "Case management"),"/cases")]),true));
+      const queueTitle = data.queue_kind === "closed" ? t("القضايا المغلقة", "Closed cases") : data.queue_kind === "awaiting_review" ? t("بانتظار المراجعة", "Awaiting review") : t("قائمة المتابعة", "Work queue");
+      const emptyQueue = data.queue_kind === "closed" ? t("لا قضايا مغلقة خلال الفترة", "No cases closed in this period") : data.queue_kind === "awaiting_review" ? t("لا قضايا بانتظار المراجعة", "No cases awaiting review") : t("لا قضايا نشطة", "No active cases");
+      const queueContent = data.queue.length ? table([{label:t("القضية", "Case"),value:r=>node("a",{href:`/cases/${r.id}${data.queue_kind === "awaiting_review" ? "?tab=reports" : ""}`,text:`${r.reference} · ${r.title}`})},{label:t("الخطورة", "Severity"),value:r=>node("span",{class:`severity ${r.severity}`,text:label(r.severity)})},{label:t("المسؤول", "Owner"),value:r=>userText(r.assignee_name)},{label:t("الحالة", "Status"),value:r=>label(r.status)},{label:data.queue_kind === "closed" ? t("الإغلاق", "Closed at") : t("الموعد", "Deadline"),value:r=>time(data.queue_kind === "closed" ? r.closed_at : r.sla_due_at)}],data.queue) : emptyState(emptyQueue,null,[linkedButton(t("إدارة القضايا", "Case management"),"/cases")]);
+      const queuePanel = panel(`${queueTitle} · ${n(data.queue_total)}`, queueContent, true);
+      queuePanel.id = "performance-cases";
+      queuePanel.setAttribute("aria-label",queueTitle);
+      if(data.queue_pages > 1) {
+        const paging = node("nav",{class:"pagination","aria-label":t("صفحات القضايا", "Case pages")},[
+          data.queue_page > 1 ? linkedButton(t("السابق", "Previous"),queueURL({page:data.queue_page-1},true)) : null,
+          node("span",{text:t(`الصفحة ${n(data.queue_page)} من ${n(data.queue_pages)}`,`Page ${n(data.queue_page)} of ${n(data.queue_pages)}`)}),
+          data.queue_page < data.queue_pages ? linkedButton(t("التالي", "Next"),queueURL({page:data.queue_page+1},true)) : null,
+        ]);
+        queuePanel.append(paging);
+      }
+      root.append(queuePanel);
       if(data.tasks.length) root.append(panel(`${t("المهام المعلقة", "Pending tasks")} · ${n(data.task_total)}`,table([{label:t("المهمة", "Task"),value:r=>node("a",{href:`/cases/${r.case_id}?tab=summary#case-task-${r.id}`,text:r.title})},{label:t("الحالة", "Status"),value:r=>label(r.status)}],data.tasks),true));
-      if(data.queue_total>50||data.task_total>50)root.append(linkedButton(t("إدارة القضايا", "Case management"),"/cases"));
+      if(data.task_total>50)root.append(linkedButton(t("إدارة القضايا", "Case management"),"/cases"));
       finish(root);
-    } catch(error) {finish(emptyState(t("تعذر تحميل الأداء", "Unable to load performance"),error.message,[button(t("إعادة المحاولة", "Retry"),performance)]));}
+      if(location.hash === "#performance-cases") {queuePanel.tabIndex=-1;queuePanel.focus({preventScroll:true});queuePanel.scrollIntoView({block:"start"});}
+    } catch(error) {finish(emptyState(t("تعذر تحميل الأداء", "Unable to load performance"),error.message,[button(t("إعادة المحاولة", "Retry"),performance),linkedButton(t("مسح المرشحات", "Clear filters"),"/performance")]));}
   }
   async function dossier(item, container) {
     const data=await api(`/api/cases/${item.case_id}/alerts/${item.id}/dossier`);

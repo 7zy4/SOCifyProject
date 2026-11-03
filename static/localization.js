@@ -19,6 +19,7 @@
   "عرض السبب الجذري": "View root cause",
   "فرع السبب المرتبط غير متاح": "The linked cause branch is unavailable",
   "المستخدم غير متاح": "User unavailable",
+  "فتح المهمة": "Open task",
   "تعذر تحميل المرجع المرتبط": "The linked reference could not be loaded",
   "مرجع نتيجة التحقيق غير متاح": "The investigation reference is unavailable",
   "لا نتائج مطابقة": "No matching results",

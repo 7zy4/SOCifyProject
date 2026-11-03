@@ -193,11 +193,13 @@ def performance():
     user = current_user() or {}
     manager = user.get("role") in {"admin", "soc_manager"}
     try:
-        if set(request.args) - {"days", "member"} or any(len(request.args.getlist(key)) != 1 for key in request.args):
+        if set(request.args) - {"days", "member", "queue", "page"} or any(len(request.args.getlist(key)) != 1 for key in request.args):
             raise ValueError
         days = request.args.get("days", "30")
         member = request.args.get("member", "team" if manager else "me")
-        if days not in {"7", "30", "90", "all"}:
+        queue_kind = request.args.get("queue", "open")
+        page = int(request.args.get("page", 1))
+        if days not in {"7", "30", "90", "all"} or queue_kind not in {"open", "closed", "awaiting_review"} or not 1 <= page <= 1000000:
             raise ValueError
         member_id = actor_id() if member == "me" else None if member == "team" else int(member)
         if member_id is not None and not 1 <= member_id <= 2**63 - 1:
@@ -298,11 +300,17 @@ def performance():
 
     def case_view(case):
         return {
-            **{key: case[key] for key in ("id", "reference", "title", "severity", "status", "assignee", "created_at", "sla_due_at")},
+            **{key: case[key] for key in ("id", "reference", "title", "severity", "status", "assignee", "created_at", "closed_at", "sla_due_at")},
             "assignee_name": members.get(case["assignee"], {}).get("name"),
         }
 
     queue = sorted(open_cases, key=lambda c: (c["id"] not in {item["id"] for item in overdue}, c["created_at"], c["id"]))
+    if queue_kind == "closed":
+        queue = sorted(closed_cases, key=lambda case: (moment(case["closed_at"]), case["id"]), reverse=True)
+    elif queue_kind == "awaiting_review":
+        queue = sorted(review_cases, key=lambda case: (case["created_at"], case["id"]))
+    pages = max(1, (len(queue) + 49) // 50)
+    page = min(page, pages)
     return jsonify(
         {
             "days": days,
@@ -323,8 +331,12 @@ def performance():
             "metrics": metric_results,
             "trend": [{"date": day, **values} for day, values in sorted(trend.items())],
             "members": list(workload.values()) if member_id is None else [workload[member_id]] if member_id in workload else [],
-            "queue": [case_view(case) for case in queue[:50]],
+            "queue": [case_view(case) for case in queue[(page - 1) * 50 : page * 50]],
             "queue_total": len(queue),
+            "queue_kind": queue_kind,
+            "queue_page": page,
+            "queue_pages": pages,
+            "queue_page_size": 50,
             "tasks": pending[:50],
             "task_total": len(pending),
         }

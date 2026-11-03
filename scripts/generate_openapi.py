@@ -148,10 +148,12 @@ def generate() -> dict[str, object]:
             elif path == "/api/soc/performance":
                 operation["summary"] = "Team and personal operational performance"
                 operation["description"] = (
-                    "Current authorized backlog and period completions. Team/member selection is manager-only; analysts can select themselves. Missing evidenced times remain null. Excludes training, archived, unapproved and restricted-batch cases. Returns 422 above 2000 scoped cases; never silently samples."
+                    "Current authorized backlog and period completions. Team/member selection is manager-only; analysts can select themselves. The queue can show active cases, cases closed in the selected period, or cases awaiting review. Case rows use stable 50-row pagination; pages beyond the end resolve to the last page. Metrics retain the full selected member and period scope. Missing evidenced times remain null. Excludes training, archived, unapproved and restricted-batch cases. Returns 422 above 2000 scoped cases; never silently samples."
                 )
                 operation["parameters"] = [
                     {"name": "days", "in": "query", "schema": {"type": "string", "enum": ["7", "30", "90", "all"], "default": "30"}},
+                    {"name": "queue", "in": "query", "schema": {"type": "string", "enum": ["open", "closed", "awaiting_review"], "default": "open"}},
+                    {"name": "page", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 1000000, "default": 1}},
                     {"name": "member", "in": "query", "schema": {"type": "string"}, "description": "me, team, or an authorized workspace member ID"},
                 ]
                 operation["responses"]["422"] = {"description": "Invalid filters or scope exceeds the bounded dashboard size"}

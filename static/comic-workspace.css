@@ -386,3 +386,6 @@ dialog::backdrop { background:rgb(10 13 15 / .78); }
 .procedure-result dd button { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
 
 .record-card .alert-property-table .button { max-width:100%;white-space:normal;overflow-wrap:anywhere; }
+
+a.insight-counter { color:var(--text);text-decoration:none; }
+a.insight-counter:hover,a.insight-counter[aria-current="page"] { border-color:var(--primary-fill); }

@@ -35,19 +35,49 @@ class ReviewJourney:
     def __init__(self, page, base, steps):
         self.page, self.base, self.steps = page, base, steps
         self.pending = set()
+        self.request_order = {}
+        self.request_sequence = 0
+        self.main_navigation = None
+        self.navigation_retirements = []
         self.last_request = time.monotonic()
 
         def started(request):
+            self.request_sequence += 1
+            self.request_order[request] = self.request_sequence
             self.pending.add(request)
+            if request.is_navigation_request() and request.frame == page.main_frame:
+                self.main_navigation = (request, self.request_sequence)
             self.last_request = time.monotonic()
 
         def finished(request):
             self.pending.discard(request)
+            self.request_order.pop(request, None)
+            if request.failure and self.main_navigation and self.main_navigation[0] == request:
+                self.main_navigation = None
+            self.last_request = time.monotonic()
+
+        def committed():
+            if self.main_navigation is None:
+                return
+            navigation, sequence = self.main_navigation
+            if navigation.url.split("#", 1)[0] != page.url.split("#", 1)[0]:
+                return
+            # A completed document navigation retires requests owned by the
+            # previous document, even if its cancellation event was not delivered.
+            # Same-document and failed navigations never discard current work.
+            retired = [request for request in self.pending if self.request_order[request] < sequence]
+            if retired:
+                self.navigation_retirements.append(sorted(urlsplit(request.url).path for request in retired))
+            for request in retired:
+                self.pending.discard(request)
+                self.request_order.pop(request, None)
+            self.main_navigation = None
             self.last_request = time.monotonic()
 
         page.on("request", started)
         page.on("requestfinished", finished)
         page.on("requestfailed", finished)
+        page.on("domcontentloaded", committed)
 
     def text(self, text):
         return self.page.evaluate("s => SOCifyLocale.text(s)", text)
@@ -162,6 +192,7 @@ def review_session(app, language, name):
                 result["error"] = str(error)
                 raise
             finally:
+                result["navigation_retirements"] = {"analyst": analyst.navigation_retirements, "manager": manager.navigation_retirements}
                 for who, page in zip(("analyst", "manager"), pages, strict=True):
                     if page.url != "about:blank":
                         page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
