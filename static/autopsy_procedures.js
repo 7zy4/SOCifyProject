@@ -58,7 +58,7 @@ async function autopsyProcedureLibrary() {
 
 window.SOCifyAutopsy.procedures = async (caseId) => {
   const [library, records] = await Promise.all([api("/api/autopsy/procedures"), api(`/api/cases/${caseId}/records?kind=playbook&limit=100`)]);
-  const body = node("div", { class: "panel-body" }, [node("p", { text: SOCifyLocale.text("توثيق إجراءات واقعية بالأدلة؛ لا ترسل المنصة أوامر عزل أو حظر إلى أجهزة الشركة.") }), linkedButton(SOCifyLocale.text("إدارة القوالب وإصداراتها"), "/playbooks")]);
+  const body = node("div", { class: "panel-body" }, [linkedButton(SOCifyLocale.text("إدارة القوالب وإصداراتها"), "/playbooks")]);
   const published = library.items.filter((item) => item.state === "published");
   if (permission("playbooks.request") && autopsy.current.status !== "closed") {
     const choice = autopsyChoice("template", published.map((item) => ({ value: item.id, label: `${item.name} · ${item.version}` })), "", true);

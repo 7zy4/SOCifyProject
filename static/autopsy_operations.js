@@ -19,7 +19,7 @@ Object.assign(autopsyLabels, { source: SOCifyLocale.text("المصدر"), licens
 
 window.SOCifyAutopsy.library = async () => {
   begin("analysis-library");
-  const root = node("div", {}, pageHead(SOCifyLocale.text("مكتبة التحليل المحلي"), SOCifyLocale.text("مصادر الشركة المحلية وقواعد الكشف. لا ترسل المنصة مؤشرات أو سجلات للخارج.")));
+  const root = node("div", {}, pageHead(SOCifyLocale.text("مكتبة التحليل المحلي"), null));
   const bundles = await api("/api/autopsy/intelligence");
   root.append(panel(SOCifyLocale.text("إصدارات مصادر TI وGeoIP"), table([{ label: SOCifyLocale.text("الاسم"), value: "name" }, { label: SOCifyLocale.text("الإصدار"), value: "version" }, { label: SOCifyLocale.text("المصدر والرخصة"), value: (row) => `${row.source} · ${row.license}` }, { label: SOCifyLocale.text("المؤشرات"), value: "entries" }, { label: SOCifyLocale.text("الصلاحية"), value: (row) => formatTime(row.expires_at) }, { label: SOCifyLocale.text("التفعيل"), value: (row) => row.active ? SOCifyLocale.text("الإصدار المختار") : permission("intel.manage") ? autopsyAction(SOCifyLocale.text("تفعيل الإصدار"), async () => { await api(`/api/autopsy/intelligence/${row.id}/activate`, { method: "POST", body: {} }); await window.SOCifyAutopsy.library(); }) : SOCifyLocale.text("غير مختار") }], bundles.items), true));
   if (permission("intel.manage")) {
