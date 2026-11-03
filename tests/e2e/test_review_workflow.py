@@ -130,7 +130,7 @@ class ReviewJourney:
 
 
 @contextmanager
-def review_session(app, language, name):
+def review_session(app, language, name, *, create_case=True):
     app.config.update(LEGACY_TRAINING_TESTS=False, ALLOW_REGISTRATION=False, WTF_CSRF_ENABLED=True)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -150,8 +150,9 @@ def review_session(app, language, name):
             analyst, manager = [ReviewJourney(page, f"http://127.0.0.1:{server.server_port}", result["steps"]) for page in pages]
             try:
                 analyst.login("analyst@socify.local")
-                analyst.create_case()
-                manager.case_id = analyst.case_id
+                if create_case:
+                    analyst.create_case()
+                    manager.case_id = analyst.case_id
                 yield analyst, manager, result
                 assert not result["browser_errors"], result["browser_errors"]
                 result["status"] = "completed"

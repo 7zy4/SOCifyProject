@@ -36,7 +36,27 @@ def generate() -> dict[str, object]:
                 operation["parameters"] = parameters
             if method in {"POST", "PUT", "PATCH"}:
                 operation["requestBody"] = {"required": False, "content": {"application/json": {"schema": {"type": "object", "additionalProperties": True}}}}
-            if path == "/api/profile/display-name":
+            if path in {"/api/cases", "/api/incidents"} and method == "POST":
+                operation["summary"] = "Create a case or recover a previous creation"
+                operation["parameters"] = [
+                    {"name": "Idempotency-Key", "in": "header", "required": False, "schema": {"type": "string", "pattern": "^[A-Za-z0-9_.:-]{8,128}$"}}
+                ]
+                operation["description"] = (
+                    "An optional retry key is scoped to the authenticated author and workspace and bound to the creation body. "
+                    "Identical retries return the same case identifier and its current authorized view, preserving later claims and approvals. "
+                    "No additional case, tasks, approval, audit or outbox entries are created. Current cases.create permission and case visibility are required. "
+                    "Changed content with the same key returns 409; an unavailable retained case returns 404 without creating a replacement. "
+                    "The receipt commits atomically with the case. A distinct intentional creation uses a fresh key."
+                )
+                operation["responses"].update(
+                    {
+                        "201": {"description": "Case created or its authorized current view recovered"},
+                        "404": {"description": "Previously created case is unavailable"},
+                        "409": {"description": "Retry key is bound to different content"},
+                        "422": {"description": "Invalid creation data or retry key"},
+                    }
+                )
+            elif path == "/api/profile/display-name":
                 operation["summary"] = "Save the authenticated user's display names"
                 operation["requestBody"] = {
                     "required": True,

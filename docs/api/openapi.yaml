@@ -1277,6 +1277,18 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "201": {
+            "description": "Case created or its authorized current view recovered"
+          },
+          "404": {
+            "description": "Previously created case is unavailable"
+          },
+          "409": {
+            "description": "Retry key is bound to different content"
+          },
+          "422": {
+            "description": "Invalid creation data or retry key"
           }
         },
         "requestBody": {
@@ -1289,7 +1301,20 @@
               }
             }
           }
-        }
+        },
+        "summary": "Create a case or recover a previous creation",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:-]{8,128}$"
+            }
+          }
+        ],
+        "description": "An optional retry key is scoped to the authenticated author and workspace and bound to the creation body. Identical retries return the same case identifier and its current authorized view, preserving later claims and approvals. No additional case, tasks, approval, audit or outbox entries are created. Current cases.create permission and case visibility are required. Changed content with the same key returns 409; an unavailable retained case returns 404 without creating a replacement. The receipt commits atomically with the case. A distinct intentional creation uses a fresh key."
       }
     },
     "/api/cases/{case_id}": {
@@ -5267,6 +5292,18 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "201": {
+            "description": "Case created or its authorized current view recovered"
+          },
+          "404": {
+            "description": "Previously created case is unavailable"
+          },
+          "409": {
+            "description": "Retry key is bound to different content"
+          },
+          "422": {
+            "description": "Invalid creation data or retry key"
           }
         },
         "requestBody": {
@@ -5279,7 +5316,20 @@
               }
             }
           }
-        }
+        },
+        "summary": "Create a case or recover a previous creation",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:-]{8,128}$"
+            }
+          }
+        ],
+        "description": "An optional retry key is scoped to the authenticated author and workspace and bound to the creation body. Identical retries return the same case identifier and its current authorized view, preserving later claims and approvals. No additional case, tasks, approval, audit or outbox entries are created. Current cases.create permission and case visibility are required. Changed content with the same key returns 409; an unavailable retained case returns 404 without creating a replacement. The receipt commits atomically with the case. A distinct intentional creation uses a fresh key."
       }
     },
     "/api/incidents/{case_id}": {

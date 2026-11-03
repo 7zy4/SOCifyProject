@@ -340,12 +340,57 @@ function autopsyForm(schema, submit, initial = {}) {
   return SOCifyDrafts.track(form);
 }
 
+// Retain operation metadata and payload digests only; never persist draft contents.
+const autopsyWriteIntents = new Map();
+async function autopsyWriteIntent(scope, body) {
+  const { version, ...content } = body;
+  const canonical = JSON.stringify(content, (_, value) => value && typeof value === "object" && !Array.isArray(value)
+    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]])) : value);
+  const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical)))].map(byte => byte.toString(16).padStart(2, "0")).join("");
+  const storageKey = `socify:${scope}:${state.user.workspace_id}:${state.user.id}:${digest}`;
+  let intent = autopsyWriteIntents.get(storageKey);
+  if (!intent) {
+    try { intent = JSON.parse(sessionStorage.getItem(storageKey)); } catch (_) { /* In-memory recovery remains available. */ }
+    if (!intent || !/^[a-f0-9-]{36}$/.test(intent.key) || (version !== undefined && !Number.isSafeInteger(intent.version))) intent = { key: crypto.randomUUID(), version };
+    autopsyWriteIntents.set(storageKey, intent);
+    try { sessionStorage.setItem(storageKey, JSON.stringify(intent)); } catch (_) { /* Storage may be disabled. */ }
+  }
+  return { key: intent.key, body: { ...content, ...(version !== undefined ? { version: intent.version } : {}) }, received: id => {
+    intent.result_id = id;
+    try { sessionStorage.setItem(storageKey, JSON.stringify(intent)); } catch (_) { /* Retained in memory until navigation. */ }
+  }, acknowledged: () => {
+    autopsyWriteIntents.delete(storageKey);
+    try { sessionStorage.removeItem(storageKey); } catch (_) { /* No draft data was stored. */ }
+  } };
+}
+
+function autopsyAcknowledgeCaseIntake(ids) {
+  const visible = new Set(ids);
+  const prefix = `socify:case-create:${state.user.workspace_id}:${state.user.id}:`;
+  const keys = new Set(autopsyWriteIntents.keys());
+  try { Object.keys(sessionStorage).forEach(key => keys.add(key)); } catch (_) { /* Storage may be disabled. */ }
+  for (const key of keys) {
+    if (!key.startsWith(prefix)) continue;
+    let intent = autopsyWriteIntents.get(key);
+    try { intent ||= JSON.parse(sessionStorage.getItem(key)); } catch (_) { /* Ignore invalid metadata. */ }
+    if (!visible.has(intent?.result_id)) continue;
+    autopsyWriteIntents.delete(key);
+    try { sessionStorage.removeItem(key); } catch (_) { /* The document has acknowledged its result. */ }
+  }
+}
+
 function autopsyNewCase(unassigned = false, destination = "overview") {
   const form = autopsyForm({ title: { required: true, max: 255 }, reason: { required: true, choices: autopsy.catalog.reasons }, objective: { required: true, max: 2000 }, classification: { required: true, choices: autopsy.catalog.classifications } }, async (body) => {
-    const payload = unassigned ? { ...body, assignee: null } : body;
-    const created = await api("/api/cases", { method: "POST", body: payload });
-    SOCifyDrafts.saved(form);
-    window.location.assign(unassigned ? "/cases" : `/cases/${created.id}${destination === "logs" ? "?tab=logs" : ""}`);
+    const controls = [...form.querySelectorAll("input,textarea,select,button")].filter(control => !control.disabled);
+    controls.forEach(control => { control.disabled = true; });
+    try {
+      const payload = unassigned ? { ...body, assignee: null } : body;
+      const intent = await autopsyWriteIntent("case-create", payload);
+      const created = await api("/api/cases", { method: "POST", headers: { "Idempotency-Key": intent.key }, body: intent.body });
+      intent.received(created.id);
+      SOCifyDrafts.saved(form);
+      window.location.assign(unassigned ? "/cases" : `/cases/${created.id}${destination === "logs" ? "?tab=logs" : ""}`);
+    } finally { controls.forEach(control => { control.disabled = false; }); }
   }, { reason: "alert_review", objective: SOCifyLocale.text("التحقيق الأولي السريع وتحديد المؤشرات والإجراء المناسب"), classification: "confidential" });
   autopsyModal(unassigned ? SOCifyLocale.text("إيداع قضية مفتوحة في طابور الفريق") : SOCifyLocale.text("إنشاء قضية سريعة وبدء التحقيق"), form);
 }
@@ -395,6 +440,7 @@ async function autopsyCases(page = null, query = null) {
   if (page * 25 < data.total) pages.append(button(SOCifyLocale.text("التالي"), () => autopsyCases(page + 1, query).catch(handleError)));
   root.append(pages);
   finish(root);
+  autopsyAcknowledgeCaseIntake([...data.items, ...(claimable.items || [])].map(item => item.id));
 }
 
 function autopsyRecordCard(record) {
@@ -589,7 +635,7 @@ async function autopsyCase(caseId) {
   let selected = new URLSearchParams(window.location.search).get("tab") || "summary";
   autopsy.current = await api(`/api/cases/${caseId}`);
   const current = autopsy.current;
-  if (window.SOCifyWorkspace?.intake(current)) return;
+  if (window.SOCifyWorkspace?.intake(current)) { autopsyAcknowledgeCaseIntake([current.id]); return; }
   document.getElementById("section-title").textContent = current.reference;
   document.getElementById("section-kicker").textContent = current.reference;
   document.title = `${current.reference} | SOCify Tactical Workbench`;
@@ -655,6 +701,7 @@ async function autopsyCase(caseId) {
   root.append(content);
   window.SOCifyWorkbench?.bindCase(current);
   finish(root);
+  autopsyAcknowledgeCaseIntake([current.id]);
   if (selected === "summary" && /^#case-task-\d+$/.test(location.hash)) {
     const task = document.getElementById(location.hash.slice(1));
     if (task) { task.focus({ preventScroll: true }); task.scrollIntoView({ block: "center", behavior: "instant" }); }

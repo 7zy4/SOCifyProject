@@ -320,6 +320,15 @@ BEFORE DELETE ON case_evidence_content
 BEGIN
     SELECT RAISE(ABORT, 'immutable evidence content');
 END;
+CREATE TABLE IF NOT EXISTS case_creation_receipts (
+    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+    actor_id INTEGER NOT NULL REFERENCES users(id),
+    request_key TEXT NOT NULL,
+    request_hash TEXT NOT NULL,
+    case_id INTEGER NOT NULL REFERENCES incident_cases(id),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(workspace_id, actor_id, request_key)
+);
 CREATE TABLE IF NOT EXISTS case_tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     case_id INTEGER NOT NULL REFERENCES incident_cases(id),

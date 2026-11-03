@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import html
 import json
+import re
 import sqlite3
 from datetime import timedelta
 from typing import Any
@@ -298,10 +299,44 @@ def create_case():
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return error_response("INVALID_JSON", "يلزم إرسال كائن JSON صالح", 400)
-    return _create_case(data)
+    key = request.headers.get("Idempotency-Key")
+    retry = None
+    if key is not None:
+        try:
+            if not re.fullmatch(r"[A-Za-z0-9_.:-]{8,128}", key):
+                raise ValueError
+            digest = hashlib.sha256(json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+        except (ValueError, TypeError, UnicodeError, RecursionError):
+            return error_response("INVALID_CASE_REQUEST", "معرف إعادة المحاولة أو بيانات القضية غير صالحة", 422)
+        retry = key, digest
+    return _create_case(data, retry)
 
 
-def _create_case(data: dict[str, Any]):
+def _case_creation_receipt(retry: tuple[str, str]):
+    row = (
+        get_db()
+        .execute(
+            "SELECT request_hash,case_id FROM case_creation_receipts WHERE workspace_id=? AND actor_id=? AND request_key=?",
+            (workspace_id(), actor_id(), retry[0]),
+        )
+        .fetchone()
+    )
+    if row is None:
+        return None
+    if row["request_hash"] != retry[1]:
+        return error_response("CASE_REQUEST_CONFLICT", "تغير محتوى الطلب؛ أعد المحاولة كعملية جديدة", 409)
+    case = _case_row(row["case_id"])
+    if case is None:
+        return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+    # Current scope and view apply, including a colleague's later assignment or approval.
+    return jsonify(_case_view(case)), 201, {"Location": f"/api/incidents/{case['id']}"}
+
+
+def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
+    if retry is not None:
+        recovered = _case_creation_receipt(retry)
+        if recovered is not None:
+            return recovered
     reason = data["reason"] if "reason" in data and data["reason"] is not None else "tactical_triage"
     objective = data["objective"] if "objective" in data and data["objective"] is not None else "التحقيق الأولي السريع وتحديد المؤشرات والإجراء المناسب"
     classification = data.get("classification", "confidential")
@@ -374,6 +409,10 @@ def _create_case(data: dict[str, Any]):
     user = current_user()
     team = str(data.get("team") or (user.get("team") if user else "") or "")[:120]
     with transaction():
+        if retry is not None:
+            recovered = _case_creation_receipt(retry)
+            if recovered is not None:
+                return recovered
         for event_id in event_ids:
             event = (
                 get_db()
@@ -464,6 +503,11 @@ def _create_case(data: dict[str, Any]):
             f"case-create:{case_id}",
         )
         insert_outbox(get_db(), workspace_id(), "incident.created", {"id": case_id})
+        if retry is not None:
+            get_db().execute(
+                "INSERT INTO case_creation_receipts(workspace_id,actor_id,request_key,request_hash,case_id,created_at) VALUES (?,?,?,?,?,?)",
+                (workspace_id(), actor_id(), retry[0], retry[1], case_id, now),
+            )
     row = _case_row(case_id)
     return jsonify(_case_view(row)), 201, {"Location": f"/api/incidents/{case_id}"}
 

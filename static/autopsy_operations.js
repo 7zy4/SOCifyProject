@@ -9,28 +9,6 @@ function autopsyAction(label, action, style = "ghost") {
   return control;
 }
 
-// Only opaque operation identifiers and payload digests survive a tab reload.
-// Rule contents and investigation drafts never enter browser storage.
-const sigmaPublicationIntents = new Map();
-async function sigmaPublicationIntent(body) {
-  const { version, ...content } = body;
-  const canonical = JSON.stringify(content, (_, value) => value && typeof value === "object" && !Array.isArray(value)
-    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]])) : value);
-  const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical)))].map(byte => byte.toString(16).padStart(2, "0")).join("");
-  const storageKey = `socify:sigma:${state.user.workspace_id}:${state.user.id}:${digest}`;
-  let intent = sigmaPublicationIntents.get(storageKey);
-  if (!intent) {
-    try { intent = JSON.parse(sessionStorage.getItem(storageKey)); } catch (_) { /* In-memory recovery remains available. */ }
-    if (!intent || !/^[a-f0-9-]{36}$/.test(intent.key) || (version !== undefined && !Number.isSafeInteger(intent.version))) intent = { key: crypto.randomUUID(), version };
-    sigmaPublicationIntents.set(storageKey, intent);
-    try { sessionStorage.setItem(storageKey, JSON.stringify(intent)); } catch (_) { /* Storage may be disabled. */ }
-  }
-  return { key: intent.key, body: { ...content, ...(version !== undefined ? { version: intent.version } : {}) }, acknowledged: () => {
-    sigmaPublicationIntents.delete(storageKey);
-    try { sessionStorage.removeItem(storageKey); } catch (_) { /* No draft data was stored. */ }
-  } };
-}
-
 async function autopsyReadJSON(input, maximum = 2 * 1024 * 1024) {
   const file = input.files?.[0];
   if (!file || file.size > maximum) throw new Error(SOCifyLocale.text("اختر ملف JSON محليًا ضمن حد الحجم المعلن"));
@@ -133,7 +111,7 @@ window.SOCifyAutopsy.library = async ({ refresh = false } = {}) => {
         const current = rules.items.find((item) => item.id === id);
         const input = await compile();
         const payload = { ...body, ...input, ...(current ? { rule_id: id, version: current.version } : {}) };
-        intent = await sigmaPublicationIntent(payload);
+        intent = await autopsyWriteIntent("sigma", payload);
         await api("/api/autopsy/sigma/publish", { method: "POST", headers: { "Idempotency-Key": intent.key }, body: intent.body });
         try { await window.SOCifyAutopsy.library({ refresh: true }); }
         catch (_) { throw new Error(SOCifyLocale.text("حُفظت القاعدة. تعذر تحديث القائمة؛ أعد المحاولة.")); }
