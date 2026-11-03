@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .autopsy_domain import canonical
 from .report_brand import design_tokens, report_fonts, report_style
+from .report_docx import add_report_run, configure_style, embed_report_fonts, set_direction
 
 FORMATS = {
     "json": "application/json",
@@ -523,8 +524,6 @@ def render_docx(payload) -> bytes:
     from docx import Document
     from docx.enum.table import WD_TABLE_DIRECTION
     from docx.shared import Pt
-
-    from .report_docx import add_report_run, configure_style, embed_report_fonts, set_direction
 
     document = Document()
     section = document.sections[0]
