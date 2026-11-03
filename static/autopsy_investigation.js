@@ -11,6 +11,7 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
   const start = node("input", { name: "timeline_start", type: "datetime-local" });
   const end = node("input", { name: "timeline_end", type: "datetime-local" });
   let visibleEvents = [];
+  let refreshEvidence = () => {};
   const localTime = (value) => { if (!value) return ""; const date = new Date(value); if (!Number.isFinite(date.getTime()) || !/(?:Z|[+-]\d{2}:\d{2})$/.test(value)) throw new Error(SOCifyLocale.text("مرشح الوقت غير صالح أو لا يحدد منطقة زمنية؛ راجع رابط القضية")); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
   const severity = node("select", { name: "timeline_severity" }, [node("option", { value: "", text: SOCifyLocale.text("كل درجات الخطورة") }), ...["critical", "high", "medium", "low"].map((value) => node("option", { value, text: autopsyLabel(value) }))]);
   const scope = node("select", { name: "timeline_scope" }, [node("option", { value: "all", text: SOCifyLocale.text("السجلات والتحقيق والإجراءات") }), node("option", { value: "logs", text: SOCifyLocale.text("السجلات فقط") })]);
@@ -30,6 +31,7 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
     const data = await api(`/api/cases/${caseId}/${scope.value === "all" ? "chronology" : "timeline"}?${parameters}`);
     window.history.replaceState(null, "", autopsyCaseURL(caseId, { timeline_scope: scope.value, timeline_q: query.value, timeline_severity: severity.value, timeline_start: parameters.get("start"), timeline_end: parameters.get("end"), timeline_page: page > 1 ? page : null }));
     visibleEvents = data.items.filter((item) => !item.entry_type || item.entry_type === "log");
+    refreshEvidence();
     const timeline = node("ol", { class: "autopsy-timeline" });
     for (const event of data.items) {
       if (event.entry_type && event.entry_type !== "log") {
@@ -106,10 +108,20 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
   const searchAttack = async () => {
     const catalog = await api(`/api/cases/${caseId}/attack?q=${encodeURIComponent(search.value)}`);
     const select = autopsyChoice("technique_id", catalog.items.filter((item) => !item.revoked && !item.deprecated).map((item) => ({ value: item.technique_id, label: `${item.technique_id} · ${item.name}` })), "", true);
-    const evidence = autopsyChoice("event_id", visibleEvents.map((item) => ({ value: item.id, label: `${item.title} · ${item.id}` })), "", false);
+    const evidenceChoice = (current = "") => autopsyChoice("event_id", visibleEvents.map((item) => ({ value: item.id, label: `${item.title} · ${item.id}` })), current, false);
+    let evidence = evidenceChoice();
+    let evidenceField = field(SOCifyLocale.text("دليل من السجلات المعروضة"), evidence.control);
+    refreshEvidence = () => {
+      let current = "";
+      try { current = evidence.input.autopsyValue() || ""; } catch (_) { /* An unfinished search is not a selected event. */ }
+      evidence = evidenceChoice(current);
+      const replacement = field(SOCifyLocale.text("دليل من السجلات المعروضة"), evidence.control);
+      evidenceField.replaceWith(replacement);
+      evidenceField = replacement;
+    };
     const annotation = autopsyForm({ assessment: { required: true, choices: ["suggested", "verified", "rejected"] }, reason: { required: true, max: 2000 } }, async (payload) => { const eventId = evidence.input.autopsyValue(); await api(`/api/cases/${caseId}/attack`, { method: "POST", body: { ...payload, technique_id: select.input.autopsyValue(), ...(eventId ? { event_id: eventId } : {}) } }); await searchAttack(); });
-    annotation.prepend(field(SOCifyLocale.text("تقنية من نتائج البحث المحلية"), select.control), field(SOCifyLocale.text("دليل من صفحة السجلات الحالية · أعد بحث التقنيات بعد تغيير مرشحات السجلات"), evidence.control));
-    results.replaceChildren(node("p", { text: SOCifyLocale.template`MITRE ATT&CK ${catalog.attack_version} · نسخة محلية · الحد ${catalog.limit} نتيجة. مرجع سجل الدليل ظاهر في الخط الزمني؛ الربط المثبت يتطلب سجلًا من القضية.` }));
+    annotation.prepend(field(SOCifyLocale.text("تقنية من نتائج البحث المحلية"), select.control), evidenceField);
+    results.replaceChildren();
     if (autopsy.current.can_update && autopsy.current.status !== "closed") results.append(annotation);
     results.append(table([{ label: SOCifyLocale.text("التقنية"), value: "technique_id" }, { label: SOCifyLocale.text("الاسم"), value: "name" }, { label: SOCifyLocale.text("الحكم"), value: (item) => autopsyLabel(item.assessment) }, { label: SOCifyLocale.text("سجل الدليل"), value: "event_id" }, { label: SOCifyLocale.text("السبب"), value: "reason" }, { label: SOCifyLocale.text("إصدار ATT&CK"), value: "attack_version" }], catalog.annotations));
   };
