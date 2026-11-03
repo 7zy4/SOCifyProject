@@ -45,6 +45,9 @@ class ReviewJourney:
     def text(self, text):
         return self.page.evaluate("s => SOCifyLocale.text(s)", text)
 
+    def system_task_title(self, title):
+        return self.text({"Validate primary evidence": "التحقق من الدليل الأساسي", "Document response decision": "توثيق قرار الاستجابة"}.get(title, title))
+
     def settle(self):
         self.page.wait_for_load_state("networkidle")
         deadline = time.monotonic() + 25

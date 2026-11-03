@@ -174,7 +174,7 @@ def build_snapshot(case, revision: int, profile: str):
     for observable in payload["observables"]:
         observable["enrichment"] = json.loads(observable["enrichment"])
     payload["tasks"] = bounded_rows(
-        "SELECT id, title, assignee, status, required, completed_at FROM case_tasks WHERE case_id = ? ORDER BY id", (case_id,), 1000
+        "SELECT id, title, system_key, assignee, status, required, completed_at FROM case_tasks WHERE case_id = ? ORDER BY id", (case_id,), 1000
     )
     payload["techniques"] = bounded_rows(
         "SELECT technique_id, attack_version, event_id, assessment, reason, created_by, created_at FROM case_technique_annotations WHERE case_id = ? ORDER BY id",

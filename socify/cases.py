@@ -27,6 +27,7 @@ from .security import (
     training_scope_sql,
     workspace_id,
 )
+from .task_titles import task_view
 from .timeutils import iso_now, utc_now
 
 cases_api = Blueprint("cases", __name__)
@@ -487,8 +488,11 @@ def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
             if not _attach_alert(get_db(), case_id, alert_id):
                 raise ValueError(f"alert {alert_id} is unavailable")
         get_db().executemany(
-            "INSERT INTO case_tasks (case_id, title, required, status, assignee, created_at) VALUES (?, ?, 1, 'pending', ?, ?)",
-            [(case_id, "Validate primary evidence", assignee, now), (case_id, "Document response decision", assignee, now)],
+            "INSERT INTO case_tasks (case_id, title, system_key, required, status, assignee, created_at) VALUES (?, ?, ?, 1, 'pending', ?, ?)",
+            [
+                (case_id, "Validate primary evidence", "validate_evidence", assignee, now),
+                (case_id, "Document response decision", "document_response", assignee, now),
+            ],
         )
         _history(get_db(), case_id, "case_created", None, {"status": "new"})
         record_audit(get_db(), "create", "case", case_id, details={"events": event_ids, "alerts": alert_ids})
@@ -585,7 +589,7 @@ def case_detail(case_id: int):
         )
         .fetchall()
     ]
-    item["tasks"] = [dict(value) for value in get_db().execute("SELECT * FROM case_tasks WHERE case_id = ? ORDER BY id", (case_id,)).fetchall()]
+    item["tasks"] = [task_view(value) for value in get_db().execute("SELECT * FROM case_tasks WHERE case_id = ? ORDER BY id", (case_id,)).fetchall()]
     item["history"] = [
         dict(value)
         for value in get_db()

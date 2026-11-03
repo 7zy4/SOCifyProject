@@ -13,6 +13,8 @@
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
   document.cookie = `socify-language=${language}; Path=/; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
   const english = {
+  "التحقق من الدليل الأساسي": "Validate primary evidence",
+  "توثيق قرار الاستجابة": "Document response decision",
   "معرف إعادة المحاولة أو بيانات القضية غير صالحة": "The retry identifier or case data is invalid",
   "حُفظت القاعدة. تعذر تحديث القائمة؛ أعد المحاولة.": "The rule was saved. The list could not refresh; try again.",
   "معرف إعادة المحاولة غير صالح": "The retry identifier is invalid",

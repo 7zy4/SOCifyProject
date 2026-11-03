@@ -13,6 +13,7 @@ from .case_counts import consistent_read
 from .db import get_db
 from .operational import case_scope
 from .security import actor_id, current_user, error_response, require_permission, workspace_id
+from .task_titles import task_view
 from .timeutils import iso_now, parse_timestamp, utc_now
 
 soc_insights_api = Blueprint("autopsy_insights", __name__)
@@ -228,7 +229,7 @@ def performance():
         ids,
     ):
         records[row["case_id"]][row["kind"]].append(json.loads(row["payload"]))
-    tasks = [dict(row) for row in get_db().execute(f"SELECT * FROM case_tasks WHERE case_id IN ({marks})", ids)]
+    tasks = [task_view(row) for row in get_db().execute(f"SELECT * FROM case_tasks WHERE case_id IN ({marks})", ids)]
     awaiting_decision = {
         row["case_id"] for row in get_db().execute(f"SELECT case_id FROM case_quick_reports WHERE case_id IN ({marks}) AND status='escalated'", ids)
     }
@@ -374,7 +375,8 @@ def alert_dossier(case_id, alert_id):
         event["raw_data"] = (event["raw_data"] or "")[:16000]
     quick = get_db().execute("SELECT * FROM case_quick_reports WHERE case_id=?", (case_id,)).fetchone()
     tasks = [
-        dict(row) for row in get_db().execute("SELECT id,title,status,required,completed_at FROM case_tasks WHERE case_id=? ORDER BY id LIMIT 100", (case_id,))
+        task_view(row)
+        for row in get_db().execute("SELECT id,title,system_key,status,required,completed_at FROM case_tasks WHERE case_id=? ORDER BY id LIMIT 100", (case_id,))
     ]
     notes = [
         dict(row)

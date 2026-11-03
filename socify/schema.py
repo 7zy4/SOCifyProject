@@ -333,6 +333,7 @@ CREATE TABLE IF NOT EXISTS case_tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     case_id INTEGER NOT NULL REFERENCES incident_cases(id),
     title TEXT NOT NULL,
+    system_key TEXT,
     required INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'pending',
     assignee INTEGER REFERENCES users(id),
@@ -729,6 +730,7 @@ CREATE TABLE IF NOT EXISTS outbox_events (
 
 
 COLUMN_MIGRATIONS: dict[str, dict[str, str]] = {
+    "case_tasks": {"system_key": "TEXT"},
     "users": {
         "name_ar": "TEXT NOT NULL DEFAULT ''",
         "name_en": "TEXT NOT NULL DEFAULT ''",

@@ -220,7 +220,7 @@ def test_incoming_reader_respects_private_decisions_and_can_recover_after_public
                 j.click("button", "حفظ", dialog)
             destination = card(j, title).get_by_role("link", name=j.text("فتح المهمة"), exact=True).get_attribute("href").split("#", 1)[1]
             j.click("link", "فتح المهمة", card(j, title))
-            expect(j.page.locator(f"#{destination}")).to_contain_text("Validate primary evidence")
+            expect(j.page.locator(f"#{destination}")).to_contain_text(j.system_task_title("Validate primary evidence"))
             expect(j.page.locator(f"#{destination}")).to_be_focused()
         result["outcomes"] = [scenario, "private decision excluded from unauthorized results and stale edits rejected", "reference usable after publication"]
         evidence_images(j, result)

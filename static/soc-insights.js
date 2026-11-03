@@ -113,7 +113,7 @@ window.SOCifyInsights = (() => {
         queuePanel.append(paging);
       }
       root.append(queuePanel);
-      if(data.tasks.length) root.append(panel(`${t("المهام المعلقة", "Pending tasks")} · ${n(data.task_total)}`,table([{label:t("المهمة", "Task"),value:r=>node("a",{href:`/cases/${r.case_id}?tab=summary#case-task-${r.id}`,text:r.title})},{label:t("الحالة", "Status"),value:r=>label(r.status)}],data.tasks),true));
+      if(data.tasks.length) root.append(panel(`${t("المهام المعلقة", "Pending tasks")} · ${n(data.task_total)}`,table([{label:t("المهمة", "Task"),value:r=>node("a",{href:`/cases/${r.case_id}?tab=summary#case-task-${r.id}`,text:r.display_title})},{label:t("الحالة", "Status"),value:r=>label(r.status)}],data.tasks),true));
       if(data.task_total>50)root.append(linkedButton(t("إدارة القضايا", "Case management"),"/cases"));
       finish(root);
       if(location.hash === "#performance-cases") {queuePanel.tabIndex=-1;queuePanel.focus({preventScroll:true});queuePanel.scrollIntoView({block:"start"});}
@@ -158,7 +158,7 @@ window.SOCifyInsights = (() => {
     }
     if(!data.events.length)section(t("سجلات التنبيه", "Alert evidence events"),[[t("السجلات", "Events"),t("لا سجلات مرتبطة", "No linked events")]],"event");
     if(data.events_truncated)section(t("سجلات التنبيه", "Alert evidence events"),[[t("السجلات", "Events"),linkedButton(t("عرض جميع السجلات", "View all logs"),`/cases/${item.case_id}?tab=logs`)]],"more-events");
-    for(const task of data.tasks)section(t("المهمة", "Task")+" #"+task.id,[[t("المهمة", "Task"),task.title],[t("الحالة", "Status"),label(task.status)],[t("أُنجزت", "Completed"),time(task.completed_at)]],"task");
+    for(const task of data.tasks)section(t("المهمة", "Task")+" #"+task.id,[[t("المهمة", "Task"),task.display_title],[t("الحالة", "Status"),label(task.status)],[t("أُنجزت", "Completed"),time(task.completed_at)]],"task");
     for(const [index,note] of data.notes.entries())section(t("ملاحظة التحقيق", "Investigation note")+" "+n(index+1),[[t("المحلل", "Analyst"),note.author],[t("الوقت", "Time"),time(note.created_at)],[t("الملاحظة", "Note"),note.body]],"note");
     root.append(details);
     container.replaceChildren(root);

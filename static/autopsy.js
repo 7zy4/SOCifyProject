@@ -148,7 +148,7 @@ function autopsyModal(title, content) {
 
 function autopsyReferenceChoice(name, source, required = false) {
   const id = `reference-${crypto.randomUUID()}`;
-  const entry = item => ({ value: item.id, label: `${["task", "event"].includes(source.kind) ? item.title : item.payload.conclusion.slice(0, 160)} · ${item.id}`, record: item });
+  const entry = item => ({ value: item.id, label: `${source.kind === "task" ? item.display_title : source.kind === "event" ? item.title : item.payload.conclusion.slice(0, 160)} · ${item.id}`, record: item });
   let chosen = source.initial ? entry(source.initial) : null, options = [], cursor = null, requestId = 0, timer;
   let lastQuery = "", retryAction;
   const input = node("input", { name, required, autocomplete: "off", class: "search-choice", value: chosen?.label || "", role: "combobox", "aria-controls": id, "aria-expanded": "false", "aria-autocomplete": "list" });
@@ -591,7 +591,7 @@ async function autopsyCaseTasks(current) {
       let content = emptyState(SOCifyLocale.text("لا مهام مطابقة"), null);
       if (data.items.length) {
         content = stackedTable([
-          { label: SOCifyLocale.text("المهمة"), value: "title" }, { label: SOCifyLocale.text("المسؤول"), value: "assignee_name" },
+          { label: SOCifyLocale.text("المهمة"), value: "display_title" }, { label: SOCifyLocale.text("المسؤول"), value: "assignee_name" },
           { label: SOCifyLocale.text("الحالة"), value: row => autopsyLabel(row.status) },
           { label: SOCifyLocale.text("إكمال"), value: row => {
             if (!row.can_update || ["completed", "reviewed"].includes(row.status)) return "—";

@@ -24,6 +24,8 @@ def note_dialog(j):
 
 
 def choose(j, dialog, name, text):
+    if name == "task_id":
+        text = j.system_task_title(text)
     control = dialog.locator(f"input[name={name}]")
     control.fill(text)
     control.press("ArrowDown")
@@ -100,7 +102,7 @@ def test_investigator_can_recover_and_keep_the_intended_reference(app, language,
                 assert records(j, "war_room")[0]["payload"]["task_id"] == old_task["id"]
                 j.click("button", "إعادة المحاولة", dialog)
                 dialog = j.page.get_by_role("dialog")
-                assert "Validate primary evidence" in dialog.locator("input[name=task_id]").input_value()
+                assert j.system_task_title("Validate primary evidence") in dialog.locator("input[name=task_id]").input_value()
             else:
                 dialog.locator("input[name=task_id]").fill("")
             dialog.locator("textarea[name=body]").fill("Updated review decision retained for the next shift.")
@@ -108,7 +110,7 @@ def test_investigator_can_recover_and_keep_the_intended_reference(app, language,
             field = dialog.locator("input[name=task_id]").locator("..")
             field.get_by_role("button", name=j.text("عرض الخيارات"), exact=True).click()
             j.click("button", "عرض المزيد", field)
-            field.get_by_role("option").filter(has_text="Validate primary evidence").click()
+            field.get_by_role("option").filter(has_text=j.system_task_title("Validate primary evidence")).click()
         elif scenario.endswith("duplicate-title"):
             control = dialog.locator("input[name=task_id]")
             control.fill("Repeated review title")
@@ -123,7 +125,7 @@ def test_investigator_can_recover_and_keep_the_intended_reference(app, language,
             expect(control).to_have_attribute("aria-expanded", "false")
             control.fill("Validate primary evidence")
             control.press("ArrowDown")
-            option = dialog.get_by_role("option").filter(has_text="Validate primary evidence")
+            option = dialog.get_by_role("option").filter(has_text=j.system_task_title("Validate primary evidence"))
             expect(option).to_be_focused()
             j.page.keyboard.press("Enter")
             control.press("ArrowDown")
@@ -147,11 +149,11 @@ def test_investigator_can_recover_and_keep_the_intended_reference(app, language,
                 control.press("ArrowDown")
             control.fill("Document response decision")
             control.press("ArrowDown")
-            expect(dialog.get_by_role("option").filter(has_text="Document response decision")).to_be_visible()
+            expect(dialog.get_by_role("option").filter(has_text=j.system_task_title("Document response decision"))).to_be_visible()
             held[0][0].fulfill(response=held[0][1])
             j.settle()
-            expect(dialog.get_by_role("option").filter(has_text="Validate primary evidence")).to_have_count(0)
-            dialog.get_by_role("option").filter(has_text="Document response decision").click()
+            expect(dialog.get_by_role("option").filter(has_text=j.system_task_title("Validate primary evidence"))).to_have_count(0)
+            dialog.get_by_role("option").filter(has_text=j.system_task_title("Document response decision")).click()
         else:
             if scenario.endswith("network-retry"):
                 j.page.route("**/api/cases/*/tasks?*", lambda route: route.abort(), times=1)
@@ -161,7 +163,7 @@ def test_investigator_can_recover_and_keep_the_intended_reference(app, language,
                 field = control.locator("..")
                 expect(field.get_by_role("alert")).to_be_visible()
                 j.click("button", "إعادة المحاولة", field)
-                dialog.get_by_role("option").filter(has_text="Validate primary evidence").click()
+                dialog.get_by_role("option").filter(has_text=j.system_task_title("Validate primary evidence")).click()
             else:
                 if scenario.endswith("empty-recovery") or scenario.endswith("foreign-case"):
                     control = dialog.locator("input[name=task_id]")
@@ -417,7 +419,7 @@ def test_investigation_note_retains_an_old_task_link(app, language, scenario):
         result["saved_task_id"] = saved["payload"].get("task_id")
         assert result["saved_task_id"] == result["expected_task_id"]
         j.click("link", "فتح المهمة")
-        expect(j.page.locator(f"#case-task-{old_task['id']}")).to_contain_text("Validate primary evidence")
+        expect(j.page.locator(f"#case-task-{old_task['id']}")).to_contain_text(j.system_task_title("Validate primary evidence"))
         j.click("link", "التحقيق والخط الزمني")
         capture(j, result)
         result["outcomes"] = ["old retained task selected or preserved through visible note controls", "setup records excluded from user counts"]

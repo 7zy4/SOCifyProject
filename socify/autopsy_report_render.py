@@ -8,6 +8,7 @@ from pathlib import Path
 from .autopsy_domain import canonical
 from .report_brand import design_tokens, report_fonts, report_style
 from .report_docx import add_report_run, configure_style, embed_report_fonts, set_direction
+from .task_titles import TITLES, task_title
 
 FORMATS = {
     "json": "application/json",
@@ -284,7 +285,7 @@ def display(value) -> str:
     return re.sub("[\u202a-\u202e\u2066-\u2069]", lambda match: f"\\u{ord(match[0]):04x}", text)
 
 
-INTERNAL_FIELDS = {"schema", "revision", "version", "source_version", "parser_version"}
+INTERNAL_FIELDS = {"schema", "revision", "version", "source_version", "parser_version", "system_key", "display_title"}
 
 
 def lines(value, depth=0):
@@ -378,7 +379,8 @@ def report_table(value, *, localize=False):
                 key = record_heading_key(record)
                 if key:
                     caption = html.escape(LABELS.get(key, key))
-                    content = f'<span data-ui-copy>{caption}</span>: <bdi dir="auto">{html.escape(display(record[key]))}</bdi>'
+                    system_copy = " data-ui-copy" if key == "title" and TITLES.get(record.get("system_key"), (None, None))[1] == record[key] else ""
+                    content = f'<span data-ui-copy>{caption}</span>: <bdi dir="auto"{system_copy}>{html.escape(display(record[key]))}</bdi>'
             elif label in LABELS.values() or label == "تفاصيل العنصر":
                 content = f"<span data-ui-copy>{content}</span>"
         rows.append(f'<tr class="report-group"><th colspan="2">{content}</th></tr>')
@@ -468,7 +470,10 @@ def sections(payload):
             yield title, network_report_content(payload[key]) if key == "network_analysis" else payload[key]
     for key in ("tasks", "evidence", "imports", "custody", "history", "limitations"):
         if payload.get(key):
-            yield LABELS[key], payload[key]
+            content = payload[key]
+            if key == "tasks":
+                content = [{**task, "title": task_title(task["title"], task.get("system_key"), "ar")} for task in content]
+            yield LABELS[key], content
 
 
 def line_html(text):

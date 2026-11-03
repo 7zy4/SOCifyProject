@@ -11,7 +11,7 @@ from tests.e2e.test_task_queue_journeys import assign, assignments
 
 
 def task_row(j, title):
-    return j.page.locator(".case-task-queue tr").filter(has=j.page.get_by_role("cell", name=title, exact=True))
+    return j.page.locator(".case-task-queue tr").filter(has=j.page.get_by_role("cell", name=j.system_task_title(title), exact=True))
 
 
 def search_tasks(j, value, status=None):

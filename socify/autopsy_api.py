@@ -9,6 +9,7 @@ from .case_counts import cached_case_count, consistent_read
 from .cases import _case_row, _case_view, create_case, list_cases
 from .db import get_db, inserted_id, transaction
 from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
+from .task_titles import task_view
 from .timeutils import iso_now
 
 autopsy_api = Blueprint("autopsy", __name__)
@@ -155,7 +156,7 @@ def case_summary(case_id: int):
         .fetchall()
     ]
     result["tasks"] = [
-        dict(row)
+        task_view(row)
         for row in get_db()
         .execute(
             "SELECT t.*, a.id AS assignment_id, socify_user_name(u.name,u.name_ar,u.name_en) AS assignee_name FROM case_tasks t LEFT JOIN team_log_assignments a ON a.task_id=t.id LEFT JOIN users u ON u.id=t.assignee WHERE t.case_id=? ORDER BY t.id DESC LIMIT 100",
@@ -230,8 +231,9 @@ def case_task_list(case_id: int):
         where += " AND t.status=?"
         args.append(status)
     if query:
-        where += " AND LOWER(t.title) LIKE ? ESCAPE '\\'"
-        args.append("%" + query.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
+        where += " AND (LOWER(t.title) LIKE ? ESCAPE '\\' OR LOWER(socify_task_title(t.title,t.system_key)) LIKE ? ESCAPE '\\')"
+        pattern = "%" + query.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        args.extend([pattern, pattern])
     total = get_db().execute(f"SELECT COUNT(*) FROM case_tasks t WHERE {where}", args).fetchone()[0]
     page_size = 25
     if focus is not None:
@@ -250,7 +252,7 @@ def case_task_list(case_id: int):
         .fetchall()
     )
     can_update = has_permission(current_user(), "cases.update") and case["status"] != "closed"
-    items = [{**dict(row), "can_update": bool(can_update and (not row["assignment_id"] or row["assignee"] == actor_id() or manager()))} for row in rows]
+    items = [{**task_view(row), "can_update": bool(can_update and (not row["assignment_id"] or row["assignee"] == actor_id() or manager()))} for row in rows]
     return jsonify({"items": items, "total": total, "page": page, "page_size": page_size, "focus": focus})
 
 
