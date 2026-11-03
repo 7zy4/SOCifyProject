@@ -36,18 +36,19 @@ from .security import (
     workspace_id,
 )
 from .timeutils import iso_now, utc_now
+from .validation import ValidationError, public_error_message
 
 ingestion_api = Blueprint("ingestion", __name__)
 IMPORT_CHUNK_SIZE = 100
 
 SYSLOG_5424 = re.compile(
-    r"^<(?P<pri>\d{1,3})>1\s+(?P<timestamp>\S+)\s+(?P<host>\S+)\s+(?P<app>\S+)\s+(?P<proc>\S+)\s+(?P<msgid>\S+)\s+(?:-|\[[^]]*\])\s*(?P<message>.*)$"
+    r"^<(?P<pri>\d{1,3})>1\s+(?P<timestamp>\S+)\s+(?P<host>\S+)\s+(?P<app>\S+)\s+(?P<proc>\S+)\s+(?P<msgid>\S+)\s+(?:-|\[[^]]*\])\s*+(?P<message>.*)$"
 )
 SYSLOG_3164 = re.compile(
     r"^<(?P<pri>\d{1,3})>(?P<month>[A-Z][a-z]{2})\s+(?P<day>\d{1,2})\s+(?P<time>\d{2}:\d{2}:\d{2})\s+(?P<host>\S+)\s+(?P<app>[\w./-]+)(?:\[(?P<pid>\d+)\])?:\s*(?P<message>.*)$"
 )
 WEB_LOG = re.compile(
-    r'^(?P<ip>\S+)\s+\S+\s+(?P<user>\S+)\s+\[(?P<time>[^]]+)\]\s+"(?P<method>\S+)\s+(?P<path>\S+)\s+(?P<protocol>[^"]+)"\s+(?P<status>\d{3})\s+(?P<size>\S+)(?:\s+"(?P<referer>[^"]*)"\s+"(?P<agent>[^"]*)")?$'
+    r'^(?P<ip>\S+)\s+\S+\s+(?P<user>\S+)\s+\[(?P<time>[^]]+)\]\s+"(?P<method>\S+)\s+(?P<path>\S+)\s+(?P<protocol>[^"\s]+)"\s+(?P<status>\d{3})\s+(?P<size>\S+)(?:\s+"(?P<referer>[^"]*)"\s+"(?P<agent>[^"]*)")?$'
 )
 AUTH_LOG = re.compile(
     r"^(?P<month>[A-Z][a-z]{2})\s+(?P<day>\d{1,2})\s+(?P<time>\d{2}:\d{2}:\d{2})\s+(?P<host>\S+)\s+(?P<service>[\w-]+)(?:\[(?P<pid>\d+)\])?:\s+(?P<message>.*)$"
@@ -106,18 +107,18 @@ def _detect_format(filename: str, content: bytes) -> str:
 
 def _decode(content: bytes) -> str:
     if b"\x00" in content[:4096]:
-        raise ValueError("binary content is not valid for the selected text format")
+        raise ValidationError("binary content is not valid for the selected text format")
     if any(len(line) > 1048576 for line in content.splitlines()):
-        raise ValueError("text line exceeds 1 MiB")
+        raise ValidationError("text line exceeds 1 MiB")
     try:
         return content.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
-        raise ValueError("file must use UTF-8 encoding") from exc
+        raise ValidationError("file must use UTF-8 encoding") from exc
 
 
 def _record_from_mapping(record: dict[str, Any], row_number: int, source_name: str, content_hash: str) -> dict[str, Any]:
     if _depth(record) > 12:
-        raise ValueError("JSON nesting exceeds 12 levels")
+        raise ValidationError("JSON nesting exceeds 12 levels")
     from .telemetry import profile
 
     raw = dict(record)
@@ -148,7 +149,7 @@ def _structured_records(record, row_number, source_name, content_hash):
     from .telemetry import osquery_rows
 
     if _depth(record) > 12:
-        raise ValueError("JSON nesting exceeds 12 levels")
+        raise ValidationError("JSON nesting exceeds 12 levels")
     rows = osquery_rows(record)
     if rows is None:
         yield _record_from_mapping(record, row_number, source_name, content_hash)
@@ -173,7 +174,7 @@ def _zeek_records(text, source_name, content_hash):
         if line.startswith("#separator "):
             separator = unescape(line.partition(" ")[2])
             if len(separator) != 1 or separator in "\r\n\x00":
-                raise ValueError("invalid Zeek separator")
+                raise ValidationError("invalid Zeek separator")
             continue
         if line.startswith("#"):
             name, _, value = line.partition(separator)
@@ -181,7 +182,7 @@ def _zeek_records(text, source_name, content_hash):
                 fields = value.split(separator)
                 types = []
                 if len(fields) > 200 or len(set(fields)) != len(fields):
-                    raise ValueError("invalid Zeek field header")
+                    raise ValidationError("invalid Zeek field header")
             elif name == "#types":
                 types = value.split(separator)
             elif name == "#unset_field":
@@ -193,7 +194,7 @@ def _zeek_records(text, source_name, content_hash):
             continue
         values = line.split(separator)
         if not fields or len(fields) != len(types) or len(values) != len(fields):
-            raise ValueError(f"invalid Zeek row at line {line_number}")
+            raise ValidationError(f"invalid Zeek row at line {line_number}")
         record: dict[str, Any] = {}
         for key, kind, value in zip(fields, types, values, strict=True):
             if value == unset:
@@ -206,7 +207,7 @@ def _zeek_records(text, source_name, content_hash):
                 record[key] = int(value)
             elif kind == "bool":
                 if value not in {"T", "F"}:
-                    raise ValueError("invalid Zeek boolean")
+                    raise ValidationError("invalid Zeek boolean")
                 record[key] = value == "T"
             else:
                 record[key] = unescape(value)
@@ -223,7 +224,7 @@ def _csv_records(text: str, source_name: str, content_hash: str, delimiter: str 
         or len(set(reader.fieldnames)) != len(reader.fieldnames)
         or any(not field.strip() for field in reader.fieldnames)
     ):
-        raise ValueError("CSV requires a header with at most 200 columns")
+        raise ValidationError("CSV requires a header with at most 200 columns")
     for row_number, record in enumerate(reader, 2):
         yield _record_from_mapping(dict(record), row_number, source_name, content_hash)
 
@@ -234,24 +235,24 @@ def _json_records(text: str, source_name: str, content_hash: str, json_lines: bo
             if not line.strip():
                 continue
             if len(line.encode()) > 1048576:
-                raise ValueError(f"line {row_number} exceeds 1 MiB")
+                raise ValidationError(f"line {row_number} exceeds 1 MiB")
             try:
                 value = json.loads(line)
                 if not isinstance(value, dict):
-                    raise ValueError(f"line {row_number} must contain an object")
+                    raise ValidationError(f"line {row_number} must contain an object")
                 yield from _structured_records(value, row_number, source_name, content_hash)
             except (ValueError, RecursionError) as exc:
                 if not tolerant:
-                    raise ValueError(f"invalid JSON record at line {row_number}") from exc
+                    raise ValidationError(f"invalid JSON record at line {row_number}") from exc
                 yield {"__parse_error": f"invalid JSON record at line {row_number}", "provenance": {"file_sha256": content_hash, "row": row_number}}
         return
     try:
         value = json.loads(text)
     except (ValueError, RecursionError) as exc:
-        raise ValueError("invalid JSON document") from exc
+        raise ValidationError("invalid JSON document") from exc
     records = value if isinstance(value, list) else [value]
     if not all(isinstance(item, dict) for item in records):
-        raise ValueError("JSON must contain an object or an array of objects")
+        raise ValidationError("JSON must contain an object or an array of objects")
     for row_number, record in enumerate(records, 1):
         yield from _structured_records(record, row_number, source_name, content_hash)
 
@@ -294,7 +295,7 @@ def _syslog_records(text: str, source_name: str, content_hash: str) -> Iterator[
             continue
         legacy = SYSLOG_3164.match(line)
         if not legacy:
-            raise ValueError(f"row {row_number} is not RFC 3164 or RFC 5424 syslog")
+            raise ValidationError(f"row {row_number} is not RFC 3164 or RFC 5424 syslog")
         values = legacy.groupdict()
         assumed = (
             datetime.strptime(f"{utc_now_year()} {values['month']} {values['day']} {values['time']}", "%Y %b %d %H:%M:%S")
@@ -332,7 +333,7 @@ def _web_records(text: str, source_name: str, content_hash: str) -> Iterator[dic
             continue
         match = WEB_LOG.match(line)
         if not match:
-            raise ValueError(f"row {row_number} is not a supported Apache/Nginx combined log")
+            raise ValidationError(f"row {row_number} is not a supported Apache/Nginx combined log")
         values = match.groupdict()
         event_time = datetime.strptime(values["time"], "%d/%b/%Y:%H:%M:%S %z").isoformat()
         status = int(values["status"])
@@ -366,7 +367,7 @@ def _auth_records(text: str, source_name: str, content_hash: str) -> Iterator[di
             continue
         match = AUTH_LOG.match(line)
         if not match:
-            raise ValueError(f"row {row_number} is not a supported Linux auth log")
+            raise ValidationError(f"row {row_number} is not a supported Linux auth log")
         values = match.groupdict()
         assumed = (
             datetime.strptime(f"{utc_now_year()} {values['month']} {values['day']} {values['time']}", "%Y %b %d %H:%M:%S")
@@ -402,7 +403,20 @@ def _auth_records(text: str, source_name: str, content_hash: str) -> Iterator[di
         )
 
 
-CEF_KV_PATTERN = re.compile(r"(?:^|\s+)([A-Za-z][A-Za-z0-9_.-]*)=(.*?)(?=\s+[A-Za-z][A-Za-z0-9_.-]*=|$)")
+CEF_KEY_PATTERN = re.compile(r"(?<!\S)([A-Za-z][A-Za-z0-9_.-]*)=")
+
+
+def _cef_extension(text: str) -> dict[str, str]:
+    """Find key boundaries once; whitespace in a value never rescans its suffix."""
+    result: dict[str, str] = {}
+    previous = None
+    for match in CEF_KEY_PATTERN.finditer(text):
+        if previous is not None:
+            result[previous.group(1)] = text[previous.end() : match.start()].replace("\\=", "=").strip()
+        previous = match
+    if previous is not None:
+        result[previous.group(1)] = text[previous.end() :].replace("\\=", "=").strip()
+    return result
 
 
 def _cef_records(text: str, source_name: str, content_hash: str) -> Iterator[dict[str, Any]]:
@@ -412,7 +426,7 @@ def _cef_records(text: str, source_name: str, content_hash: str) -> Iterator[dic
             continue
         cef_idx = line.find("CEF:")
         if cef_idx < 0:
-            raise ValueError(f"row {row_number} is not a valid CEF record")
+            raise ValidationError(f"row {row_number} is not a valid CEF record")
         cef_body = line[cef_idx:]
         parts: list[str] = []
         buf: list[str] = []
@@ -433,10 +447,10 @@ def _cef_records(text: str, source_name: str, content_hash: str) -> Iterator[dic
             else:
                 buf.append(ch)
         if len(parts) < 7:
-            raise ValueError(f"row {row_number} has an incomplete CEF header")
+            raise ValidationError(f"row {row_number} has an incomplete CEF header")
         _, vendor, product, _version, sig_id, name, sev_raw = parts
         ext_str = cef_body[ext_start:].strip()
-        ext = {match.group(1): match.group(2).replace("\\=", "=").strip() for match in CEF_KV_PATTERN.finditer(ext_str)}
+        ext = _cef_extension(ext_str)
         try:
             sev_num = int(sev_raw)
             severity = "critical" if sev_num >= 9 else "high" if sev_num >= 7 else "medium" if sev_num >= 4 else "low"
@@ -478,7 +492,7 @@ def _cef_records(text: str, source_name: str, content_hash: str) -> Iterator[dic
 def _sysmon_xml_records(content: bytes, source_name: str, content_hash: str) -> Iterator[dict[str, Any]]:
     upper = content[:8192].upper()
     if b"<!DOCTYPE" in upper or b"<!ENTITY" in upper:
-        raise ValueError("XML document types and entities are not allowed")
+        raise ValidationError("XML document types and entities are not allowed")
     root = ElementTree.fromstring(content, forbid_dtd=True, forbid_entities=True, forbid_external=True)
     events = [root] if root.tag.endswith("Event") else [item for item in root.iter() if item.tag.endswith("Event")]
     windows_map: dict[str, tuple[str, str, str, str | None, str | None]] = {
@@ -580,7 +594,7 @@ def parse_records(
     filename: str, content: bytes, selected_format: str | None, source_name: str, options: dict[str, Any] | None = None
 ) -> tuple[str, Iterable[dict[str, Any]]]:
     if len(content) > int(current_app.config["MAX_CONTENT_LENGTH"]):
-        raise ValueError("file exceeds the configured upload limit")
+        raise ValidationError("file exceeds the configured upload limit")
     content_hash = hashlib.sha256(content).hexdigest()
     options = options or {}
     format_name = selected_format or "auto"
@@ -599,9 +613,9 @@ def parse_records(
         try:
             text = content.decode(encoding)
         except UnicodeError as exc:
-            raise ValueError("file encoding does not match the selected encoding") from exc
+            raise ValidationError("file encoding does not match the selected encoding") from exc
         if "\x00" in text or any(len(line.encode()) > 1048576 for line in text.splitlines()):
-            raise ValueError("invalid binary text or oversized line")
+            raise ValidationError("invalid binary text or oversized line")
     else:
         text = _decode(content)
     if format_name == "csv":
@@ -621,7 +635,7 @@ def parse_records(
         return format_name, _mapped_records(_web_records(text, source_name, content_hash), options, source_name)
     if format_name == "linux_auth":
         return format_name, _mapped_records(_auth_records(text, source_name, content_hash), options, source_name)
-    raise ValueError("selected format is not supported")
+    raise ValidationError("selected format is not supported")
 
 
 def _mapped_records(records: Iterable[dict[str, Any]], options: dict[str, Any], source: str) -> Iterator[dict[str, Any]]:
@@ -653,13 +667,13 @@ def _mapped_records(records: Iterable[dict[str, Any]], options: dict[str, Any], 
         try:
             value = record.get("event_time")
             if isinstance(value, bool):
-                raise ValueError("boolean timestamps are invalid")
+                raise ValidationError("boolean timestamps are invalid")
             if isinstance(value, str):
                 moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
                 if moment.tzinfo is None:
                     zone = _resolve_timezone(options.get("source_timezone", "UTC"))
                     if moment.replace(tzinfo=zone, fold=0).utcoffset() != moment.replace(tzinfo=zone, fold=1).utcoffset():
-                        raise ValueError("ambiguous or nonexistent local time; supply an explicit UTC offset")
+                        raise ValidationError("ambiguous or nonexistent local time; supply an explicit UTC offset")
                     moment = moment.replace(tzinfo=zone)
                 record["event_time"] = moment.astimezone(UTC).isoformat().replace("+00:00", "Z")
             record["source"] = source
@@ -738,13 +752,13 @@ def _job_access(job_id: int, write: bool = False) -> sqlite3.Row | None:
 def _job_content(row: sqlite3.Row) -> bytes:
     ciphertext = row["evidence_ciphertext"]
     if not ciphertext:
-        raise ValueError("raw import evidence is unavailable")
+        raise ValidationError("raw import evidence is unavailable")
     try:
         content = base64.b64decode(decrypt_secret(str(ciphertext)), validate=True)
     except (ValueError, binascii.Error) as exc:
-        raise ValueError("raw import evidence cannot be decrypted") from exc
+        raise ValidationError("raw import evidence cannot be decrypted") from exc
     if len(content) != int(row["raw_size"]) or not hashlib.sha256(content).hexdigest() == row["content_hash"]:
-        raise ValueError("raw import evidence failed integrity validation")
+        raise ValidationError("raw import evidence failed integrity validation")
     return content
 
 
@@ -770,7 +784,7 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
         content = _job_content(job)
         _, records = parse_records(job["filename"], content, job["format"], job["source_name"], json.loads(job["autopsy_options"]))
     except (ValueError, json.JSONDecodeError, csv.Error, ElementTree.ParseError) as exc:
-        _mark_job_failed(job_id, str(exc))
+        _mark_job_failed(job_id, public_error_message(exc, "Unable to parse the import; check its format and encoding"))
         failed = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
         if failed is None:
             raise RuntimeError("import job disappeared after failure") from exc
@@ -828,7 +842,7 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
                     rejected += 1
                     get_db().execute(
                         "INSERT INTO ingestion_errors (job_id, row_number, error_code, message, sample, created_at) VALUES (?, ?, 'PARSE_ERROR', ?, NULL, ?)",
-                        (job_id, row_number, str(parse_error)[:500], iso_now()),
+                        (job_id, row_number, public_error_message(parse_error, "Invalid record syntax"), iso_now()),
                     )
                     continue
                 if record is None:
@@ -836,7 +850,7 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
                 get_db().execute("SAVEPOINT import_row")
                 try:
                     if record.get("__parse_error"):
-                        raise ValueError(str(record["__parse_error"]))
+                        raise ValidationError("Record could not be parsed")
                     if job["case_id"] is not None:
                         record["idempotency_key"] = (
                             f"pipeline:{hashlib.sha256(job['autopsy_options'].encode()).hexdigest()}:{record.get('idempotency_key', row_number)}"
@@ -864,7 +878,7 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
                     rejected += 1
                     get_db().execute(
                         "INSERT INTO ingestion_errors (job_id, row_number, error_code, message, sample, created_at) VALUES (?, ?, 'VALIDATION_ERROR', ?, ?, ?)",
-                        (job_id, row_number, str(exc)[:500], json.dumps(record, ensure_ascii=True)[:1000], iso_now()),
+                        (job_id, row_number, public_error_message(exc, "Record validation failed"), json.dumps(record, ensure_ascii=True)[:1000], iso_now()),
                     )
             checkpoint += len(batch)
             estimated = max(min(int(job["estimated_total"]), maximum_rows), 1)
@@ -999,7 +1013,7 @@ def _upload_payload() -> tuple[str, bytes, str | None, int | None, int | None]:
     if request.files:
         uploaded = request.files.get("file")
         if not uploaded or not uploaded.filename:
-            raise ValueError("file is required")
+            raise ValidationError("file is required")
         content = uploaded.stream.read(int(current_app.config["MAX_CONTENT_LENGTH"]) + 1)
         filename = _safe_import_filename(uploaded.filename, content)
         selected_format = request.form.get("format", "auto")
@@ -1008,7 +1022,7 @@ def _upload_payload() -> tuple[str, bytes, str | None, int | None, int | None]:
         return filename, content, selected_format, source_id, training_run_id
     data = request.get_json(silent=True)
     if not isinstance(data, dict) or not isinstance(data.get("content"), str):
-        raise ValueError("multipart file or textual content is required")
+        raise ValidationError("multipart file or textual content is required")
     content = data["content"].encode()
     filename = _safe_import_filename(str(data.get("filename") or "import.log"), content)
     return (
@@ -1029,13 +1043,13 @@ def _upload_options() -> tuple[int | None, dict[str, Any]]:
     case_id = (request.view_args or {}).get("case_id")
     case = _case_row(case_id) if type(case_id) is int else None
     if not case or case["status"] == "closed":
-        raise ValueError("an open, authorized case is required")
+        raise ValidationError("an open, authorized case is required")
     data = request.form.to_dict() if request.files else request.get_json(silent=True)
     allowed = {"filename", "content", "format", "source_id", "source_label", "mapping", "source_timezone", "source_year", "encoding", "delimiter"}
     if not isinstance(data, dict) or set(data) - allowed:
-        raise ValueError("unknown import parameters")
+        raise ValidationError("unknown import parameters")
     if not request.files and not isinstance(data.get("filename", "import.log"), str):
-        raise ValueError("filename must be a string")
+        raise ValidationError("filename must be a string")
     mapping: Any = data.get("mapping", {})
     if isinstance(mapping, str) and len(mapping) <= 10000:
         mapping = json.loads(mapping)
@@ -1062,35 +1076,35 @@ def _upload_options() -> tuple[int | None, dict[str, Any]]:
         or len(mapping) > 50
         or any(not isinstance(key, str) or not 1 <= len(key) <= 100 or not isinstance(value, str) or value not in fields for key, value in mapping.items())
     ):
-        raise ValueError("field mapping contains invalid source/destination fields")
+        raise ValidationError("field mapping contains invalid source/destination fields")
     if len(set(mapping.values())) != len(mapping):
-        raise ValueError("map each destination field only once")
+        raise ValidationError("map each destination field only once")
     encoding, delimiter = data.get("encoding", "utf-8-sig"), data.get("delimiter", ",")
     if encoding not in ("utf-8-sig", "utf-8", "utf-16", "latin-1") or delimiter not in (",", ";", "\t", "|"):
-        raise ValueError("unsupported encoding or delimiter")
+        raise ValidationError("unsupported encoding or delimiter")
     zone = text_value(data.get("source_timezone", "UTC"), 100, True)
     if not re.fullmatch(r"[A-Za-z0-9_+-]+(?:/[A-Za-z0-9_+-]+)*", zone):
-        raise ValueError("invalid source timezone")
+        raise ValidationError("invalid source timezone")
     try:
         _resolve_timezone(zone)
     except ZoneInfoNotFoundError as exc:
-        raise ValueError("source timezone is not available locally") from exc
+        raise ValidationError("source timezone is not available locally") from exc
     options = {"mapping": mapping, "source_timezone": zone, "encoding": encoding, "delimiter": delimiter}
     if data.get("source_year") not in (None, ""):
         year = data["source_year"]
         if isinstance(year, str) and year.isascii() and year.isdecimal():
             year = int(year)
         if type(year) is not int or not 1970 <= year <= 2100:
-            raise ValueError("source year must be between 1970 and 2100")
+            raise ValidationError("source year must be between 1970 and 2100")
         options["source_year"] = year
     if data.get("source_label"):
         options["source_label"] = text_value(data["source_label"], 100, True)
     if "source_id" in data and data["source_id"] not in (None, ""):
         if request.files:
             if not str(data["source_id"]).isdecimal() or not 1 <= int(data["source_id"]) <= 9223372036854775807:
-                raise ValueError("source id must be an integer")
+                raise ValidationError("source id must be an integer")
         elif type(data["source_id"]) is not int or not 1 <= data["source_id"] <= 9223372036854775807:
-            raise ValueError("source id must be an integer")
+            raise ValidationError("source id must be an integer")
     return case_id, options
 
 
@@ -1117,7 +1131,7 @@ def preview_import():
             {"filename": filename, "format": format_name, "content_hash": hashlib.sha256(content).hexdigest(), "preview": preview, "commit_required": True}
         )
     except (ValueError, json.JSONDecodeError, csv.Error, ElementTree.ParseError) as exc:
-        return error_response("IMPORT_PREVIEW_FAILED", str(exc), 422)
+        return error_response("IMPORT_PREVIEW_FAILED", public_error_message(exc, "Unable to parse the import; check its format and encoding"), 422)
 
 
 @ingestion_api.post("/api/imports")
@@ -1127,7 +1141,7 @@ def create_import():
         case_id, options = _upload_options()
         filename, content, selected_format, source_id, training_run_id = _upload_payload()
     except (ValueError, OverflowError) as exc:
-        return error_response("INVALID_IMPORT", str(exc), 422)
+        return error_response("INVALID_IMPORT", public_error_message(exc, "Check the import options"), 422)
     if len(content) > int(current_app.config["MAX_CONTENT_LENGTH"]):
         return error_response("UPLOAD_TOO_LARGE", "الملف يتجاوز الحجم المسموح", 413)
     if not can_access_training_run(training_run_id):
@@ -1166,7 +1180,7 @@ def create_import():
         format_name, _ = parse_records(filename, content, selected_format, source_name, options)
         estimated_total = _estimated_rows(format_name, content, options)
     except (ValueError, json.JSONDecodeError, csv.Error, ElementTree.ParseError) as exc:
-        return error_response("IMPORT_FORMAT_ERROR", str(exc), 422)
+        return error_response("IMPORT_FORMAT_ERROR", public_error_message(exc, "File does not match the selected format"), 422)
     now = iso_now()
     original_filename = request.files["file"].filename if request.files else (request.get_json(silent=True) or {}).get("filename", filename)
     if operational_mode():
@@ -1175,7 +1189,7 @@ def create_import():
         try:
             original_filename = text_value(original_filename, 255, True)
         except ValueError as exc:
-            return error_response("INVALID_FILENAME", str(exc), 422)
+            return error_response("INVALID_FILENAME", public_error_message(exc, "Specify a valid filename without a path"), 422)
     ciphertext = encrypt_secret(base64.b64encode(content).decode())
     with transaction():
         cursor = get_db().execute(
@@ -1328,7 +1342,7 @@ def import_evidence(job_id: int):
     try:
         content = _job_content(row)
     except ValueError as exc:
-        return error_response("IMPORT_EVIDENCE_INVALID", str(exc), 409)
+        return error_response("IMPORT_EVIDENCE_INVALID", public_error_message(exc, "Import evidence is unavailable or failed integrity validation"), 409)
     record_audit(get_db(), "read", "import_evidence", job_id, details={"sha256": row["content_hash"]})
     response = Response(content, mimetype="application/octet-stream")
     response.headers["Content-Disposition"] = f"attachment; filename={row['filename']}"

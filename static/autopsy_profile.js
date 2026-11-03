@@ -54,7 +54,7 @@ window.SOCifyAutopsy.profile = async () => {
       dialog.addEventListener("close", () => { secret.value = ""; }, { once: true });
     }, SOCifyLocale.text("بدء إعداد MFA")));
   } else {
-    mfa.append(securityForm([{ name: "current_password", label: SOCifyLocale.text("كلمة المرور الحالية"), type: "password", autocomplete: "current-password" }, { name: "code", label: SOCifyLocale.text("رمز MFA أو رمز استرداد غير مستخدم"), max: 20, autocomplete: "one-time-code" }], async (body) => { await api("/api/auth/mfa", { method: "DELETE", body }); await window.SOCifyAutopsy.profile(); }, SOCifyLocale.text("إلغاء MFA بعد التحقق")));
+    mfa.append(securityForm([{ name: "current_password", label: SOCifyLocale.text("كلمة المرور الحالية"), type: "password", autocomplete: "current-password" }, { name: "code", label: SOCifyLocale.text("رمز MFA أو رمز استرداد غير مستخدم"), max: 64, autocomplete: "one-time-code" }], async (body) => { await api("/api/auth/mfa", { method: "DELETE", body }); await window.SOCifyAutopsy.profile(); }, SOCifyLocale.text("إلغاء MFA بعد التحقق")));
   }
   root.append(panel(SOCifyLocale.text("المصادقة متعددة العوامل"), mfa, true));
   root.append(panel(SOCifyLocale.text("تغيير كلمة المرور"), node("div", { class: "panel-body" }, securityForm([{ name: "current_password", label: SOCifyLocale.text("كلمة المرور الحالية"), type: "password", autocomplete: "current-password" }, { name: "new_password", label: SOCifyLocale.text("كلمة مرور جديدة من 12 إلى 128 محرفًا وبحد 72 بايت"), type: "password", min: 12, autocomplete: "new-password" }, { name: "confirmation", label: SOCifyLocale.text("تأكيد كلمة المرور الجديدة"), type: "password", min: 12, autocomplete: "new-password" }], async (body) => {

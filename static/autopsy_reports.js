@@ -335,13 +335,15 @@ window.SOCifyAutopsy.reports = async (caseId) => {
       node("details", {}, [node("summary", { text: SOCifyLocale.text("بصمة الملف") }), node("bdi", { text: `SHA-256: ${report.sha256}` })]),
     ]);
     const links = node("div", { class: "action-row report-downloads" });
-    if (report.formats.length) {
-      const formats = node("select", { "aria-label": SOCifyLocale.text("صيغة التقرير") }, report.formats.map((format) => node("option", { value: format, selected: format === "pdf", text: format.toUpperCase() })));
-      const download = linkedButton(SOCifyLocale.text("تنزيل الصيغة المختارة"), `/api/cases/${caseId}/reports/${report.id}/files/${formats.value}`);
-      formats.addEventListener("change", () => { download.href = `/api/cases/${caseId}/reports/${report.id}/files/${formats.value}`; });
+    const available = report.formats.filter(format => ["json", "html", "pdf", "md", "docx"].includes(format));
+    if (available.length) {
+      const paths = new Map(available.map(format => [format, `/api/cases/${caseId}/reports/${report.id}/files/${encodeURIComponent(format)}`]));
+      const formats = node("select", { "aria-label": SOCifyLocale.text("صيغة التقرير") }, available.map((format) => node("option", { value: format, selected: format === "pdf", text: format.toUpperCase() })));
+      const download = linkedButton(SOCifyLocale.text("تنزيل الصيغة المختارة"), paths.get(formats.value));
+      formats.addEventListener("change", () => { const path = paths.get(formats.value); if (path) download.href = path; });
       card.append(node("div", { class: "report-downloads action-row" }, [field(SOCifyLocale.text("صيغة التقرير"), formats), download]));
     }
-    for (const format of report.formats) links.append(linkedButton(SOCifyLocale.template`تنزيل ${format.toUpperCase()}`, `/api/cases/${caseId}/reports/${report.id}/files/${format}`));
+    for (const format of available) links.append(linkedButton(SOCifyLocale.template`تنزيل ${format.toUpperCase()}`, `/api/cases/${caseId}/reports/${report.id}/files/${format}`));
     card.append(links);
     if (report.payload) {
       const preview = node("details", { open: view.has("preview") }, [node("summary", { text: SOCifyLocale.text("عرض بيانات النسخة للمراجعة") }), node("div", { class: "report-preview" }, autopsyReportPreview(report.payload, 0, "", view))]);

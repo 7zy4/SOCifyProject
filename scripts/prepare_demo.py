@@ -62,7 +62,7 @@ def provision(directory: Path):
             users.append({"id": identifier, "email": email, "name": name, "role": role, "password": password})
         _seed_rules(db, users[0]["id"])
     credentials = directory / "accounts.json"
-    credentials.write_text(json.dumps(users, ensure_ascii=False, indent=2) + "\n")
+    credentials.write_text(json.dumps(users, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     credentials.chmod(0o600)
     client = app.test_client()
 
@@ -208,12 +208,12 @@ def provision(directory: Path):
         for index in range(24)
     ]
     retained_events = baseline + events
-    (fixtures / "case1-logs.json").write_text(json.dumps(retained_events, ensure_ascii=False, indent=2) + "\n")
+    (fixtures / "case1-logs.json").write_text(json.dumps(retained_events, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     csv_output = io.StringIO()
     writer = csv.DictWriter(csv_output, fieldnames=list(events[0]))
     writer.writeheader()
     writer.writerows(retained_events)
-    (fixtures / "case1-logs.csv").write_text(csv_output.getvalue())
+    (fixtures / "case1-logs.csv").write_text(csv_output.getvalue(), encoding="utf-8")
     import_jobs = []
     for index, case in enumerate(cases):
         if index == 2:
@@ -472,7 +472,7 @@ def provision(directory: Path):
         "report": report["id"],
         "credentials_file": "accounts.json",
     }
-    (directory / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
+    (directory / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (directory / "README.txt").write_text(
         "Private synthetic demonstration. Keep runtime.env with socify.db to preserve encrypted evidence.\nFrom the checkout run: python -m scripts.run_demo --directory <this directory>\nRequires the isolated analysis service for new analyses and report exports; existing analysis and generated report files are retained.\nCredentials: accounts.json. Do not upload this directory to Git.\n"
     )

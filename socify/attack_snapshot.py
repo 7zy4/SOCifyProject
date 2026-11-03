@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .timeutils import iso_now
+from .validation import ValidationError
 
 Technique = tuple[str, str, str, str, str, int, int, int]
 
@@ -19,7 +20,7 @@ def _parse_techniques(payload: object) -> list[Technique]:
                 continue
             tactics = item.get("tactics")
             if not isinstance(tactics, list):
-                raise ValueError("compact ATT&CK techniques require a tactics list")
+                raise ValidationError("compact ATT&CK techniques require a tactics list")
             techniques.append(
                 (
                     str(item["technique_id"]).upper(),
@@ -34,7 +35,7 @@ def _parse_techniques(payload: object) -> list[Technique]:
             )
     objects = payload.get("objects") if isinstance(payload, dict) else None
     if not techniques and not isinstance(objects, list):
-        raise ValueError("STIX bundle objects are required")
+        raise ValidationError("STIX bundle objects are required")
     for item in objects or []:
         if not isinstance(item, dict) or item.get("type") != "attack-pattern":
             continue
@@ -72,9 +73,9 @@ def _parse_techniques(payload: object) -> list[Technique]:
         )
     identifiers = [item[0] for item in techniques]
     if any(not re.fullmatch(r"T\d{4}(?:\.\d{3})?", value) for value in identifiers):
-        raise ValueError("snapshot contains an invalid ATT&CK technique identifier")
+        raise ValidationError("snapshot contains an invalid ATT&CK technique identifier")
     if len(set(identifiers)) != len(identifiers):
-        raise ValueError("snapshot contains duplicate ATT&CK technique identifiers")
+        raise ValidationError("snapshot contains duplicate ATT&CK technique identifiers")
     return sorted(techniques)
 
 
@@ -103,7 +104,7 @@ def _transition_counts(connection: sqlite3.Connection, old_version: str | None, 
 def _activate(connection: sqlite3.Connection, version: str) -> bool:
     catalog = connection.execute("SELECT * FROM attack_catalog_versions WHERE version = ?", (version,)).fetchone()
     if not catalog:
-        raise ValueError("ATT&CK catalog version does not exist")
+        raise ValidationError("ATT&CK catalog version does not exist")
     active = connection.execute("SELECT version FROM attack_catalog_versions WHERE active = 1").fetchone()
     old_version = str(active["version"]) if active else None
     if old_version == version:
@@ -151,13 +152,13 @@ def activate_attack_version(connection: sqlite3.Connection, version: str) -> boo
 
 def load_stix_snapshot(connection: sqlite3.Connection, filename: str, version: str, allow_partial: bool = False) -> int:
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", version):
-        raise ValueError("invalid ATT&CK catalog version")
+        raise ValidationError("invalid ATT&CK catalog version")
     path = Path(filename)
     raw = path.read_bytes()
     payload = json.loads(raw)
     techniques = _parse_techniques(payload)
     if not techniques or (not allow_partial and len(techniques) < 600):
-        raise ValueError("snapshot does not contain a complete Enterprise ATT&CK technique set")
+        raise ValidationError("snapshot does not contain a complete Enterprise ATT&CK technique set")
     digest = hashlib.sha256(raw).hexdigest()
     declared_source = payload.get("source_url") if isinstance(payload, dict) else None
     source = str(declared_source or path.resolve().as_uri())
@@ -165,7 +166,7 @@ def load_stix_snapshot(connection: sqlite3.Connection, filename: str, version: s
     try:
         existing = connection.execute("SELECT source_sha256 FROM attack_catalog_versions WHERE version = ?", (version,)).fetchone()
         if existing and existing["source_sha256"] != digest:
-            raise ValueError("ATT&CK catalog version already exists with different content")
+            raise ValidationError("ATT&CK catalog version already exists with different content")
         if not existing:
             connection.execute(
                 "INSERT INTO attack_catalog_versions (version, source_url, source_sha256, technique_count, imported_at, active) VALUES (?, ?, ?, ?, ?, 0)",

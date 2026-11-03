@@ -15,6 +15,7 @@ from .chronology_time import record_clock, sql_utc_key, utc_key
 from .db import get_db
 from .security import actor_id, current_user, error_response, has_permission, require_permission
 from .timeutils import parse_timestamp, utc_now
+from .validation import ValidationError, public_error_message
 
 autopsy_chronology_api = Blueprint("autopsy_chronology", __name__)
 CHRONOLOGY_KINDS = ("timeline", "war_room", "response", "bookmark", "escalation")
@@ -228,10 +229,10 @@ def case_chronology(case_id):
             return error_response("BATCH_SCOPE_REQUIRED", "الخط الشامل يحتاج نطاق القضية الكامل؛ استخدم خط السجلات المصرح بها", 403)
         try:
             if set(request.args) - {"q", "severity", "start", "end", "page", "limit"}:
-                raise ValueError("مرشح غير معروف للخط الشامل")
+                raise ValidationError("مرشح غير معروف للخط الشامل")
             page, limit = int(request.args.get("page", 1)), int(request.args.get("limit", 50))
             if not 1 <= page <= 1000000 or not 1 <= limit <= 100:
-                raise ValueError("الترقيم خارج النطاق")
+                raise ValidationError("الترقيم خارج النطاق")
             return jsonify(chronology_page(case_id, page, limit))
         except ValueError as exc:
-            return error_response("INVALID_CHRONOLOGY_FILTER", str(exc), 422)
+            return error_response("INVALID_CHRONOLOGY_FILTER", public_error_message(exc, "حدد مرشحًا وفترة وترقيمًا صالحًا"), 422)

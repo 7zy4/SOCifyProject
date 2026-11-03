@@ -11,6 +11,7 @@ from .db import get_db, inserted_id, transaction
 from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
 from .task_titles import task_view
 from .timeutils import iso_now
+from .validation import ValidationError, public_error_message
 
 autopsy_api = Blueprint("autopsy", __name__)
 
@@ -28,10 +29,10 @@ def validate_escalation_routing(payload):
         "management": {"soc_manager", "admin"},
     }
     if not manager() and (current_user() or {}).get("role") not in levels[payload["from_level"]]:
-        raise ValueError("مستوى إرسال التصعيد لا يطابق دورك")
+        raise ValidationError("مستوى إرسال التصعيد لا يطابق دورك")
     target = get_db().execute("SELECT id, role, workspace_id FROM users WHERE id = ? AND is_active = 1", (payload["to_user"],)).fetchone()
     if target is None or target["role"] not in levels[payload["to_level"]] | {"admin", "soc_manager"}:
-        raise ValueError("دور المستلم لا يطابق مستوى التصعيد")
+        raise ValidationError("دور المستلم لا يطابق مستوى التصعيد")
     principal = dict(target)
     policy = (
         get_db()
@@ -41,7 +42,7 @@ def validate_escalation_routing(payload):
     if policy:
         principal["role_permissions"] = json.loads(policy[0])
     if not has_permission(principal, "cases.read") or not has_permission(principal, "cases.update"):
-        raise ValueError("مستقبل التصعيد يحتاج صلاحية قراءة القضية وتحديثها")
+        raise ValidationError("مستقبل التصعيد يحتاج صلاحية قراءة القضية وتحديثها")
 
 
 def record_view(row) -> dict[str, Any]:
@@ -435,13 +436,13 @@ def update_context(case_id: int):
                 value = data[key]
                 if key == "legal_hold":
                     if type(value) is not bool or not manager():
-                        raise ValueError("تغيير الحفظ القانوني للمدير فقط")
+                        raise ValidationError("تغيير الحفظ القانوني للمدير فقط")
                     result[key] = int(value)
                 elif key == "retention_until":
                     from .timeutils import iso_timestamp
 
                     if not manager() or not isinstance(value, str):
-                        raise ValueError("سياسة الاحتفاظ للمدير فقط")
+                        raise ValidationError("سياسة الاحتفاظ للمدير فقط")
                     result[key] = iso_timestamp(value)
                 else:
                     result[key] = text_value(value, 2000 if key == "objective" else 500, True)
@@ -451,9 +452,9 @@ def update_context(case_id: int):
                 "alert_verdict": {"malicious", "benign", "false_positive", "undetermined"},
             }
             if any(result[key] not in allowed for key, allowed in choices.items()) or not result["reason"] or not result["objective"]:
-                raise ValueError("سبب القضية وهدفها واختياراتها مطلوبة وصالحة")
+                raise ValidationError("سبب القضية وهدفها واختياراتها مطلوبة وصالحة")
         except ValueError as exc:
-            return error_response("INVALID_CASE_CONTEXT", str(exc), 422)
+            return error_response("INVALID_CASE_CONTEXT", public_error_message(exc, "تحقق من حقول القضية"), 422)
         get_db().execute(
             "INSERT INTO autopsy_case_context(case_id, reason, objective, classification, attack_outcome, alert_verdict, legal_hold, retention_until, created_at) VALUES (:case_id, :reason, :objective, :classification, :attack_outcome, :alert_verdict, :legal_hold, :retention_until, :created_at) ON CONFLICT(case_id) DO UPDATE SET reason=excluded.reason, objective=excluded.objective, classification=excluded.classification, attack_outcome=excluded.attack_outcome, alert_verdict=excluded.alert_verdict, legal_hold=excluded.legal_hold, retention_until=excluded.retention_until",
             result,
@@ -506,14 +507,14 @@ def record_create(case_id: int, kind: str):
             if kind == "escalation":
                 validate_escalation_routing(payload)
                 if payload["status"] != "raised":
-                    raise ValueError("يبدأ التصعيد بحالة raised")
+                    raise ValidationError("يبدأ التصعيد بحالة raised")
                 payload.update({"from_user": actor_id(), "raised_at": iso_now()})
                 get_db().execute(
                     "INSERT INTO autopsy_case_members(case_id, user_id, responsibility, assigned_by, assigned_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(case_id, user_id) DO NOTHING",
                     (case_id, payload["to_user"], payload["to_level"], actor_id(), iso_now()),
                 )
         except (ValueError, UnicodeError) as exc:
-            return error_response("INVALID_RECORD", str(exc), 422)
+            return error_response("INVALID_RECORD", public_error_message(exc, "تحقق من حقول السجل"), 422)
         if kind == "indicator":
             duplicate = (
                 get_db()
@@ -553,7 +554,7 @@ def record_update(case_id: int, record_id: int):
             payload = validate_record(case_id, row["kind"], data["payload"])
             if row["kind"] == "escalation":
                 if any(payload[key] != previous[key] for key in ("to_user", "from_level", "to_level")):
-                    raise ValueError("حافظ على مسار التصعيد؛ أضف تصعيدًا جديدًا أو سلّم المسؤوليات من إدارة الفريق")
+                    raise ValidationError("حافظ على مسار التصعيد؛ أضف تصعيدًا جديدًا أو سلّم المسؤوليات من إدارة الفريق")
                 if not manager() and previous["to_user"] != actor_id():
                     return error_response("PERMISSION_DENIED", "الإقرار والاستجابة لمتلقي التصعيد أو المدير", 403)
                 transitions = {
@@ -563,16 +564,16 @@ def record_update(case_id: int, record_id: int):
                     "resolved": {"resolved"},
                 }
                 if payload["status"] not in transitions[previous["status"]]:
-                    raise ValueError("انتقال التصعيد غير مسموح")
+                    raise ValidationError("انتقال التصعيد غير مسموح")
                 payload.update({key: value for key, value in previous.items() if key in {"from_user", "raised_at", "acknowledged_at", "responded_at"}})
                 if payload["status"] == "acknowledged" and not payload.get("acknowledged_at"):
                     payload["acknowledged_at"] = iso_now()
                 if payload["status"] == "resolved":
                     if not payload.get("response"):
-                        raise ValueError("سجل الاستجابة قبل إتمام التصعيد")
+                        raise ValidationError("سجل الاستجابة قبل إتمام التصعيد")
                     payload.setdefault("responded_at", iso_now())
         except (ValueError, UnicodeError) as exc:
-            return error_response("INVALID_RECORD", str(exc), 422)
+            return error_response("INVALID_RECORD", public_error_message(exc, "تحقق من حقول السجل"), 422)
         serialized = canonical(payload)
         if row["kind"] == "root_cause":
             branch_ids = {item["id"] for item in payload.get("whys", [])}
@@ -642,12 +643,12 @@ def remove_case_member(case_id: int, user_id: int):
     data = request.get_json(silent=True)
     try:
         if not isinstance(data, dict) or set(data) != {"version", "reason"}:
-            raise ValueError("حدد سبب سحب الوصول وحالة القضية الحالية")
+            raise ValidationError("حدد سبب سحب الوصول وحالة القضية الحالية")
         if type(data["version"]) is not int or not 1 <= data["version"] <= 9223372036854775807:
-            raise ValueError("حدد سبب سحب الوصول وحالة القضية الحالية")
+            raise ValidationError("حدد سبب سحب الوصول وحالة القضية الحالية")
         reason = text_value(data["reason"], 1000, True)
     except ValueError as exc:
-        return error_response("INVALID_MEMBER_REMOVAL", str(exc), 422)
+        return error_response("INVALID_MEMBER_REMOVAL", public_error_message(exc, "حدد سبب سحب الوصول وحالة القضية الحالية"), 422)
     with transaction():
         case = _case_row(case_id)
         if not case:

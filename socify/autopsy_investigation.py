@@ -11,6 +11,7 @@ from .cases import _case_row, annotate_technique
 from .chronology_time import sql_utc_key
 from .db import get_db
 from .security import error_response, require_permission
+from .validation import ValidationError, public_error_message
 from .visualization import build_graph
 
 autopsy_investigation_api = Blueprint("autopsy_investigation", __name__)
@@ -24,13 +25,13 @@ def case_timeline(case_id: int):
         return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
     try:
         if set(request.args) - {"q", "severity", "start", "end", "page", "limit", "job_id"}:
-            raise ValueError("مرشح غير معروف")
+            raise ValidationError("مرشح غير معروف")
         page, limit = int(request.args.get("page", 1)), int(request.args.get("limit", 50))
         if not 1 <= page <= 1000000 or not 1 <= limit <= 100:
-            raise ValueError("الترقيم خارج النطاق")
+            raise ValidationError("الترقيم خارج النطاق")
         where, args = log_query(case_id)
     except ValueError as exc:
-        return error_response("INVALID_TIMELINE_FILTER", str(exc), 422)
+        return error_response("INVALID_TIMELINE_FILTER", public_error_message(exc, "حدد مرشحًا وفترة وترقيمًا صالحًا"), 422)
     source, where, total, relation = metadata_scope(where, args)
     rows = (
         get_db()
@@ -77,10 +78,10 @@ def case_graph(case_id: int):
         return error_response("BATCH_ACCESS_REQUIRED", "الرسم الكامل يحتاج نطاق القضية الكامل؛ السجلات المصرح بها متاحة في الخط الزمني", 403)
     try:
         if set(request.args) - {"limit", "severity", "start", "end"}:
-            raise ValueError("مرشح الرسم غير معروف")
+            raise ValidationError("مرشح الرسم غير معروف")
         limit = int(request.args.get("limit", 30))
         if not 1 <= limit <= 100:
-            raise ValueError("حد الرسم من 1 إلى 100 سجل")
+            raise ValidationError("حد الرسم من 1 إلى 100 سجل")
         return jsonify(
             {
                 **build_graph(limit, case_id),
@@ -89,7 +90,7 @@ def case_graph(case_id: int):
             }
         )
     except ValueError as exc:
-        return error_response("INVALID_GRAPH_FILTER", str(exc), 422)
+        return error_response("INVALID_GRAPH_FILTER", public_error_message(exc, "حدد مرشحًا وفترة صالحين"), 422)
 
 
 @autopsy_investigation_api.get("/api/cases/<int:case_id>/attack")

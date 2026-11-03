@@ -29,6 +29,7 @@ from .security import (
 )
 from .task_titles import task_view
 from .timeutils import iso_now, utc_now
+from .validation import ValidationError, public_error_message
 
 cases_api = Blueprint("cases", __name__)
 
@@ -68,7 +69,7 @@ def _json_list(value: object, field: str, maximum: int = 50) -> list[str]:
     if value is None:
         return []
     if not isinstance(value, list) or len(value) > maximum or any(not isinstance(item, str) or len(item) > 100 for item in value):
-        raise ValueError(f"{field} must be a list of short strings")
+        raise ValidationError(f"{field} must be a list of short strings")
     return value
 
 
@@ -369,7 +370,7 @@ def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
             text_value(reason, 500, True)
             text_value(objective, 2000, True)
         except ValueError as exc:
-            return error_response("INVALID_CASE", str(exc), 422)
+            return error_response("INVALID_CASE", public_error_message(exc, "Check the case fields"), 422)
         data.setdefault("assignee", actor_id())
     title = data.get("title")
     description = data.get("description", "")
@@ -386,7 +387,7 @@ def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
         tags = _json_list(data.get("tags"), "tags")
         mitre_ids = _json_list(data.get("mitre_ids"), "mitre_ids", 20)
     except ValueError as exc:
-        return error_response("INVALID_CASE_METADATA", str(exc), 422)
+        return error_response("INVALID_CASE_METADATA", public_error_message(exc, "Check the case fields"), 422)
     event_ids = data.get("event_ids", [])
     alert_ids = data.get("alert_ids", [])
     if not isinstance(event_ids, list) or any(not isinstance(item, int) for item in event_ids) or len(event_ids) > 100:
@@ -483,10 +484,10 @@ def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
                 )
         for event_id in event_ids:
             if not _attach_event(get_db(), case_id, event_id):
-                raise ValueError(f"event {event_id} is unavailable")
+                raise ValidationError(f"event {event_id} is unavailable")
         for alert_id in alert_ids:
             if not _attach_alert(get_db(), case_id, alert_id):
-                raise ValueError(f"alert {alert_id} is unavailable")
+                raise ValidationError(f"alert {alert_id} is unavailable")
         get_db().executemany(
             "INSERT INTO case_tasks (case_id, title, system_key, required, status, assignee, created_at) VALUES (?, ?, ?, 1, 'pending', ?, ?)",
             [
@@ -694,7 +695,7 @@ def update_case(case_id: int):
             try:
                 updates[field] = json.dumps(_json_list(data[field], field, 20 if field == "mitre_ids" else 50), ensure_ascii=False)
             except ValueError as exc:
-                return error_response("INVALID_CASE_FIELD", str(exc), 422)
+                return error_response("INVALID_CASE_FIELD", public_error_message(exc, "Invalid case field"), 422)
     if not updates:
         return error_response("NO_CHANGES", "لم تُرسل حقول قابلة للتعديل", 422)
     now = iso_now()
@@ -981,7 +982,7 @@ def evidence_content(case_id: int, evidence_id: int):
     try:
         content = decrypt_secret(evidence["ciphertext"]).encode()
         if not hmac.compare_digest(hashlib.sha256(content).hexdigest(), evidence["sha256"]):
-            raise ValueError("digest mismatch")
+            raise ValidationError("digest mismatch")
     except ValueError:
         record_audit(get_db(), "read", "case_evidence", evidence_id, result="denied", details={"case_id": case_id, "reason": "integrity_failure"})
         return error_response("EVIDENCE_INTEGRITY_FAILURE", "تعذر التحقق من سلامة المحتوى", 409)

@@ -10,6 +10,7 @@ from .db import get_db, inserted_id, transaction
 from .schema import insert_outbox, public_id
 from .security import actor_id, can_access_training_run, error_response, redact, require_permission, workspace_id
 from .timeutils import iso_now
+from .validation import ValidationError, public_error_message
 
 playbooks_api = Blueprint("playbooks", __name__)
 
@@ -214,10 +215,10 @@ def _steps(version_id: int) -> list[sqlite3.Row]:
 def _parameters(data: dict[str, Any]) -> dict[str, Any]:
     parameters = data.get("parameters", {})
     if not isinstance(parameters, dict) or len(parameters) > 30:
-        raise ValueError("parameters must be an object with at most 30 fields")
+        raise ValidationError("parameters must be an object with at most 30 fields")
     serialized = json.dumps(parameters, ensure_ascii=False)
     if len(serialized) > 10000:
-        raise ValueError("parameters exceed the size limit")
+        raise ValidationError("parameters exceed the size limit")
     return parameters
 
 
@@ -253,7 +254,7 @@ def preview_playbook(playbook_id: int):
     try:
         parameters = _parameters(data)
     except ValueError as exc:
-        return error_response("INVALID_PARAMETERS", str(exc), 422)
+        return error_response("INVALID_PARAMETERS", public_error_message(exc, "Check the action parameters"), 422)
     steps = _steps(int(version["id"]))
     return jsonify(
         {
@@ -308,7 +309,7 @@ def create_playbook_run():
     try:
         parameters = _parameters(data)
     except ValueError as exc:
-        return error_response("INVALID_PARAMETERS", str(exc), 422)
+        return error_response("INVALID_PARAMETERS", public_error_message(exc, "Check the action parameters"), 422)
     idempotency_key = request.headers.get("Idempotency-Key") or data.get("idempotency_key")
     if not isinstance(idempotency_key, str) or not 8 <= len(idempotency_key) <= 255:
         return error_response("IDEMPOTENCY_KEY_REQUIRED", "يلزم مفتاح Idempotency بطول 8 محارف على الأقل", 422)
@@ -394,13 +395,13 @@ def _entity_key(action: str, parameters: dict[str, Any]) -> tuple[str, str, str]
     entity_type, parameter_name, state = mapping[action]
     identifier = parameters.get(parameter_name)
     if not isinstance(identifier, str) or not identifier.strip() or len(identifier) > 255:
-        raise ValueError(f"parameter {parameter_name} is required")
+        raise ValidationError(f"parameter {parameter_name} is required")
     return entity_type, identifier.strip(), state
 
 
 def _apply_action(connection: sqlite3.Connection, run: sqlite3.Row, action: str, parameters: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     if action not in ACTIONS:
-        raise ValueError("unsupported playbook action")
+        raise ValidationError("unsupported playbook action")
     before: dict[str, Any] = {}
     after: dict[str, Any] = {}
     if action in {
@@ -424,13 +425,13 @@ def _apply_action(connection: sqlite3.Connection, run: sqlite3.Row, action: str,
         after = {"entity_type": entity_type, "entity_id": entity_id, "state": target_state}
     elif action == "collect_evidence":
         if not run["case_id"]:
-            raise ValueError("collect_evidence requires a case")
+            raise ValidationError("collect_evidence requires a case")
         case = connection.execute(
             "SELECT status FROM incident_cases WHERE id = ? AND workspace_id = ? AND training_run_id IS ?",
             (run["case_id"], run["workspace_id"], run["training_run_id"]),
         ).fetchone()
         if not case or case["status"] == "closed":
-            raise ValueError("case evidence is locked or inaccessible")
+            raise ValidationError("case evidence is locked or inaccessible")
         content = json.dumps(parameters, ensure_ascii=False, sort_keys=True)
         digest = hashlib.sha256(content.encode()).hexdigest()
         cursor = connection.execute(
@@ -448,13 +449,13 @@ def _apply_action(connection: sqlite3.Connection, run: sqlite3.Row, action: str,
         after = {"evidence_id": cursor.lastrowid, "sha256": digest}
     elif action == "escalate_to_manager":
         if not run["case_id"]:
-            raise ValueError("escalation requires a case")
+            raise ValidationError("escalation requires a case")
         case = connection.execute(
             "SELECT status FROM incident_cases WHERE id = ? AND workspace_id = ? AND training_run_id IS ?",
             (run["case_id"], run["workspace_id"], run["training_run_id"]),
         ).fetchone()
         if not case or case["status"] in {"closed", "cancelled"}:
-            raise ValueError("case must be reopened before escalation")
+            raise ValidationError("case must be reopened before escalation")
         before = {"status": case["status"]}
         connection.execute("UPDATE incident_cases SET status = 'escalated', updated_at = ?, version = version + 1 WHERE id = ?", (iso_now(), run["case_id"]))
         after = {"status": "escalated"}
@@ -470,18 +471,18 @@ def _apply_action(connection: sqlite3.Connection, run: sqlite3.Row, action: str,
         ioc_id = parameters.get("ioc_id")
         tag = parameters.get("tag")
         if not isinstance(ioc_id, int) or not isinstance(tag, str) or not tag:
-            raise ValueError("ioc_id and tag are required")
+            raise ValidationError("ioc_id and tag are required")
         from .hunting import _ioc_view
 
         ioc = connection.execute("SELECT * FROM ioc_indicators WHERE id = ? AND workspace_id = ?", (ioc_id, run["workspace_id"])).fetchone()
         if not ioc or _ioc_view(ioc) is None:
-            raise ValueError("indicator not found")
+            raise ValidationError("indicator not found")
         observations = connection.execute(
             "SELECT o.event_id, o.tags FROM ioc_observations o JOIN security_events e ON e.id = o.event_id WHERE o.ioc_id = ? AND e.workspace_id = ? AND e.training_run_id IS ?",
             (ioc_id, run["workspace_id"], run["training_run_id"]),
         ).fetchall()
         if not observations and (run["training_run_id"] is not None or ioc["source"] != "SOCify synthetic fixtures"):
-            raise ValueError("indicator not found in response scope")
+            raise ValidationError("indicator not found in response scope")
         tags = sorted({value for observation in observations for value in json.loads(observation["tags"])}) if observations else json.loads(ioc["tags"])
         before = {"tags": list(tags)}
         tags = sorted(set(tags + [tag[:80]]))
@@ -532,7 +533,8 @@ def _execute_run(run_id: int) -> None:
         except (ValueError, sqlite3.Error) as exc:
             failed = True
             get_db().execute(
-                "UPDATE playbook_step_runs SET status = 'failed', error = ?, completed_at = ? WHERE id = ?", (str(exc)[:500], iso_now(), step["id"])
+                "UPDATE playbook_step_runs SET status = 'failed', error = ?, completed_at = ? WHERE id = ?",
+                (public_error_message(exc, "Unable to complete the action"), iso_now(), step["id"]),
             )
             break
     state = "failed" if failed else "succeeded"

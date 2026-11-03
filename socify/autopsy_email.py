@@ -15,6 +15,7 @@ from .cases import _case_row
 from .db import get_db, transaction
 from .file_names import evidence_filename
 from .security import cipher, error_response, require_permission
+from .validation import ValidationError, public_error_message
 
 autopsy_email_api = Blueprint("autopsy_email", __name__)
 MAXIMUM = 2 * 1024 * 1024
@@ -49,13 +50,13 @@ class MailText(HTMLParser):
 
 def inspect_email(content: bytes) -> dict:
     if not content or len(content) > MAXIMUM:
-        raise ValueError("حجم رسالة EML يجب ألا يتجاوز 2MiB")
+        raise ValidationError("حجم رسالة EML يجب ألا يتجاوز 2MiB")
     try:
         message = BytesParser(policy=policy.default).parsebytes(content)
     except RecursionError as exc:
-        raise ValueError("تداخل أجزاء MIME يتجاوز الحد المسموح") from exc
+        raise ValidationError("تداخل أجزاء MIME يتجاوز الحد المسموح") from exc
     if not any(message.get(key) for key in ("From", "To", "Subject", "Message-ID")):
-        raise ValueError("الملف لا يحتوي رؤوس رسالة EML معروفة")
+        raise ValidationError("الملف لا يحتوي رؤوس رسالة EML معروفة")
     headers = {}
     for key in ("From", "To", "Cc", "Reply-To", "Subject", "Date", "Message-ID", "Return-Path", "Authentication-Results", "Received-SPF"):
         headers[key] = "\n".join(str(value) for value in message.get_all(key, []))[:4096]
@@ -68,11 +69,11 @@ def inspect_email(content: bytes) -> dict:
     while pending:
         part, depth = pending.pop()
         if depth > MAX_MIME_DEPTH:
-            raise ValueError("تداخل أجزاء MIME يتجاوز الحد المسموح")
+            raise ValidationError("تداخل أجزاء MIME يتجاوز الحد المسموح")
         part_count += 1
         header_count += len(part.keys())
         if part_count > MAX_MIME_PARTS or header_count > 200:
-            raise ValueError("عدد أجزاء MIME أو رؤوس الرسالة يتجاوز الحد المسموح")
+            raise ValidationError("عدد أجزاء MIME أو رؤوس الرسالة يتجاوز الحد المسموح")
         is_attachment = (
             bool(part.get_filename())
             or part.get_content_disposition() == "attachment"
@@ -81,13 +82,13 @@ def inspect_email(content: bytes) -> dict:
         if is_attachment:
             attachment_count += 1
             if attachment_count > MAX_ATTACHMENTS:
-                raise ValueError("عدد المرفقات يتجاوز الحد المسموح")
+                raise ValidationError("عدد المرفقات يتجاوز الحد المسموح")
         if part.is_multipart():
             children = part.get_payload()
             if not isinstance(children, list):
-                raise ValueError("بنية MIME غير صالحة")
+                raise ValidationError("بنية MIME غير صالحة")
             if len(children) + len(pending) + part_count > MAX_MIME_PARTS:
-                raise ValueError("عدد أجزاء MIME أو رؤوس الرسالة يتجاوز الحد المسموح")
+                raise ValidationError("عدد أجزاء MIME أو رؤوس الرسالة يتجاوز الحد المسموح")
             pending.extend((child, depth + 1) for child in reversed(children))
             continue
         leaves.append((part, is_attachment))
@@ -95,7 +96,7 @@ def inspect_email(content: bytes) -> dict:
     for part, is_attachment in leaves:
         data = part.get_payload(decode=True) or b""
         if not isinstance(data, bytes):
-            raise ValueError("محتوى جزء MIME ليس بيانات ثنائية صالحة")
+            raise ValidationError("محتوى جزء MIME ليس بيانات ثنائية صالحة")
         filename = part.get_filename()
         if is_attachment:
             digest = hashlib.sha256(data).hexdigest()
@@ -157,7 +158,7 @@ def review_email(case_id: int, sample_id: int):
     except InvalidToken:
         return error_response("SAMPLE_INTEGRITY_FAILED", "تعذر التحقق من سلامة أصل الرسالة", 409)
     except (ValueError, UnicodeError, RecursionError) as exc:
-        return error_response("INVALID_EMAIL_FILE", str(exc)[:200], 422)
+        return error_response("INVALID_EMAIL_FILE", public_error_message(exc, "ملف البريد غير صالح"), 422)
     with transaction():
         case = _case_row(case_id)
         if not case or not case_full_access(case_id):
@@ -224,13 +225,13 @@ def inspect_email_with_attachment_triage(content: bytes) -> dict:
 
     max_eml_bytes = 5 * 1024 * 1024
     if not content or len(content) > max_eml_bytes:
-        raise ValueError("حجم رسالة EML يجب ألا يتجاوز 5MiB")
+        raise ValidationError("حجم رسالة EML يجب ألا يتجاوز 5MiB")
     try:
         message = BytesParser(policy=policy.default).parsebytes(content)
     except RecursionError as exc:
-        raise ValueError("تداخل أجزاء MIME يتجاوز الحد المسموح") from exc
+        raise ValidationError("تداخل أجزاء MIME يتجاوز الحد المسموح") from exc
     if not any(message.get(key) for key in ("From", "To", "Subject", "Message-ID")):
-        raise ValueError("الملف لا يحتوي رؤوس رسالة EML معروفة")
+        raise ValidationError("الملف لا يحتوي رؤوس رسالة EML معروفة")
     headers = {}
     for key in ("From", "To", "Cc", "Reply-To", "Subject", "Date", "Message-ID", "Return-Path", "Authentication-Results", "Received-SPF"):
         headers[key] = "\n".join(str(value) for value in message.get_all(key, []))[:4096]
@@ -270,11 +271,11 @@ def inspect_email_with_attachment_triage(content: bytes) -> dict:
     while pending:
         part, depth = pending.pop()
         if depth > MAX_MIME_DEPTH:
-            raise ValueError("تداخل أجزاء MIME يتجاوز الحد المسموح")
+            raise ValidationError("تداخل أجزاء MIME يتجاوز الحد المسموح")
         part_count += 1
         header_count += len(part.keys())
         if part_count > MAX_MIME_PARTS or header_count > 200:
-            raise ValueError("عدد أجزاء MIME أو رؤوس الرسالة يتجاوز الحد المسموح")
+            raise ValidationError("عدد أجزاء MIME أو رؤوس الرسالة يتجاوز الحد المسموح")
         is_attachment = (
             bool(part.get_filename())
             or part.get_content_disposition() == "attachment"
@@ -283,13 +284,13 @@ def inspect_email_with_attachment_triage(content: bytes) -> dict:
         if is_attachment:
             attachment_count += 1
             if attachment_count > MAX_ATTACHMENTS:
-                raise ValueError("عدد المرفقات يتجاوز الحد المسموح")
+                raise ValidationError("عدد المرفقات يتجاوز الحد المسموح")
         if part.is_multipart():
             children = part.get_payload()
             if not isinstance(children, list):
-                raise ValueError("بنية MIME غير صالحة")
+                raise ValidationError("بنية MIME غير صالحة")
             if len(children) + len(pending) + part_count > MAX_MIME_PARTS:
-                raise ValueError("عدد أجزاء MIME أو رؤوس الرسالة يتجاوز الحد المسموح")
+                raise ValidationError("عدد أجزاء MIME أو رؤوس الرسالة يتجاوز الحد المسموح")
             pending.extend((child, depth + 1) for child in reversed(children))
             continue
         leaves.append((part, is_attachment))
@@ -299,7 +300,7 @@ def inspect_email_with_attachment_triage(content: bytes) -> dict:
     for part, is_attachment in leaves:
         data = part.get_payload(decode=True) or b""
         if not isinstance(data, bytes):
-            raise ValueError("محتوى جزء MIME ليس بيانات ثنائية صالحة")
+            raise ValidationError("محتوى جزء MIME ليس بيانات ثنائية صالحة")
         raw_filename = str(part.get_filename() or "")
         if is_attachment:
             digest = hashlib.sha256(data).hexdigest()
@@ -383,19 +384,19 @@ def quick_email_triage(case_id: int):
         if upload:
             original_name = text_value(upload.filename or "message.eml", 255, True)
             if any(ch in original_name for ch in ("/", "\\")):
-                raise ValueError("أرسل اسم ملف دون مسار")
+                raise ValidationError("أرسل اسم ملف دون مسار")
             content = upload.stream.read(5 * 1024 * 1024 + 1)
         else:
             body = request.get_json(silent=True) or {}
             if not isinstance(body, dict) or not isinstance(body.get("raw_eml"), str):
-                raise ValueError("أرفق ملف .eml في حقل file أو أرسل raw_eml نصيًا")
+                raise ValidationError("أرفق ملف .eml في حقل file أو أرسل raw_eml نصيًا")
             original_name = text_value(str(body.get("filename") or "message.eml"), 255, True)
             content = body["raw_eml"].encode("utf-8")
         if not original_name.lower().endswith(".eml"):
             original_name = f"{original_name}.eml"
         parsed = inspect_email_with_attachment_triage(content)
     except (ValueError, UnicodeError, RecursionError) as exc:
-        return error_response("INVALID_EMAIL_FILE", str(exc)[:200], 422)
+        return error_response("INVALID_EMAIL_FILE", public_error_message(exc, "ملف البريد غير صالح"), 422)
 
     with transaction():
         case = _case_row(case_id)

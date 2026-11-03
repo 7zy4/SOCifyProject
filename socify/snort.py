@@ -4,6 +4,7 @@ import ipaddress
 import re
 
 from .timeutils import iso_now, iso_timestamp
+from .validation import ValidationError
 
 
 def snort_profile(record):
@@ -12,12 +13,12 @@ def snort_profile(record):
     def text(key, limit=512):
         value = record.get(key, "")
         if not isinstance(value, str) or len(value) > limit:
-            raise ValueError("invalid Snort text field")
+            raise ValidationError("invalid Snort text field")
         return value
 
     rule = text("rule", 100)
     if not re.fullmatch(r"[0-9]{1,10}:[0-9]{1,10}:[0-9]{1,10}", rule) or any(int(part) > 2**32 - 1 for part in rule.split(":")):
-        raise ValueError("invalid Snort rule identifier")
+        raise ValidationError("invalid Snort rule identifier")
 
     def endpoint(prefix):
         address = text(prefix + "_addr", 80)
@@ -28,13 +29,13 @@ def snort_profile(record):
                 return "", port
             address, separator, raw_port = combined.rpartition(":")
             if not separator:
-                raise ValueError("invalid Snort address and port")
+                raise ValidationError("invalid Snort address and port")
             port = number(raw_port, 65535, True)
             if port is None:
-                raise ValueError("Snort address requires a port")
+                raise ValidationError("Snort address requires a port")
             address = address.removeprefix("[").removesuffix("]")
         if "%" in address:
-            raise ValueError("scoped Snort addresses are not supported")
+            raise ValidationError("scoped Snort addresses are not supported")
         return str(ipaddress.ip_address(address)), port
 
     source, source_port = endpoint("src")

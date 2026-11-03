@@ -8,6 +8,7 @@ from .cases import _case_row
 from .db import get_db, inserted_id, transaction
 from .security import actor_id, current_user, error_response, require_permission, workspace_id
 from .timeutils import iso_now
+from .validation import ValidationError, public_error_message
 
 autopsy_procedures_api = Blueprint("autopsy_procedures", __name__)
 PHASES = {"triage", "analysis", "containment", "eradication", "recovery", "validation", "review"}
@@ -16,20 +17,20 @@ STEP_ROLES = {"any", "l1", "l2", "investigator", "reviewer", "manager"}
 
 def validate_steps(value):
     if not isinstance(value, list) or not 1 <= len(value) <= 30:
-        raise ValueError("يتطلب القالب من خطوة إلى 30 خطوة")
+        raise ValidationError("يتطلب القالب من خطوة إلى 30 خطوة")
     steps = []
     for entry in value:
         if not isinstance(entry, dict) or set(entry) - {"title", "description", "phase", "role", "required", "approval_required"}:
-            raise ValueError("حقول الخطوة غير معروفة")
+            raise ValidationError("حقول الخطوة غير معروفة")
         if (
             not isinstance(entry.get("phase", "analysis"), str)
             or not isinstance(entry.get("role", "any"), str)
             or entry.get("phase", "analysis") not in PHASES
             or entry.get("role", "any") not in STEP_ROLES
         ):
-            raise ValueError("مرحلة أو دور الخطوة غير صالح")
+            raise ValidationError("مرحلة أو دور الخطوة غير صالح")
         if type(entry.get("required", True)) is not bool or type(entry.get("approval_required", False)) is not bool:
-            raise ValueError("الإلزام والموافقة يتطلبان قيمة منطقية")
+            raise ValidationError("الإلزام والموافقة يتطلبان قيمة منطقية")
         steps.append(
             {
                 "title": text_value(entry.get("title"), 255, True),
@@ -59,10 +60,10 @@ def template_create():
     data = request.get_json(silent=True)
     try:
         if not isinstance(data, dict) or set(data) != {"name", "steps"}:
-            raise ValueError("أرسل اسم القالب وخطواته فقط")
+            raise ValidationError("أرسل اسم القالب وخطواته فقط")
         name, steps = text_value(data["name"], 160, True), validate_steps(data["steps"])
     except (ValueError, TypeError) as exc:
-        return error_response("INVALID_PROCEDURE", str(exc), 422)
+        return error_response("INVALID_PROCEDURE", public_error_message(exc, "قالب الإجراءات غير صالح"), 422)
     with transaction():
         version = (
             get_db()
@@ -207,15 +208,15 @@ def update_step(case_id: int, record_id: int, step_id: int):
             if evidence is not None and (
                 type(evidence) is not int or not get_db().execute("SELECT 1 FROM case_evidence WHERE id = ? AND case_id = ?", (evidence, case_id)).fetchone()
             ):
-                raise ValueError("الدليل غير متاح في القضية")
+                raise ValidationError("الدليل غير متاح في القضية")
             if data["status"] == "completed" and step["required"] and not evidence:
-                raise ValueError("إكمال خطوة إلزامية يتطلب دليلًا")
+                raise ValidationError("إكمال خطوة إلزامية يتطلب دليلًا")
             if data["status"] in {"failed", "not_applicable"} and len(notes) < 3:
-                raise ValueError("سجل سبب الفشل أو عدم الانطباق")
+                raise ValidationError("سجل سبب الفشل أو عدم الانطباق")
             if data["status"] == "not_applicable" and step["required"] and not manager():
                 return error_response("APPROVAL_REQUIRED", "تجاوز خطوة إلزامية يتطلب اعتماد المدير", 403)
         except ValueError as exc:
-            return error_response("INVALID_PROCEDURE_STEP", str(exc), 422)
+            return error_response("INVALID_PROCEDURE_STEP", public_error_message(exc, "خطوة الإجراء غير صالحة"), 422)
         target = "awaiting_approval" if data["status"] == "completed" and step["approval_required"] and not manager() else data["status"]
         step.update(status=target, evidence_id=evidence, notes=notes, updated_by=actor_id(), updated_at=iso_now())
         for key in ("completed_by", "completed_at", "approved_by"):

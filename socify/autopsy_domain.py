@@ -11,6 +11,7 @@ from .db import get_db
 from .operational import case_visible
 from .security import actor_id, has_permission
 from .timeutils import iso_now, iso_timestamp, parse_timestamp
+from .validation import ValidationError
 
 ASSET_TYPES = [
     "web_server",
@@ -157,16 +158,16 @@ KINDS: dict[str, dict[str, dict[str, Any]]] = {
 
 def text_value(value: object, maximum: int, required: bool = False) -> str:
     if not isinstance(value, str):
-        raise ValueError("يلزم نص صالح")
+        raise ValidationError("يلزم نص صالح")
     result = value.strip()
     if len(result) > maximum or required and not result:
-        raise ValueError("طول النص غير صالح")
+        raise ValidationError("طول النص غير صالح")
     try:
         result.encode("utf-8")
     except UnicodeError as exc:
-        raise ValueError("ترميز النص غير صالح") from exc
+        raise ValidationError("ترميز النص غير صالح") from exc
     if any(ord(char) < 32 and char not in "\n\t" for char in result):
-        raise ValueError("النص يحتوي محارف تحكم غير مسموحة")
+        raise ValidationError("النص يحتوي محارف تحكم غير مسموحة")
     return result
 
 
@@ -211,41 +212,41 @@ def touch_case(case_id: int) -> None:
 
 def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
     if kind not in KINDS or not isinstance(payload, dict):
-        raise ValueError("نوع السجل أو بنيته غير صالح")
+        raise ValidationError("نوع السجل أو بنيته غير صالح")
     schema = {**KINDS[kind], "evidence_id": {"evidence": True}}
     if set(payload) - set(schema):
-        raise ValueError("الطلب يحتوي حقولًا غير معروفة")
+        raise ValidationError("الطلب يحتوي حقولًا غير معروفة")
     result: dict[str, Any] = {}
     case = _case_row(case_id)
     if not case:
-        raise ValueError("القضية غير متاحة")
+        raise ValidationError("القضية غير متاحة")
     for key, spec in schema.items():
         value = payload.get(key)
         if value is None or value == "":
             if spec.get("required"):
-                raise ValueError(f"الحقل {key} مطلوب")
+                raise ValidationError(f"الحقل {key} مطلوب")
             continue
         if spec.get("user"):
             if (
                 type(value) is not int
                 or not get_db().execute("SELECT 1 FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (value, case["workspace_id"])).fetchone()
             ):
-                raise ValueError("المستخدم المحدد غير متاح")
+                raise ValidationError("المستخدم المحدد غير متاح")
         elif spec.get("evidence"):
             if type(value) is not int or not get_db().execute("SELECT 1 FROM case_evidence WHERE id = ? AND case_id = ?", (value, case_id)).fetchone():
-                raise ValueError("الدليل لا ينتمي إلى القضية")
+                raise ValidationError("الدليل لا ينتمي إلى القضية")
         elif spec.get("asset"):
             if (
                 type(value) is not int
                 or not get_db().execute("SELECT 1 FROM autopsy_records WHERE id = ? AND case_id = ? AND kind = 'asset'", (value, case_id)).fetchone()
             ):
-                raise ValueError("الأصل لا ينتمي إلى القضية")
+                raise ValidationError("الأصل لا ينتمي إلى القضية")
         elif spec.get("event"):
             if type(value) is not int or not get_db().execute("SELECT 1 FROM case_events WHERE case_id = ? AND event_id = ?", (case_id, value)).fetchone():
-                raise ValueError("السجل لا ينتمي إلى القضية")
+                raise ValidationError("السجل لا ينتمي إلى القضية")
         elif spec.get("task"):
             if type(value) is not int or not get_db().execute("SELECT 1 FROM case_tasks WHERE id=? AND case_id=?", (value, case_id)).fetchone():
-                raise ValueError("المهمة لا تنتمي إلى القضية")
+                raise ValidationError("المهمة لا تنتمي إلى القضية")
         elif spec.get("record_kind"):
             if (
                 type(value) is not int
@@ -253,32 +254,32 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
                 .execute("SELECT 1 FROM autopsy_records WHERE id = ? AND case_id = ? AND kind = ?", (value, case_id, spec["record_kind"]))
                 .fetchone()
             ):
-                raise ValueError("مرجع نتيجة التحقيق لا ينتمي إلى القضية")
+                raise ValidationError("مرجع نتيجة التحقيق لا ينتمي إلى القضية")
         elif spec.get("integer"):
             if type(value) is not int or not spec.get("min", 0) <= value <= spec["max"]:
-                raise ValueError(f"قيمة {key} غير صالحة")
+                raise ValidationError(f"قيمة {key} غير صالحة")
         elif spec.get("list"):
             if not isinstance(value, list) or len(value) > 30:
-                raise ValueError("قائمة الوسوم غير صالحة")
+                raise ValidationError("قائمة الوسوم غير صالحة")
             value = [text_value(entry, 80, True) for entry in value]
         elif spec.get("whys"):
             if not isinstance(value, list) or len(value) > 10:
-                raise ValueError("سلسلة الأسباب تتجاوز الحدود")
+                raise ValidationError("سلسلة الأسباب تتجاوز الحدود")
             chain = []
             for index, step in enumerate(value, 1):
                 if not isinstance(step, dict) or set(step) - {"question", "answer", "evidence_id", "id", "parent_id", "assessment"}:
-                    raise ValueError("خطوة تحليل السبب غير صالحة")
+                    raise ValidationError("خطوة تحليل السبب غير صالحة")
                 item: dict[str, Any] = {"question": text_value(step.get("question"), 500, True), "answer": text_value(step.get("answer"), 2000, True)}
                 identifier = text_value(step.get("id", f"why-{index}"), 64, True)
                 if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", identifier):
-                    raise ValueError("معرف فرع السبب غير صالح")
+                    raise ValidationError("معرف فرع السبب غير صالح")
                 item["id"] = identifier
                 parent = step.get("parent_id")
                 if parent is not None:
                     item["parent_id"] = text_value(parent, 64, True)
                 assessment = step.get("assessment", "supported" if step.get("evidence_id") else "unverified")
                 if not isinstance(assessment, str) or assessment not in {"unverified", "hypothesis", "supported", "refuted"}:
-                    raise ValueError("حدد ما إذا كان السبب فرضية أو نتيجة مدعومة أو غير متحققة")
+                    raise ValidationError("حدد ما إذا كان السبب فرضية أو نتيجة مدعومة أو غير متحققة")
                 item["assessment"] = assessment
                 if step.get("evidence_id") is not None:
                     evidence = step["evidence_id"]
@@ -286,41 +287,41 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
                         type(evidence) is not int
                         or not get_db().execute("SELECT 1 FROM case_evidence WHERE id = ? AND case_id = ?", (evidence, case_id)).fetchone()
                     ):
-                        raise ValueError("دليل السبب غير متاح")
+                        raise ValidationError("دليل السبب غير متاح")
                     item["evidence_id"] = evidence
                 if assessment in {"supported", "refuted"} and not item.get("evidence_id"):
-                    raise ValueError("تأييد سبب أو نفيه يتطلب دليلًا من القضية")
+                    raise ValidationError("تأييد سبب أو نفيه يتطلب دليلًا من القضية")
                 chain.append(item)
             identifiers = {step["id"] for step in chain}
             if len(identifiers) != len(chain):
-                raise ValueError("معرف فرع السبب مكرر")
+                raise ValidationError("معرف فرع السبب مكرر")
             parents = {step["id"]: step.get("parent_id") for step in chain}
             for starting_id in identifiers:
                 cursor_id: str | None = starting_id
                 seen = set()
                 while cursor_id is not None:
                     if cursor_id not in identifiers or cursor_id in seen:
-                        raise ValueError("شجرة الأسباب تحتوي مرجعًا مفقودًا أو حلقة")
+                        raise ValidationError("شجرة الأسباب تحتوي مرجعًا مفقودًا أو حلقة")
                     seen.add(cursor_id)
                     cursor_id = parents[cursor_id]
             value = chain
         elif spec.get("timestamp"):
             if not isinstance(value, str) or not re.search(r"(?:Z|[+-]\d{2}:\d{2})$", value):
-                raise ValueError("حدد الوقت مع منطقته الزمنية")
+                raise ValidationError("حدد الوقت مع منطقته الزمنية")
             value = iso_timestamp(value)
         else:
             value = text_value(value, spec.get("max", 100), spec.get("required", False))
             if spec.get("choices") and value not in spec["choices"]:
-                raise ValueError(f"اختيار {key} غير صالح")
+                raise ValidationError(f"اختيار {key} غير صالح")
         result[key] = value
     if kind == "indicator":
         result["value"] = normalize_indicator(result["type"], result["value"])
         if result["classification"] == "ioc" and not result.get("evidence_id"):
-            raise ValueError("تصنيف IOC يتطلب دليلًا مرتبطًا")
+            raise ValidationError("تصنيف IOC يتطلب دليلًا مرتبطًا")
     if kind == "timeline_view" and result.get("start") and result.get("end") and parse_timestamp(result["start"]) > parse_timestamp(result["end"]):
-        raise ValueError("بداية الفترة تتجاوز نهايتها")
+        raise ValidationError("بداية الفترة تتجاوز نهايتها")
     if kind == "corrective" and result["status"] == "validated" and not result.get("validation"):
-        raise ValueError("توثيق التحقق من فاعلية الإجراء مطلوب")
+        raise ValidationError("توثيق التحقق من فاعلية الإجراء مطلوب")
     if kind == "corrective" and result.get("why_id"):
         cause = (
             get_db()
@@ -330,7 +331,7 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
         if cause is None or not any(
             step.get("id", f"why-{index}") == result["why_id"] for index, step in enumerate(json.loads(cause["payload"]).get("whys", []), 1)
         ):
-            raise ValueError("فرع السبب المرتبط بالإجراء التصحيحي غير متاح")
+            raise ValidationError("فرع السبب المرتبط بالإجراء التصحيحي غير متاح")
     if kind == "corrective":
         principal = dict(get_db().execute("SELECT id,role,workspace_id FROM users WHERE id=?", (result["owner_id"],)).fetchone())
         policy = (
@@ -341,7 +342,7 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
         if policy:
             principal["role_permissions"] = json.loads(policy[0])
         if not case_visible(case_id, principal) or not has_permission(principal, "cases.read") or not has_permission(principal, "cases.update"):
-            raise ValueError("مسؤول الإجراء يحتاج عضوية القضية وصلاحية قراءتها وتحديثها؛ أضفه عبر المدير قبل إسناد الإجراء")
+            raise ValidationError("مسؤول الإجراء يحتاج عضوية القضية وصلاحية قراءتها وتحديثها؛ أضفه عبر المدير قبل إسناد الإجراء")
     if (
         kind == "foothold"
         or kind == "hypothesis"
@@ -349,13 +350,13 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
         or kind == "root_cause"
         and result.get("category") != "unknown"
     ) and not result.get("evidence_id"):
-        raise ValueError("الاستنتاج المؤكد يتطلب دليلًا مرتبطًا")
+        raise ValidationError("الاستنتاج المؤكد يتطلب دليلًا مرتبطًا")
     if (
         kind == "response"
         and result["status"] == "succeeded"
         and (not result.get("performed_by") or not result.get("performed_at") or not result.get("evidence_id"))
     ):
-        raise ValueError("الإجراء الناجح يتطلب منفذًا ووقتًا ودليلًا")
+        raise ValidationError("الإجراء الناجح يتطلب منفذًا ووقتًا ودليلًا")
     return result
 
 
@@ -364,17 +365,20 @@ def normalize_indicator(kind: str, value: str) -> str:
         return str(ipaddress.ip_address(value))
     if kind in {"md5", "sha1", "sha256"}:
         if not re.fullmatch(rf"[0-9a-fA-F]{{{ {'md5': 32, 'sha1': 40, 'sha256': 64}[kind] }}}", value):
-            raise ValueError("بصمة الملف غير صالحة")
+            raise ValidationError("بصمة الملف غير صالحة")
         return value.lower()
     if kind in {"domain", "hostname"}:
         normalized = value.rstrip(".").encode("idna").decode().lower()
         if len(normalized) > 253 or not all(re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", part) for part in normalized.split(".")):
-            raise ValueError("اسم المضيف أو النطاق غير صالح")
+            raise ValidationError("اسم المضيف أو النطاق غير صالح")
         return normalized
     if kind == "url":
         parsed = urlsplit(value)
         if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
-            raise ValueError("عنوان URL غير صالح")
-    if kind == "email" and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value):
-        raise ValueError("البريد الإلكتروني غير صالح")
+            raise ValidationError("عنوان URL غير صالح")
+    if kind == "email":
+        local, separator, domain = value.partition("@")
+        host, dot, suffix = domain.rpartition(".")
+        if not (local and separator and host and dot and suffix) or "@" in domain or any(char.isspace() for char in value):
+            raise ValidationError("البريد الإلكتروني غير صالح")
     return value

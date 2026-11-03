@@ -10,6 +10,7 @@ from flask import Blueprint, Response, g, jsonify, request, stream_with_context
 from .db import get_db
 from .security import actor_id, can_access_training_run, current_user, error_response, has_permission, require_permission, workspace_id
 from .timeutils import iso_timestamp
+from .validation import ValidationError, public_error_message
 
 visualization_api = Blueprint("visualization", __name__)
 
@@ -74,7 +75,7 @@ def _filters(alias: str = "e", fixed_case_id: int | None = None) -> tuple[str, l
         try:
             case_value = int(case_id)
         except ValueError as exc:
-            raise ValueError("case_id must be an integer") from exc
+            raise ValidationError("case_id must be an integer") from exc
         if _case_row(case_value) is None:
             clauses.append("1 = 0")
         else:
@@ -83,7 +84,7 @@ def _filters(alias: str = "e", fixed_case_id: int | None = None) -> tuple[str, l
     severity = request.args.get("severity")
     if severity:
         if severity not in {"low", "medium", "high", "critical"}:
-            raise ValueError("invalid severity")
+            raise ValidationError("invalid severity")
         clauses.append(f"{alias}.severity = ?")
         parameters.append(severity)
     training_run_id = request.args.get("training_run_id")
@@ -91,7 +92,7 @@ def _filters(alias: str = "e", fixed_case_id: int | None = None) -> tuple[str, l
         try:
             value = int(training_run_id)
         except ValueError as exc:
-            raise ValueError("training_run_id must be an integer") from exc
+            raise ValidationError("training_run_id must be an integer") from exc
         clauses.append(f"{alias}.training_run_id = ?")
         parameters.append(value)
     start = request.args.get("start")
@@ -256,7 +257,7 @@ def graph():
         limit = min(max(int(request.args.get("limit", 500)), 1), 1000)
         result = build_graph(limit)
     except ValueError as exc:
-        return error_response("INVALID_GRAPH_FILTER", str(exc), 422)
+        return error_response("INVALID_GRAPH_FILTER", public_error_message(exc, "حدد مرشحًا وفترة صالحين"), 422)
     return jsonify(result)
 
 
@@ -267,7 +268,7 @@ def timeline():
         limit = min(max(int(request.args.get("limit", 500)), 1), 1000)
         where, parameters = _filters()
     except ValueError as exc:
-        return error_response("INVALID_TIMELINE_FILTER", str(exc), 422)
+        return error_response("INVALID_TIMELINE_FILTER", public_error_message(exc, "حدد مرشحًا وفترة وترقيمًا صالحًا"), 422)
     scope, scope_parameters = _scope()
     rows = (
         get_db()
@@ -287,7 +288,7 @@ def export_graph():
     try:
         result = build_graph(min(max(int(request.args.get("limit", 500)), 1), 1000))
     except ValueError as exc:
-        return error_response("INVALID_GRAPH_FILTER", str(exc), 422)
+        return error_response("INVALID_GRAPH_FILTER", public_error_message(exc, "حدد مرشحًا وفترة صالحين"), 422)
     return Response(
         json.dumps(result, ensure_ascii=False, separators=(",", ":")),
         mimetype="application/json",

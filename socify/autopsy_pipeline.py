@@ -3,6 +3,7 @@ import sqlite3
 
 from .db import get_db
 from .security import actor_id, current_user
+from .validation import ValidationError
 
 
 def guard_batch_scope():
@@ -179,7 +180,7 @@ def activate_import(job, actor: int | None = None) -> None:
     from .autopsy_domain import custody, touch_case
 
     if job["status"] not in {"completed", "completed_with_errors"} or job["accepted"] <= 0:
-        raise ValueError("Activate a completed nonempty derived version")
+        raise ValidationError("Activate a completed nonempty derived version")
     connection = get_db()
     connection.execute(
         "UPDATE ingestion_jobs SET active_version = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE case_id = ? AND content_hash = ?",

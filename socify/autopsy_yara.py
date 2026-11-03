@@ -11,6 +11,7 @@ from .autopsy_worker import compute_artifacts
 from .db import get_db, inserted_id, transaction
 from .security import actor_id, error_response, require_permission, workspace_id
 from .timeutils import iso_now
+from .validation import ValidationError, public_error_message
 
 autopsy_yara_api = Blueprint("autopsy_yara", __name__)
 
@@ -27,31 +28,31 @@ def migrate(connection):
 
 def validate_input(data):
     if not isinstance(data, dict) or set(data) != {"name", "version", "source", "license", "origin", "fixtures"}:
-        raise ValueError("حدد اسم الحزمة وإصدارها ومصدرها ورخصتها وfixtures")
+        raise ValidationError("حدد اسم الحزمة وإصدارها ومصدرها ورخصتها وfixtures")
     if type(data["version"]) is not int or not 1 <= data["version"] <= 1000000:
-        raise ValueError("الإصدار عدد صحيح موجب")
+        raise ValidationError("الإصدار عدد صحيح موجب")
     fields = {key: text_value(data[key], maximum, True) for key, maximum in (("name", 120), ("source", 65536), ("license", 500), ("origin", 1000))}
     if len(fields["source"].encode()) > 65536:
-        raise ValueError("قواعد YARA تتجاوز 64 KiB")
+        raise ValidationError("قواعد YARA تتجاوز 64 KiB")
     fixtures = data["fixtures"]
     if not isinstance(fixtures, dict) or set(fixtures) != {"positive", "negative"}:
-        raise ValueError("fixtures تتطلب positive وnegative بترميز base64")
+        raise ValidationError("fixtures تتطلب positive وnegative بترميز base64")
     total = 0
     for items in fixtures.values():
         if not isinstance(items, list) or not 1 <= len(items) <= 10:
-            raise ValueError("كل مجموعة fixtures تتطلب 1–10 عينات اصطناعية")
+            raise ValidationError("كل مجموعة fixtures تتطلب 1–10 عينات اصطناعية")
         for item in items:
             if not isinstance(item, str) or len(item) > 87384:
-                raise ValueError("fixture يتجاوز 64 KiB")
+                raise ValidationError("fixture يتجاوز 64 KiB")
             try:
                 content = base64.b64decode(item, validate=True)
             except ValueError as exc:
-                raise ValueError("ترميز fixture غير صالح") from exc
+                raise ValidationError("ترميز fixture غير صالح") from exc
             if not content or len(content) > 65536:
-                raise ValueError("fixture فارغ أو كبير")
+                raise ValidationError("fixture فارغ أو كبير")
             total += len(content)
     if total > 512 * 1024:
-        raise ValueError("مجموع fixtures يتجاوز 512 KiB")
+        raise ValidationError("مجموع fixtures يتجاوز 512 KiB")
     return {**fields, "version": data["version"], "fixtures": fixtures}
 
 
@@ -75,7 +76,7 @@ def publish_pack():
     try:
         data = validate_input(request.get_json(silent=True))
     except (ValueError, UnicodeError) as exc:
-        return error_response("INVALID_YARA_PACK", str(exc), 422)
+        return error_response("INVALID_YARA_PACK", public_error_message(exc, "حزمة قواعد الفحص غير صالحة"), 422)
     if get_db().execute("SELECT COUNT(*) FROM autopsy_yara_packs WHERE workspace_id=?", (workspace_id(),)).fetchone()[0] >= 1000:
         return error_response("YARA_LIBRARY_FULL", "وصلت المكتبة إلى حد الإصدارات المحلي", 409)
     try:

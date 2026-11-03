@@ -15,6 +15,7 @@ from .operational import case_scope
 from .security import actor_id, current_user, error_response, require_permission, workspace_id
 from .task_titles import task_view
 from .timeutils import iso_now, parse_timestamp, utc_now
+from .validation import public_error_message
 
 soc_insights_api = Blueprint("autopsy_insights", __name__)
 
@@ -41,7 +42,7 @@ def network_insights(case_id):
     try:
         snapshot = network_snapshot(get_db(), case_id, workspace_id())
     except ValueError as exc:
-        return error_response("NETWORK_ANALYSIS_LIMIT", str(exc), 422)
+        return error_response("NETWORK_ANALYSIS_LIMIT", public_error_message(exc, "يتجاوز تحليل الشبكة الحد المسموح"), 422)
     items = snapshot.pop("items")
     selected = next((item for item in items if item["key"] == pair), None)
     if pair and selected is None:

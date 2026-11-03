@@ -103,7 +103,7 @@ def preflight_analysis():
 def incomplete_demo(directory):
     """Recognize the old failed synthetic seeder without claiming arbitrary data."""
     try:
-        accounts = json.loads((directory / "accounts.json").read_text())
+        accounts = json.loads((directory / "accounts.json").read_text(encoding="utf-8"))
         expected = {f"{handle}@demo.socify.test" for handle, _name, _role in TEAM}
         if {account["email"] for account in accounts} != expected or not (directory / "runtime.env").is_file():
             return False
@@ -118,7 +118,7 @@ def incomplete_demo(directory):
 def prepare(directory):
     if directory.exists():
         if (directory / "manifest.json").is_file():
-            if json.loads((directory / "manifest.json").read_text()).get("synthetic") is not True:
+            if json.loads((directory / "manifest.json").read_text(encoding="utf-8")).get("synthetic") is not True:
                 raise RuntimeError("The existing directory is not a synthetic demo")
             return
         if not incomplete_demo(directory):
@@ -137,7 +137,7 @@ def prepare(directory):
 
 def verify_accounts(directory):
     keys = dict(line.split("=", 1) for line in (directory / "runtime.env").read_text().splitlines() if "=" in line)
-    accounts = json.loads((directory / "accounts.json").read_text())
+    accounts = json.loads((directory / "accounts.json").read_text(encoding="utf-8"))
     app = create_app(
         {
             "DATABASE": str(directory / "socify.db"),

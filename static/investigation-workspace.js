@@ -15,7 +15,10 @@ window.SOCifyWorkspace = (() => {
       header.replaceChildren(node("span", {class:"scope-caption",text:t("نطاق التحقيق")}));
       if (selection.items.length) {
         const control = node("select", {"aria-label":t("القضية النشطة")}, selection.items.map(item => node("option", {value:item.id,selected:item.id === active.id,text:`${item.reference} · ${item.title}`})));
-        control.addEventListener("change", () => location.assign(`/cases/${control.value}`));
+        control.addEventListener("change", () => {
+          const identifier = Number(control.value);
+          if (Number.isSafeInteger(identifier) && identifier > 0 && selection.items.some(item => item.id === identifier)) location.assign(`/cases/${identifier}`);
+        });
         header.append(control);
         window.SOCifyWorkbench.bindCase(active);
       } else header.append(node("span", {text:t("لم تُحدد قضية بعد")}));

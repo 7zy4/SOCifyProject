@@ -6,6 +6,7 @@ import json
 import statistics
 
 from .timeutils import parse_timestamp
+from .validation import ValidationError
 
 MAX_NETWORK_EVENTS = 20000
 
@@ -107,7 +108,7 @@ def network_snapshot(connection, case_id, workspace):
         (case_id, workspace, MAX_NETWORK_EVENTS + 1),
     ).fetchall()
     if len(rows) > MAX_NETWORK_EVENTS:
-        raise ValueError("تجاوز تحليل الشبكة حد ٢٠٠٠٠ سجل للقضية")
+        raise ValidationError("تجاوز تحليل الشبكة حد ٢٠٠٠٠ سجل للقضية")
     events = []
     for row in rows:
         item = dict(row)
@@ -129,7 +130,7 @@ def network_snapshot(connection, case_id, workspace):
 def telemetry_report(connection, case_id, workspace):
     network = network_snapshot(connection, case_id, workspace)
     if len(network["items"]) > 2000:
-        raise ValueError("تجاوز التقرير حد ٢٠٠٠ اتصال")
+        raise ValidationError("تجاوز التقرير حد ٢٠٠٠ اتصال")
     endpoints = []
     size = 0
     for row in connection.execute(
@@ -148,7 +149,7 @@ def telemetry_report(connection, case_id, workspace):
         size += len(json.dumps(item).encode())
         endpoints.append(item)
         if len(endpoints) > 2000 or size > 4 * 1024 * 1024:
-            raise ValueError("تجاوز التقرير حد نتائج الأجهزة")
+            raise ValidationError("تجاوز التقرير حد نتائج الأجهزة")
     runtime = []
     for row in connection.execute(
         "SELECT id,hostname,username,title,severity,event_time,raw_hash,normalized_fields FROM security_events WHERE owner_case_id=? AND workspace_id=? AND autopsy_active=1 AND source_type='falco' ORDER BY id LIMIT 2001",
@@ -191,7 +192,7 @@ def telemetry_report(connection, case_id, workspace):
         size += len(json.dumps(item).encode())
         runtime.append(item)
         if len(runtime) > 2000 or size > 4 * 1024 * 1024:
-            raise ValueError("تجاوز التقرير حد أحداث أمن التشغيل")
+            raise ValidationError("تجاوز التقرير حد أحداث أمن التشغيل")
     alerts = []
     for row in connection.execute(
         "SELECT id,source_ip,destination_ip,title,severity,action,event_time,normalized_fields FROM security_events WHERE owner_case_id=? AND workspace_id=? AND autopsy_active=1 AND source_type='snort' ORDER BY id LIMIT 2001",
@@ -221,7 +222,7 @@ def telemetry_report(connection, case_id, workspace):
         alerts.append(item)
         size += len(json.dumps(item).encode())
         if len(alerts) > 2000 or size > 4 * 1024 * 1024:
-            raise ValueError("تجاوز التقرير حد تنبيهات الشبكة")
+            raise ValidationError("تجاوز التقرير حد تنبيهات الشبكة")
     from .windows_logon import CONTEXT_FIELDS
 
     logons = []
@@ -236,7 +237,7 @@ def telemetry_report(connection, case_id, workspace):
         logons.append(item)
         size += len(json.dumps(item).encode())
         if len(logons) > 2000 or size > 4 * 1024 * 1024:
-            raise ValueError("تجاوز التقرير حد أحداث تسجيل الدخول")
+            raise ValidationError("تجاوز التقرير حد أحداث تسجيل الدخول")
     return {
         "network_analysis": network if network["event_count"] else {},
         "endpoint_results": endpoints,

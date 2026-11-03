@@ -6,6 +6,7 @@ from .audit import record_audit
 from .db import get_db, transaction
 from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
 from .timeutils import iso_now
+from .validation import public_error_message
 
 autopsy_workspace_api = Blueprint("autopsy_workspace", __name__)
 
@@ -160,7 +161,7 @@ def review_case(case_id):
     try:
         data["reason"] = text_value(data["reason"], 1000, True)
     except ValueError as exc:
-        return error_response("INVALID_REVIEW", str(exc), 422)
+        return error_response("INVALID_REVIEW", public_error_message(exc, "بيانات المراجعة غير صالحة"), 422)
     with transaction():
         if not _case_row(case_id):
             return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
@@ -194,7 +195,7 @@ def link_cases(case_id):
     try:
         data["reason"] = text_value(data["reason"], 1000, True)
     except ValueError as exc:
-        return error_response("INVALID_RELATIONSHIP", str(exc), 422)
+        return error_response("INVALID_RELATIONSHIP", public_error_message(exc, "علاقة السجلات غير صالحة"), 422)
     with transaction():
         if not _case_row(case_id) or not _case_row(target):
             return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)

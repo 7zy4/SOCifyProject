@@ -14,6 +14,7 @@ from .detection import SEVERITIES
 from .schema import public_id
 from .security import actor_id, error_response, require_permission, workspace_id
 from .timeutils import iso_now
+from .validation import ValidationError, public_error_message
 
 watchlist_api = Blueprint("watchlist", __name__)
 
@@ -62,41 +63,41 @@ def normalize_watchlist_indicator(indicator_type: str, raw_value: str) -> str:
     kind = (indicator_type or "").strip().lower()
     val = (raw_value or "").strip()
     if kind not in INDICATOR_TYPES:
-        raise ValueError("نوع المؤشر غير مدعوم؛ استخدم email أو ip أو cidr أو domain أو url أو sha256")
+        raise ValidationError("نوع المؤشر غير مدعوم؛ استخدم email أو ip أو cidr أو domain أو url أو sha256")
     if not val or len(val) > 512:
-        raise ValueError("قيمة المؤشر مطلوبة وبحد أقصى 512 محرفًا")
+        raise ValidationError("قيمة المؤشر مطلوبة وبحد أقصى 512 محرفًا")
     if kind == "email":
         lowered = val.lower()
         if not EMAIL_PATTERN.match(lowered):
-            raise ValueError("صيغة البريد الإلكتروني غير صالحة")
+            raise ValidationError("صيغة البريد الإلكتروني غير صالحة")
         return lowered
     if kind == "ip":
         try:
             return str(_normalize_ip_obj(val))
         except ValueError as exc:
-            raise ValueError("عنوان IP غير صالح") from exc
+            raise ValidationError("عنوان IP غير صالح") from exc
     if kind == "cidr":
         try:
             net = ipaddress.ip_network(val, strict=False)
             return str(net)
         except ValueError as exc:
-            raise ValueError("نطاق CIDR غير صالح") from exc
+            raise ValidationError("نطاق CIDR غير صالح") from exc
     if kind == "domain":
         lowered = val.lower().rstrip(".")
         if not DOMAIN_PATTERN.match(lowered):
-            raise ValueError("اسم النطاق غير صالح")
+            raise ValidationError("اسم النطاق غير صالح")
         return lowered
     if kind == "url":
         parsed = urlparse(val)
         if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
-            raise ValueError("الرابط يجب أن يبدأ بـ http:// أو https://")
+            raise ValidationError("الرابط يجب أن يبدأ بـ http:// أو https://")
         return val
     if kind == "sha256":
         lowered = val.lower()
         if not SHA256_PATTERN.match(lowered):
-            raise ValueError("بصمة SHA-256 يجب أن تتكون من 64 محرفًا سداسيًا عشريًا")
+            raise ValidationError("بصمة SHA-256 يجب أن تتكون من 64 محرفًا سداسيًا عشريًا")
         return lowered
-    raise ValueError("نوع المؤشر غير صالح")
+    raise ValidationError("نوع المؤشر غير صالح")
 
 
 def _entry_view(row: sqlite3.Row) -> dict[str, Any]:
@@ -315,7 +316,7 @@ def create_watchlist_entry():
         kind = str(body.get("indicator_type") or body.get("type") or "").strip().lower()
         normalized_val = normalize_watchlist_indicator(kind, str(body.get("value") or ""))
     except ValueError as exc:
-        return error_response("INVALID_WATCHLIST_INDICATOR", str(exc), 422)
+        return error_response("INVALID_WATCHLIST_INDICATOR", public_error_message(exc, "قيمة المؤشر غير صالحة"), 422)
 
     severity = str(body.get("severity") or "high").strip().lower()
     if severity not in SEVERITIES:

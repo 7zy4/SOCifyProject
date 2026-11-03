@@ -2,6 +2,7 @@ import os
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 
 import bcrypt
 
@@ -16,7 +17,7 @@ class PhaseOneTests(unittest.TestCase):
         self.old_csrf = app.config.get("WTF_CSRF_ENABLED")
         self.old_legacy = app.config.get("LEGACY_TRAINING_TESTS")
         app.config.update(DATABASE=os.path.join(self.temp.name, "test.db"), TESTING=True, WTF_CSRF_ENABLED=False, LEGACY_TRAINING_TESTS=True)
-        with sqlite3.connect(app.config["DATABASE"]) as db:
+        with closing(sqlite3.connect(app.config["DATABASE"])) as db, db:
             db.executescript("""
             CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, name TEXT,
                 password_hash TEXT, role TEXT, is_active INTEGER DEFAULT 1);
@@ -85,7 +86,7 @@ class PhaseOneTests(unittest.TestCase):
         two = self.event()
         self.assertEqual(two.status_code, 200)
         self.assertEqual(len(two.json["detections"]), 1)
-        with sqlite3.connect(app.config["DATABASE"]) as db:
+        with closing(sqlite3.connect(app.config["DATABASE"])) as db, db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM detection_matches").fetchone()[0], 1)
 
     def test_analyst_cannot_delete_security_events(self):
@@ -120,7 +121,7 @@ class PhaseOneTests(unittest.TestCase):
         self.assertEqual(rejected.status_code, 403)
         accepted = self.client.post("/api/profile/password", json={"current_password": "testpassword", "new_password": "updated-strong-password"})
         self.assertEqual(accepted.status_code, 200)
-        with sqlite3.connect(app.config["DATABASE"]) as db:
+        with closing(sqlite3.connect(app.config["DATABASE"])) as db, db:
             password_hash = db.execute("SELECT password_hash FROM users WHERE id = 2").fetchone()[0]
         self.assertTrue(bcrypt.checkpw(b"updated-strong-password", password_hash.encode()))
 

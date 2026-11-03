@@ -13,6 +13,7 @@ from .report_brand import report_style
 from .schema import public_id
 from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
 from .timeutils import iso_now, parse_timestamp
+from .validation import ValidationError, public_error_message
 
 scoring_api = Blueprint("scoring", __name__)
 
@@ -187,7 +188,7 @@ def calculate_assessment(connection: sqlite3.Connection, run_id: int) -> dict[st
         return assessment_view(existing)
     run = connection.execute("SELECT * FROM training_runs WHERE id = ?", (run_id,)).fetchone()
     if not run or run["state"] != "completed" or not run["submitted_at"]:
-        raise ValueError("training run requires explicit learner submission before scoring")
+        raise ValidationError("training run requires explicit learner submission before scoring")
     version = connection.execute("SELECT * FROM scenario_versions WHERE id = ?", (run["scenario_version_id"],)).fetchone()
     if version is None:
         raise RuntimeError("scenario version is missing")
@@ -480,7 +481,7 @@ def run_score(run_id: int):
     try:
         result = calculate_assessment(get_db(), run_id)
     except ValueError as exc:
-        return error_response("ASSESSMENT_NOT_READY", str(exc), 409)
+        return error_response("ASSESSMENT_NOT_READY", public_error_message(exc, "Assessment is not ready"), 409)
     return jsonify(result)
 
 

@@ -9,6 +9,7 @@ from .db import transaction
 from .playbooks import _apply_action
 from .schema import insert_outbox
 from .timeutils import iso_now, utc_now
+from .validation import public_error_message
 
 
 def _future(seconds: int) -> str:
@@ -165,7 +166,7 @@ def process_playbook_run(connection: sqlite3.Connection, run_id: int, worker_id:
                 duration_ms = int((time.monotonic() - started) * 1000)
                 connection.execute("ROLLBACK TO SAVEPOINT playbook_effect")
                 connection.execute("RELEASE SAVEPOINT playbook_effect")
-                error = str(exc)[:500]
+                error = "Action timeout; try again" if isinstance(exc, TimeoutError) else public_error_message(exc, "Unable to complete the action")
                 if int(step["attempt"]) < int(step["retry_limit"]):
                     backoff = min(300, 2 ** max(0, int(step["attempt"]) - 1))
                     available_at = _future(backoff)

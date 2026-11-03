@@ -5,19 +5,20 @@ import re
 from typing import Any
 
 from .timeutils import iso_timestamp, parse_timestamp
+from .validation import ValidationError
 
 
 def falco_profile(record: dict[str, Any]) -> dict[str, Any]:
     """Normalize runtime alerts without treating the collector as an affected host."""
     values = record["output_fields"]
     if not isinstance(values, dict) or len(values) > 200:
-        raise ValueError("invalid Falco output fields")
+        raise ValidationError("invalid Falco output fields")
 
     def text(value, limit=512):
         if value is None or isinstance(value, str) and value in {"", "<NA>", "<nil>"}:
             return None
         if not isinstance(value, str) or len(value) > limit:
-            raise ValueError("invalid or oversized Falco text field")
+            raise ValidationError("invalid or oversized Falco text field")
         return value
 
     def process_id(key):
@@ -38,10 +39,10 @@ def falco_profile(record: dict[str, Any]) -> dict[str, Any]:
         "debug": "low",
     }
     if not rule or not priority or priority.casefold() not in levels or not timestamp:
-        raise ValueError("Falco rule, priority and event time are required")
+        raise ValidationError("Falco rule, priority and event time are required")
     tags = record.get("tags", [])
     if not isinstance(tags, list) or len(tags) > 50 or any(not isinstance(tag, str) or len(tag) > 80 for tag in tags):
-        raise ValueError("invalid Falco tags")
+        raise ValidationError("invalid Falco tags")
     fields = {
         "telemetry_schema": "falco",
         "runtime_rule": rule,
@@ -89,13 +90,13 @@ def number(value, maximum=2**53 - 1, integral=False):
     if value in (None, "", "-"):
         return None
     if isinstance(value, bool):
-        raise ValueError("boolean telemetry numbers are invalid")
+        raise ValidationError("boolean telemetry numbers are invalid")
     try:
         parsed = float(value)
     except (TypeError, OverflowError) as exc:
-        raise ValueError("invalid telemetry number") from exc
+        raise ValidationError("invalid telemetry number") from exc
     if not math.isfinite(parsed) or not 0 <= parsed <= maximum or integral and not parsed.is_integer():
-        raise ValueError("telemetry number is outside its permitted range")
+        raise ValidationError("telemetry number is outside its permitted range")
     return int(parsed) if integral else parsed
 
 
@@ -107,21 +108,21 @@ def osquery_rows(record):
         rows = [(record.get("action"), record["columns"], "columns")]
     elif "snapshot" in record:
         if not isinstance(record["snapshot"], list):
-            raise ValueError("osquery snapshot must be an array")
+            raise ValidationError("osquery snapshot must be an array")
         rows = [("snapshot", row, f"snapshot/{index}") for index, row in enumerate(record["snapshot"])]
     elif "diffResults" in record:
         diff = record["diffResults"]
         if not isinstance(diff, dict) or set(diff) - {"added", "removed"}:
-            raise ValueError("invalid osquery differential results")
+            raise ValidationError("invalid osquery differential results")
         rows = []
         for action, values in diff.items():
             if not isinstance(values, list):
-                raise ValueError("osquery changes must be arrays")
+                raise ValidationError("osquery changes must be arrays")
             rows.extend((action, row, f"diffResults/{action}/{index}") for index, row in enumerate(values))
     else:
         return None
     if len(rows) > 10000:
-        raise ValueError("osquery result exceeds 10000 rows")
+        raise ValidationError("osquery result exceeds 10000 rows")
     context = {key: value for key, value in record.items() if key not in {"snapshot", "diffResults", "columns", "action"}}
     if not rows:
         # An empty snapshot is evidence too; never invent an endpoint process.
@@ -129,9 +130,9 @@ def osquery_rows(record):
     result = []
     for action, columns, pointer in rows:
         if action not in {"added", "removed", "snapshot"} or not isinstance(columns, dict) or len(columns) > 200:
-            raise ValueError("invalid osquery result row")
+            raise ValidationError("invalid osquery result row")
         if any(not isinstance(value, (str, int, float, bool, type(None))) for value in columns.values()):
-            raise ValueError("osquery columns must contain scalar values")
+            raise ValidationError("osquery columns must contain scalar values")
         result.append(({**context, "action": action, "columns": columns}, pointer))
     return result
 
@@ -152,7 +153,7 @@ def profile(record: dict[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     if all(key in record for key in ("uid", "id.orig_h", "id.resp_h")):
         if not isinstance(record["uid"], str) or not record["uid"]:
-            raise ValueError("Zeek UID must be a nonempty string")
+            raise ValidationError("Zeek UID must be a nonempty string")
         connection = any(key in record for key in ("conn_state", "orig_bytes", "orig_pkts"))
         kind = "conn" if connection else "dns" if "query" in record else "http" if "method" in record else "tls" if "server_name" in record else "event"
         fields = {
@@ -190,7 +191,7 @@ def profile(record: dict[str, Any]) -> dict[str, Any]:
             or not str(record["flow_id"]).isascii()
             or not str(record["flow_id"]).isdecimal()
         ):
-            raise ValueError("Suricata flow_id must be an unsigned integer identifier")
+            raise ValidationError("Suricata flow_id must be an unsigned integer identifier")
         kind = record["event_type"]
         flow = section("flow")
         alert = section("alert")
@@ -234,7 +235,7 @@ def profile(record: dict[str, Any]) -> dict[str, Any]:
     elif all(key in record for key in ("hostIdentifier", "name", "columns")):
         columns = record["columns"]
         if not isinstance(columns, dict):
-            raise ValueError("invalid osquery columns")
+            raise ValidationError("invalid osquery columns")
         fields = {
             "telemetry_schema": "osquery",
             "query_name": str(record["name"]),
@@ -265,7 +266,7 @@ def profile(record: dict[str, Any]) -> dict[str, Any]:
     for key, limit in (("flow_id", 256), ("protocol", 32), ("dns_question", 512), ("tls_sni", 512), ("http_host", 512), ("query_name", 255)):
         value = fields.get(key)
         if value is not None and (not isinstance(value, str) or len(value) > limit):
-            raise ValueError(f"invalid or oversized telemetry field: {key}")
+            raise ValidationError(f"invalid or oversized telemetry field: {key}")
     if result["category"] == "network":
         # An HTTP Host header names a destination, not the endpoint hostname.
         result["hostname"] = ""

@@ -9,6 +9,7 @@ from typing import Any
 import dpkt
 
 from .timeutils import iso_timestamp
+from .validation import ValidationError
 
 DNS_CHARACTERS = (string.ascii_letters + string.digits + "-_").encode("ascii")
 
@@ -82,12 +83,12 @@ def packet_records(content: bytes, source: str, maximum: int) -> Iterator[dict[s
         reader = dpkt.pcapng.Reader(stream) if content[:4] == b"\x0a\x0d\x0d\x0a" else dpkt.pcap.Reader(stream)
         link = reader.datalink()
         if link not in {dpkt.pcap.DLT_EN10MB, dpkt.pcap.DLT_RAW, 101}:
-            raise ValueError("packet link type is not supported; original capture remains preserved")
+            raise ValidationError("packet link type is not supported; original capture remains preserved")
         for ordinal, (timestamp, frame) in enumerate(reader, 1):
             if ordinal > maximum:
-                raise ValueError("packet count exceeds the configured row limit")
+                raise ValidationError("packet count exceeds the configured row limit")
             if len(frame) > 1048576:
-                raise ValueError("captured frame exceeds 1 MiB")
+                raise ValidationError("captured frame exceeds 1 MiB")
             try:
                 network = (
                     dpkt.ethernet.Ethernet(frame).data

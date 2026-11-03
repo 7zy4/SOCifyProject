@@ -32,7 +32,7 @@
         <input id="email" name="email" type="email" autocomplete="username" required maxlength="254" spellcheck="false" dir="ltr">
         <label for="password" data-ui-copy>كلمة المرور</label>
         <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="128">
-        <details class="auth-mfa" {% if request.args.get('mfa') == '1' %}open{% endif %}><summary data-ui-copy>رمز التحقق</summary><label for="mfa_code" data-ui-copy>رمز MFA أو الاسترداد</label><input id="mfa_code" name="mfa_code" type="text" inputmode="text" spellcheck="false" autocomplete="one-time-code" maxlength="20" dir="ltr"></details>
+        <details class="auth-mfa" {% if request.args.get('mfa') == '1' %}open{% endif %}><summary data-ui-copy>رمز التحقق</summary><label for="mfa_code" data-ui-copy>رمز MFA أو الاسترداد</label><input id="mfa_code" name="mfa_code" type="text" inputmode="text" spellcheck="false" autocomplete="one-time-code" maxlength="64" dir="ltr"></details>
         <button class="button primary full" type="submit" data-ui-copy>دخول إلى المنصة</button>
       </form>
     </section>

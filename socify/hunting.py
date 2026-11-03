@@ -13,6 +13,7 @@ from .db import get_db, inserted_id, transaction
 from .events import _event_view
 from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
 from .timeutils import iso_now
+from .validation import ValidationError, public_error_message
 
 hunting_api = Blueprint("hunting", __name__)
 
@@ -35,7 +36,9 @@ FIELD_MAP = {
     "mitre_id": "e.mitre_ids",
     "event_time": "e.event_time",
 }
-TOKEN_PATTERN = re.compile(r'\s*(>=|<=|!=|=|>|<|~|\(|\)|"(?:[^"\\]|\\.)*"|\bAND\b|\bOR\b|\bNOT\b|[A-Za-z_][A-Za-z0-9_]*|[0-9A-Fa-f:.@/_-]+)\s*', re.IGNORECASE)
+TOKEN_PATTERN = re.compile(
+    r'\s*+(>=|<=|!=|=|>|<|~|\(|\)|"(?:[^"\\]|\\.)*+"|\bAND\b|\bOR\b|\bNOT\b|[A-Za-z_][A-Za-z0-9_]*|[0-9A-Fa-f:.@/_-]+)\s*+', re.IGNORECASE
+)
 
 OFFLINE_INTELLIGENCE = {
     ("ip", "198.51.100.20"): {"verdict": "suspicious", "confidence": 0.92, "reason": "Synthetic credential attack source in the SOCify reference scenario"},
@@ -45,7 +48,7 @@ OFFLINE_INTELLIGENCE = {
 }
 
 
-class QueryError(ValueError):
+class QueryError(ValidationError):
     __slots__ = ()
 
 
@@ -193,7 +196,7 @@ def execute_query():
     try:
         compiled = compile_query(query)
     except QueryError as exc:
-        return error_response("INVALID_HUNT_QUERY", str(exc), 422)
+        return error_response("INVALID_HUNT_QUERY", public_error_message(exc, "Invalid search expression"), 422)
     try:
         page = max(int(payload.get("page", 1)), 1)
         page_size = min(max(int(payload.get("page_size", 50)), 1), 100)
@@ -265,7 +268,7 @@ def save_query():
     try:
         compile_query(data["query"])
     except QueryError as exc:
-        return error_response("INVALID_HUNT_QUERY", str(exc), 422)
+        return error_response("INVALID_HUNT_QUERY", public_error_message(exc, "Invalid search expression"), 422)
     tags = data.get("tags", [])
     if not isinstance(tags, list) or len(tags) > 20 or any(not isinstance(item, str) or len(item) > 80 for item in tags):
         return error_response("INVALID_TAGS", "الوسوم غير صالحة", 422)

@@ -12,6 +12,7 @@ from flask_wtf.csrf import generate_csrf
 
 from .audit import record_audit
 from .db import get_db, inserted_id, transaction
+from .recovery_codes import hash_recovery_code, verify_recovery_code
 from .security import (
     actor_id,
     current_user,
@@ -91,7 +92,6 @@ def _record_attempt(email: str, ip_address: str, succeeded: bool) -> None:
 
 
 def _backup_code_valid(user_id: int, code: str) -> bool:
-    digest = hashlib.sha256(code.strip().upper().encode()).hexdigest()
     row = (
         get_db()
         .execute(
@@ -101,7 +101,7 @@ def _backup_code_valid(user_id: int, code: str) -> bool:
         .fetchall()
     )
     for candidate in row:
-        if secrets.compare_digest(candidate["code_hash"], digest):
+        if verify_recovery_code(code, candidate["code_hash"]):
             consumed = get_db().execute("UPDATE mfa_backup_codes SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL", (iso_now(), candidate["id"]))
             return consumed.rowcount == 1
     return False
@@ -111,14 +111,14 @@ def _mfa_valid(user_id: int, candidate: object) -> bool:
     enrollment = get_db().execute("SELECT secret_ciphertext, enabled FROM mfa_enrollments WHERE user_id = ?", (user_id,)).fetchone()
     if not enrollment or not enrollment["enabled"]:
         return True
-    if not isinstance(candidate, str) or not re.fullmatch(r"(?:[0-9]{6}|[0-9A-Fa-f]{10})", candidate.strip()):
+    if not isinstance(candidate, str) or not re.fullmatch(r"(?:[0-9]{6}|[0-9A-Fa-f]{10}|[0-9A-Fa-f]{32})", candidate.strip()):
         return False
     candidate = candidate.strip()
     try:
         secret = decrypt_secret(enrollment["secret_ciphertext"])
     except ValueError:
         return False
-    return verify_totp(secret, candidate) or _backup_code_valid(user_id, candidate)
+    return verify_totp(secret, candidate) if len(candidate) == 6 else _backup_code_valid(user_id, candidate)
 
 
 def _start_session(user: sqlite3.Row) -> dict[str, Any]:
@@ -524,14 +524,14 @@ def mfa_verify():
         _record_attempt(identity, address, False)
         record_audit(get_db(), "verify", "mfa", actor_id(), "denied")
         return error_response("INVALID_MFA_CODE", "رمز المصادقة غير صحيح", 422)
-    codes = [secrets.token_hex(5).upper() for _ in range(10)]
+    codes = [secrets.token_hex(16).upper() for _ in range(10)]
     _record_attempt(identity, address, True)
     with transaction():
         get_db().execute("UPDATE mfa_enrollments SET enabled = 1, verified_at = ?, updated_at = ? WHERE user_id = ?", (iso_now(), iso_now(), actor_id()))
         get_db().execute("DELETE FROM mfa_backup_codes WHERE user_id = ?", (actor_id(),))
         get_db().executemany(
             "INSERT INTO mfa_backup_codes (user_id, code_hash, created_at) VALUES (?, ?, ?)",
-            [(actor_id(), hashlib.sha256(item.encode()).hexdigest(), iso_now()) for item in codes],
+            [(actor_id(), hash_recovery_code(item), iso_now()) for item in codes],
         )
         record_audit(get_db(), "enabled", "mfa", actor_id())
     return jsonify({"message": "تم تفعيل المصادقة متعددة العوامل", "backup_codes": codes})

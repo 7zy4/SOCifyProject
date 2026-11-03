@@ -13,11 +13,12 @@ from .detection import SEVERITIES, evaluate_rules
 from .schema import insert_outbox, public_id
 from .security import actor_id, can_access_training_run, error_response, require_permission, training_scope_sql, workspace_id
 from .timeutils import iso_now, iso_timestamp
+from .validation import ValidationError, public_error_message
 
 events_api = Blueprint("events", __name__)
 
 EVENT_STATUSES = {"open", "investigating", "resolved", "false_positive"}
-SORT_FIELDS = {"event_time", "ingested_at", "severity", "source", "event_type", "id"}
+SORT_FIELDS = {"event_time": "event_time", "ingested_at": "ingested_at", "severity": "severity", "source": "source", "event_type": "event_type", "id": "id"}
 
 
 def _raw_object(value: object) -> dict[str, Any]:
@@ -38,15 +39,15 @@ def _raw_object(value: object) -> dict[str, Any]:
 def _string(value: object, maximum: int, required: bool = False) -> str | None:
     if value is None:
         if required:
-            raise ValueError("required string is missing")
+            raise ValidationError("required string is missing")
         return None
     if not isinstance(value, str):
-        raise ValueError("value must be a string")
+        raise ValidationError("value must be a string")
     normalized = value.strip()
     if required and not normalized:
-        raise ValueError("required string is empty")
+        raise ValidationError("required string is empty")
     if len(normalized) > maximum:
-        raise ValueError(f"string exceeds {maximum} characters")
+        raise ValidationError(f"string exceeds {maximum} characters")
     return normalized or None
 
 
@@ -55,7 +56,7 @@ def normalize_event(data: dict[str, Any]) -> dict[str, Any]:
     source = _string(data.get("source"), 100, True)
     severity = str(data.get("severity", "medium")).lower()
     if severity not in SEVERITIES:
-        raise ValueError("severity must be critical, high, medium, or low")
+        raise ValidationError("severity must be critical, high, medium, or low")
     category = _string(data.get("category", data.get("event_type", "general")), 100, True)
     event_type = _string(data.get("event_type", raw.get("event_type")), 100) or str(category).lower().replace(" ", "_")
     lowered_category = str(category).casefold()
@@ -105,13 +106,13 @@ def normalize_event(data: dict[str, Any]) -> dict[str, Any]:
         try:
             extracted["http_status"] = int(extracted["http_status"])
         except (TypeError, ValueError) as exc:
-            raise ValueError("http_status must be an integer") from exc
+            raise ValidationError("http_status must be an integer") from exc
     tags = data.get("tags", [])
     mitre_ids = data.get("mitre_ids", [])
     if not isinstance(tags, list) or len(tags) > 50 or any(not isinstance(item, str) or len(item) > 80 for item in tags):
-        raise ValueError("tags must be a list of short strings")
+        raise ValidationError("tags must be a list of short strings")
     if not isinstance(mitre_ids, list) or len(mitre_ids) > 20 or any(not isinstance(item, str) for item in mitre_ids):
-        raise ValueError("mitre_ids must be a list of identifiers")
+        raise ValidationError("mitre_ids must be a list of identifiers")
     from .content_inspection import RESERVED_FIELDS
 
     merged_normalized = {
@@ -176,7 +177,7 @@ def ingest_event(
             type(case_id) is not int
             or not connection.execute("SELECT 1 FROM incident_cases WHERE id = ? AND workspace_id = ? AND archived_at IS NULL", (case_id, workspace)).fetchone()
         ):
-            raise ValueError("invalid case context")
+            raise ValidationError("invalid case context")
         if normalized["idempotency_key"]:
             normalized["idempotency_key"] = f"case:{case_id}:{normalized['idempotency_key']}"
     mitre_ids = json.loads(str(normalized["mitre_ids"]))
@@ -188,7 +189,7 @@ def ingest_event(
         }
         unknown = sorted(set(mitre_ids) - known)
         if unknown:
-            raise ValueError(f"unknown ATT&CK technique identifiers: {', '.join(unknown)}")
+            raise ValidationError(f"unknown ATT&CK technique identifiers: {', '.join(unknown)}")
     idempotency_key = normalized["idempotency_key"]
     if idempotency_key:
         existing = connection.execute(
@@ -304,14 +305,14 @@ def list_events():
         try:
             start = iso_timestamp(start)
         except ValueError as exc:
-            return error_response("INVALID_TIME_RANGE", str(exc), 422)
+            return error_response("INVALID_TIME_RANGE", public_error_message(exc, "Specify a valid time range with timezone"), 422)
         clauses.append("event_time >= ?")
         parameters.append(start)
     if end:
         try:
             end = iso_timestamp(end)
         except ValueError as exc:
-            return error_response("INVALID_TIME_RANGE", str(exc), 422)
+            return error_response("INVALID_TIME_RANGE", public_error_message(exc, "Specify a valid time range with timezone"), 422)
         clauses.append("event_time <= ?")
         parameters.append(end)
     query_text = request.args.get("q", "").strip()
@@ -321,16 +322,16 @@ def list_events():
         clauses.append("(title LIKE ? OR description LIKE ? OR source_ip LIKE ? OR username LIKE ? OR hostname LIKE ?)")
         escaped = "%" + query_text.replace("%", "\\%").replace("_", "\\_") + "%"
         parameters.extend([escaped] * 5)
-    sort = request.args.get("sort", "event_time")
-    direction = request.args.get("direction", "desc").lower()
-    if sort not in SORT_FIELDS or direction not in {"asc", "desc"}:
+    sort = SORT_FIELDS.get(request.args.get("sort", "event_time"))
+    direction = {"asc": "ASC", "desc": "DESC"}.get(request.args.get("direction", "desc").lower())
+    if sort is None or direction is None:
         return error_response("INVALID_SORT", "حقل الفرز أو اتجاهه غير مسموح", 422)
     where = " AND ".join(clauses)
     total = int(get_db().execute(f"SELECT COUNT(*) FROM security_events WHERE {where}", parameters).fetchone()[0])
     rows = (
         get_db()
         .execute(
-            f"SELECT * FROM security_events WHERE {where} ORDER BY {sort} {direction.upper()}, id DESC LIMIT ? OFFSET ?",
+            f"SELECT * FROM security_events WHERE {where} ORDER BY {sort} {direction}, id DESC LIMIT ? OFFSET ?",
             (*parameters, page_size, (page - 1) * page_size),
         )
         .fetchall()
@@ -356,7 +357,7 @@ def create_event():
             if not duplicate:
                 record_audit(get_db(), "create", "event", event_id, details={"source": data.get("source"), "alerts": alerts})
     except ValueError as exc:
-        return error_response("INVALID_EVENT", str(exc), 422)
+        return error_response("INVALID_EVENT", public_error_message(exc, "Check the event fields"), 422)
     row = get_db().execute("SELECT event_id FROM security_events WHERE id = ?", (event_id,)).fetchone()
     status = 200 if duplicate else 201
     return jsonify({"id": event_id, "event_id": row["event_id"], "detections": alerts, "duplicate": duplicate}), status, {"Location": f"/api/events/{event_id}"}

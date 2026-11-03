@@ -10,6 +10,8 @@ from pathlib import PurePosixPath
 
 import yara
 
+from .validation import ValidationError
+
 BUILTIN_RULES = 'rule SOCify_EICAR_Test_Marker { strings: $a = "EICAR-STANDARD-ANTIVIRUS-TEST-FILE" condition: $a }'
 
 
@@ -231,9 +233,9 @@ def inspect_static_bytes(
     yara_source: str | None = None,
 ) -> dict:
     if not content:
-        raise ValueError("الملف فارغ ولا يمكن فحصه")
+        raise ValidationError("الملف فارغ ولا يمكن فحصه")
     if len(content) > 10 * 1024 * 1024:
-        raise ValueError("يتجاوز حجم الملف الحد الأقصى للفحص الساكن السريع (10 MiB)")
+        raise ValidationError("يتجاوز حجم الملف الحد الأقصى للفحص الساكن السريع (10 MiB)")
 
     raw_name = (filename or "sample.bin").strip()
     clean_name = raw_name.replace("\\", "/").rsplit("/", 1)[-1]
@@ -423,13 +425,13 @@ def inspect_static_bytes(
     rules_text = yara_source if isinstance(yara_source, str) and yara_source.strip() else BUILTIN_RULES
     yara_matches: list[dict] = []
     if len(rules_text.encode("utf-8")) > 65536:
-        raise ValueError("تعذر إكمال فحص قواعد YARA")
+        raise ValidationError("تعذر إكمال فحص قواعد YARA")
     try:
         compiled = yara.compile(source=rules_text, includes=False, error_on_warning=True)
         for m in compiled.match(data=content, timeout=3)[:50]:
             yara_matches.append({"rule": m.rule, "tags": list(m.tags)})
     except (yara.Error, ValueError, OSError) as exc:
-        raise ValueError("تعذر إكمال فحص قواعد YARA") from exc
+        raise ValidationError("تعذر إكمال فحص قواعد YARA") from exc
     if yara_matches:
         add_flag("yara_rule_match", "critical", 75, f"تطابق مع قواعد YARA المحلية: {', '.join(m['rule'] for m in yara_matches[:5])}")
 

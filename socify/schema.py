@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .db import inserted_id
+from .recovery_codes import protect_existing_recovery_codes
 from .timeutils import iso_now
 
 BASE_SCHEMA = """
@@ -1096,6 +1097,7 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         migrate_watchlist(connection)
         migrate_quick_reports(connection)
         seed_builtin_rules(connection)
+        protect_existing_recovery_codes(connection)
         connection.commit()
     except Exception:
         connection.rollback()

@@ -6,6 +6,7 @@ from .attack_snapshot import activate_attack_version
 from .audit import record_audit
 from .db import get_db
 from .security import error_response, require_permission, training_scope_sql, workspace_id
+from .validation import public_error_message
 
 attack_api = Blueprint("attack", __name__)
 
@@ -44,7 +45,7 @@ def activate_catalog(version: str):
     try:
         changed = activate_attack_version(connection, version)
     except ValueError as exc:
-        return error_response("ATTACK_VERSION_NOT_FOUND", str(exc), 404)
+        return error_response("ATTACK_VERSION_NOT_FOUND", public_error_message(exc, "ATT&CK catalog is unavailable"), 404)
     record_audit(
         connection,
         "activate",

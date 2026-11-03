@@ -20,6 +20,7 @@ from flask import current_app, g, jsonify, redirect, request, session, url_for
 
 from .db import get_db
 from .timeutils import iso_now, utc_now
+from .validation import ValidationError
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -381,7 +382,7 @@ def parse_json_object(value: object, field: str) -> dict[str, Any]:
         try:
             parsed = json.loads(value)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"{field} must contain valid JSON") from exc
+            raise ValidationError(f"{field} must contain valid JSON") from exc
         if isinstance(parsed, dict):
             return parsed
-    raise ValueError(f"{field} must be an object")
+    raise ValidationError(f"{field} must be an object")

@@ -26,6 +26,7 @@ from .security import (
     workspace_id,
 )
 from .timeutils import iso_now
+from .validation import ValidationError, public_error_message
 
 sources_api = Blueprint("sources", __name__)
 
@@ -45,7 +46,7 @@ def _fetch_remote_events_bytes(url: str, headers: dict[str, str]) -> tuple[bytes
     with opener.open(req, timeout=5) as resp:  # nosec B310
         body = resp.read(MAX_REMOTE_PULL_BYTES + 1)
         if len(body) > MAX_REMOTE_PULL_BYTES:
-            raise ValueError("Remote SIEM response exceeds 5 MiB limit")
+            raise ValidationError("Remote SIEM response exceeds 5 MiB limit")
         content_type = str(resp.headers.get("Content-Type", "application/octet-stream"))
         return body, content_type
 
@@ -75,9 +76,9 @@ def _extract_source_token() -> str | None:
 
 def _parse_stream_payload(raw_bytes: bytes, content_type: str, source_name: str) -> tuple[str, list[dict[str, Any]]]:
     if not raw_bytes or not raw_bytes.strip():
-        raise ValueError("empty SIEM ingest payload")
+        raise ValidationError("empty SIEM ingest payload")
     if len(raw_bytes) > int(current_app.config["MAX_CONTENT_LENGTH"]):
-        raise ValueError("payload exceeds configured upload limit")
+        raise ValidationError("payload exceeds configured upload limit")
     ct_lower = content_type.lower()
     if "ndjson" in ct_lower or "jsonl" in ct_lower:
         fmt, iterator = parse_records("stream.jsonl", raw_bytes, "jsonl", source_name)
@@ -113,7 +114,7 @@ def _ingest_records_for_source(
     source_name = str(source_row["name"])
     fmt, records = _parse_stream_payload(raw_bytes, content_type, source_name)
     if len(records) > MAX_INGEST_BATCH_RECORDS:
-        raise ValueError(f"SIEM batch exceeds {MAX_INGEST_BATCH_RECORDS} records")
+        raise ValidationError(f"SIEM batch exceeds {MAX_INGEST_BATCH_RECORDS} records")
 
     effective_actor = actor
     if effective_actor is None:
@@ -152,7 +153,7 @@ def _ingest_records_for_source(
                 .fetchone()
             )
             if not case_check or case_check["archived_at"] is not None or case_check["status"] == "closed":
-                raise ValueError("linked target case is closed or unavailable")
+                raise ValidationError("linked target case is closed or unavailable")
             retained = (
                 get_db()
                 .execute(
@@ -525,7 +526,7 @@ def source_webhook_ingest(source_id: int):
     try:
         result = _ingest_records_for_source(row, raw_bytes, request.content_type or "", target_case, None)
     except ValueError as exc:
-        return error_response("SIEM_INGEST_FAILED", str(exc), 422)
+        return error_response("SIEM_INGEST_FAILED", public_error_message(exc, "Unable to accept the event batch; check its format"), 422)
     return jsonify(result), 201
 
 

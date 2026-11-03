@@ -12,6 +12,7 @@ from .cases import _case_row
 from .db import get_db, inserted_id, transaction
 from .security import actor_id, error_response, require_permission, workspace_id
 from .timeutils import iso_now, iso_timestamp, parse_timestamp, utc_now
+from .validation import ValidationError, public_error_message
 
 autopsy_intel_api = Blueprint("autopsy_intel", __name__)
 VERDICTS = {"unknown": 0, "benign": 1, "suspicious": 2, "malicious": 3}
@@ -60,29 +61,29 @@ def migrate(connection):
 
 def normalize_entry(item):
     if not isinstance(item, dict) or set(item) - {"type", "value", "verdict", "confidence", "country", "asn", "notes", "valid_from", "valid_until"}:
-        raise ValueError("حقول مؤشر الحزمة غير معروفة")
+        raise ValidationError("حقول مؤشر الحزمة غير معروفة")
     kind = text_value(item.get("type"), 20, True)
     if kind not in {"ip", "cidr", "domain", "url", "md5", "sha1", "sha256"}:
-        raise ValueError("نوع مؤشر غير مدعوم")
+        raise ValidationError("نوع مؤشر غير مدعوم")
     raw = text_value(item.get("value"), 2048, True)
     value = str(ipaddress.ip_network(raw, strict=False)) if kind == "cidr" else normalize_indicator(kind, raw)
     verdict = text_value(item.get("verdict", "unknown"), 20, True)
     confidence = item.get("confidence", 50)
     country, asn = item.get("country"), item.get("asn")
     if verdict not in VERDICTS or type(confidence) is not int or not 0 <= confidence <= 100:
-        raise ValueError("الحكم أو الثقة غير صالح")
+        raise ValidationError("الحكم أو الثقة غير صالح")
     if country is not None and (not isinstance(country, str) or not re.fullmatch(r"[A-Z]{2}", country)):
-        raise ValueError("الدولة تتطلب رمزًا من حرفين كبيرين")
+        raise ValidationError("الدولة تتطلب رمزًا من حرفين كبيرين")
     if asn is not None and (type(asn) is not int or not 1 <= asn <= 2**32 - 1):
-        raise ValueError("ASN خارج النطاق")
+        raise ValidationError("ASN خارج النطاق")
     times = {}
     for field in ("valid_from", "valid_until"):
         value_at = item.get(field)
         if value_at is not None and (not isinstance(value_at, str) or not re.search(r"(?:Z|[+-]\d{2}:\d{2})$", value_at)):
-            raise ValueError("صلاحية المؤشر تتطلب وقتًا بمنطقة زمنية صريحة")
+            raise ValidationError("صلاحية المؤشر تتطلب وقتًا بمنطقة زمنية صريحة")
         times[field] = iso_timestamp(value_at) if value_at is not None else None
     if times["valid_from"] and times["valid_until"] and times["valid_from"] >= times["valid_until"]:
-        raise ValueError("نهاية صلاحية المؤشر تسبق بدايتها")
+        raise ValidationError("نهاية صلاحية المؤشر تسبق بدايتها")
     return {
         "type": kind,
         "value": value,
@@ -100,12 +101,12 @@ def convert_intelligence(content, format_name):
         entries = content
     elif format_name == "stix21":
         if not isinstance(content, dict) or content.get("type") != "bundle" or not isinstance(content.get("objects"), list) or len(content["objects"]) > 10000:
-            raise ValueError("يتطلب STIX حزمة objects")
+            raise ValidationError("يتطلب STIX حزمة objects")
         entries = []
         mapping = {"ipv4-addr": "ip", "ipv6-addr": "ip", "domain-name": "domain", "url": "url"}
         for obj in content["objects"]:
             if not isinstance(obj, dict):
-                raise ValueError("كائن STIX غير صالح")
+                raise ValidationError("كائن STIX غير صالح")
             if obj.get("type") in {"identity", "marking-definition"}:
                 continue
             if obj.get("revoked") is True:
@@ -114,7 +115,7 @@ def convert_intelligence(content, format_name):
                 pattern = obj.get("pattern")
                 match = re.fullmatch(r"\[(ipv4-addr|ipv6-addr|domain-name|url):value = '([^'\\]+)'\]", pattern) if isinstance(pattern, str) else None
                 if obj.get("pattern_type") != "stix" or not match:
-                    raise ValueError("يدعم مستورد STIX مساواة قيمة مفردة فقط؛ الشرط غير المدعوم لم يُتجاهل")
+                    raise ValidationError("يدعم مستورد STIX مساواة قيمة مفردة فقط؛ الشرط غير المدعوم لم يُتجاهل")
                 entries.append(
                     {
                         "type": mapping[match[1]],
@@ -134,19 +135,19 @@ def convert_intelligence(content, format_name):
                 for name, value in obj["hashes"].items():
                     kind = {"SHA-256": "sha256", "SHA-1": "sha1", "MD5": "md5"}.get(name)
                     if not kind:
-                        raise ValueError("خوارزمية STIX غير مدعومة")
+                        raise ValidationError("خوارزمية STIX غير مدعومة")
                     entries.append({"type": kind, "value": value})
             else:
-                raise ValueError("نوع STIX خارج نطاق المستورد المعلن")
+                raise ValidationError("نوع STIX خارج نطاق المستورد المعلن")
     elif format_name == "misp":
         event = content.get("Event") if isinstance(content, dict) else None
         attributes = event.get("Attribute") if isinstance(event, dict) else None
         if not isinstance(attributes, list) or len(attributes) > 10000:
-            raise ValueError("استخدم export لحدث MISP يحتوي Attribute")
+            raise ValidationError("استخدم export لحدث MISP يحتوي Attribute")
         entries = []
         for item in attributes:
             if not isinstance(item, dict):
-                raise ValueError("MISP attribute غير صالح")
+                raise ValidationError("MISP attribute غير صالح")
             kind = {
                 "ip-src": "ip",
                 "ip-dst": "ip",
@@ -158,19 +159,19 @@ def convert_intelligence(content, format_name):
                 "sha256": "sha256",
             }.get(text_value(item.get("type"), 100, True))
             if not kind or type(item.get("to_ids", False)) is not bool:
-                raise ValueError("نوع MISP attribute أو to_ids غير مدعوم")
+                raise ValidationError("نوع MISP attribute أو to_ids غير مدعوم")
             entries.append(
                 {"type": kind, "value": item.get("value"), "verdict": "suspicious" if item.get("to_ids") else "unknown", "notes": item.get("comment", "")}
             )
     else:
-        raise ValueError("الصيغة غير مدعومة؛ لا يوجد جلب شبكة")
+        raise ValidationError("الصيغة غير مدعومة؛ لا يوجد جلب شبكة")
     if not isinstance(entries, list) or not 1 <= len(entries) <= 10000:
-        raise ValueError("الحزمة تتطلب من 1 إلى 10,000 مؤشر")
+        raise ValidationError("الحزمة تتطلب من 1 إلى 10,000 مؤشر")
     result = [normalize_entry(item) for item in entries]
     if len({(item["type"], item["value"]) for item in result}) != len(result):
-        raise ValueError("الحزمة تحتوي مؤشرات متكررة")
+        raise ValidationError("الحزمة تحتوي مؤشرات متكررة")
     if format_name == "geoip" and any(item["type"] != "cidr" or not (item["country"] or item["asn"]) for item in result):
-        raise ValueError("GeoIP المحلي يتطلب شبكات CIDR ودولة أو ASN")
+        raise ValidationError("GeoIP المحلي يتطلب شبكات CIDR ودولة أو ASN")
     return result
 
 
@@ -202,9 +203,9 @@ def import_bundle():
     request_key = request.headers.get("Idempotency-Key")
     try:
         if not isinstance(data, dict) or set(data) != {"name", "version", "source", "license", "expires_at", "format", "content"}:
-            raise ValueError("حدد الاسم والإصدار والمصدر والرخصة والصلاحية والصيغة والمحتوى المحلي")
+            raise ValidationError("حدد الاسم والإصدار والمصدر والرخصة والصلاحية والصيغة والمحتوى المحلي")
         if request_key is not None and not re.fullmatch(r"[A-Za-z0-9_.:-]{8,128}", request_key):
-            raise ValueError("معرف إعادة المحاولة غير صالح")
+            raise ValidationError("معرف إعادة المحاولة غير صالح")
         request_hash = hashlib.sha256(canonical(data).encode()).hexdigest()
         if request_key is not None:
             receipt = _import_receipt(request_key, request_hash)
@@ -213,16 +214,16 @@ def import_bundle():
         name, version = text_value(data["name"], 160, True), text_value(data["version"], 80, True)
         source, license_name = text_value(data["source"], 500, True), text_value(data["license"], 500, True)
         if not isinstance(data["expires_at"], str) or not re.search(r"(?:Z|[+-]\d{2}:\d{2})$", data["expires_at"]):
-            raise ValueError("أدخل صلاحية بمنطقة زمنية صريحة")
+            raise ValidationError("أدخل صلاحية بمنطقة زمنية صريحة")
         expires = iso_timestamp(data["expires_at"])
         if parse_timestamp(expires) <= datetime.now(UTC):
-            raise ValueError("لا يمكن استيراد حزمة منتهية")
+            raise ValidationError("لا يمكن استيراد حزمة منتهية")
         payload = canonical({"format": data["format"], "content": data["content"]})
         if len(payload.encode()) > 2 * 1024 * 1024:
-            raise ValueError("الحزمة تتجاوز 2 MiB")
+            raise ValidationError("الحزمة تتجاوز 2 MiB")
         entries = convert_intelligence(data["content"], data["format"])
     except (ValueError, TypeError, UnicodeError, RecursionError) as exc:
-        return error_response("INVALID_LOCAL_INTELLIGENCE", str(exc), 422)
+        return error_response("INVALID_LOCAL_INTELLIGENCE", public_error_message(exc, "حزمة المعلومات غير صالحة"), 422)
     with transaction():
         # A concurrent retry can have committed while the source was being validated.
         if request_key is not None:

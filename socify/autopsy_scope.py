@@ -1,4 +1,5 @@
 from .timeutils import parse_timestamp, utc_now
+from .validation import ValidationError
 
 
 def investigation_scope(records, now=None):
@@ -13,7 +14,7 @@ def investigation_scope(records, now=None):
         try:
             moment = parse_timestamp(foothold.get("first_observed_at"))
             if not foothold.get("evidence_id") or not foothold.get("asset_id") or moment > current:
-                raise ValueError("Unverified or future observation")
+                raise ValidationError("Unverified or future observation")
         except (ValueError, TypeError, OverflowError):
             excluded += 1
             continue

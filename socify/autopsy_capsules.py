@@ -21,6 +21,7 @@ from .ingestion import _job_content
 from .request_limits import StructureLimitError, validate_json_structure
 from .security import actor_id, cipher, current_user, decrypt_secret, encrypt_secret, error_response, has_permission, require_permission, workspace_id
 from .timeutils import iso_now
+from .validation import ValidationError, public_error_message
 
 autopsy_capsules_api = Blueprint("autopsy_capsules", __name__)
 MAX_EXPANDED = 64 * 1024 * 1024
@@ -80,7 +81,7 @@ def digest(content):
 def rows(query, values=()):
     found = get_db().execute(query + " LIMIT ?", (*values, MAX_ROWS + 1)).fetchall()
     if len(found) > MAX_ROWS:
-        raise ValueError("تتجاوز الحزمة حد الصفوف؛ استخدم تصدير السجلات المقسم والأرشيف المعتمد لدى الشركة")
+        raise ValidationError("تتجاوز الحزمة حد الصفوف؛ استخدم تصدير السجلات المقسم والأرشيف المعتمد لدى الشركة")
     return [dict(row) for row in found]
 
 
@@ -92,14 +93,14 @@ def full_case_access(case_id):
 
 def add_file(files, path, content):
     if len(content) > MAX_MEMBER or len(files) >= MAX_FILES - 1 or sum(map(len, files.values())) + len(content) > MAX_EXPANDED:
-        raise ValueError("تتجاوز الحزمة حدود الحجم أو عدد الملفات المسموح")
+        raise ValidationError("تتجاوز الحزمة حدود الحجم أو عدد الملفات المسموح")
     files[path] = content
 
 
 def export_snapshot(case_id, profile):
     case = _case_row(case_id)
     if case is None:
-        raise ValueError("القضية غير متاحة")
+        raise ValidationError("القضية غير متاحة")
     snapshot: dict[str, Any] = {
         "case": dict(case),
         "context": dict(get_db().execute("SELECT * FROM autopsy_case_context WHERE case_id = ?", (case_id,)).fetchone() or {}),
@@ -156,7 +157,7 @@ def export_snapshot(case_id, profile):
             encrypted = get_db().execute("SELECT ciphertext FROM autopsy_samples WHERE id = ?", (sample["id"],)).fetchone()[0]
             content = cipher().decrypt(encrypted)
             if digest(content) != sample["sha256"]:
-                raise ValueError("بصمة العينة غير مطابقة")
+                raise ValidationError("بصمة العينة غير مطابقة")
             add_file(files, f"samples/{sample['id']}.bin", content)
     for report in snapshot["tables"]["autopsy_reports"]:
         if profile == "team":
@@ -165,12 +166,12 @@ def export_snapshot(case_id, profile):
         for item in rows("SELECT * FROM autopsy_report_files WHERE report_id = ? ORDER BY format", (report["id"],)):
             content = cipher().decrypt(item["content"])
             if digest(content) != item["sha256"]:
-                raise ValueError("بصمة ملف التقرير غير مطابقة")
+                raise ValidationError("بصمة ملف التقرير غير مطابقة")
             add_file(files, f"reports/{report['id']}/{item['format']}", content)
     for report in snapshot["tables"]["case_reports"]:
         content = report.pop("content").encode()
         if digest(content) != report["sha256"]:
-            raise ValueError("بصمة التقرير المؤرشف غير مطابقة")
+            raise ValidationError("بصمة التقرير المؤرشف غير مطابقة")
         if profile == "backup":
             add_file(files, f"legacy_reports/{report['id']}.txt", content)
     snapshot["policy"] = {
@@ -195,7 +196,7 @@ def export_snapshot(case_id, profile):
         for path, content in files.items():
             archive.writestr(path, content)
     if output.tell() > MAX_ARCHIVE:
-        raise ValueError("تتجاوز الحزمة الحد المسموح")
+        raise ValidationError("تتجاوز الحزمة الحد المسموح")
     return output.getvalue()
 
 
@@ -203,14 +204,14 @@ def object_pairs(pairs):
     result = {}
     for key, value in pairs:
         if key in result:
-            raise ValueError("مفتاح JSON مكرر")
+            raise ValidationError("مفتاح JSON مكرر")
         result[key] = value
     return result
 
 
 def decode_json(content):
     if not isinstance(content, (str, bytes)):
-        raise ValueError("JSON الحزمة يتطلب نصًا")
+        raise ValidationError("JSON الحزمة يتطلب نصًا")
     try:
         value = json.loads(
             content, object_pairs_hook=object_pairs, parse_constant=lambda value: (_ for _ in ()).throw(ValueError("JSON numeric constant is invalid"))
@@ -219,25 +220,25 @@ def decode_json(content):
         canonical(value).encode()
         return value
     except (UnicodeError, RecursionError, json.JSONDecodeError, StructureLimitError) as exc:
-        raise ValueError("JSON الحزمة غير صالح") from exc
+        raise ValidationError("JSON الحزمة غير صالح") from exc
 
 
 def inspect_capsule(content):
     if not content or len(content) > MAX_ARCHIVE:
-        raise ValueError("حجم الحزمة خارج النطاق")
+        raise ValidationError("حجم الحزمة خارج النطاق")
     preflight_directory(content)
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as archive:
             entries = archive.infolist()
             names = [entry.filename for entry in entries]
             if not 2 <= len(entries) <= MAX_FILES or len(set(names)) != len(names) or "manifest.json" not in names:
-                raise ValueError("فهرس الحزمة ناقص أو مكرر")
+                raise ValidationError("فهرس الحزمة ناقص أو مكرر")
             if sum(entry.file_size for entry in entries) > MAX_EXPANDED:
-                raise ValueError("حجم الحزمة بعد التوسيع يتجاوز الحد")
+                raise ValidationError("حجم الحزمة بعد التوسيع يتجاوز الحد")
             for entry in entries:
                 mode = entry.external_attr >> 16
                 if entry.filename != "manifest.json" and not PATH.fullmatch(entry.filename):
-                    raise ValueError("مسار ملف غير مسموح")
+                    raise ValidationError("مسار ملف غير مسموح")
                 if (
                     entry.is_dir()
                     or stat.S_ISLNK(mode)
@@ -247,7 +248,7 @@ def inspect_capsule(content):
                     or entry.compress_type not in {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}
                     or entry.file_size > max(entry.compress_size, 1) * 1000
                 ):
-                    raise ValueError("خصائص ملف الحزمة غير مسموحة")
+                    raise ValidationError("خصائص ملف الحزمة غير مسموحة")
             manifest = decode_json(archive.read("manifest.json"))
             if (
                 not isinstance(manifest, dict)
@@ -257,9 +258,9 @@ def inspect_capsule(content):
                 or manifest["version"] != 1
                 or manifest["profile"] not in {"team", "backup"}
             ):
-                raise ValueError("صيغة manifest غير مدعومة")
+                raise ValidationError("صيغة manifest غير مدعومة")
             if not isinstance(manifest["members"], list) or len(manifest["members"]) != len(entries) - 1:
-                raise ValueError("فهرس manifest لا يطابق الملفات")
+                raise ValidationError("فهرس manifest لا يطابق الملفات")
             files = {}
             for item in manifest["members"]:
                 if (
@@ -271,15 +272,15 @@ def inspect_capsule(content):
                     or type(item["size"]) is not int
                     or not isinstance(item["sha256"], str)
                 ):
-                    raise ValueError("سجل manifest غير صالح")
+                    raise ValidationError("سجل manifest غير صالح")
                 payload = archive.read(item["path"])
                 if len(payload) != item["size"] or digest(payload) != item["sha256"]:
-                    raise ValueError("بصمة ملف الحزمة أو حجمه غير مطابق")
+                    raise ValidationError("بصمة ملف الحزمة أو حجمه غير مطابق")
                 files[item["path"]] = payload
             if set(files) != set(names) - {"manifest.json"} or "data.json" not in files:
-                raise ValueError("ملفات غير مفهرسة أو بيانات القضية مفقودة")
+                raise ValidationError("ملفات غير مفهرسة أو بيانات القضية مفقودة")
     except (zipfile.BadZipFile, zipfile.LargeZipFile, KeyError, TypeError, NotImplementedError, RuntimeError, OSError) as exc:
-        raise ValueError("حزمة ZIP غير صالحة أو تالفة") from exc
+        raise ValidationError("حزمة ZIP غير صالحة أو تالفة") from exc
     data = decode_json(files["data.json"])
     if (
         not isinstance(data, dict)
@@ -305,41 +306,41 @@ def inspect_capsule(content):
         or not isinstance(data["tables"], dict)
         or set(data["tables"]) != set(CASE_TABLES)
     ):
-        raise ValueError("مخطط بيانات القضية غير مدعوم")
+        raise ValidationError("مخطط بيانات القضية غير مدعوم")
     for key in ("revisions", "events", "event_links", "alerts", "alert_links", "alert_events", "actors", "imports", "import_errors", "samples"):
         if not isinstance(data[key], list) or len(data[key]) > MAX_ROWS or any(not isinstance(row, dict) for row in data[key]):
-            raise ValueError("قائمة بيانات القضية غير صالحة")
+            raise ValidationError("قائمة بيانات القضية غير صالحة")
     for value in data["tables"].values():
         if not isinstance(value, list) or len(value) > MAX_ROWS or any(not isinstance(row, dict) for row in value):
-            raise ValueError("جدول بيانات القضية غير صالح")
+            raise ValidationError("جدول بيانات القضية غير صالح")
     for values in [data["events"], data["imports"], data["samples"], *data["tables"].values()]:
         identifiers = []
         for row in values:
             if "id" in row:
                 identifier = row["id"]
                 if type(identifier) is not int or not 1 <= identifier <= 2**63 - 1:
-                    raise ValueError("معرف سجل الحزمة غير صالح")
+                    raise ValidationError("معرف سجل الحزمة غير صالح")
                 identifiers.append(identifier)
         if len(set(identifiers)) != len(identifiers):
-            raise ValueError("معرف سجل الحزمة مكرر")
+            raise ValidationError("معرف سجل الحزمة مكرر")
     for row in data["tables"]["autopsy_records"]:
         if not isinstance(row.get("kind"), str) or not isinstance(decode_json(row.get("payload")), dict):
-            raise ValueError("مخطط إفادة الحزمة غير صالح")
+            raise ValidationError("مخطط إفادة الحزمة غير صالح")
     for row in data["revisions"]:
         if not isinstance(decode_json(row.get("payload")), dict):
-            raise ValueError("مخطط إصدار الإفادة غير صالح")
+            raise ValidationError("مخطط إصدار الإفادة غير صالح")
     for row in data["tables"]["case_evidence"]:
         if not isinstance(row.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", row["sha256"]):
-            raise ValueError("بصمة الدليل غير صالحة")
+            raise ValidationError("بصمة الدليل غير صالحة")
     for row in data["events"]:
         for key, expected in (("normalized_fields", dict), ("tags", list), ("mitre_ids", list)):
             if not isinstance(decode_json(row.get(key, "{}" if expected is dict else "[]")), expected):
-                raise ValueError("حقول السجل المطبع غير صالحة")
+                raise ValidationError("حقول السجل المطبع غير صالحة")
     text_value(manifest["source_reference"], 160, True)
     text_value(data["case"].get("title"), 255, True)
     for key in ("severity", "priority", "description"):
         if key in data["case"] and not isinstance(data["case"][key], str):
-            raise ValueError("بيانات القضية غير صالحة")
+            raise ValidationError("بيانات القضية غير صالحة")
     if manifest["profile"] == "team" and (
         any(row.get("visibility") == "private" for row in data["tables"]["case_notes"])
         or any(decode_json(row["payload"]).get("visibility") == "private" for row in data["tables"]["autopsy_records"])
@@ -347,19 +348,19 @@ def inspect_capsule(content):
         or any("payload" in row for row in data["tables"]["autopsy_reports"])
         or any(path.startswith(("samples/", "reports/", "legacy_reports/")) for path in files)
     ):
-        raise ValueError("سياسة مشاركة الحزمة لا تطابق محتواها")
+        raise ValidationError("سياسة مشاركة الحزمة لا تطابق محتواها")
     event_ids = {row["id"] for row in data["events"]}
     if any(row.get("event_id") not in event_ids for row in data["event_links"]):
-        raise ValueError("علاقة سجل الحزمة غير صالحة")
+        raise ValidationError("علاقة سجل الحزمة غير صالحة")
     for row in data["imports"]:
         if f"originals/{row['id']}.bin" not in files and row.get("raw_size", 0):
-            raise ValueError("أصل استيراد مفقود")
+            raise ValidationError("أصل استيراد مفقود")
     return manifest, data, files
 
 
 def preflight_directory(content):
     if len(content) < 22:
-        raise ValueError("فهرس ZIP مفقود")
+        raise ValidationError("فهرس ZIP مفقود")
     signature, disk, directory_disk, disk_count, total, size, offset, comment = struct.unpack_from("<4s4H2IH", content, len(content) - 22)
     if (
         signature != b"PK\x05\x06"
@@ -370,25 +371,25 @@ def preflight_directory(content):
         or comment
         or offset + size != len(content) - 22
     ):
-        raise ValueError("تتطلب الحزمة فهرس ZIP32 واحدًا محدودًا بلا تعليق ختامي")
+        raise ValidationError("تتطلب الحزمة فهرس ZIP32 واحدًا محدودًا بلا تعليق ختامي")
     cursor, count = offset, 0
     while cursor < offset + size:
         count += 1
         if count > MAX_FILES or cursor + 46 > offset + size or content[cursor : cursor + 4] != b"PK\x01\x02":
-            raise ValueError("فهرس ZIP يتجاوز حدود الملفات أو يحتوي بيانات تالفة")
+            raise ValidationError("فهرس ZIP يتجاوز حدود الملفات أو يحتوي بيانات تالفة")
         name_size, extra_size, comment_size = struct.unpack_from("<3H", content, cursor + 28)
         cursor += 46 + name_size + extra_size + comment_size
         if not 1 <= name_size <= 200 or cursor > offset + size:
-            raise ValueError("سجل فهرس ZIP خارج الحدود")
+            raise ValidationError("سجل فهرس ZIP خارج الحدود")
     if cursor != offset + size or count != total:
-        raise ValueError("عدد ملفات فهرس ZIP غير متطابق")
+        raise ValidationError("عدد ملفات فهرس ZIP غير متطابق")
 
 
 def insert_values(table, values):
     columns = {row["name"] for row in get_db().execute(f"PRAGMA table_info({table})")}
     selected = {key: value for key, value in values.items() if key in columns}
     if any(not isinstance(value, (str, int, float, bytes, type(None))) for value in selected.values()):
-        raise ValueError("قيمة جدول غير صالحة")
+        raise ValidationError("قيمة جدول غير صالحة")
     return inserted_id(get_db().execute(f"INSERT INTO {table} ({','.join(selected)}) VALUES ({','.join('?' for _ in selected)})", tuple(selected.values())))
 
 
@@ -435,7 +436,7 @@ def restore_capsule(content, manifest, data, files):
             continue
         payload = files[path]
         if digest(payload) != source.get("content_hash"):
-            raise ValueError("بصمة أصل الاستيراد غير مطابقة")
+            raise ValidationError("بصمة أصل الاستيراد غير مطابقة")
         values = {
             key: value for key, value in source.items() if key not in {"id", "source_id", "training_run_id", "worker_id", "lease_expires_at", "available_at"}
         }
@@ -467,7 +468,7 @@ def restore_capsule(content, manifest, data, files):
         if source.get("import_job_id") is not None:
             mapped = maps["imports"].get(str(source["import_job_id"]))
             if mapped is None:
-                raise ValueError("مرجع مصدر السجل غير موجود")
+                raise ValidationError("مرجع مصدر السجل غير موجود")
             values["import_job_id"] = mapped
         new_id = insert_values("security_events", values)
         maps["events"][str(identifier)] = new_id
@@ -477,11 +478,11 @@ def restore_capsule(content, manifest, data, files):
         reference = str(source["reference_id"])
         if source["evidence_type"] == "event":
             if reference not in maps["events"]:
-                raise ValueError("مرجع سجل الدليل مفقود")
+                raise ValidationError("مرجع سجل الدليل مفقود")
             reference = str(maps["events"][reference])
         elif source["evidence_type"] == "import":
             if reference not in maps["imports"]:
-                raise ValueError("مرجع أصل الدليل مفقود")
+                raise ValidationError("مرجع أصل الدليل مفقود")
             reference = str(maps["imports"][reference])
         values = {
             "case_id": case_id,
@@ -498,7 +499,7 @@ def restore_capsule(content, manifest, data, files):
         path = f"evidence/{identifier}.txt"
         if path in files:
             if digest(files[path]) != source["sha256"]:
-                raise ValueError("بصمة محتوى الدليل غير مطابقة")
+                raise ValidationError("بصمة محتوى الدليل غير مطابقة")
             get_db().execute("INSERT INTO case_evidence_content(evidence_id, ciphertext) VALUES (?, ?)", (new_id, encrypt_secret(files[path].decode())))
     for source in data["samples"]:
         identifier = int(source["id"])
@@ -507,7 +508,7 @@ def restore_capsule(content, manifest, data, files):
             continue
         evidence_id = maps["evidence"].get(str(source["evidence_id"]))
         if not evidence_id or digest(files[path]) != source["sha256"]:
-            raise ValueError("دليل العينة أو بصمتها غير مطابق")
+            raise ValidationError("دليل العينة أو بصمتها غير مطابق")
         new_id = insert_values(
             "autopsy_samples",
             {
@@ -557,7 +558,7 @@ def export_case_capsule(case_id: int):
         try:
             content = export_snapshot(case_id, profile)
         except (ValueError, InvalidToken) as exc:
-            return error_response("CAPSULE_EXPORT_FAILED", str(exc), 422)
+            return error_response("CAPSULE_EXPORT_FAILED", public_error_message(exc, "تعذر تصدير حزمة القضية"), 422)
         custody(case_id, "capsule_exported", {"profile": profile, "sha256": digest(content), "bytes": len(content)})
     return Response(
         content,
@@ -587,7 +588,7 @@ def import_case_capsule():
         with transaction():
             result = restore_capsule(content, manifest, data, files)
     except (ValueError, InvalidToken, sqlite3.IntegrityError, OverflowError, UnicodeError, KeyError, TypeError) as exc:
-        return error_response("INVALID_CAPSULE", str(exc), 422)
+        return error_response("INVALID_CAPSULE", public_error_message(exc, "حزمة القضية غير صالحة أو تالفة"), 422)
     return jsonify(result), 201
 
 
@@ -627,7 +628,7 @@ def capsule_snapshot(case_id: int, archive_id: int):
     try:
         page, limit = int(request.args.get("page", 1)), int(request.args.get("limit", 50))
         if not 1 <= page <= 1000000 or not 1 <= limit <= 100 or set(request.args) - {"section", "page", "limit"}:
-            raise ValueError("الترقيم أو المرشح غير صالح")
+            raise ValidationError("الترقيم أو المرشح غير صالح")
         manifest, snapshot, _ = inspect_capsule(cipher().decrypt(row["ciphertext"]))
         if section == "manifest":
             value = manifest["members"]
@@ -636,7 +637,7 @@ def capsule_snapshot(case_id: int, archive_id: int):
         elif section in snapshot["tables"]:
             value = snapshot["tables"][section]
         else:
-            raise ValueError("قسم الأرشيف غير معروف")
+            raise ValidationError("قسم الأرشيف غير معروف")
         items = value if isinstance(value, list) else [value]
         return jsonify(
             {
@@ -650,7 +651,7 @@ def capsule_snapshot(case_id: int, archive_id: int):
             }
         )
     except (ValueError, InvalidToken) as exc:
-        return error_response("INVALID_CAPSULE_VIEW", str(exc), 422)
+        return error_response("INVALID_CAPSULE_VIEW", public_error_message(exc, "تعذر قراءة قسم الأرشيف المحدد"), 422)
 
 
 @autopsy_capsules_api.get("/api/cases/<int:case_id>/capsules/<int:archive_id>/file/<path:member>")

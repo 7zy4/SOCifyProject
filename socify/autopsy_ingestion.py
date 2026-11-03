@@ -18,6 +18,7 @@ from .events import _event_view
 from .ingestion import _job_content, _job_view, cancel_import, create_import, preview_import, resume_import
 from .security import actor_id, current_user, error_response, has_permission, require_permission
 from .timeutils import iso_now
+from .validation import ValidationError, public_error_message
 
 autopsy_ingestion_api = Blueprint("autopsy_ingestion", __name__)
 SEARCH_COUNT_LIMIT = 10000
@@ -125,7 +126,7 @@ def case_import_activate(case_id: int, job_id: int):
         try:
             activate_import(job)
         except ValueError as exc:
-            return error_response("IMPORT_NOT_ACTIVATABLE", str(exc), 409)
+            return error_response("IMPORT_NOT_ACTIVATABLE", public_error_message(exc, "لا يمكن تفعيل نسخة الاستيراد المحددة"), 409)
         custody(case_id, "derived_import_activation_reason", {"job_id": job_id, "reason": data["reason"].strip()})
     return jsonify({"id": job_id, "active_version": True, "detection_rescan_required": True})
 
@@ -200,16 +201,16 @@ def log_query(case_id: int) -> tuple[str, list[Any]]:
     selected_job = request.args.get("job_id")
     if selected_job:
         if not selected_job.isascii() or not selected_job.isdecimal() or not 1 <= int(selected_job) <= 2**63 - 1:
-            raise ValueError("معرف نسخة الاستيراد غير صالح")
+            raise ValidationError("معرف نسخة الاستيراد غير صالح")
         if not _job_for_case(case_id, int(selected_job)):
-            raise ValueError("نسخة الاستيراد غير متاحة في القضية")
+            raise ValidationError("نسخة الاستيراد غير متاحة في القضية")
         clauses.append("ce.import_job_id = ?")
         args.append(int(selected_job))
     else:
         clauses.append("ce.active_event = 1")
     query = request.args.get("q", "").strip()
     if len(query) > 200:
-        raise ValueError("نص البحث يتجاوز الحد المسموح")
+        raise ValidationError("نص البحث يتجاوز الحد المسموح")
     if query:
         words = [word for word in re.findall(r"[\w.-]+", query) if any(char.isalnum() for char in word)][:20]
         if words:
@@ -226,11 +227,11 @@ def log_query(case_id: int) -> tuple[str, list[Any]]:
     if ranges:
         clauses.append("ce.time_known=1")
     if ranges.get("start") and ranges.get("end") and ranges["start"] > ranges["end"]:
-        raise ValueError("بداية الفترة تتجاوز نهايتها")
+        raise ValidationError("بداية الفترة تتجاوز نهايتها")
     if request.args.get("severity"):
         severity = request.args["severity"]
         if severity not in {"critical", "high", "medium", "low"}:
-            raise ValueError("الخطورة غير صالحة")
+            raise ValidationError("الخطورة غير صالحة")
         clauses.append("ce.event_severity = ?")
         args.append(severity)
     return " AND ".join(clauses), args
@@ -265,10 +266,10 @@ def case_logs(case_id: int):
     try:
         page, limit = int(request.args.get("page", 1)), int(request.args.get("limit", 50))
         if not 1 <= page <= 1000000 or not 1 <= limit <= 100:
-            raise ValueError("قيم الترقيم غير صالحة")
+            raise ValidationError("قيم الترقيم غير صالحة")
         where, args = log_query(case_id)
     except ValueError as exc:
-        return error_response("INVALID_LOG_FILTER", str(exc), 422)
+        return error_response("INVALID_LOG_FILTER", public_error_message(exc, "حدد مرشحًا وفترة وترقيمًا صالحًا"), 422)
     source, where, total, relation = metadata_scope(where, args)
     rows = (
         get_db()
@@ -370,7 +371,7 @@ def export_case_logs(case_id: int):
     try:
         where, args = log_query(case_id)
     except ValueError as exc:
-        return error_response("INVALID_LOG_FILTER", str(exc), 422)
+        return error_response("INVALID_LOG_FILTER", public_error_message(exc, "حدد مرشحًا وفترة وترقيمًا صالحًا"), 422)
     identifiers = [
         row[0]
         for row in get_db()

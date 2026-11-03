@@ -15,6 +15,7 @@ from .db import get_db, transaction
 from .operational import case_scope
 from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
 from .timeutils import iso_now, parse_timestamp, utc_now
+from .validation import ValidationError, public_error_message
 
 autopsy_workflow_api = Blueprint("autopsy_workflow", __name__)
 RECIPES = {
@@ -48,13 +49,13 @@ RECIPES = {
 def _body(allowed, required=()):
     data = request.get_json(silent=True)
     if not isinstance(data, dict) or set(data) - set(allowed) or not set(required) <= set(data):
-        raise ValueError("الطلب يحتوي حقولًا مفقودة أو غير معروفة")
+        raise ValidationError("الطلب يحتوي حقولًا مفقودة أو غير معروفة")
     return data
 
 
 def _case_version(case, version):
     if type(version) is not int or version != case["version"]:
-        raise ValueError("تغير إصدار القضية؛ حدّث البيانات قبل الحفظ")
+        raise ValidationError("تغير إصدار القضية؛ حدّث البيانات قبل الحفظ")
 
 
 def _active_member(case_id, user_id):
@@ -96,25 +97,25 @@ def validate_calendar(value):
         or not isinstance(value.get("mode"), str)
         or value.get("mode") not in {"24x7", "business"}
     ):
-        raise ValueError("تقويم SLA غير صالح")
+        raise ValidationError("تقويم SLA غير صالح")
     name = text_value(value.get("timezone", "UTC"), 100, True)
     try:
         if name.upper() not in ("UTC", "ETC/UTC"):
             ZoneInfo(name)
     except (ZoneInfoNotFoundError, ValueError) as exc:
-        raise ValueError("المنطقة الزمنية للتقويم غير صالحة") from exc
+        raise ValidationError("المنطقة الزمنية للتقويم غير صالحة") from exc
     if value["mode"] == "24x7":
         return {"mode": "24x7", "timezone": name}
     days, start, end, holidays = value.get("weekdays"), value.get("start_hour"), value.get("end_hour"), value.get("holidays", [])
     if not isinstance(days, list) or not 1 <= len(days) <= 7 or any(type(day) is not int or not 0 <= day <= 6 for day in days) or len(set(days)) != len(days):
-        raise ValueError("أيام العمل غير صالحة؛ الاثنين 0 والأحد 6")
+        raise ValidationError("أيام العمل غير صالحة؛ الاثنين 0 والأحد 6")
     if type(start) is not int or type(end) is not int or not 0 <= start < end <= 24:
-        raise ValueError("ساعات العمل من بداية اليوم حتى نهايته؛ النهاية بعد البداية")
+        raise ValidationError("ساعات العمل من بداية اليوم حتى نهايته؛ النهاية بعد البداية")
     if not isinstance(holidays, list) or len(holidays) > 100:
-        raise ValueError("قائمة أيام الإجازة تتجاوز الحد")
+        raise ValidationError("قائمة أيام الإجازة تتجاوز الحد")
     for holiday in holidays:
         if not isinstance(holiday, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", holiday):
-            raise ValueError("تاريخ الإجازة غير صالح")
+            raise ValidationError("تاريخ الإجازة غير صالح")
         date.fromisoformat(holiday)
     return {"mode": "business", "timezone": name, "weekdays": sorted(days), "start_hour": start, "end_hour": end, "holidays": sorted(set(holidays))}
 
@@ -128,7 +129,7 @@ def _windows(start, end, calendar):
     zone = UTC if calendar["timezone"].upper() in ("UTC", "ETC/UTC") else ZoneInfo(calendar["timezone"])
     day, final = start.astimezone(zone).date(), end.astimezone(zone).date()
     if (final - day).days > 3660:
-        raise ValueError("الفترة تتجاوز عشر سنوات؛ يلزم مراجعة نطاق SLA")
+        raise ValidationError("الفترة تتجاوز عشر سنوات؛ يلزم مراجعة نطاق SLA")
     holidays = set(calendar["holidays"])
     while day <= final:
         if day.weekday() in calendar["weekdays"] and day.isoformat() not in holidays:
@@ -198,7 +199,7 @@ def configure_sla(case_id: int):
     try:
         data = _body({"version", "minutes", "calendar", "reason"}, {"version", "minutes", "calendar", "reason"})
         if type(data["minutes"]) is not int or not 1 <= data["minutes"] <= 525600:
-            raise ValueError("ميزانية SLA من دقيقة إلى سنة")
+            raise ValidationError("ميزانية SLA من دقيقة إلى سنة")
         calendar, reason = validate_calendar(data["calendar"]), text_value(data["reason"], 1000, True)
         with transaction():
             case = _case_row(case_id)
@@ -219,7 +220,7 @@ def configure_sla(case_id: int):
             }
             record_id = insert_record(case_id, "workflow_sla", payload)
     except ValueError as exc:
-        return error_response("INVALID_SLA_POLICY", str(exc), 422)
+        return error_response("INVALID_SLA_POLICY", public_error_message(exc, "تحقق من تقويم الاستجابة وحدوده الزمنية"), 422)
     return jsonify({"id": record_id, "policy": payload}), 201
 
 
@@ -241,7 +242,7 @@ def sla_action(case_id: int, action: str):
                 return error_response("SLA_STATE_CONFLICT", "تغيرت حالة SLA أو لا تنطبق العملية", 409)
             identifier = insert_record(case_id, "workflow_sla_action", {"action": action, "reason": reason, "at": iso_now(), "actor_id": actor_id()})
     except ValueError as exc:
-        return error_response("INVALID_SLA_ACTION", str(exc), 422)
+        return error_response("INVALID_SLA_ACTION", public_error_message(exc, "إجراء الاستجابة غير صالح"), 422)
     return jsonify({"id": identifier, "action": action}), 201
 
 
@@ -430,7 +431,7 @@ def create_postmortem(case_id: int):
             }
             identifier = insert_record(case_id, "postmortem", payload)
     except ValueError as exc:
-        return error_response("INVALID_POSTMORTEM", str(exc), 422)
+        return error_response("INVALID_POSTMORTEM", public_error_message(exc, "تحقق من حقول مراجعة الحادث"), 422)
     return jsonify({"id": identifier, "version": 1, "payload": payload}), 201
 
 
@@ -473,7 +474,7 @@ def review_postmortem(case_id: int, record_id: int):
             )
             result = _revise(row, payload)
     except ValueError as exc:
-        return error_response("INVALID_POSTMORTEM_REVIEW", str(exc), 422)
+        return error_response("INVALID_POSTMORTEM_REVIEW", public_error_message(exc, "تحقق من حقول اعتماد المراجعة"), 422)
     return jsonify(result)
 
 
@@ -483,7 +484,7 @@ def request_collection(case_id: int):
     try:
         data = _body({"version", "recipe_id", "collector_id", "reason"}, {"version", "recipe_id", "collector_id", "reason"})
         if not isinstance(data["recipe_id"], str) or data["recipe_id"] not in RECIPES:
-            raise ValueError("اختر وصفة جمع محلية معروفة")
+            raise ValidationError("اختر وصفة جمع محلية معروفة")
         reason = text_value(data["reason"], 2000, True)
         with transaction():
             case = _case_row(case_id)
@@ -493,7 +494,7 @@ def request_collection(case_id: int):
             if case["status"] == "closed":
                 return error_response("CASE_CLOSED", "القضية مغلقة", 409)
             if not _active_member(case_id, data["collector_id"]):
-                raise ValueError("الجامع يجب أن يكون عضوًا نشطًا مخولًا في القضية")
+                raise ValidationError("الجامع يجب أن يكون عضوًا نشطًا مخولًا في القضية")
             payload = {
                 "state": "pending_approval",
                 "recipe_id": data["recipe_id"],
@@ -507,7 +508,7 @@ def request_collection(case_id: int):
             }
             identifier = insert_record(case_id, "collection_request", payload)
     except ValueError as exc:
-        return error_response("INVALID_COLLECTION_REQUEST", str(exc), 422)
+        return error_response("INVALID_COLLECTION_REQUEST", public_error_message(exc, "طلب جمع الأدلة غير صالح"), 422)
     return jsonify({"id": identifier, "version": 1, "payload": payload}), 201
 
 
@@ -556,13 +557,13 @@ def update_collection(case_id: int, record_id: int, action: str):
                     .fetchone()
                 )
                 if not row_evidence:
-                    raise ValueError("اربط دليلًا محفوظًا من القضية")
+                    raise ValidationError("اربط دليلًا محفوظًا من القضية")
                 stamp = data.get("collected_at")
                 if not isinstance(stamp, str) or not re.search(r"(?:Z|[+-]\d{2}:\d{2})$", stamp):
-                    raise ValueError("وقت الجمع يتطلب المنطقة الزمنية")
+                    raise ValidationError("وقت الجمع يتطلب المنطقة الزمنية")
                 moment = parse_timestamp(stamp)
                 if moment > utc_now():
-                    raise ValueError("لا توثق عملية جمع فعلية في المستقبل")
+                    raise ValidationError("لا توثق عملية جمع فعلية في المستقبل")
                 artifacts = data.get("artifacts")
                 if (
                     not isinstance(artifacts, list)
@@ -570,7 +571,7 @@ def update_collection(case_id: int, record_id: int, action: str):
                     or any(not isinstance(item, str) or item not in payload["recipe_snapshot"]["artifacts"] for item in artifacts)
                     or len(set(artifacts)) != len(artifacts)
                 ):
-                    raise ValueError("حدد مصادر الوصفة التي جُمعت فعليًا")
+                    raise ValidationError("حدد مصادر الوصفة التي جُمعت فعليًا")
                 missing = sorted(set(payload["recipe_snapshot"]["artifacts"]) - set(artifacts))
                 payload.update(
                     state="documented_with_gaps" if missing else "documented",
@@ -586,5 +587,5 @@ def update_collection(case_id: int, record_id: int, action: str):
                 )
             result = _revise(row, payload)
     except (ValueError, TypeError, OverflowError) as exc:
-        return error_response("INVALID_COLLECTION_UPDATE", str(exc), 422)
+        return error_response("INVALID_COLLECTION_UPDATE", public_error_message(exc, "تحقق من بيانات جمع الأدلة"), 422)
     return jsonify(result)

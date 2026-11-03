@@ -14,6 +14,7 @@ from .cases import _case_row, _history
 from .db import get_db, inserted_id, transaction
 from .security import actor_id, cipher, current_user, error_response, has_permission, require_permission
 from .timeutils import iso_now
+from .validation import ValidationError, public_error_message
 
 autopsy_reports_api = Blueprint("autopsy_reports", __name__)
 STATES = {
@@ -37,7 +38,7 @@ STATES = {
 def bounded_rows(sql, args, maximum):
     rows = get_db().execute(sql + " LIMIT ?", (*args, maximum + 1)).fetchall()
     if len(rows) > maximum:
-        raise ValueError("حجم التقرير تجاوز الحد؛ قلل العناصر المكررة أو استخدم تصدير السجلات المنفصل")
+        raise ValidationError("حجم التقرير تجاوز الحد؛ قلل العناصر المكررة أو استخدم تصدير السجلات المنفصل")
     return [dict(row) for row in rows]
 
 
@@ -208,7 +209,7 @@ def build_snapshot(case, revision: int, profile: str):
         previous, count = entry["entry_hash"], count + 1
     payload["custody"] = {"entries": count, "head_sha256": previous, "integrity_valid": valid}
     if len(canonical(payload).encode()) > 4 * 1024 * 1024:
-        raise ValueError("حجم التقرير يتجاوز 4 MiB؛ استخدم حزمة القضية للأرشيف الكامل")
+        raise ValidationError("حجم التقرير يتجاوز 4 MiB؛ استخدم حزمة القضية للأرشيف الكامل")
     return payload
 
 
@@ -253,7 +254,7 @@ def create_report(case_id: int):
         try:
             payload = build_snapshot(case, revision, profile)
         except ValueError as exc:
-            return error_response("REPORT_TOO_LARGE", str(exc), 422)
+            return error_response("REPORT_TOO_LARGE", public_error_message(exc, "يتجاوز التقرير الحد المسموح"), 422)
     serialized = canonical(payload)
     digest = hashlib.sha256(serialized.encode()).hexdigest()
     with transaction():
@@ -355,10 +356,10 @@ def approve_report(case_id: int, report_id: int):
     data = request.get_json(silent=True)
     try:
         if not isinstance(data, dict) or set(data) - {"version", "override_reason"} or type(data.get("version")) is not int:
-            raise ValueError("حدد إصدار القضية وسبب الاستثناء إن لزم")
+            raise ValidationError("حدد إصدار القضية وسبب الاستثناء إن لزم")
         override = text_value(data.get("override_reason", ""), 1000)
     except ValueError as exc:
-        return error_response("INVALID_REPORT_APPROVAL", str(exc), 422)
+        return error_response("INVALID_REPORT_APPROVAL", public_error_message(exc, "تحقق من بيانات اعتماد التقرير"), 422)
     with transaction():
         case = _case_row(case_id)
         if not case:
@@ -459,7 +460,7 @@ def transition_operational(case_id, row, target, reason, data):
     try:
         reason = text_value(reason, 2000, True)
     except ValueError as exc:
-        return error_response("INVALID_TRANSITION", str(exc), 422)
+        return error_response("INVALID_TRANSITION", public_error_message(exc, "انتقال الحالة غير مسموح"), 422)
     if target not in STATES.get(row["status"], set()):
         return error_response("ILLEGAL_CASE_TRANSITION", "الانتقال غير متاح من الحالة الحالية", 409)
     if target == "closed" and not has_permission(current_user(), "cases.close"):

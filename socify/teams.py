@@ -10,6 +10,7 @@ from .db import get_db, inserted_id, transaction
 from .operational import case_scope, case_visible, operational_mode
 from .security import actor_id, current_user, error_response, has_permission, login_required, require_permission, workspace_id
 from .timeutils import iso_now, utc_now
+from .validation import ValidationError, public_error_message
 
 teams_api = Blueprint("teams", __name__)
 MEMBER_ROLES = {"analyst", "auditor", "instructor", "soc_manager", "l1_analyst", "l2_responder", "investigator", "reviewer"}
@@ -370,13 +371,13 @@ def deactivate_member(user_id: int):
     data = request.get_json(silent=True)
     try:
         if not isinstance(data, dict) or set(data) - {"handoff_to", "reason"}:
-            raise ValueError("حدد سبب الإيقاف والبديل إن كانت هناك مسؤوليات")
+            raise ValidationError("حدد سبب الإيقاف والبديل إن كانت هناك مسؤوليات")
         reason = text_value(data.get("reason"), 1000, True)
         target = data.get("handoff_to")
         if target is not None and (type(target) is not int or target == user_id):
-            raise ValueError("حدد عضوًا آخر لتسليم المسؤوليات")
+            raise ValidationError("حدد عضوًا آخر لتسليم المسؤوليات")
     except ValueError as exc:
-        return error_response("INVALID_HANDOFF", str(exc), 422)
+        return error_response("INVALID_HANDOFF", public_error_message(exc, "تحقق من أعضاء التسليم والمسؤوليات"), 422)
     with transaction():
         member = get_db().execute("SELECT id, role FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (user_id, workspace_id())).fetchone()
         if not member or member["role"] == "admin":
@@ -468,13 +469,13 @@ def shift_handoff(case_id: int):
     data = request.get_json(silent=True)
     try:
         if not isinstance(data, dict) or set(data) != {"from_user", "to_user", "version", "reason"}:
-            raise ValueError("حدد المسؤول السابق والبديل والإصدار والسبب")
+            raise ValidationError("حدد المسؤول السابق والبديل والإصدار والسبب")
         source, target = data["from_user"], data["to_user"]
         if any(type(item) is not int or item < 1 for item in (source, target, data["version"])) or source == target:
-            raise ValueError("حدد عضوين مختلفين وإصدارًا صالحًا")
+            raise ValidationError("حدد عضوين مختلفين وإصدارًا صالحًا")
         reason = text_value(data["reason"], 1000, True)
     except ValueError as exc:
-        return error_response("INVALID_HANDOFF", str(exc), 422)
+        return error_response("INVALID_HANDOFF", public_error_message(exc, "تحقق من أعضاء التسليم والمسؤوليات"), 422)
     with transaction():
         case = _case_row(case_id)
         if not case:

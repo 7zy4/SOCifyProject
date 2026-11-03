@@ -12,6 +12,7 @@ from .cases import _case_row
 from .db import get_db, transaction
 from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
 from .timeutils import iso_now
+from .validation import ValidationError, public_error_message
 
 quick_reports_api = Blueprint("quick_reports", __name__)
 
@@ -156,16 +157,16 @@ def migrate(connection: sqlite3.Connection) -> None:
 
 def _validate_answers(raw_answers: object) -> dict[str, str]:
     if not isinstance(raw_answers, dict) or not raw_answers:
-        raise ValueError("اختر الإجابات من القوائم المنسدلة المعتمدة")
+        raise ValidationError("اختر الإجابات من القوائم المنسدلة المعتمدة")
     unknown_keys = set(raw_answers) - set(QUESTION_OPTION_MAP)
     if unknown_keys:
-        raise ValueError(f"أسئلة غير معروفة في التقرير: {', '.join(sorted(unknown_keys))}")
+        raise ValidationError(f"أسئلة غير معروفة في التقرير: {', '.join(sorted(unknown_keys))}")
     validated: dict[str, str] = {}
     for q in QUICK_REPORT_QUESTIONS:
         qid = q["id"]
         val = raw_answers.get(qid)
         if not isinstance(val, str) or val not in QUESTION_OPTION_MAP[qid]:
-            raise ValueError(f"قيمة غير معتمدة للسؤال {qid}؛ يجب الاختيار من القائمة المنسدلة فقط")
+            raise ValidationError(f"قيمة غير معتمدة للسؤال {qid}؛ يجب الاختيار من القائمة المنسدلة فقط")
         validated[qid] = val
     return validated
 
@@ -321,9 +322,9 @@ def save_quick_report(case_id: int):
         answers = _validate_answers(body.get("answers"))
         note = str(body.get("executive_note") or "").strip()
         if len(note) > 280:
-            raise ValueError("الملاحظة المختصرة يجب ألا تتجاوز 280 محرفًا")
+            raise ValidationError("الملاحظة المختصرة يجب ألا تتجاوز 280 محرفًا")
     except ValueError as exc:
-        return error_response("INVALID_QUICK_REPORT", str(exc), 422)
+        return error_response("INVALID_QUICK_REPORT", public_error_message(exc, "تحقق من حقول التقرير وإجاباته"), 422)
 
     now = iso_now()
     user_id = actor_id()
@@ -385,9 +386,9 @@ def escalate_quick_report(case_id: int):
                 answers = _validate_answers(body.get("answers"))
                 note = str(body.get("executive_note", existing["executive_note"] if existing else "") or "").strip()
                 if len(note) > 280:
-                    raise ValueError("الملاحظة المختصرة يجب ألا تتجاوز 280 محرفًا")
+                    raise ValidationError("الملاحظة المختصرة يجب ألا تتجاوز 280 محرفًا")
             except ValueError as exc:
-                return error_response("INVALID_QUICK_REPORT", str(exc), 422)
+                return error_response("INVALID_QUICK_REPORT", public_error_message(exc, "تحقق من حقول التقرير وإجاباته"), 422)
             if existing:
                 get_db().execute(
                     """UPDATE case_quick_reports
@@ -580,7 +581,7 @@ def print_quick_report(case_id: int):
         inspected = inspection_snapshot(get_db(), case_id, case["workspace_id"])
         telemetry = telemetry_report(get_db(), case_id, case["workspace_id"])
     except ValueError as exc:
-        return error_response("REPORT_CONTENT_LIMIT", str(exc), 422)
+        return error_response("REPORT_CONTENT_LIMIT", public_error_message(exc, "يتجاوز محتوى التقرير الحد المسموح"), 422)
     inspection_html = ""
     if inspected:
         parts = ['<h2 class="section-title" data-ui-copy>فحص المحتوى والترميزات</h2>']

@@ -9,6 +9,8 @@ from collections import Counter
 from typing import Any
 from urllib.parse import unquote
 
+from .validation import ValidationError
+
 ENGINE = "socify-content-1"
 RESERVED_FIELDS = {"content_inspection", "exposed_secret_count", "sensitive_data_count", "decoded_threat_count"}
 TEXT_LIMIT = 32768
@@ -24,7 +26,8 @@ PRIVATE_KEY = re.compile(
 CARD = re.compile(r"(?<![0-9])(?:[0-9][ -]?){12,18}[0-9](?![0-9])")
 IBAN = re.compile(r"\b[A-Z]{2}[0-9]{2}(?:[ ]?[A-Z0-9]){11,30}\b")
 TOKEN = re.compile(r"(?<![A-Za-z0-9+/_-])[A-Za-z0-9+/_-]{16,4096}={0,6}(?![A-Za-z0-9+/=_-])")
-POWERSHELL = re.compile(r"(?:powershell(?:\.exe)?|pwsh(?:\.exe)?).*?\s-(?:e|en|enc|enco|encodedcommand)\s+[\"']?([A-Za-z0-9+/]{8,4096}={0,2})", re.I)
+POWERSHELL = re.compile(r"(?:powershell|pwsh)(?:\.exe)?", re.I)
+ENCODED_COMMAND = re.compile(r"(?<=\s)-(?:e|en|enc|enco|encodedcommand)\s+[\"']?([A-Za-z0-9+/]{8,4096}={0,2})", re.I)
 THREAT = re.compile(r"downloadstring\s*\(|invoke-expression\b|\biex\s*\(|/etc/(?:passwd|shadow)\b|vssadmin\s+delete\s+shadows|sekurlsa\b", re.I)
 
 
@@ -121,9 +124,11 @@ def decode_layer(text, powershell=False):
     variants = []
     if len(raw) >= 16 and len(raw) % 2 == 0 and re.fullmatch(r"[a-fA-F0-9]+", raw):
         variants.append(("hex", lambda: bytes.fromhex(raw)))
-    if len(raw) >= 16 and re.fullmatch(r"[A-Z2-7]+={0,6}", raw):
+    unpadded = raw.rstrip("=")
+    padding = len(raw) - len(unpadded)
+    if len(raw) >= 16 and padding <= 6 and unpadded and all(char in "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567" for char in unpadded):
         variants.append(("base32", lambda: base64.b32decode(raw + "=" * (-len(raw) % 8))))
-    if len(raw) >= 8 and re.fullmatch(r"[A-Za-z0-9+/_-]+={0,2}", raw):
+    if len(raw) >= 8 and padding <= 2 and unpadded and all(char in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/_-" for char in unpadded):
         variants.append(
             ("base64url" if "-" in raw or "_" in raw else "base64", lambda: base64.b64decode(raw + "=" * (-len(raw) % 4), altchars=b"-_", validate=True))
         )
@@ -179,7 +184,8 @@ def inspect_content(source):
 
         retain(matches)
         candidates = [(text, 0, False)] if re.search(r"%[0-9a-fA-F]{2}", text) else []
-        ps = POWERSHELL.search(text)
+        executable = POWERSHELL.search(text)
+        ps = ENCODED_COMMAND.search(text, executable.end()) if executable else None
         if ps:
             candidates.append((ps.group(1), ps.start(1), True))
         else:
@@ -249,13 +255,13 @@ def inspection_snapshot(connection, case_id, workspace_id):
         (case_id, workspace_id, ENGINE),
     ).fetchall()
     if len(rows) > 2000:
-        raise ValueError("تجاوز فحص المحتوى حد التقرير: ٢٠٠٠ سجل")
+        raise ValidationError("تجاوز فحص المحتوى حد التقرير: ٢٠٠٠ سجل")
     results = []
     size = 0
     for row in rows:
         inspection = json.loads(row["normalized_fields"])["content_inspection"]
         size += len(json.dumps(inspection, ensure_ascii=False).encode())
         if size > 4 * 1024 * 1024:
-            raise ValueError("تجاوز حجم نتائج فحص المحتوى حد التقرير")
+            raise ValidationError("تجاوز حجم نتائج فحص المحتوى حد التقرير")
         results.append({"event_id": row["id"], "raw_hash": row["raw_hash"], **inspection})
     return results

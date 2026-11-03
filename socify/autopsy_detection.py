@@ -13,6 +13,7 @@ from .detection import evaluate_rules
 from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
 from .sigma_subset import CAPABILITIES, compile_sigma, validate_fixtures
 from .timeutils import iso_now, iso_timestamp, parse_timestamp, utc_now
+from .validation import ValidationError, public_error_message
 
 autopsy_detection_api = Blueprint("autopsy_detection", __name__)
 
@@ -87,9 +88,9 @@ def sigma_action(action):
     request_key = request.headers.get("Idempotency-Key") if action == "publish" else None
     try:
         if not isinstance(data, dict) or set(data) - {"source", "fixtures", "rule_id", "version", "reason"}:
-            raise ValueError("حقول Sigma غير معروفة")
+            raise ValidationError("حقول Sigma غير معروفة")
         if request_key is not None and not re.fullmatch(r"[A-Za-z0-9_.:-]{8,128}", request_key):
-            raise ValueError("معرف إعادة المحاولة غير صالح")
+            raise ValidationError("معرف إعادة المحاولة غير صالح")
         request_hash = hashlib.sha256(canonical(data).encode()).hexdigest()
         if request_key is not None:
             receipt = _sigma_receipt(request_key, request_hash)
@@ -100,15 +101,15 @@ def sigma_action(action):
         if any(
             not get_db().execute("SELECT 1 FROM attack_techniques WHERE technique_id=?", (technique,)).fetchone() for technique in compiled["dsl"]["mitre_ids"]
         ):
-            raise ValueError("تقنية MITRE غير موجودة في الكتالوج المحلي")
+            raise ValidationError("تقنية MITRE غير موجودة في الكتالوج المحلي")
         if action == "compile":
             return jsonify({"compiled": compiled, "fixtures_passed": True, "published": False})
         reason = text_value(data.get("reason"), 1000, True)
         rule_id = data.get("rule_id")
         if rule_id is not None and (type(rule_id) is not int or not 1 <= rule_id <= 2**63 - 1 or type(data.get("version")) is not int):
-            raise ValueError("معرف القاعدة وإصدارها غير صالحين")
+            raise ValidationError("معرف القاعدة وإصدارها غير صالحين")
     except (ValueError, TypeError, UnicodeError, RecursionError) as exc:
-        return error_response("INVALID_SIGMA_SUBSET", str(exc), 422)
+        return error_response("INVALID_SIGMA_SUBSET", public_error_message(exc, "قاعدة الكشف غير صالحة"), 422)
     with transaction():
         # Repeat after acquiring the write lock: concurrent retries must share one commit.
         if request_key is not None:
@@ -416,21 +417,21 @@ def review_alert(case_id, alert_id):
             or set(data) != {"version", "verdict", "attack_outcome", "group", "suppressed_until", "reason"}
             or type(data["version"]) is not int
         ):
-            raise ValueError("حدد إصدار المراجعة وقرار التنبيه ونتيجة الهجوم والمجموعة وسبب التغيير")
+            raise ValidationError("حدد إصدار المراجعة وقرار التنبيه ونتيجة الهجوم والمجموعة وسبب التغيير")
         verdict = text_value(data["verdict"], 30, True)
         outcome = text_value(data["attack_outcome"], 30, True)
         if verdict not in {"undetermined", "malicious", "benign", "false_positive"} or outcome not in {"unknown", "successful", "blocked", "partial"}:
-            raise ValueError("قرار التنبيه أو نتيجة الهجوم غير صالحة")
+            raise ValidationError("قرار التنبيه أو نتيجة الهجوم غير صالحة")
         group, reason = text_value(data["group"], 100), text_value(data["reason"], 2000, True)
         until = data["suppressed_until"]
         if until is not None:
             if not isinstance(until, str) or not until.endswith("Z"):
-                raise ValueError("نهاية suppression تتطلب UTC")
+                raise ValidationError("نهاية suppression تتطلب UTC")
             until = iso_timestamp(until)
             if not utc_now() < parse_timestamp(until) <= utc_now() + timedelta(days=30):
-                raise ValueError("مدة suppression من الآن وحتى 30 يومًا")
+                raise ValidationError("مدة suppression من الآن وحتى 30 يومًا")
     except (ValueError, TypeError, UnicodeError) as exc:
-        return error_response("INVALID_ALERT_REVIEW", str(exc), 422)
+        return error_response("INVALID_ALERT_REVIEW", public_error_message(exc, "مراجعة التنبيه غير صالحة"), 422)
     with transaction():
         case = _case_row(case_id)
         row = (
