@@ -9,7 +9,7 @@ from .autopsy_domain import canonical, custody, text_value, touch_case
 from .cases import _case_row
 from .db import get_db, inserted_id, transaction
 from .detection import evaluate_rules
-from .security import actor_id, error_response, require_permission, workspace_id
+from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
 from .sigma_subset import CAPABILITIES, compile_sigma, validate_fixtures
 from .timeutils import iso_now, iso_timestamp, parse_timestamp, utc_now
 
@@ -144,6 +144,49 @@ def sigma_action(action):
             details={"version": version, "sha256": compiled["source_sha256"], "compiler": compiled["compiler"], "reason": reason},
         )
     return jsonify({"id": rule_id, "version": version, "fixtures_passed": True, "compiled": compiled}), 201
+
+
+def detection_job_view(job, case):
+    from .autopsy_api import manager
+
+    parameters = json.loads(job["parameters"])
+    result = {
+        key: job[key] for key in ("id", "kind", "state", "error_code", "attempts", "created_by", "created_at", "started_at", "completed_at", "available_at")
+    }
+    control = job["created_by"] == actor_id() or manager()
+    result.update(
+        mode=parameters["mode"],
+        result_record_id=json.loads(job["result"] or "{}").get("record_id"),
+        can_cancel=control and job["state"] in {"queued", "processing"},
+        can_retry=control
+        and job["state"] in {"cancelled", "failed"}
+        and job["attempts"] < 3
+        and case["status"] != "closed"
+        and has_permission(current_user(), "cases.update")
+        and case["version"] == parameters["case_version"],
+        scope_changed=case["version"] != parameters["case_version"] and job["state"] != "completed",
+    )
+    return result
+
+
+@autopsy_detection_api.get("/api/cases/<int:case_id>/detection")
+@require_permission("cases.read")
+def list_detection_jobs(case_id):
+    case = _case_row(case_id)
+    if not case:
+        return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+    try:
+        page = int(request.args.get("page", 1))
+        if set(request.args) - {"page"} or not 1 <= page <= 1000000:
+            raise ValueError
+    except ValueError:
+        return error_response("INVALID_DETECTION_PAGE", "صفحة الفحوص خارج النطاق", 422)
+    rows = (
+        get_db()
+        .execute("SELECT * FROM autopsy_jobs WHERE case_id=? AND kind='detection' ORDER BY id DESC LIMIT 26 OFFSET ?", (case_id, (page - 1) * 25))
+        .fetchall()
+    )
+    return jsonify({"items": [detection_job_view(row, case) for row in rows[:25]], "page": page, "has_next": len(rows) > 25})
 
 
 @autopsy_detection_api.post("/api/cases/<int:case_id>/detection")

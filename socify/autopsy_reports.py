@@ -497,7 +497,7 @@ def get_job(case_id: int, job_id: int):
     row = (
         get_db()
         .execute(
-            "SELECT id, kind, state, error_code, attempts, created_by, created_at, started_at, completed_at, available_at, result FROM autopsy_jobs WHERE id = ? AND case_id = ?",
+            "SELECT * FROM autopsy_jobs WHERE id = ? AND case_id = ?",
             (job_id, case_id),
         )
         .fetchone()
@@ -508,8 +508,13 @@ def get_job(case_id: int, job_id: int):
         from .autopsy_samples import sample_job_view
 
         return jsonify(sample_job_view(row, case))
-    data = dict(row)
-    data.pop("result")
+    if row["kind"] == "detection":
+        from .autopsy_detection import detection_job_view
+
+        return jsonify(detection_job_view(row, case))
+    data = {
+        key: row[key] for key in ("id", "kind", "state", "error_code", "attempts", "created_by", "created_at", "started_at", "completed_at", "available_at")
+    }
     return jsonify(data)
 
 
@@ -534,6 +539,11 @@ def job_action(case_id: int, job_id: int, action: str):
                 "UPDATE autopsy_jobs SET state = 'cancelled', completed_at = ?, worker_id = NULL, lease_expires_at = NULL WHERE id = ?", (iso_now(), job_id)
             )
         else:
+            if job["kind"] == "detection":
+                from .autopsy_detection import detection_job_view
+
+                if not detection_job_view(job, case)["can_retry"]:
+                    return error_response("DETECTION_RETRY_NOT_ALLOWED", "تغير نطاق الفحص أو صلاحياته؛ ابدأ فحصًا جديدًا بعد مراجعة القضية", 409)
             if job["kind"] == "sample" and (case["status"] == "closed" or not has_permission(current_user(), "cases.update")):
                 return error_response("ANALYSIS_NOT_ALLOWED", "إعادة التحليل تحتاج قضية مفتوحة وصلاحية تعديلها", 403)
             if job["state"] not in {"failed", "cancelled"} or job["attempts"] >= 3:

@@ -148,7 +148,7 @@ function autopsyModal(title, content) {
 
 function autopsyReferenceChoice(name, source, required = false) {
   const id = `reference-${crypto.randomUUID()}`;
-  const entry = item => ({ value: item.id, label: `${source.kind === "task" ? item.title : item.payload.conclusion.slice(0, 160)} · ${item.id}`, record: item });
+  const entry = item => ({ value: item.id, label: `${["task", "event"].includes(source.kind) ? item.title : item.payload.conclusion.slice(0, 160)} · ${item.id}`, record: item });
   let chosen = source.initial ? entry(source.initial) : null, options = [], cursor = null, requestId = 0, timer;
   let lastQuery = "", retryAction;
   const input = node("input", { name, required, autocomplete: "off", class: "search-choice", value: chosen?.label || "", role: "combobox", "aria-controls": id, "aria-expanded": "false", "aria-autocomplete": "list" });
@@ -185,14 +185,16 @@ function autopsyReferenceChoice(name, source, required = false) {
     if (!append) { options = []; render(); }
     retryAction = () => load(query, next, append, focusFirst);
     try {
-      const path = source.kind === "task"
+      const path = source.kind === "event"
+        ? `/api/cases/${source.caseId}/timeline?${new URLSearchParams({ q: query, page: String(next || 1), limit: "25" })}`
+        : source.kind === "task"
         ? `/api/cases/${source.caseId}/tasks?${new URLSearchParams({ q: query, page: String(next || 1) })}`
         : `/api/cases/${source.caseId}/records?${new URLSearchParams({ kind: source.kind, q: query, limit: "25", ...(next ? { before: next } : {}) })}`;
       const data = await api(path);
       if (request !== requestId) return;
       const incoming = data.items.map(entry);
       options = append ? [...options, ...incoming.filter(value => !options.some(existing => existing.value === value.value))] : incoming;
-      cursor = source.kind === "task" ? data.page * data.page_size < data.total ? data.page + 1 : null : data.next_before;
+      cursor = source.kind === "event" ? data.has_next ? data.page + 1 : null : source.kind === "task" ? data.page * data.page_size < data.total ? data.page + 1 : null : data.next_before;
       render(); more.hidden = !cursor;
       message.textContent = SOCifyLocale.text("لا نتائج مطابقة"); message.hidden = options.length > 0;
       if (focusFirst && !popup.hidden) list.querySelector("[role=option]")?.focus();
@@ -396,6 +398,9 @@ async function autopsyCases(page = null, query = null) {
 }
 
 function autopsyRecordCard(record) {
+  if(record.kind === "analysis" && record.payload.analysis_type === "local_detection") {
+    return node("article", { class: "card record-card" }, [node("h3", { text: SOCifyLocale.text("نتيجة فحص السجلات") }), autopsyDetectionResult(record, autopsy.current.id), node("p", { text: formatTime(record.updated_at) })]);
+  }
   if(record.kind==="analysis"&&(record.payload.method==="quick_static_triage"||record.payload.engine==="SOCify local static analysis/1")) {
     return node("article",{class:"card record-card sample-record"},[node("h3",{text:record.payload.filename||SOCifyLocale.text("نتيجة الفحص")}),autopsySampleView(record.payload),node("p",{text:formatTime(record.updated_at)})]);
   }
@@ -435,7 +440,6 @@ function autopsyRecordCard(record) {
   });
   const card = node("article", { class: "card record-card" }, [node("h3", { text: record.payload.title || record.payload.name || autopsyLabel(record.kind) }), values, node("p", { text: formatTime(record.updated_at) })]);
   if (autopsy.current.can_update && (autopsy.current.status !== "closed" || record.kind === "corrective") && autopsy.catalog.record_schemas[record.kind]) card.append(button(SOCifyLocale.text("تعديل"), () => autopsyEditRecord(record.kind, record)));
-  if (record.kind === "analysis" && record.payload.analysis_type === "local_detection" && record.payload.next_after_id && autopsy.current.can_update && autopsy.current.status !== "closed") card.append(autopsyAction(SOCifyLocale.text("استكمال فحص الدفعة التالية"), async () => { await api(`/api/cases/${autopsy.current.id}/detection`, { method: "POST", body: { version: autopsy.current.version, mode: record.payload.mode, after_id: record.payload.next_after_id } }); await autopsyCase(autopsy.current.id); }));
   return card;
 }
 

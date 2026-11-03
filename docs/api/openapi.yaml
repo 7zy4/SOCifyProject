@@ -1978,6 +1978,33 @@
       }
     },
     "/api/cases/{case_id}/detection": {
+      "get": {
+        "operationId": "autopsy_detection_list_detection_jobs_get__api_cases_case_id_detection",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
       "post": {
         "operationId": "autopsy_detection_queue_detection_post__api_cases_case_id_detection",
         "responses": {

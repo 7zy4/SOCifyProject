@@ -113,7 +113,7 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
             )
             page.goto(f"http://127.0.0.1:{server.server_port}/cases/{case_id}?tab=analysis&analysis=detection")
             page.get_by_role("heading", name="الإثراء والكشف ومراجعة التنبيهات", exact=True).wait_for()
-            assert page.get_by_role("cell", name="matched · suspicious", exact=True).count() == 1
+            assert page.get_by_role("cell", name="تطابق مع المصادر · مشتبه", exact=True).count() == 1
             page.get_by_role("button", name="تفاصيل ومراجعة", exact=True).first.click()
             dialog = page.get_by_role("dialog")
             dialog.locator("input[name=verdict]").fill("إيجابي كاذب")

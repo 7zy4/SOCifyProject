@@ -104,6 +104,84 @@ window.SOCifyAutopsy.library = async () => {
   finish(root);
 };
 
+function autopsyDetectionState(value) {
+  return SOCifyLocale.text({ queued: "بانتظار المعالجة", processing: "تجري المعالجة", completed: "اكتمل التحليل", failed: "تعذرت المعالجة", cancelled: "أُلغيت المعالجة" }[value] || "غير متاحة");
+}
+
+function autopsyDetectionMode(value) {
+  return SOCifyLocale.text(value === "anomaly" ? "مقارنة بالسجلات السابقة" : "فحص القواعد");
+}
+
+function autopsyDetectionFacts(caption, rows) {
+  return node("table", { class: "alert-property-table" }, [node("caption", { text: caption }), node("tbody", {}, rows.map(([label, value]) => node("tr", {}, [node("th", { scope: "row", text: label }), node("td", {}, value instanceof Node ? value : node("bdi", { dir: "auto", text: value ?? "—" }))])))]);
+}
+
+async function autopsyQueueDetection(caseId, mode, after = 0, changed = () => {}) {
+  const current = await api(`/api/cases/${caseId}`);
+  const initial = await api(`/api/cases/${caseId}/detection`, { method: "POST", body: { version: current.version, mode, after_id: after } });
+  autopsyModal(SOCifyLocale.text("حالة فحص السجلات"), autopsyDetectionJob(caseId, initial, changed));
+  await changed();
+}
+
+function autopsyDetectionResult(record, caseId, changed = () => {}) {
+  const t = SOCifyLocale.text, result = record.payload;
+  const count = value => Number(value || 0).toLocaleString(SOCifyLocale.language);
+  const root = node("div", { class: "detection-result" });
+  const rows = [[t("نوع الفحص"), autopsyDetectionMode(result.mode)], [t("السجلات المفحوصة"), count(result.evaluated_events)]];
+  if(result.mode === "anomaly") rows.push([t("سجلات المقارنة السابقة"), count(result.baseline_events)], [t("اختلافات تحتاج المراجعة"), count(result.findings?.length)]);
+  else rows.push([t("التنبيهات الجديدة"), count(result.alert_ids?.length)]);
+  root.append(autopsyDetectionFacts(t("نتيجة فحص السجلات"), rows));
+  if(result.status === "insufficient_baseline") root.append(node("p", { class: "notice", text: t("السجلات السابقة غير كافية للمقارنة") }));
+  else if(result.mode === "anomaly" && !result.findings?.length) root.append(node("p", { text: t("لا اختلافات عن السجلات السابقة ضمن النطاق المفحوص") }));
+  if(result.mode === "anomaly" && result.findings?.length) {
+    root.append(node("p", { class: "notice", text: t("الاختلاف لا يثبت نشاطًا خبيثًا") }));
+    for(const item of result.findings)root.append(autopsyDetectionFacts(t("اختلاف يحتاج المراجعة"), [[t("عنوان IP"), item.source_ip], [t("اسم الجهاز"), item.hostname], [t("الدليل"), autopsyAction(t("عرض السجل"), async () => {
+      const event = await api(`/api/cases/${caseId}/logs/${item.event_id}`);
+      autopsyModal(t("تفاصيل السجل"), node("div", { class: "detection-result" }, [autopsyDetectionFacts(event.title, [[t("وقت الحدث"), event.normalized_fields?.event_time_known === false ? t("غير معروف") : formatTime(event.event_time)], [t("المصدر"), event.source], [t("الخطورة"), autopsyLabel(event.severity)]]), node("details", {}, [node("summary", { text: t("السجل الخام") }), node("pre", { dir: "auto", text: typeof event.raw_data === "string" ? event.raw_data : JSON.stringify(event.raw_data, null, 2) })])]));
+    })]]));
+  }
+  if(result.alert_ids?.length) root.append(linkedButton(t("عرض التنبيهات"), `/monitoring?case_id=${caseId}`));
+  if(result.next_after_id && autopsy.current?.can_update && autopsy.current.status !== "closed") root.append(autopsyAction(t("استكمال فحص الدفعة التالية"), async () => {
+    root.closest("dialog")?.close();
+    await autopsyQueueDetection(caseId, result.mode, result.next_after_id, changed);
+  }));
+  return root;
+}
+
+function autopsyDetectionJob(caseId, initial, changed = () => {}) {
+  const t = SOCifyLocale.text, root = node("div", { class: "detection-job" });
+  let signature = null, timer;
+  async function refresh() {
+    if(!root.isConnected)return;
+    try { render(await api(`/api/cases/${caseId}/jobs/${initial.id}`)); }
+    catch(error) { clearTimeout(timer); signature = null; root.replaceChildren(node("p", { role: "status", text: error.message }), autopsyAction(t("إعادة المحاولة"), refresh)); }
+  }
+  function render(job) {
+    clearTimeout(timer);
+    const next = JSON.stringify(job);
+    if(next !== signature) {
+      signature = next;
+      root.replaceChildren(node("p", { role: "status", text: autopsyDetectionState(job.state) }));
+      if(job.scope_changed) root.append(node("p", { class: "notice", text: t("تغيرت القضية؛ ابدأ فحصًا جديدًا لمراجعة السجلات الحالية") }));
+      else if(job.error_code) root.append(node("p", { class: "notice", text: t(job.error_code === "ACCESS_REVOKED" ? "تغيرت صلاحيات الفحص أو نطاق القضية" : "تعذر إكمال الفحص") }));
+      const action = (label, route) => autopsyAction(t(label), async () => { await api(`/api/cases/${caseId}/jobs/${job.id}/${route}`, { method: "POST", body: {} }); await refresh(); await changed(); });
+      if(job.can_cancel)root.append(action("إلغاء المعالجة", "cancel"));
+      if(job.can_retry)root.append(action("إعادة المحاولة", "retry"));
+      if(job.state === "completed" && job.result_record_id)root.append(autopsyAction(t("عرض النتيجة"), async () => {
+        const records = await api(`/api/cases/${caseId}/records?kind=analysis&limit=1&before=${job.result_record_id + 1}`);
+        const record = records.items.find(item => item.id === job.result_record_id);
+        if(!record)throw new Error(t("النتيجة غير متاحة"));
+        root.closest("dialog")?.close();
+        autopsyModal(t("نتيجة فحص السجلات"), autopsyDetectionResult(record, caseId, changed));
+      }));
+      if(["completed", "cancelled", "failed"].includes(job.state))Promise.resolve(changed()).catch(handleError);
+    }
+    if(["queued", "processing"].includes(job.state))timer = setTimeout(refresh, 1500);
+  }
+  render(initial);
+  return root;
+}
+
 window.SOCifyAutopsy.localDetection = async (caseId) => {
   const base = `/api/cases/${caseId}`;
   const params=new URLSearchParams(location.search);
@@ -120,9 +198,20 @@ window.SOCifyAutopsy.localDetection = async (caseId) => {
   root.append(linkedButton(SOCifyLocale.text("مكتبة المصادر والقواعد"), "/analysis-library"));
   root.append(table([{ label: SOCifyLocale.text("القيمة"), value: "value" }, { label: SOCifyLocale.text("النوع"), value: "type" }, { label: SOCifyLocale.text("السجلات الفعالة"), value: "occurrences" }, { label: SOCifyLocale.text("نتيجة آخر فحص"), value: (row) => `${autopsyIntelligenceStatus(row.enrichment.status)} · ${autopsyIntelligenceVerdict(row.enrichment.verdict)}` }, { label: SOCifyLocale.text("المصدر والتحقق"), value: (row) => autopsyAction(SOCifyLocale.text("تفاصيل الإثراء"), async () => { const content = autopsyEnrichmentDetails(row.enrichment); if (autopsy.current.can_update && autopsy.current.status !== "closed") content.append(autopsyAction(SOCifyLocale.text("إثراء محلي بالإصدارات الحالية"), async () => { await api(base + `/observables/${row.id}/enrich`, { method: "POST", body: {} }); await autopsyCase(caseId); })); autopsyModal(SOCifyLocale.text("مصدر نتيجة الإثراء وحدودها"), content); }) }], observables.items));
   paging("observables_page",observables);
+  const history = node("div");
+  const refreshHistory = async () => {
+    const scans = await api(base + `/detection?page=${pageOf("detections_page")}`);
+    history.replaceChildren(node("h3", { text: SOCifyLocale.text("فحوص السجلات") }), table([{ label: SOCifyLocale.text("نوع الفحص"), value: item => autopsyDetectionMode(item.mode) }, { label: SOCifyLocale.text("وقت الطلب"), value: item => formatTime(item.created_at) }, { label: SOCifyLocale.text("الحالة"), value: item => autopsyDetectionState(item.state) }, { label: SOCifyLocale.text("فتح"), value: item => autopsyAction(SOCifyLocale.text("متابعة الفحص"), async () => { const current = await api(base + `/jobs/${item.id}`); autopsyModal(SOCifyLocale.text("حالة فحص السجلات"), autopsyDetectionJob(caseId, current, refreshHistory)); }) }], scans.items));
+    const navigation = node("nav", { class: "pagination", "aria-label": SOCifyLocale.text("فحوص السجلات") });
+    for(const [page, label] of [[scans.page > 1 ? scans.page - 1 : null, "السابق"], [scans.has_next ? scans.page + 1 : null, "التالي"]])if(page) { const target = new URL(location.href); target.searchParams.set("detections_page", String(page)); navigation.append(linkedButton(SOCifyLocale.text(label), target.pathname + target.search)); }
+    if(navigation.childNodes.length)history.append(navigation);
+  };
   if (autopsy.current.can_update && autopsy.current.status !== "closed") {
-    root.append(autopsyForm({ mode: { required: true, choices: ["rules", "anomaly"] }, after_id: { integer: true, min: 0, max: Number.MAX_SAFE_INTEGER } }, async (body) => { const job = await api(base + "/detection", { method: "POST", body: { ...body, after_id: body.after_id || 0, version: autopsy.current.version } }); autopsyModal(SOCifyLocale.text("تحليل محلي في الطابور"), node("div", {}, [node("p", { text: SOCifyLocale.template`العمل ${job.id} · حد الدفعة 1000 سجل. نتائج الشذوذ تحتاج 20 سجلًا سابقًا صالحًا للـbaseline. استخدم next_after_id من النتيجة لاستكمال النطاق.` }), autopsyAction(SOCifyLocale.text("تحديث حالة العمل"), async () => { const status = await api(base + `/jobs/${job.id}`); autopsyModal(SOCifyLocale.text("حالة التحليل"), node("pre", { text: JSON.stringify(status, null, 2) })); }), linkedButton(SOCifyLocale.text("نتائج التحليل داخل القضية"), `/cases/${caseId}?tab=analysis`)])); }));
+    const form = autopsyForm({ mode: { label: SOCifyLocale.text("نوع الفحص"), required: true, choices: ["rules", "anomaly"].map(value => ({ value, label: autopsyDetectionMode(value) })) }, start_event: { label: SOCifyLocale.text("ابدأ من سجل"), reference: { kind: "event", caseId } } }, async (body) => autopsyQueueDetection(caseId, body.mode, body.start_event ? body.start_event - 1 : 0, refreshHistory), { mode: "rules" });
+    form.querySelector("[name=start_event]").placeholder = SOCifyLocale.text("كل السجلات");
+    root.append(form);
   }
+  await refreshHistory(); root.append(history);
   root.append(table([{ label: SOCifyLocale.text("التنبيه"), value: "reason" }, { label: SOCifyLocale.text("الخطر"), value: "severity" }, { label: SOCifyLocale.text("تقييم المحقق"), value: (row) => `${autopsyLabel(row.review.verdict)} · ${autopsyLabel(row.review.attack_outcome)}` }, { label: SOCifyLocale.text("مجموعة / نطاق"), value: (row) => `${row.review.group || "—"}${row.historical_derivation ? SOCifyLocale.text(" · نسخة تاريخية") : ""}${row.suppressed ? SOCifyLocale.text(" · إشعار مكبوت مؤقتًا") : ""}` }, { label: SOCifyLocale.text("المراجعة"), value: (row) => autopsyAction(SOCifyLocale.text("تفاصيل ومراجعة"), async () => {
     const content = node("div", {}, node("pre", { text: JSON.stringify({ evidence: row.evidence, trace: row.trace, review: row.review }, null, 2) }));
     if (autopsy.current.can_update && autopsy.current.status !== "closed") content.append(autopsyForm({ verdict: { required: true, choices: autopsy.catalog.verdicts }, attack_outcome: { required: true, choices: autopsy.catalog.outcomes }, group: { max: 100 }, suppressed_until: { timestamp: true }, reason: { required: true, max: 2000 } }, async (body) => { await api(base + `/alerts/${row.id}`, { method: "PATCH", body: { ...body, version: row.review_version, group: body.group || "", suppressed_until: body.suppressed_until || null } }); await autopsyCase(caseId); }, row.review));

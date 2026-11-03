@@ -49,7 +49,7 @@ def test_uploaded_case_dashboard_dossier_and_explicit_report_answers(app, langua
             page.screenshot(path=str(output / f"team-{language}-{theme}-{width}.png"), full_page=True)
             page.locator("select[name=days]").select_option("7")
             page.locator(".filter-row button[type=submit]").click()
-            page.wait_for_url("**/performance?days=7&member=team")
+            page.wait_for_url("**/performance?days=7&member=team&queue=open")
             page.locator(".insight-counters").wait_for()
             page.goto(base + "/performance?member=me&days=7")
             page.locator(".insight-counters").wait_for()
