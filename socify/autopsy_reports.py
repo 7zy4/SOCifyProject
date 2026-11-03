@@ -489,19 +489,26 @@ def transition_case(case_id: int):
 @autopsy_reports_api.get("/api/cases/<int:case_id>/jobs/<int:job_id>")
 @require_permission("cases.read")
 def get_job(case_id: int, job_id: int):
-    if not _case_row(case_id):
+    case = _case_row(case_id)
+    if not case:
         return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
     row = (
         get_db()
         .execute(
-            "SELECT id, kind, state, error_code, attempts, created_by, created_at, started_at, completed_at, available_at FROM autopsy_jobs WHERE id = ? AND case_id = ?",
+            "SELECT id, kind, state, error_code, attempts, created_by, created_at, started_at, completed_at, available_at, result FROM autopsy_jobs WHERE id = ? AND case_id = ?",
             (job_id, case_id),
         )
         .fetchone()
     )
     if not row:
         return error_response("JOB_NOT_FOUND", "العمل غير متاح", 404)
-    return jsonify(dict(row))
+    if row["kind"] == "sample":
+        from .autopsy_samples import sample_job_view
+
+        return jsonify(sample_job_view(row, case))
+    data = dict(row)
+    data.pop("result")
+    return jsonify(data)
 
 
 @autopsy_reports_api.post("/api/cases/<int:case_id>/jobs/<int:job_id>/<action>")
@@ -510,7 +517,8 @@ def job_action(case_id: int, job_id: int, action: str):
     if action not in {"cancel", "retry"}:
         return error_response("JOB_ACTION_NOT_FOUND", "الإجراء غير متاح", 404)
     with transaction():
-        if not _case_row(case_id):
+        case = _case_row(case_id)
+        if not case:
             return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
         job = get_db().execute("SELECT * FROM autopsy_jobs WHERE id = ? AND case_id = ?", (job_id, case_id)).fetchone()
         if not job:
@@ -524,8 +532,10 @@ def job_action(case_id: int, job_id: int, action: str):
                 "UPDATE autopsy_jobs SET state = 'cancelled', completed_at = ?, worker_id = NULL, lease_expires_at = NULL WHERE id = ?", (iso_now(), job_id)
             )
         else:
+            if job["kind"] == "sample" and (case["status"] == "closed" or not has_permission(current_user(), "cases.update")):
+                return error_response("ANALYSIS_NOT_ALLOWED", "إعادة التحليل تحتاج قضية مفتوحة وصلاحية تعديلها", 403)
             if job["state"] not in {"failed", "cancelled"} or job["attempts"] >= 3:
-                return error_response("JOB_STATE_CONFLICT", "أعد إعداد تقرير جديد بعد مراجعة سبب الفشل", 409)
+                return error_response("JOB_STATE_CONFLICT", "راجع سبب الفشل ثم أنشئ طلب معالجة جديدًا", 409)
             get_db().execute("UPDATE autopsy_jobs SET state = 'queued', error_code = NULL, completed_at = NULL, available_at = NULL WHERE id = ?", (job_id,))
         custody(case_id, "job_" + action, {"job_id": job_id, "kind": job["kind"]})
     return jsonify({"id": job_id, "state": "cancelled" if action == "cancel" else "queued"})

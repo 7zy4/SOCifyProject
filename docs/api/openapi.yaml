@@ -3229,7 +3229,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Inspects retained bytes without executing them. Validates the selected published YARA package in the case workspace. A matching current result returns 200 with duplicate=true without changing the case, evidence or existing reports; changed content, filename risk or rule findings create a new result."
       }
     },
     "/api/cases/{case_id}/quick-report": {
@@ -3805,7 +3806,8 @@
               "type": "integer"
             }
           }
-        ]
+        ],
+        "description": "Lists retained samples with their latest analysis job, readable processing state, result record reference and current cancel/retry capabilities. Jobs are scoped to the same case; internal parameters and sample bytes are excluded."
       },
       "post": {
         "operationId": "autopsy_samples_upload_sample_post__api_cases_case_id_samples",
@@ -4038,7 +4040,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Inspects retained bytes without executing them. Validates the selected published YARA package in the case workspace. A matching current result returns 200 with duplicate=true without changing the case, evidence or existing reports; changed content, filename risk or rule findings create a new result."
       }
     },
     "/api/cases/{case_id}/siem-connectors": {

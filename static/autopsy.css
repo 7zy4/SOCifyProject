@@ -95,3 +95,11 @@
 .choice-control .search-choice::-webkit-calendar-picker-indicator { opacity: 0; }
 .email-review > .panel[id] { scroll-margin-block-start: calc(var(--header-height, 72px) + 16px); }
 .email-record { grid-column: 1 / -1; }
+.sample-record { grid-column: 1 / -1; }
+.sample-result details { margin-block: 16px; }
+.sample-result summary { cursor: pointer; color: var(--blue); font-weight: 700; }
+.sample-result .sample-strings { max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sample-result li { overflow-wrap: anywhere; }
+.sample-upload [role=alert] { flex-basis: 100%; }
+.sample-job { display: grid; gap: 8px; min-width: 150px; }
+.sample-identity { display: grid; gap: 8px; min-width: 180px; }

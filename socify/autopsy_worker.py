@@ -171,7 +171,8 @@ def job_authorized(job):
     if not case_full_access(job["case_id"], principal):
         return False
     if job["kind"] == "sample":
-        return has_permission(principal, "cases.update")
+        status = get_db().execute("SELECT status FROM incident_cases WHERE id=?", (job["case_id"],)).fetchone()
+        return bool(status) and status["status"] != "closed" and has_permission(principal, "cases.update")
     if job["kind"] == "detection":
         return has_permission(principal, "cases.update")
     report = (
@@ -231,6 +232,7 @@ def run_autopsy_worker_once(identity="local-autopsy-worker"):
                     yara_pack={key: pack[key] for key in ("id", "name", "version", "license", "origin", "sha256")},
                 )
             analysis = compute_sample(payload)
+            analysis["filename"] = sample["filename"]
         elif job["kind"] == "detection":
             from .autopsy_detection import run_detection_job
 

@@ -6,6 +6,7 @@ function autopsyStaticVerdict(value) {
 }
 
 function autopsyStaticFileType(value) {
+  if(value === "ooxml_document")return SOCifyLocale.text("مستند Office");
   const labels = { pe_executable: "ملف Windows تنفيذي", dos_executable: "توقيع DOS تنفيذي", elf_executable: "ملف ELF تنفيذي", mach_o_executable: "ملف Mach-O تنفيذي", pdf: "مستند PDF", ole2_compound: "مستند OLE مركب", zip_container: "حاوية ZIP أو Office", rar_archive: "أرشيف RAR", "7z_archive": "أرشيف 7-Zip", gzip_archive: "أرشيف GZIP", rtf_document: "مستند RTF", lnk_shortcut: "اختصار Windows", html_document: "محتوى HTML", xml_document: "مستند XML", text_or_script: "نص أو برنامج نصي", unknown_binary: "نوع ثنائي غير معروف" };
   return SOCifyLocale.text(labels[value] || value || "لم يُحدد النوع");
 }
@@ -37,18 +38,96 @@ function autopsyEmailView(mail, watch = () => null) {
   return body;
 }
 
+function autopsySampleView(result) {
+  const t=SOCifyLocale.text;
+  const root=node("div",{class:"panel-body sample-result"});
+  if(result.verdict)root.append(node("p",{class:"notice",text:`${autopsyStaticVerdict(result.verdict)} · ${result.risk_score}/100`}));
+  const rows=[];
+  const add=(label,value)=>{if(value!==null&&value!==undefined&&value!=="")rows.push({label:t(label),value});};
+  add("الملف",result.filename);
+  add("الحجم",`${Number(result.size||0).toLocaleString(SOCifyLocale.language)} ${t("بايت")}`);
+  const observedTypes={"DOS signature; PE not yet verified":"dos_executable","PE header verified; content never executed":"pe_executable","ELF signature; content never executed":"elf_executable","ZIP-compatible container; not extracted or executed":"zip_container"};
+  const detected=result.detected_magic||observedTypes[result.file_type_observation];
+  add("النوع المكتشف",detected?autopsyStaticFileType(detected):t("نوع غير محدد"));
+  add("الامتداد المعلن",result.declared_extension);
+  add("النوع المعلن",result.declared_mime);
+  add("SHA-256",node("bdi",{dir:"ltr",text:result.sha256}));
+  root.append(table([{label:t("الحقل"),value:"label"},{label:t("القيمة"),value:"value"}],rows));
+  const flags={filename_bidi_spoofing:"محارف اتجاه قد تخفي امتداد الملف",double_extension:"امتداد مزدوج مضلل",magic_extension_mismatch:"نوع الملف لا يطابق امتداده",executable_binary:"محتوى تنفيذي",zip_bomb_ratio_warning:"نسبة ضغط أو عدد ملفات مرتفع",vba_macro_detected:"وحدات ماكرو داخل المستند",archive_contains_executable_or_script:"ملفات تنفيذية أو سكربتات داخل الأرشيف",corrupt_zip_container:"أرشيف تالف أو مشفر",pdf_active_content:"محتوى نشط داخل PDF",rtf_embedded_object:"كائن مضمّن داخل RTF",html_smuggling_indicator:"مؤشرات بناء ملف من محتوى HTML",suspicious_execution_strings:"سلاسل مرتبطة بالتنفيذ أو الحقن",high_entropy_packed_or_encrypted:"محتوى قد يكون مضغوطًا أو مشفرًا",high_window_entropy_embedded_blob:"كتلة بيانات عالية العشوائية داخل النص",yara_rule_match:"تطابق مع قواعد الفحص"};
+  if(result.flags?.length)root.append(table([{label:t("الخطورة"),value:flag=>autopsyLabel(flag.severity)},{label:t("النتيجة"),value:flag=>t(flags[flag.code]||flag.detail)}],result.flags));
+  root.append(node("h4",{text:"YARA"}),node("p",{text:result.yara_pack?.name||"EICAR"}));
+  root.append(result.yara_matches?.length ? node("ul",{},result.yara_matches.map(match=>node("li",{text:match.rule}))) : node("p",{text:t("لا تطابقات مع القواعد المختارة")}));
+  for(const [key,label] of [["extracted_urls","الروابط المرصودة"],["extracted_ips","عناوين IP"],["extracted_emails","عناوين البريد"]]) {
+    if(!result[key]?.length)continue;
+    const values=result[key].map(value=>node("li",{},node("bdi",{dir:"ltr",text:value})));
+    root.append(node("details",{},[node("summary",{text:t(label)}),node("ul",{class:"sample-observables"},values)]));
+  }
+  if(result.archive_summary?.sample_entries?.length)root.append(node("details",{},[node("summary",{text:t("محتويات الأرشيف")}),node("ul",{},result.archive_summary.sample_entries.map(value=>node("li",{text:value})))]));
+  if(result.printable_strings_first_100?.length)root.append(node("details",{},[node("summary",{text:t("النصوص المستخرجة")}),node("pre",{class:"sample-strings",tabindex:0,text:result.printable_strings_first_100.join("\n")})]));
+  return root;
+}
+
+function autopsySampleJob(caseId, initial) {
+  const t=SOCifyLocale.text;
+  const root=node("div",{class:"sample-job"});
+  let signature=null;
+  let timer;
+  async function refresh() {
+    if(!root.isConnected)return;
+    try{render(await api(`/api/cases/${caseId}/jobs/${initial.id}`));}
+    catch(error){root.replaceChildren(node("p",{role:"status",text:error.message}),button(t("تحديث النتيجة"),refresh));}
+  }
+  function render(job) {
+    clearTimeout(timer);
+    const next=JSON.stringify(job);
+    if(next!==signature) {
+      signature=next;
+      const labels={queued:"بانتظار المعالجة",processing:"تجري المعالجة",completed:"اكتمل التحليل",failed:"تعذرت المعالجة",cancelled:"أُلغيت المعالجة"};
+      root.replaceChildren(node("p",{class:"sample-job-state",role:"status",text:t(labels[job.state]||"غير متاحة")}));
+      if(job.error_code&&!["completed","cancelled"].includes(job.state))root.append(node("p",{class:"notice",text:t(job.state==="queued"?"التحليل متوقف مؤقتًا. ستتم إعادة المحاولة تلقائيًا.":job.error_code==="ACCESS_REVOKED"?"تغيرت صلاحيات التحليل أو أُغلقت القضية.":"تعذر إكمال التحليل. العينة محفوظة.")}));
+      if(job.state==="failed"&&job.attempts>=3)root.append(node("p",{text:t("انتهت محاولات التحليل. يمكنك طلب فحص جديد لاحقًا.")}));
+      const action=(label,route)=>button(t(label),async()=>{await api(`/api/cases/${caseId}/jobs/${job.id}/${route}`,{method:"POST",body:{}});await refresh();});
+      if(job.can_cancel)root.append(action("إلغاء المعالجة","cancel"));
+      if(job.can_retry)root.append(action("إعادة المحاولة","retry"));
+      if(job.state==="completed"&&job.result_record_id)root.append(button(t("عرض النتيجة"),async()=>{
+        const records=await api(`/api/cases/${caseId}/records?kind=analysis&limit=1&before=${job.result_record_id+1}`);
+        const record=records.items.find(item=>item.id===job.result_record_id);
+        if(record){root.closest("dialog")?.close();autopsyModal(t("نتيجة الفحص"),autopsySampleView(record.payload));}
+      }));
+    }
+    if(["queued","processing"].includes(job.state))timer=setTimeout(refresh,1500);
+  }
+  render(initial);
+  return root;
+}
+
 window.SOCifyAutopsy.analysis = async (caseId) => {
   const samples = await api(`/api/cases/${caseId}/samples`);
   const indicators = (await api(`/api/cases/${caseId}/records?kind=indicator&limit=100`)).items;
   const root = node("div");
+  const jobViews=new Map();
   const packs = await api("/api/autopsy/yara");
-  const packChoice = autopsyChoice("yara_pack_id", [{ value: "", label: "EICAR" }, ...packs.items.map((pack) => ({ value: pack.id, label: `${pack.name} · v${pack.version} · ${pack.license}` }))]);
+  const selectedPack=new URLSearchParams(location.search).get("yara_pack")||"";
+  const packChoice = autopsyChoice("yara_pack_id", [{ value: "", label: "EICAR" }, ...packs.items.map((pack) => ({ value: pack.id, label: packs.items.filter(other=>other.name===pack.name).length>1?`${pack.name} · ${pack.sha256.slice(0,8)}`:pack.name }))], selectedPack);
+  if(selectedPack&&!packs.items.some(pack=>String(pack.id)===selectedPack))packChoice.input.value=SOCifyLocale.text("الحزمة المختارة غير متاحة");
+  packChoice.input.addEventListener("change",()=>{
+    try{
+      const value=packChoice.input.autopsyValue();
+      const address=new URL(location.href);
+      if(value)address.searchParams.set("yara_pack",String(value));else address.searchParams.delete("yara_pack");
+      history.replaceState(history.state,"",address.pathname+address.search);
+    }catch(_){ /* The field keeps an unrecognized choice for correction. */ }
+  });
   const body = node("div", { class: "panel-body" });
   body.append(field("YARA", packChoice.control), linkedButton(SOCifyLocale.text("إدارة حزم YARA المحلية"), "/analysis-library"));
   if (permission("evidence.add") && autopsy.current.status !== "closed") {
     const file = node("input", { type: "file", required: true, name: "sample" });
+    const errors=node("p",{role:"alert",class:"notice",hidden:true});
+    const showError=error=>{errors.textContent=error.message;errors.hidden=false;};
     const quickBtn = button(SOCifyLocale.language === "ar" ? "فحص الملف" : "Inspect file", async () => {
-      if (!file.files[0]) { handleError(new Error(SOCifyLocale.text("اختر ملفًا أولًا"))); return; }
+      errors.hidden=true;
+      if (!file.files[0]) { showError(new Error(SOCifyLocale.text("اختر ملفًا أولًا"))); return; }
+      if(!file.files[0].size||file.files[0].size>10*1024*1024){showError(new Error(SOCifyLocale.text("اختر ملفًا غير فارغ لا يتجاوز 10 MiB")));return;}
       quickBtn.disabled = true;
       try {
         const data = new FormData();
@@ -56,22 +135,18 @@ window.SOCifyAutopsy.analysis = async (caseId) => {
         const selected = packChoice.input.autopsyValue();
         if (selected) data.set("yara_pack_id", String(selected));
         const res = await api(`/api/cases/${caseId}/quick-file-triage`, { method: "POST", body: data });
-        const t = res.triage;
-        autopsyModal(SOCifyLocale.language === "ar" ? "نتيجة الفحص" : "Inspection result", node("div", {}, [
-          node("p", { text: SOCifyLocale.template`الحكم الأولي: ${t.verdict} · درجة الخطورة: ${t.risk_score}/100 · البصمة الفعلية: ${t.file_type_observation}` }),
-          node("p", { text: `SHA-256: ${t.sha256}` }),
-          node("pre", { text: JSON.stringify({ flags: t.flags, urls: t.extracted_urls, ips: t.extracted_ips, emails: t.extracted_emails }, null, 2) }),
-        ]));
+        autopsyModal(SOCifyLocale.text("نتيجة الفحص"), autopsySampleView(res.triage));
         await autopsyCase(caseId);
-      } catch (error) { handleError(error); }
+      } catch (error) { showError(error); }
       finally { quickBtn.disabled = false; }
     }, "primary");
-    const form = node("form", { class: "filter-row" }, [
+    const form = node("form", { class: "filter-row sample-upload" }, [
       field(SOCifyLocale.text("عينة للفحص المحلي"), file),
       quickBtn,
       node("button", { type: "submit", class: "button ghost", text: SOCifyLocale.text("حجر العينة") }),
+      errors,
     ]);
-    form.addEventListener("submit", async (event) => { event.preventDefault(); try { const data = new FormData(); data.set("file", file.files[0]); await api(`/api/cases/${caseId}/samples`, { method: "POST", body: data }); await autopsyCase(caseId); } catch (error) { handleError(error); } });
+    form.addEventListener("submit", async (event) => { event.preventDefault(); errors.hidden=true; try { const data = new FormData(); data.set("file", file.files[0]); await api(`/api/cases/${caseId}/samples`, { method: "POST", body: data }); await autopsyCase(caseId); } catch (error) { showError(error); } });
     body.append(form);
 
     const emlFile = node("input", { type: "file", required: true, name: "eml_file", accept: ".eml,message/rfc822" });
@@ -92,23 +167,24 @@ window.SOCifyAutopsy.analysis = async (caseId) => {
     });
     body.append(emlForm);
   }
-  body.append(table([{ label: SOCifyLocale.text("العينة"), value: "filename" }, { label: "SHA-256", value: (row) => node("bdi", { text: row.sha256 }) }, { label: SOCifyLocale.text("الحجم"), value: "size" }, { label: SOCifyLocale.text("فحص فوري"), value: (row) => autopsy.current.can_update && autopsy.current.status !== "closed" ? button(SOCifyLocale.text("فحص أولي فوري"), async () => {
+  body.append(table([{ label: SOCifyLocale.text("العينة"), value: row=>{
+    const progress=node("div",{},row.last_job?autopsySampleJob(caseId,row.last_job):null);
+    jobViews.set(row.id,progress);
+    return node("div",{class:"sample-identity"},[node("bdi",{dir:"auto",text:row.filename}),progress]);
+  } }, { label: "SHA-256", value: (row) => node("bdi", { text: row.sha256 }) }, { label: SOCifyLocale.text("الحجم"), value: "size" }, { label: SOCifyLocale.text("فحص فوري"), value: (row) => autopsy.current.can_update && autopsy.current.status !=="closed" ? button(SOCifyLocale.text("فحص أولي فوري"), async () => {
     try {
-      await api(`/api/cases/${caseId}/samples/${row.id}/quick-triage`, { method: "POST", body: {} });
+      const selected=packChoice.input.autopsyValue();
+      const res=await api(`/api/cases/${caseId}/samples/${row.id}/quick-triage`, { method: "POST", body: selected?{yara_pack_id:Number(selected)}:{} });
       await autopsyCase(caseId);
+      autopsyModal(SOCifyLocale.text("نتيجة الفحص"),autopsySampleView(res.triage));
     } catch (error) { handleError(error); }
   }, "primary") : "—" }, { label: SOCifyLocale.text("الفحص"), value: (row) => autopsy.current.can_update && autopsy.current.status !== "closed" ? button(SOCifyLocale.text("تحليل ساكن محلي"), async () => {
     try {
       const selected = packChoice.input.autopsyValue();
       const queued = await api(`/api/cases/${caseId}/samples/${row.id}/analyze`, { method: "POST", body: selected ? { yara_pack_id: Number(selected) } : {} });
-      const status = node("p", { role: "status", text: SOCifyLocale.text("بانتظار التنفيذ") });
-      const dialog = autopsyModal(SOCifyLocale.text("التحليل المحلي"), node("div", {}, [status, button(SOCifyLocale.text("تحديث النتيجة"), () => { dialog.close(); autopsyCase(caseId).catch(handleError); })]));
-      let attempts = 0;
-      const poll = async () => {
-        if (!dialog.isConnected || ++attempts > 40) return;
-        try { const job = await api(`/api/cases/${caseId}/jobs/${queued.id}`); status.textContent = `${job.state}${job.error_code ? ` · ${job.error_code}` : ""}`; if (["queued", "processing"].includes(job.state)) setTimeout(poll, 1500); else if (job.state === "completed") { dialog.close(); await autopsyCase(caseId); } } catch (error) { status.textContent = error.message; }
-      };
-      setTimeout(poll, 1000);
+      const job=await api(`/api/cases/${caseId}/jobs/${queued.id}`);
+      jobViews.get(row.id)?.replaceChildren(autopsySampleJob(caseId,job));
+      autopsyModal(SOCifyLocale.text("التحليل المحلي"),autopsySampleJob(caseId,job));
     } catch (error) { handleError(error); }
   }) : "—" }, { label: SOCifyLocale.text("الأصل المحجور"), value: (row) => permission("samples.download") ? linkedButton(SOCifyLocale.text("تنزيل ثنائي للمتخصص المصرح"), `/api/cases/${caseId}/samples/${row.id}/download`) : SOCifyLocale.text("تنزيل الأصل مقيد بدور مستقل") }], samples.items));
   root.append(panel(SOCifyLocale.text("العينات والتحليل الساكن"), body, true));

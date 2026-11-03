@@ -67,6 +67,14 @@ def generate() -> dict[str, object]:
                     {"name": "page_size", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 200, "default": 100}},
                 ]
                 operation["responses"]["422"] = {"description": "Search or filter exceeds its length limit"}
+            elif path in {"/api/cases/{case_id}/quick-file-triage", "/api/cases/{case_id}/samples/{sample_id}/quick-triage"} and method == "POST":
+                operation["description"] = (
+                    "Inspects retained bytes without executing them. Validates the selected published YARA package in the case workspace. A matching current result returns 200 with duplicate=true without changing the case, evidence or existing reports; changed content, filename risk or rule findings create a new result."
+                )
+            elif path == "/api/cases/{case_id}/samples" and method == "GET":
+                operation["description"] = (
+                    "Lists retained samples with their latest analysis job, readable processing state, result record reference and current cancel/retry capabilities. Jobs are scoped to the same case; internal parameters and sample bytes are excluded."
+                )
             elif path == "/api/cases/{case_id}/email-triage" and method == "POST":
                 operation["description"] = (
                     "Inspects an uploaded EML without executing attachments or visiting URLs. An identical current result in the same case returns 200 with duplicate=true and preserves the evidence, case version and report snapshots. New content or changed inspection findings create a new result."

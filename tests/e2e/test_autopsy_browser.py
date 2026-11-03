@@ -5,7 +5,7 @@ import threading
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 from werkzeug.serving import make_server
 
 from scripts.local_services import local_worker_services
@@ -152,8 +152,11 @@ def test_local_sample_manual_reputation_and_team_assignment_browser(app):
             page.get_by_role("button", name="حجر العينة", exact=True).click()
             page.get_by_role("button", name="تحليل ساكن محلي", exact=True).wait_for()
             page.get_by_role("button", name="تحليل ساكن محلي", exact=True).click()
-            page.get_by_text("SOCify local static analysis/1", exact=True).wait_for(timeout=40000)
-            assert page.get_by_text("never executed", exact=True).count() == 1
+            page.get_by_role("dialog").get_by_role("button", name="عرض النتيجة", exact=True).click(timeout=40000)
+            expect(page.get_by_role("dialog").locator(".sample-result")).to_contain_text("SOCify_EICAR_Test_Marker")
+            analysis = page.evaluate("id => api(`/api/cases/${id}/records?kind=analysis`)", case_id)["items"][0]["payload"]
+            assert analysis["engine"] == "SOCify local static analysis/1" and analysis["execution"] == "never executed"
+            page.get_by_role("dialog").get_by_role("button", name="إغلاق", exact=True).click()
             report = {
                 "data": {
                     "id": digest,

@@ -1,5 +1,4 @@
 import base64
-import contextlib
 import hashlib
 import io
 import math
@@ -420,14 +419,17 @@ def inspect_static_bytes(
     extracted_ips = [ip for ip in dict.fromkeys(IPV4_EXTRACT_RE.findall(joined_strings)) if not ip.startswith(("0.", "127.", "255."))][:50]
     extracted_emails = list(dict.fromkeys(e.lower() for e in EMAIL_EXTRACT_RE.findall(joined_strings)))[:50]
 
-    # Local YARA check (graceful pure-Python safety)
+    # A failed rule evaluation is not a negative result.
     rules_text = yara_source if isinstance(yara_source, str) and yara_source.strip() else BUILTIN_RULES
     yara_matches: list[dict] = []
-    with contextlib.suppress(yara.Error, ValueError, OSError):
-        if len(rules_text.encode("utf-8")) <= 65536:
-            compiled = yara.compile(source=rules_text, includes=False, error_on_warning=True)
-            for m in compiled.match(data=content, timeout=3)[:50]:
-                yara_matches.append({"rule": m.rule, "tags": list(m.tags)})
+    if len(rules_text.encode("utf-8")) > 65536:
+        raise ValueError("تعذر إكمال فحص قواعد YARA")
+    try:
+        compiled = yara.compile(source=rules_text, includes=False, error_on_warning=True)
+        for m in compiled.match(data=content, timeout=3)[:50]:
+            yara_matches.append({"rule": m.rule, "tags": list(m.tags)})
+    except (yara.Error, ValueError, OSError) as exc:
+        raise ValueError("تعذر إكمال فحص قواعد YARA") from exc
     if yara_matches:
         add_flag("yara_rule_match", "critical", 75, f"تطابق مع قواعد YARA المحلية: {', '.join(m['rule'] for m in yara_matches[:5])}")
 

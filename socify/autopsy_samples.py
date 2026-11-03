@@ -6,12 +6,12 @@ from datetime import UTC, datetime
 from cryptography.fernet import InvalidToken
 from flask import Blueprint, Response, current_app, jsonify, request
 
-from .autopsy_api import insert_record
+from .autopsy_api import insert_record, manager
 from .autopsy_domain import canonical, custody, text_value
 from .cases import _case_row
 from .db import get_db, inserted_id, transaction
 from .file_names import evidence_filename
-from .security import actor_id, cipher, encrypt_secret, error_response, require_permission
+from .security import actor_id, cipher, current_user, encrypt_secret, error_response, has_permission, require_permission
 from .timeutils import iso_now
 
 autopsy_samples_api = Blueprint("autopsy_samples", __name__)
@@ -20,7 +20,8 @@ autopsy_samples_api = Blueprint("autopsy_samples", __name__)
 @autopsy_samples_api.get("/api/cases/<int:case_id>/samples")
 @require_permission("cases.read")
 def list_samples(case_id: int):
-    if not _case_row(case_id):
+    case = _case_row(case_id)
+    if not case:
         return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
     rows = (
         get_db()
@@ -30,7 +31,33 @@ def list_samples(case_id: int):
         )
         .fetchall()
     )
-    return jsonify({"items": [dict(row) for row in rows], "policy": "quarantined; never executed"})
+    jobs = (
+        get_db()
+        .execute(
+            "SELECT * FROM autopsy_jobs WHERE id IN (SELECT MAX(id) FROM autopsy_jobs WHERE case_id=? AND kind='sample' GROUP BY json_extract(parameters,'$.sample_id'))",
+            (case_id,),
+        )
+        .fetchall()
+    )
+    latest = {json.loads(job["parameters"])["sample_id"]: sample_job_view(job, case) for job in jobs}
+    return jsonify({"items": [{**dict(row), "last_job": latest.get(row["id"])} for row in rows], "policy": "quarantined; never executed"})
+
+
+def sample_job_view(job, case):
+    result = {
+        key: job[key] for key in ("id", "kind", "state", "error_code", "attempts", "created_by", "created_at", "started_at", "completed_at", "available_at")
+    }
+    control = job["created_by"] == actor_id() or manager()
+    result["can_cancel"] = control and job["state"] in {"queued", "processing"}
+    result["can_retry"] = (
+        control
+        and job["state"] in {"cancelled", "failed"}
+        and job["attempts"] < 3
+        and case["status"] != "closed"
+        and has_permission(current_user(), "cases.update")
+    )
+    result["result_record_id"] = json.loads(job["result"] or "{}").get("record_id")
+    return result
 
 
 @autopsy_samples_api.post("/api/cases/<int:case_id>/samples")
@@ -312,6 +339,58 @@ def quarantine_or_get_sample(case_id: int, original_name: str, content: bytes, s
     return sample_id, evidence_id, digest, False
 
 
+def _triage_pack(case, identifier):
+    if identifier is None or identifier == "":
+        return None
+    if isinstance(identifier, bool) or not str(identifier).isdigit() or not 1 <= int(identifier) <= 9223372036854775807:
+        raise ValueError("اختر حزمة YARA منشورة")
+    pack = (
+        get_db()
+        .execute("SELECT id,name,version,sha256,source FROM autopsy_yara_packs WHERE id=? AND workspace_id=?", (int(identifier), case["workspace_id"]))
+        .fetchone()
+    )
+    if not pack:
+        raise LookupError("الحزمة غير متاحة في الفريق")
+    if hashlib.sha256(pack["source"].encode()).hexdigest() != pack["sha256"]:
+        raise ValueError("تعذر التحقق من سلامة حزمة YARA")
+    return pack
+
+
+def _retain_triage(case_id, sample_id, evidence_id, triage, duplicate_sample=True):
+    payload = {
+        "title": f"Quick Static Triage · {triage['filename'][:180]}",
+        "method": "quick_static_triage",
+        "sample_id": sample_id,
+        "evidence_id": evidence_id,
+        **triage,
+    }
+    prior = (
+        get_db()
+        .execute("SELECT id FROM autopsy_records WHERE case_id=? AND kind='analysis' AND payload=? ORDER BY id DESC LIMIT 1", (case_id, canonical(payload)))
+        .fetchone()
+    )
+    if prior:
+        identifier = prior["id"]
+    else:
+        identifier = insert_record(case_id, "analysis", payload)
+        custody(
+            case_id,
+            "quick_static_triage_completed",
+            {"sample_id": sample_id, "analysis_id": identifier, "sha256": triage["sha256"], "verdict": triage["verdict"], "risk_score": triage["risk_score"]},
+        )
+    return jsonify(
+        {
+            "id": identifier,
+            "analysis_id": identifier,
+            "sample_id": sample_id,
+            "evidence_id": evidence_id,
+            "duplicate_sample": duplicate_sample,
+            "duplicate": bool(prior),
+            "triage": payload,
+        }
+    ), 200 if prior else 201
+
+
 @autopsy_samples_api.post("/api/cases/<int:case_id>/quick-file-triage")
 @require_permission("evidence.add")
 def quick_file_triage(case_id: int):
@@ -328,20 +407,18 @@ def quick_file_triage(case_id: int):
         content = upload.stream.read(maximum + 1)
         if not content or len(content) > maximum:
             raise ValueError("الملف فارغ أو يتجاوز الحد المسموح (10 MiB)")
-        yara_source = None
         raw_pack_id = request.form.get("yara_pack_id")
         case = _case_row(case_id)
         if not case:
             return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
         if case["status"] == "closed":
             return error_response("CASE_CLOSED", "القضية مغلقة", 409)
-        if raw_pack_id:
-            pack = (
-                get_db().execute("SELECT rules FROM autopsy_yara_packs WHERE id = ? AND workspace_id = ?", (int(raw_pack_id), case["workspace_id"])).fetchone()
-            )
-            if pack:
-                yara_source = pack["rules"]
-        triage = inspect_static_bytes(original_name, content, upload.mimetype, yara_source=yara_source)
+        pack = _triage_pack(case, raw_pack_id)
+        triage = inspect_static_bytes(original_name, content, upload.mimetype, yara_source=pack["source"] if pack else None)
+        if pack:
+            triage["yara_pack"] = {key: pack[key] for key in ("id", "name", "version", "sha256")}
+    except LookupError as exc:
+        return error_response("YARA_PACK_NOT_FOUND", str(exc), 404)
     except ValueError as exc:
         return error_response("INVALID_SAMPLE", str(exc), 422)
 
@@ -352,32 +429,7 @@ def quick_file_triage(case_id: int):
         if case["status"] == "closed":
             return error_response("CASE_CLOSED", "القضية مغلقة", 409)
         sample_id, evidence_id, digest, duplicate_sample = quarantine_or_get_sample(case_id, original_name, content, "quick_file_triage")
-        payload = {
-            "title": f"Quick Static Triage · {original_name[:180]}",
-            "method": "quick_static_triage",
-            "sample_id": sample_id,
-            "evidence_id": evidence_id,
-            **triage,
-        }
-        analysis_id = insert_record(case_id, "analysis", payload)
-        custody(
-            case_id,
-            "quick_static_triage_completed",
-            {"sample_id": sample_id, "analysis_id": analysis_id, "sha256": digest, "verdict": triage["verdict"], "risk_score": triage["risk_score"]},
-        )
-    return (
-        jsonify(
-            {
-                "id": analysis_id,
-                "analysis_id": analysis_id,
-                "sample_id": sample_id,
-                "evidence_id": evidence_id,
-                "duplicate_sample": duplicate_sample,
-                "triage": payload,
-            }
-        ),
-        201,
-    )
+        return _retain_triage(case_id, sample_id, evidence_id, triage, duplicate_sample)
 
 
 @autopsy_samples_api.post("/api/cases/<int:case_id>/samples/<int:sample_id>/quick-triage")
@@ -390,6 +442,15 @@ def quick_triage_existing_sample(case_id: int, sample_id: int):
         return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
     if case["status"] == "closed":
         return error_response("CASE_CLOSED", "القضية مغلقة", 409)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or set(data) - {"yara_pack_id"}:
+        return error_response("INVALID_ANALYSIS", "أرسل كائنًا فارغًا أو رقم حزمة YARA محلية منشورة", 422)
+    try:
+        pack = _triage_pack(case, data.get("yara_pack_id"))
+    except LookupError as exc:
+        return error_response("YARA_PACK_NOT_FOUND", str(exc), 404)
+    except ValueError as exc:
+        return error_response("INVALID_ANALYSIS", str(exc), 422)
     row = get_db().execute("SELECT * FROM autopsy_samples WHERE case_id = ? AND id = ?", (case_id, sample_id)).fetchone()
     if not row:
         return error_response("SAMPLE_NOT_FOUND", "العينة غير متاحة", 404)
@@ -404,19 +465,23 @@ def quick_triage_existing_sample(case_id: int, sample_id: int):
     if ev_row and ev_row["provenance"]:
         with contextlib.suppress(json.JSONDecodeError):
             original_name = json.loads(ev_row["provenance"]).get("original_filename") or original_name
-    triage = inspect_static_bytes(original_name, content)
-    with transaction():
-        payload = {
-            "title": f"Quick Static Triage · {original_name[:180]}",
-            "method": "quick_static_triage",
-            "sample_id": sample_id,
-            "evidence_id": row["evidence_id"],
-            **triage,
-        }
-        analysis_id = insert_record(case_id, "analysis", payload)
-        custody(
-            case_id,
-            "quick_static_triage_completed",
-            {"sample_id": sample_id, "analysis_id": analysis_id, "sha256": row["sha256"], "verdict": triage["verdict"], "risk_score": triage["risk_score"]},
+    previous = (
+        get_db()
+        .execute(
+            "SELECT payload FROM autopsy_records WHERE case_id=? AND kind='analysis' AND json_extract(payload,'$.sample_id')=? AND json_extract(payload,'$.method')='quick_static_triage' AND json_extract(payload,'$.filename')=? ORDER BY id DESC LIMIT 1",
+            (case_id, sample_id, original_name),
         )
-    return jsonify({"id": analysis_id, "analysis_id": analysis_id, "sample_id": sample_id, "evidence_id": row["evidence_id"], "triage": payload}), 201
+        .fetchone()
+    )
+    mime = json.loads(previous["payload"]).get("declared_mime") if previous else None
+    try:
+        triage = inspect_static_bytes(original_name, content, mime, yara_source=pack["source"] if pack else None)
+    except ValueError as exc:
+        return error_response("INVALID_ANALYSIS", str(exc), 422)
+    if pack:
+        triage["yara_pack"] = {key: pack[key] for key in ("id", "name", "version", "sha256")}
+    with transaction():
+        case = _case_row(case_id)
+        if not case or case["status"] == "closed":
+            return error_response("CASE_CLOSED", "القضية مغلقة أو غير متاحة", 409)
+        return _retain_triage(case_id, sample_id, row["evidence_id"], triage)
