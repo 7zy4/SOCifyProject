@@ -189,6 +189,22 @@ def custody(case_id: int, action: str, details: dict[str, Any], actor: int | Non
     record_audit(get_db(), action, "autopsy_case", case_id, details=details, actor=principal, workspace=owner["workspace_id"])
 
 
+def member_has_open_work(case_id: int, user_id: int) -> bool:
+    return (
+        get_db()
+        .execute(
+            "SELECT 1 FROM case_tasks WHERE case_id=? AND assignee=? AND status NOT IN ('completed','reviewed') "
+            "UNION ALL SELECT 1 FROM team_log_assignments WHERE case_id=? AND assignee=? AND state!='completed' "
+            "UNION ALL SELECT 1 FROM autopsy_records WHERE case_id=? AND "
+            "((kind='corrective' AND json_extract(payload,'$.owner_id')=? AND json_extract(payload,'$.status')!='validated') "
+            "OR (kind='escalation' AND json_extract(payload,'$.to_user')=? AND json_extract(payload,'$.status') IN ('raised','acknowledged'))) LIMIT 1",
+            (case_id, user_id, case_id, user_id, case_id, user_id, user_id),
+        )
+        .fetchone()
+        is not None
+    )
+
+
 def touch_case(case_id: int) -> None:
     get_db().execute("UPDATE incident_cases SET updated_at = ?, version = version + 1 WHERE id = ?", (iso_now(), case_id))
 

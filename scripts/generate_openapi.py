@@ -75,6 +75,36 @@ def generate() -> dict[str, object]:
                         "422": {"description": "Invalid source data or retry key"},
                     }
                 )
+            elif path == "/api/cases/{case_id}/members/{user_id}" and method == "DELETE":
+                operation["summary"] = "Revoke a member's access to one case"
+                operation["description"] = (
+                    "Requires an operational case and a manager with cases.assign. "
+                    "The current case version and a reason are required. Transfer open ownership, tasks, assignments, "
+                    "corrective work and pending escalations before revocation. Manager-wide access cannot be removed here. "
+                    "Removes case membership and explicit batch grants for this case only, preserving account access, "
+                    "other cases and completed history. Audit and revocation commit atomically. "
+                    "A retry after removal returns success without duplicate audit. A subsequent grant must pass the version guard."
+                )
+                operation["requestBody"] = {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "required": ["version", "reason"],
+                                "properties": {"version": {"type": "integer", "minimum": 1}, "reason": {"type": "string", "minLength": 1, "maxLength": 1000}},
+                            }
+                        }
+                    },
+                }
+                operation["responses"].update(
+                    {
+                        "404": {"description": "Case or member unavailable"},
+                        "409": {"description": "Case changed, open responsibility or inherited access"},
+                        "422": {"description": "Invalid reason or case version"},
+                    }
+                )
             elif path == "/api/profile/display-name":
                 operation["summary"] = "Save the authenticated user's display names"
                 operation["requestBody"] = {

@@ -460,7 +460,7 @@ def deactivate_member(user_id: int):
 @teams_api.post("/api/cases/<int:case_id>/handoff")
 @login_required
 def shift_handoff(case_id: int):
-    from .autopsy_domain import custody, text_value, touch_case
+    from .autopsy_domain import custody, member_has_open_work, text_value, touch_case
     from .cases import _case_row
 
     if not operational_mode() or not manager() or not all(has_permission(current_user(), permission) for permission in ("cases.update", "cases.assign")):
@@ -496,7 +496,7 @@ def shift_handoff(case_id: int):
         )
         if not member or not replacement:
             return error_response("HANDOFF_MEMBER_NOT_FOUND", "المسؤول أو البديل غير متاح في الفريق", 422)
-        if member["responsibility"] == "previous_shift":
+        if member["responsibility"] == "previous_shift" and case["assignee"] != source and not member_has_open_work(case_id, source):
             return error_response("HANDOFF_ALREADY_COMPLETED", "هذا العضو سلم مناوبته بالفعل؛ حدد المسؤول الحالي", 409)
         principal = dict(replacement)
         policy = (
@@ -517,6 +517,8 @@ def shift_handoff(case_id: int):
         if duplicate:
             return error_response("HANDOFF_ASSIGNMENT_CONFLICT", "البديل لديه إسناد لهذه الدفعة؛ عالج الإسناد الحالي أولًا", 409)
         responsibility = get_db().execute("SELECT responsibility FROM autopsy_case_members WHERE case_id=? AND user_id=?", (case_id, source)).fetchone()[0]
+        if responsibility == "previous_shift":
+            responsibility = "owner" if case["assignee"] == source else "investigator"
         get_db().execute(
             "INSERT INTO autopsy_case_members(case_id,user_id,responsibility,assigned_by,assigned_at) VALUES (?,?,?,?,?) ON CONFLICT(case_id,user_id) DO UPDATE SET responsibility=excluded.responsibility,assigned_by=excluded.assigned_by,assigned_at=excluded.assigned_at",
             (case_id, target, responsibility, actor_id(), iso_now()),

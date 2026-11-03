@@ -4,7 +4,7 @@ from typing import Any
 
 from flask import Blueprint, jsonify, request
 
-from .autopsy_domain import KINDS, canonical, custody, text_value, touch_case, validate_record
+from .autopsy_domain import KINDS, canonical, custody, member_has_open_work, text_value, touch_case, validate_record
 from .case_counts import cached_case_count, consistent_read
 from .cases import _case_row, _case_view, create_case, list_cases
 from .db import get_db, inserted_id, transaction
@@ -626,6 +626,52 @@ def case_member(case_id: int):
         custody(case_id, "member_assigned", {"user_id": data["user_id"], "responsibility": data["responsibility"]})
         touch_case(case_id)
     return case_summary(case_id)
+
+
+@autopsy_api.delete("/api/cases/<int:case_id>/members/<int:user_id>")
+@require_permission("cases.assign")
+def remove_case_member(case_id: int, user_id: int):
+    from .operational import operational_mode
+
+    if not operational_mode() or not manager():
+        return error_response("PERMISSION_DENIED", "سحب وصول القضية للمدير المخول فقط", 403)
+    data = request.get_json(silent=True)
+    try:
+        if not isinstance(data, dict) or set(data) != {"version", "reason"}:
+            raise ValueError("حدد سبب سحب الوصول وحالة القضية الحالية")
+        if type(data["version"]) is not int or not 1 <= data["version"] <= 9223372036854775807:
+            raise ValueError("حدد سبب سحب الوصول وحالة القضية الحالية")
+        reason = text_value(data["reason"], 1000, True)
+    except ValueError as exc:
+        return error_response("INVALID_MEMBER_REMOVAL", str(exc), 422)
+    with transaction():
+        case = _case_row(case_id)
+        if not case:
+            return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
+        if not 1 <= user_id <= 9223372036854775807:
+            return error_response("MEMBER_NOT_FOUND", "العضو غير متاح", 404)
+        user = get_db().execute("SELECT role FROM users WHERE id=? AND workspace_id=?", (user_id, workspace_id())).fetchone()
+        if not user:
+            return error_response("MEMBER_NOT_FOUND", "العضو غير متاح", 404)
+        if user["role"] in {"admin", "soc_manager"}:
+            return error_response("INHERITED_CASE_ACCESS", "صلاحية المدير تشمل جميع القضايا؛ غيّر دوره من إدارة الفريق أولًا", 409)
+        if not get_db().execute("SELECT 1 FROM autopsy_case_context WHERE case_id=?", (case_id,)).fetchone():
+            return error_response("LEGACY_CASE_ACCESS", "تتطلب هذه القضية مراجعة صلاحياتها قبل سحب الوصول", 409)
+        member = get_db().execute("SELECT responsibility FROM autopsy_case_members WHERE case_id=? AND user_id=?", (case_id, user_id)).fetchone()
+        # A lost acknowledgement can be retried. A subsequent grant creates a new
+        # membership and must still pass the original case-version guard below.
+        if not member:
+            return jsonify({"removed": True, "user_id": user_id})
+        if case["version"] != data["version"]:
+            return error_response("CASE_VERSION_CONFLICT", "تغيرت القضية؛ حدّث قبل الحفظ", 409)
+        owns_open_case = case["status"] != "closed" and (case["assignee"] == user_id or member["responsibility"] == "owner")
+        if member_has_open_work(case_id, user_id) or owns_open_case:
+            return error_response("CASE_MEMBER_HAS_WORK", "سلّم مسؤوليات العضو عبر تسليم المناوبة قبل سحب وصوله", 409)
+        get_db().execute("DELETE FROM autopsy_batch_members WHERE user_id=? AND job_id IN (SELECT id FROM ingestion_jobs WHERE case_id=?)", (user_id, case_id))
+        get_db().execute("DELETE FROM autopsy_case_members WHERE case_id=? AND user_id=?", (case_id, user_id))
+        custody(case_id, "member_access_revoked", {"user_id": user_id, "responsibility": member["responsibility"], "reason": reason})
+        touch_case(case_id)
+    return jsonify({"removed": True, "user_id": user_id})
 
 
 @autopsy_api.get("/api/cases/<int:case_id>/custody")

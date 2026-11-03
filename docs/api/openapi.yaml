@@ -2940,6 +2940,80 @@
         }
       }
     },
+    "/api/cases/{case_id}/members/{user_id}": {
+      "delete": {
+        "operationId": "autopsy_remove_case_member_delete__api_cases_case_id_members_user_id",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Case or member unavailable"
+          },
+          "409": {
+            "description": "Case changed, open responsibility or inherited access"
+          },
+          "422": {
+            "description": "Invalid reason or case version"
+          }
+        },
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "summary": "Revoke a member's access to one case",
+        "description": "Requires an operational case and a manager with cases.assign. The current case version and a reason are required. Transfer open ownership, tasks, assignments, corrective work and pending escalations before revocation. Manager-wide access cannot be removed here. Removes case membership and explicit batch grants for this case only, preserving account access, other cases and completed history. Audit and revocation commit atomically. A retry after removal returns success without duplicate audit. A subsequent grant must pass the version guard.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "version",
+                  "reason"
+                ],
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/cases/{case_id}/network-insights": {
       "get": {
         "operationId": "autopsy_insights_network_insights_get__api_cases_case_id_network-insights",
