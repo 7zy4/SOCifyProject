@@ -6,14 +6,10 @@
 
 [البدء](#البدء) · [المميزات](docs/features.md) · [دليل المحلل](docs/analyst-guide.md) · [التشغيل](docs/operations.md) · [الأمان](SECURITY.md)
 
-![لوحة أداء الفريق باللغة العربية والوضع الداكن](docs/images/performance-ar-dark.png)
-
-<details>
-<summary>عرض الواجهة الإنجليزية والوضع الفاتح</summary>
-
 ![لوحة أداء الفريق باللغة الإنجليزية والوضع الفاتح](docs/images/performance-en-light.png)
 
-</details>
+![لوحة أداء الفريق باللغة العربية والوضع الداكن](docs/images/performance-ar-dark.png)
+
 
 ## من السجل إلى التقرير
 
