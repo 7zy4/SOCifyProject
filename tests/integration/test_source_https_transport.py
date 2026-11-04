@@ -43,6 +43,18 @@ def tls_source(tmp_path, monkeypatch):
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             requests.append({"path": self.path, "host": self.headers["Host"], "authorization": self.headers.get("Authorization")})
+            if self.path == "/provider-status" and responses.get("status", 200) != 200:
+                body = responses.get("error_body", b'{"title":"Provider error document"}')
+                self.send_response(responses["status"])
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                if responses["status"] == 302:
+                    self.send_header("Location", f"https://siem.example:{self.server.server_port}/events")
+                if responses["status"] == 429:
+                    self.send_header("Retry-After", "1")
+                self.end_headers()
+                self.wfile.write(body)
+                return
             if self.path in {"/slow-headers", "/slow-chunk-header"}:
                 prefix = (
                     b"HTTP/1.1 200 OK\r\nX-Source: " if self.path == "/slow-headers" else b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1;extension="
@@ -175,6 +187,17 @@ def test_wrong_certificate_hostname_is_rejected_before_credentials_are_sent(tls_
 def test_truncated_response_does_not_masquerade_as_a_complete_event_batch(tls_source):
     with pytest.raises(ValidationError):
         fetch_source_bytes(tls_source["url"] + "/truncated", {}, {"siem.example"}, 1024)
+    assert len(tls_source["requests"]) == 1
+
+
+@pytest.mark.parametrize(
+    ("status", "message"),
+    [(302, "رابط المصدر يعيد التوجيه"), (429, "المصدر يقيّد معدل الطلبات")],
+)
+def test_provider_status_explains_recovery_without_accepting_its_json(tls_source, status, message):
+    tls_source["responses"].update(status=status, error_body=b'{"title":"Importable-looking provider error"}')
+    with pytest.raises(ValidationError, match=message):
+        fetch_source_bytes(tls_source["url"] + "/provider-status", {}, {"siem.example"}, 1024)
     assert len(tls_source["requests"]) == 1
 
 

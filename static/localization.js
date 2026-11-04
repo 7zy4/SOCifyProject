@@ -21,6 +21,8 @@
   "تعذر حل اسم المضيف": "The source hostname could not be resolved",
   "عنوان المضيف محجوب بواسطة سياسة الشبكة": "The source address is blocked by network policy",
   "تعذر سحب السجلات من المصدر؛ تحقق من الاتصال والصلاحيات": "Could not retrieve source logs; check the connection and access permissions",
+  "رابط المصدر يعيد التوجيه؛ حدّثه إلى الرابط المباشر": "The source redirects; update it to the direct address",
+  "المصدر يقيّد معدل الطلبات؛ أعد المحاولة لاحقًا": "The source is limiting requests; try again later",
   "التحقق من الدليل الأساسي": "Validate primary evidence",
   "توثيق قرار الاستجابة": "Document response decision",
   "معرف إعادة المحاولة أو بيانات القضية غير صالحة": "The retry identifier or case data is invalid",

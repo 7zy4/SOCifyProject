@@ -147,6 +147,10 @@ def fetch_source_bytes(endpoint: str, headers: dict[str, str], allowed_hosts: se
         connection.request("GET", target.path, headers={"Accept": "application/json, text/plain", "Connection": "close", **headers})
         connection.limit_read_time()
         with connection.getresponse() as response:
+            if 300 <= response.status < 400:
+                raise ValidationError("رابط المصدر يعيد التوجيه؛ حدّثه إلى الرابط المباشر")
+            if response.status == 429:
+                raise ValidationError("المصدر يقيّد معدل الطلبات؛ أعد المحاولة لاحقًا")
             if not 200 <= response.status < 300:
                 raise ValidationError("تعذر سحب السجلات من المصدر؛ تحقق من الاتصال والصلاحيات")
             body = bytearray()
