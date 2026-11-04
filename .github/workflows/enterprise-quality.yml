@@ -93,6 +93,7 @@ jobs:
           cache: pip
       - run: python -m pip install -r requirements.txt -r requirements-dev.txt
       - run: python -m playwright install --with-deps chromium
+      - run: sudo apt-get update && sudo apt-get install --yes poppler-utils
       - run: npm install --no-save --ignore-scripts axe-core@4.14.0
       - uses: ./.github/actions/analysis-backend
       - run: xvfb-run --auto-servernum --server-args="-screen 0 1600x1200x24" python -m pytest -m e2e tests/e2e --junitxml=artifacts/browser-junit.xml
@@ -147,6 +148,9 @@ jobs:
             artifacts/usability_campaign/calendar-decisions/
             artifacts/usability_campaign/scope-continuity-decisions/
             artifacts/usability_campaign/source-provider-decisions/
+            artifacts/usability_campaign/followup-decisions/
+            artifacts/usability_campaign/native-delivery-decisions/
+            artifacts/usability_campaign/occurrence-user-decisions/
             work/interface-review/
       - if: always()
         run: docker rm --force socify-ci-analysis

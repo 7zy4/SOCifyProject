@@ -261,7 +261,10 @@ def preview_note(j, text):
         collapsed = data.locator("details:not([open]) > summary:visible")
         if not collapsed.count():
             break
-        collapsed.first.click()
+        summary = collapsed.first.element_handle()
+        assert summary is not None
+        summary.click()
+        j.page.wait_for_function("summary => summary.parentElement.open && summary.parentElement.children.length > 1", arg=summary)
     expect(data.get_by_text(text, exact=True)).to_be_visible()
 
 

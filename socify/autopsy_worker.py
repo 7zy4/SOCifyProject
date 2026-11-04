@@ -18,7 +18,7 @@ from .autopsy_domain import canonical, custody
 from .db import database_is_busy, get_db, transaction
 from .operational import case_visible
 from .security import cipher, has_permission
-from .timeutils import iso_now, utc_now
+from .timeutils import iso_now, parse_timestamp, utc_now
 
 
 def deny_network(*args, **kwargs):
@@ -149,7 +149,30 @@ def claim_job_locked(identity):
             "UPDATE autopsy_jobs SET state = 'processing', attempts = attempts + 1, worker_id = ?, lease_expires_at = ?, started_at = COALESCE(started_at, ?), error_code = NULL WHERE id = ?",
             (identity, lease, now, job["id"]),
         )
-        return dict(job)
+        return dict(get_db().execute("SELECT * FROM autopsy_jobs WHERE id=?", (job["id"],)).fetchone())
+
+
+class JobClaimLostError(RuntimeError):
+    """The work belongs to an expired, cancelled or superseded claim."""
+
+
+def current_job_claim(job):
+    """Validate the complete claim; callers that write must hold a transaction."""
+    current = (
+        get_db()
+        .execute(
+            "SELECT * FROM autopsy_jobs WHERE id=? AND state='processing' AND worker_id=? AND attempts=? AND lease_expires_at=?",
+            (job["id"], job["worker_id"], job["attempts"], job["lease_expires_at"]),
+        )
+        .fetchone()
+    )
+    if current:
+        try:
+            if parse_timestamp(current["lease_expires_at"]) > utc_now():
+                return current
+        except ValueError:
+            return None
+    return None
 
 
 def job_authorized(job):
@@ -192,6 +215,8 @@ def run_autopsy_worker_once(identity="local-autopsy-worker"):
     job = claim_job(identity)
     if not job:
         return None
+    if job["worker_id"] != identity or not current_job_claim(job):
+        return job["id"]
     error, files, analysis = None, None, None
     try:
         if not job_authorized(job):
@@ -239,6 +264,8 @@ def run_autopsy_worker_once(identity="local-autopsy-worker"):
             analysis = run_detection_job(job)
         else:
             raise ValueError("Unknown local analysis job")
+    except JobClaimLostError:
+        return job["id"]
     except Exception as exc:
         current_app.logger.error("autopsy_job_failed id=%s error_type=%s", job["id"], type(exc).__name__)
         error = (
@@ -251,7 +278,7 @@ def run_autopsy_worker_once(identity="local-autopsy-worker"):
             else "LOCAL_RENDER_FAILED"
         )
     with transaction():
-        current = get_db().execute("SELECT * FROM autopsy_jobs WHERE id = ? AND worker_id = ? AND state = 'processing'", (job["id"], identity)).fetchone()
+        current = current_job_claim(job)
         if not current:
             return job["id"]
         if not job_authorized(job):

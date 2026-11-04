@@ -1,6 +1,7 @@
 import hashlib
 import json
 import re
+from contextlib import suppress
 from datetime import timedelta
 
 from flask import Blueprint, jsonify, request
@@ -269,11 +270,40 @@ def queue_detection(case_id):
     return jsonify({"id": identifier, "state": "queued", "batch_limit": 1000}), 202
 
 
+def _rule_policy_fingerprint(rules):
+    """Bind rule identity and decision inputs, excluding runtime counters and JSON formatting."""
+    fields = ("id", "workspace_id", "name", "version", "condition_type", "condition_value", "dsl_json", "action_type", "action_value")
+    material = []
+    for rule in rules:
+        item = {key: rule[key] for key in fields}
+        for key in ("condition_value", "dsl_json", "action_value"):
+            # Invalid persisted rules remain attributable; the evaluator handles them.
+            with suppress(ValueError, TypeError):
+                item[key] = json.loads(item[key]) if item[key] else item[key]
+        material.append(item)
+    ordered = sorted(material, key=lambda item: item["id"])
+    return hashlib.sha256(canonical({"domain": "socify.detection.active_rules", "rules": ordered}).encode()).hexdigest()
+
+
+def _execution_rules(owner, has_events):
+    """Mirror evaluate_rules eligibility and lazy seeding under the caller's write lock."""
+    query = "SELECT * FROM rules WHERE workspace_id = ? AND is_active = 1 AND archived_at IS NULL ORDER BY id LIMIT 500"
+    rules = get_db().execute(query, (owner,)).fetchall()
+    if has_events and not any(str(rule["name"]).startswith("[SOCify]") for rule in rules):
+        from .builtin_rules import seed_builtin_rules
+
+        if seed_builtin_rules(get_db()):
+            rules = get_db().execute(query, (owner,)).fetchall()
+    return rules
+
+
 def run_detection_job(job):
-    from .autopsy_worker import job_authorized
+    from .autopsy_worker import JobClaimLostError, current_job_claim, job_authorized
 
     parameters = json.loads(job["parameters"])
     with transaction():
+        if not current_job_claim(job):
+            raise JobClaimLostError("Detection claim is no longer current")
         case = get_db().execute("SELECT * FROM incident_cases WHERE id=?", (job["case_id"],)).fetchone()
         if not job_authorized(job) or case["status"] == "closed" or case["version"] != parameters["case_version"]:
             raise PermissionError("Detection scope changed before execution")
@@ -290,6 +320,8 @@ def run_detection_job(job):
         if parameters["mode"] == "rules":
             from .content_inspection import inspect_event_fields
 
+            policy_rules = _execution_rules(case["workspace_id"], bool(batch))
+            policy_fingerprint = _rule_policy_fingerprint(policy_rules)
             for event in batch:
                 retained = get_db().execute("SELECT raw_data,normalized_fields,description FROM security_events WHERE id=?", (event["id"],)).fetchone()
                 fields = inspect_event_fields(retained["raw_data"], json.loads(retained["normalized_fields"]), retained["description"])
@@ -300,6 +332,28 @@ def run_detection_job(job):
                     "INSERT OR IGNORE INTO case_alerts(case_id,alert_id,attached_by,attached_at) VALUES (?,?,?,?)",
                     (job["case_id"], alert_id, job["created_by"], iso_now()),
                 )
+            # The retained job binds this receipt to its result record. No rule source,
+            # name, version list or secret-bearing configuration leaves the hash input.
+            if not current_job_claim(job):
+                raise JobClaimLostError("Detection claim expired during evaluation")
+            custody(
+                job["case_id"],
+                "detection",
+                {
+                    "job_id": job["id"],
+                    "attempt": job["attempts"],
+                    "policy_sha256": policy_fingerprint,
+                    "rule_count": len(policy_rules),
+                    "scope": {
+                        "case_version": parameters["case_version"],
+                        "after_id": parameters["after_id"],
+                        "through_id": parameters["through_id"],
+                        "evaluated_events": len(batch),
+                        "event_ids_sha256": hashlib.sha256(canonical([event["id"] for event in batch]).encode()).hexdigest(),
+                    },
+                },
+                actor=job["created_by"],
+            )
         elif batch:
             baseline = (
                 get_db()
