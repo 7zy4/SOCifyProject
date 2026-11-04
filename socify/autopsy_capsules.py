@@ -40,6 +40,7 @@ CASE_TABLES = (
     "case_technique_annotations",
     "autopsy_case_members",
     "autopsy_case_imports",
+    "autopsy_event_occurrences",
     "autopsy_records",
     "autopsy_custody",
     "autopsy_reports",
@@ -304,7 +305,7 @@ def inspect_capsule(content):
         or not isinstance(data["case"], dict)
         or not isinstance(data["context"], dict)
         or not isinstance(data["tables"], dict)
-        or set(data["tables"]) != set(CASE_TABLES)
+        or set(data["tables"]) not in (set(CASE_TABLES), set(CASE_TABLES) - {"autopsy_event_occurrences"})
     ):
         raise ValidationError("مخطط بيانات القضية غير مدعوم")
     for key in ("revisions", "events", "event_links", "alerts", "alert_links", "alert_events", "actors", "imports", "import_errors", "samples"):
@@ -352,6 +353,24 @@ def inspect_capsule(content):
     event_ids = {row["id"] for row in data["events"]}
     if any(row.get("event_id") not in event_ids for row in data["event_links"]):
         raise ValidationError("علاقة سجل الحزمة غير صالحة")
+    import_ids = {row["id"] for row in data["imports"]}
+    occurrence_keys = set()
+    for row in data["tables"].get("autopsy_event_occurrences", []):
+        if (
+            type(row.get("job_id")) is not int
+            or row["job_id"] not in import_ids
+            or type(row.get("event_id")) is not int
+            or row["event_id"] not in event_ids
+            or not isinstance(row.get("row_key"), str)
+            or not 1 <= len(row["row_key"]) <= 2000
+            or row.get("disposition") not in {"accepted", "repeated"}
+            or not isinstance(decode_json(row.get("provenance")), dict)
+        ):
+            raise ValidationError("علاقة أصل السجل غير صالحة")
+        occurrence_key = (row["job_id"], row["row_key"])
+        if occurrence_key in occurrence_keys:
+            raise ValidationError("علاقة أصل السجل مكررة")
+        occurrence_keys.add(occurrence_key)
     for row in data["imports"]:
         if f"originals/{row['id']}.bin" not in files and row.get("raw_size", 0):
             raise ValidationError("أصل استيراد مفقود")
@@ -440,6 +459,20 @@ def restore_capsule(content, manifest, data, files):
         values = {
             key: value for key, value in source.items() if key not in {"id", "source_id", "training_run_id", "worker_id", "lease_expires_at", "available_at"}
         }
+        previous_options = decode_json(source.get("autopsy_options") or "{}")
+        if not isinstance(previous_options, dict):
+            raise ValidationError("إعدادات أصل الاستيراد غير صالحة")
+        restored_options = {
+            key: previous_options[key]
+            for key in ("mapping", "source_timezone", "source_year", "source_label", "encoding", "delimiter")
+            if key in previous_options
+        }
+        disconnected = source.get("source_id") is not None or (
+            "capsule_source_job" in previous_options and previous_options.get("capsule_source_kind") != "declared"
+        )
+        restored_options.update(
+            capsule_source_job=identifier, source_sha256=digest(content), capsule_source_kind="disconnected" if disconnected else "declared"
+        )
         values.update(
             case_id=case_id,
             workspace_id=workspace_id(),
@@ -448,7 +481,7 @@ def restore_capsule(content, manifest, data, files):
             executor_id=principal,
             evidence_ciphertext=encrypt_secret(base64.b64encode(payload).decode()),
             status="completed" if source.get("status") in {"completed", "completed_with_errors"} else "cancelled",
-            autopsy_options=canonical({"capsule_source_job": identifier, "source_sha256": digest(content)}),
+            autopsy_options=canonical(restored_options),
         )
         new_id = insert_values("ingestion_jobs", values)
         maps["imports"][str(identifier)] = new_id
@@ -473,6 +506,25 @@ def restore_capsule(content, manifest, data, files):
         new_id = insert_values("security_events", values)
         maps["events"][str(identifier)] = new_id
         insert_values("case_events", {"case_id": case_id, "event_id": new_id, "attached_by": principal, "attached_at": now})
+    for source in data["tables"].get("autopsy_event_occurrences", []):
+        job_id = maps["imports"].get(str(source["job_id"]))
+        event_id = maps["events"].get(str(source["event_id"]))
+        if job_id is None or event_id is None:
+            raise ValidationError("مرجع أصل السجل غير موجود")
+        insert_values(
+            "autopsy_event_occurrences",
+            {
+                "case_id": case_id,
+                "job_id": job_id,
+                "event_id": event_id,
+                "row_key": source["row_key"],
+                "provenance": source["provenance"],
+                "disposition": source["disposition"],
+            },
+        )
+    from .event_identity import restore_declared_identities
+
+    restore_declared_identities(get_db(), case_id)
     for source in data["tables"]["case_evidence"]:
         identifier = int(source["id"])
         reference = str(source["reference_id"])

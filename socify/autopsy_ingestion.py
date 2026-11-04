@@ -5,12 +5,12 @@ import re
 from collections.abc import Iterator
 from typing import Any
 
-from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
+from flask import Blueprint, Response, current_app, g, jsonify, request, stream_with_context
 from werkzeug.utils import secure_filename
 
 from .autopsy_domain import custody, normalize_indicator, touch_case
 from .autopsy_pipeline import activate_import, event_visible, job_visible, visibility_sql
-from .case_counts import cached_case_count, consistent_read
+from .case_counts import cached_case_count, consistent_read, read_snapshot
 from .cases import _attach_event, _case_row
 from .chronology_time import sql_utc_key, utc_key
 from .db import connect_readonly, get_db, transaction
@@ -206,7 +206,7 @@ def _canonical_log_ip(value):
 def log_query(case_id: int) -> tuple[str, list[Any]]:
     clauses = ["ce.case_id = ?"]
     args: list[Any] = [case_id]
-    scope, parameters = visibility_sql("ce")
+    scope, parameters = visibility_sql("ce", active_only=not bool(request.args.get("job_id")))
     clauses.append(scope)
     args.extend(parameters)
     selected_job = request.args.get("job_id")
@@ -215,8 +215,10 @@ def log_query(case_id: int) -> tuple[str, list[Any]]:
             raise ValidationError("معرف نسخة الاستيراد غير صالح")
         if not _job_for_case(case_id, int(selected_job)):
             raise ValidationError("نسخة الاستيراد غير متاحة في القضية")
-        clauses.append("ce.import_job_id = ?")
-        args.append(int(selected_job))
+        from .event_identity import job_event_sql
+
+        clauses.append(job_event_sql("ce"))
+        args.extend((int(selected_job), int(selected_job)))
     else:
         clauses.append("ce.active_event = 1")
     query = request.args.get("q", "").strip()
@@ -314,6 +316,7 @@ def case_logs(case_id: int):
 
 @autopsy_ingestion_api.get("/api/cases/<int:case_id>/logs/<int:event_id>")
 @require_permission("cases.read")
+@consistent_read
 def case_log_detail(case_id: int, event_id: int):
     if not _case_row(case_id):
         return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
@@ -430,7 +433,20 @@ def export_case_logs(case_id: int):
             yield "\ufeff" + buffer.getvalue()
         first = True
         for row in snapshot_rows():
-            item = _redacted_event(row) if redaction == "1" else _event_view(row, include_raw=True)
+            # Revoke unread rows without changing evidence origin between the
+            # access check and metadata selection. Do not hold a transaction
+            # while waiting for the next network write.
+            with read_snapshot():
+                g.pop("current_user", None)
+                principal = current_user()
+                if not has_permission(principal, "cases.export") or redaction == "0" and not has_permission(principal, "evidence.download"):
+                    break
+                selected_job = int(request.args["job_id"]) if request.args.get("job_id") else None
+                if not _case_row(case_id) or selected_job is not None and not job_visible(selected_job):
+                    break
+                if not event_visible(case_id, row["id"], active_only=selected_job is None):
+                    continue
+                item = _redacted_event(row) if redaction == "1" else _event_view(row, include_raw=True)
             if format_name == "csv":
                 buffer = io.StringIO()
                 csv.writer(buffer, lineterminator="\r\n").writerow([_csv_cell(item.get(column)) for column in columns])

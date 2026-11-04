@@ -10,7 +10,7 @@ from typing import Any
 from flask import Blueprint, Response, current_app, jsonify, request
 
 from .audit import record_audit, record_training_action
-from .autopsy_pipeline import job_visible
+from .autopsy_pipeline import visibility_sql
 from .db import get_db, inserted_id, transaction
 from .operational import case_scope, case_visible, operational_mode
 from .report_brand import report_style
@@ -117,11 +117,17 @@ def _attach_event(connection: sqlite3.Connection, case_id: int, event_id: int) -
     case = connection.execute("SELECT training_run_id FROM incident_cases WHERE id = ? AND workspace_id = ?", (case_id, workspace_id())).fetchone()
     if not event or not case or event["training_run_id"] != case["training_run_id"] or not can_access_training_run(event["training_run_id"]):
         return False
-    if operational_mode() and event["import_job_id"] is not None and not job_visible(event["import_job_id"]):
-        return False
+    if operational_mode():
+        scope, params = visibility_sql("e", active_only=False)
+        if not connection.execute(f"SELECT 1 FROM security_events e WHERE e.id=? AND {scope}", (event_id, *params)).fetchone():
+            return False
     already_linked = connection.execute("SELECT 1 FROM case_events WHERE case_id = ? AND event_id = ?", (case_id, event_id)).fetchone()
     if not already_linked and not _source_visible(event["owner_case_id"], event["created_by"]):
         return False
+    from .event_identity import visible_provenance
+
+    occurrence = visible_provenance(connection, event_id, current_user())
+    provenance = occurrence["provenance"] if occurrence else event["provenance"]
     now = iso_now()
     connection.execute(
         "INSERT OR IGNORE INTO case_events (case_id, event_id, attached_by, attached_at) VALUES (?, ?, ?, ?)", (case_id, event_id, actor_id(), now)
@@ -135,7 +141,7 @@ def _attach_event(connection: sqlite3.Connection, case_id: int, event_id: int) -
             str(event_id),
             event["title"],
             event["raw_hash"] or hashlib.sha256(str(event["event_id"]).encode()).hexdigest(),
-            event["provenance"] or "{}",
+            provenance or "{}",
             actor_id(),
             now,
         ),
@@ -162,8 +168,10 @@ def _attach_alert(connection: sqlite3.Connection, case_id: int, alert_id: int) -
         or event["training_run_id"] != case["training_run_id"]
         or not _source_visible(event["owner_case_id"], event["created_by"])
         or operational_mode()
-        and event["import_job_id"] is not None
-        and not job_visible(event["import_job_id"])
+        and not connection.execute(
+            f"SELECT 1 FROM security_events e WHERE e.id=? AND {visibility_sql('e', active_only=False)[0]}",
+            (event["id"], *visibility_sql("e", active_only=False)[1]),
+        ).fetchone()
         for event in events
     ):
         return False

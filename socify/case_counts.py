@@ -38,8 +38,10 @@ def consistent_read(function):
 def count_for_revision(namespace, database, case_id, version, job_id, active_only):
     clauses, args = ["case_id=?"], [case_id]
     if job_id is not None:
-        clauses.append("import_job_id=?")
-        args.append(job_id)
+        from .event_identity import job_event_sql
+
+        clauses.append(job_event_sql("case_events"))
+        args.extend((job_id, job_id))
     if active_only:
         clauses.append("active_event=1")
     return get_db().execute("SELECT COUNT(*) FROM case_events WHERE " + " AND ".join(clauses), args).fetchone()[0]

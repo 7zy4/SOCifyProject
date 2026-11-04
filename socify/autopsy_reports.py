@@ -161,7 +161,7 @@ def build_snapshot(case, revision: int, profile: str):
         "SELECT id, evidence_type, title, sha256, added_by, added_at FROM case_evidence WHERE case_id = ? ORDER BY id", (case_id,), 2000
     )
     payload["imports"] = bounded_rows(
-        "SELECT j.id, j.original_filename, j.filename, j.content_hash AS sha256, j.format, j.parser_version, j.status, j.accepted, j.rejected, j.autopsy_options, j.active_version, j.created_at FROM ingestion_jobs j JOIN autopsy_case_imports a ON a.job_id = j.id WHERE a.case_id = ? ORDER BY j.id",
+        "SELECT j.id, j.original_filename, j.filename, j.content_hash AS sha256, j.format, j.parser_version, j.status, j.accepted, j.rejected, j.skipped, j.total, j.autopsy_options, j.active_version, j.created_at FROM ingestion_jobs j JOIN autopsy_case_imports a ON a.job_id = j.id WHERE a.case_id = ? ORDER BY j.id",
         (case_id,),
         1000,
     )

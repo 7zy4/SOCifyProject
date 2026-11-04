@@ -93,6 +93,9 @@ def migrate(connection: sqlite3.Connection) -> None:
             f"UPDATE case_events SET (event_time,time_known,import_job_id,active_event,event_severity) = (SELECT {projection} FROM security_events e WHERE e.id = case_events.event_id)"
         )
         connection.execute("INSERT INTO schema_meta(key,value,updated_at) VALUES ('autopsy_event_projection_version','1',strftime('%Y-%m-%dT%H:%M:%fZ','now'))")
+    from .event_identity import migrate as migrate_occurrences
+
+    migrate_occurrences(connection)
 
 
 def active_event_sql(alias: str = "e") -> str:
@@ -121,7 +124,7 @@ def job_visible(job_id: int, user: dict | None = None) -> bool:
     )
 
 
-def visibility_sql(alias: str = "e", user: dict | None = None) -> tuple[str, list[object]]:
+def visibility_sql(alias: str = "e", user: dict | None = None, *, active_only: bool = True) -> tuple[str, list[object]]:
     if alias not in {"e", "security_events", "candidate", "event", "ce"}:
         raise ValueError("Unknown event SQL alias")
     principal = user if user is not None else current_user()
@@ -129,14 +132,20 @@ def visibility_sql(alias: str = "e", user: dict | None = None) -> tuple[str, lis
         return "0 = 1", []
     if _manager(principal):
         return "1 = 1", []
+    event_key = "event_id" if alias == "ce" else "id"
+    active = "AND j.active_version=1" if active_only else ""
+    denied = "SELECT a.job_id FROM autopsy_batch_access a WHERE a.restricted=1 AND NOT EXISTS (SELECT 1 FROM ingestion_jobs j WHERE j.id=a.job_id AND j.created_by=?) AND NOT EXISTS (SELECT 1 FROM autopsy_batch_members m WHERE m.job_id=a.job_id AND m.user_id=?)"
     return (
-        f"({alias}.import_job_id IS NULL OR {alias}.import_job_id NOT IN (SELECT a.job_id FROM autopsy_batch_access a WHERE a.restricted=1 AND NOT EXISTS (SELECT 1 FROM ingestion_jobs j WHERE j.id=a.job_id AND j.created_by=?) AND NOT EXISTS (SELECT 1 FROM autopsy_batch_members m WHERE m.job_id=a.job_id AND m.user_id=?)))",
-        [principal["id"], principal["id"]],
+        f"""(EXISTS (SELECT 1 FROM autopsy_event_occurrences o JOIN ingestion_jobs j ON j.id=o.job_id
+            WHERE o.event_id={alias}.{event_key} {active} AND o.job_id NOT IN ({denied}))
+            OR (NOT EXISTS (SELECT 1 FROM autopsy_event_occurrences o WHERE o.event_id={alias}.{event_key})
+            AND ({alias}.import_job_id IS NULL OR {alias}.import_job_id NOT IN ({denied}))))""",
+        [principal["id"], principal["id"], principal["id"], principal["id"]],
     )
 
 
 def event_visible(case_id: int, event_id: int, user: dict | None = None, active_only: bool = True) -> bool:
-    scope, arguments = visibility_sql("e", user)
+    scope, arguments = visibility_sql("e", user, active_only=active_only)
     active = " AND e.autopsy_active = 1" if active_only else ""
     return bool(
         get_db()
@@ -179,16 +188,25 @@ def case_full_access(case_id: int, user: dict | None = None) -> bool:
 def activate_import(job, actor: int | None = None) -> None:
     from .autopsy_domain import custody, touch_case
 
-    if job["status"] not in {"completed", "completed_with_errors"} or job["accepted"] <= 0:
-        raise ValidationError("Activate a completed nonempty derived version")
     connection = get_db()
+    has_rows = connection.execute("SELECT 1 FROM autopsy_event_occurrences WHERE job_id=? LIMIT 1", (job["id"],)).fetchone()
+    if job["status"] not in {"completed", "completed_with_errors"} or (job["accepted"] <= 0 and not has_rows):
+        raise ValidationError("Activate a completed nonempty derived version")
     connection.execute(
-        "UPDATE ingestion_jobs SET active_version = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE case_id = ? AND content_hash = ?",
-        (job["id"], job["case_id"], job["content_hash"]),
+        "UPDATE ingestion_jobs SET active_version = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE case_id = ? AND content_hash = ? AND source_id IS ? AND source_name=?",
+        (job["id"], job["case_id"], job["content_hash"], job["source_id"], job["source_name"]),
     )
     connection.execute(
-        "UPDATE security_events SET autopsy_active = CASE WHEN import_job_id = ? THEN 1 ELSE 0 END WHERE owner_case_id = ? AND import_job_id IN (SELECT id FROM ingestion_jobs WHERE case_id = ? AND content_hash = ?)",
-        (job["id"], job["case_id"], job["case_id"], job["content_hash"]),
+        "UPDATE security_events SET autopsy_active = CASE WHEN import_job_id = ? THEN 1 ELSE 0 END WHERE owner_case_id = ? AND import_job_id IN (SELECT id FROM ingestion_jobs WHERE case_id = ? AND content_hash = ? AND source_id IS ? AND source_name=?) AND NOT EXISTS (SELECT 1 FROM autopsy_event_occurrences o WHERE o.event_id=security_events.id)",
+        (job["id"], job["case_id"], job["case_id"], job["content_hash"], job["source_id"], job["source_name"]),
+    )
+    connection.execute(
+        """UPDATE security_events SET autopsy_active=EXISTS (
+            SELECT 1 FROM autopsy_event_occurrences o JOIN ingestion_jobs j ON j.id=o.job_id
+            WHERE o.event_id=security_events.id AND j.active_version=1)
+        WHERE id IN (SELECT o.event_id FROM autopsy_event_occurrences o JOIN ingestion_jobs j ON j.id=o.job_id
+            WHERE j.case_id=? AND j.content_hash=?)""",
+        (job["case_id"], job["content_hash"]),
     )
     custody(
         job["case_id"],

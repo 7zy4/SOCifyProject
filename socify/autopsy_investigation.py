@@ -10,7 +10,8 @@ from .case_counts import consistent_read
 from .cases import _case_row, annotate_technique
 from .chronology_time import sql_utc_key
 from .db import get_db
-from .security import error_response, require_permission
+from .event_identity import visible_provenance
+from .security import current_user, error_response, require_permission
 from .validation import ValidationError, public_error_message
 from .visualization import build_graph
 
@@ -43,6 +44,10 @@ def case_timeline(case_id: int):
     )
     items = []
     for row in rows[:limit]:
+        row = dict(row)
+        occurrence = visible_provenance(get_db(), row["id"], current_user(), int(request.args["job_id"]) if request.args.get("job_id") else None)
+        if occurrence:
+            row.update(provenance=occurrence["provenance"], ingested_at=occurrence["created_at"])
         normalized, provenance = json.loads(row["normalized_fields"] or "{}"), json.loads(row["provenance"] or "{}")
         known = normalized.get("event_time_known") is True
         items.append(

@@ -11,7 +11,7 @@ from .audit import record_audit
 from .db import get_db, inserted_id, transaction
 from .detection import SEVERITIES, evaluate_rules
 from .schema import insert_outbox, public_id
-from .security import actor_id, can_access_training_run, error_response, require_permission, training_scope_sql, workspace_id
+from .security import actor_id, can_access_training_run, current_user, error_response, require_permission, training_scope_sql, workspace_id
 from .timeutils import iso_now, iso_timestamp
 from .validation import ValidationError, public_error_message
 
@@ -162,8 +162,12 @@ def ingest_event(
     case_id: int | None = None,
     import_job_id: int | None = None,
     is_active: bool = True,
+    import_row: int | None = None,
 ) -> tuple[int, list[int], bool]:
     normalized = normalize_event(data)
+    from .event_identity import identity_key, occurrence_key, retain_occurrence
+
+    job = connection.execute("SELECT * FROM ingestion_jobs WHERE id=?", (import_job_id,)).fetchone() if import_job_id is not None else None
     if import_job_id is not None and (
         type(import_job_id) is not int
         or type(is_active) is not bool
@@ -172,6 +176,13 @@ def ingest_event(
         ).fetchone()
     ):
         raise ValueError("invalid trusted import context")
+    provenance = json.loads(normalized["provenance"])
+    row_key = occurrence_key(provenance, import_row)
+    if job is not None:
+        # Transport retries are distinct from source identity. A source ID alone
+        # must never suppress a later observation with different facts.
+        normalized["idempotency_key"] = f"import-job:{job['id']}:{hashlib.sha256(row_key.encode()).hexdigest()}"
+    identity = identity_key(normalized, job)
     if case_id is not None:
         if (
             type(case_id) is not int
@@ -197,7 +208,13 @@ def ingest_event(
             (workspace, training_run_id, idempotency_key),
         ).fetchone()
         if existing:
+            retain_occurrence(connection, int(existing["id"]), job, provenance, repeated=True, row_key=row_key)
             return int(existing["id"]), [], True
+    if identity:
+        existing = connection.execute("SELECT event_id FROM autopsy_event_identities WHERE identity_key=?", (identity,)).fetchone()
+        if existing:
+            retain_occurrence(connection, int(existing["event_id"]), job, provenance, repeated=True, row_key=row_key)
+            return int(existing["event_id"]), [], True
     if case_id is not None:
         from .content_inspection import inspect_event_fields
 
@@ -253,6 +270,9 @@ def ingest_event(
         connection.execute("UPDATE security_events SET owner_case_id = ? WHERE id = ?", (case_id, event_id))
     if import_job_id is not None:
         connection.execute("UPDATE security_events SET import_job_id = ?, autopsy_active = ? WHERE id = ?", (import_job_id, int(is_active), event_id))
+        retain_occurrence(connection, event_id, job, provenance, repeated=False, row_key=row_key)
+    if identity:
+        connection.execute("INSERT INTO autopsy_event_identities(identity_key,event_id) VALUES (?,?)", (identity, event_id))
     from .watchlist import evaluate_watchlist_for_event
 
     alerts = evaluate_rules(connection, event_id)
@@ -265,6 +285,28 @@ def ingest_event(
 
 def _event_view(row: sqlite3.Row, include_raw: bool = False) -> dict[str, Any]:
     item = dict(row)
+    if item.get("import_job_id") is not None:
+        from .event_identity import visible_provenance
+
+        selected = request.args.get("job_id", "")
+        job_id = int(selected) if len(selected) <= 19 and selected.isascii() and selected.isdecimal() and 0 < int(selected) <= 2**63 - 1 else None
+        occurrence = visible_provenance(get_db(), item["id"], current_user(), job_id)
+        if occurrence is None and job_id is not None:
+            occurrence = visible_provenance(get_db(), item["id"], current_user())
+        if occurrence is None and get_db().execute("SELECT 1 FROM autopsy_event_occurrences WHERE event_id=? LIMIT 1", (item["id"],)).fetchone():
+            from werkzeug.exceptions import NotFound
+
+            raise NotFound()
+        if occurrence:
+            item.update(
+                provenance=occurrence["provenance"],
+                import_job_id=occurrence["job_id"],
+                created_by=occurrence["created_by"],
+                ingested_at=occurrence["created_at"],
+                autopsy_active=occurrence["active_version"],
+            )
+            # Internal transport keys can identify a different, restricted batch.
+            item.pop("idempotency_key", None)
     for field, fallback in (("normalized_fields", {}), ("tags", []), ("mitre_ids", []), ("provenance", {})):
         try:
             item[field] = json.loads(item.get(field) or json.dumps(fallback))

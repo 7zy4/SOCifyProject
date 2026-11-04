@@ -77,6 +77,7 @@ def logon_context(event_id: str, data: dict[str, str], hostname: str | None) -> 
 def reconcile_logons(connection, job):
     """Revisit successes affected by late failures, including a reversed export."""
     from .detection import evaluate_rules
+    from .event_identity import job_event_sql
 
     yield from _reconcile_failed_logons(connection, job)
     rule = connection.execute(
@@ -85,22 +86,22 @@ def reconcile_logons(connection, job):
     if not rule:
         return
     bounds = connection.execute(
-        "SELECT MIN(event_time),MAX(event_time) FROM security_events WHERE import_job_id=? AND autopsy_active=1 AND outcome='failed' AND json_extract(normalized_fields,'$.auth_target') IS NOT NULL AND json_extract(normalized_fields,'$.event_time_known')=1",
-        (job["id"],),
+        f"SELECT MIN(event_time),MAX(event_time) FROM security_events WHERE {job_event_sql('security_events')} AND autopsy_active=1 AND outcome='failed' AND json_extract(normalized_fields,'$.auth_target') IS NOT NULL AND json_extract(normalized_fields,'$.event_time_known')=1",
+        (job["id"], job["id"]),
     ).fetchone()
     if not bounds[0]:
         return
     latest = min(parse_timestamp(bounds[1]), datetime.max.replace(tzinfo=UTC) - timedelta(seconds=600))
     end = (latest + timedelta(seconds=600)).isoformat().replace("+00:00", "Z")
     candidates = connection.execute(
-        """SELECT e.id FROM security_events e
+        f"""SELECT e.id FROM security_events e
         WHERE e.workspace_id=? AND e.owner_case_id=? AND e.training_run_id IS ? AND e.autopsy_active=1
         AND e.source_type='windows' AND e.outcome='success' AND e.event_time>=? AND e.event_time<=?
-        AND EXISTS (SELECT 1 FROM security_events f WHERE f.import_job_id=? AND f.autopsy_active=1
+        AND EXISTS (SELECT 1 FROM security_events f WHERE {job_event_sql("f")} AND f.autopsy_active=1
             AND f.outcome='failed' AND f.event_time<=e.event_time AND julianday(f.event_time)>=julianday(e.event_time)-600.0/86400
             AND f.source_ip=e.source_ip AND json_extract(f.normalized_fields,'$.auth_target')=json_extract(e.normalized_fields,'$.auth_target'))
         ORDER BY e.event_time,e.id""",
-        (job["workspace_id"], job["case_id"], job["training_run_id"], bounds[0], end, job["id"]),
+        (job["workspace_id"], job["case_id"], job["training_run_id"], bounds[0], end, job["id"], job["id"]),
     )
     for row in candidates:
         alerts = evaluate_rules(connection, row["id"], only_rule_id=rule["id"])
@@ -111,12 +112,13 @@ def reconcile_logons(connection, job):
 def _reconcile_failed_logons(connection, job):
     """Late failures can complete an earlier imported count or distinct-user window."""
     from .detection import _event_dict, evaluate_dsl, evaluate_rules, legacy_dsl
+    from .event_identity import job_event_sql
 
     bounds = connection.execute(
-        """SELECT MIN(event_time),MAX(event_time) FROM security_events
-        WHERE import_job_id=? AND autopsy_active=1 AND event_type='failed_login'
+        f"""SELECT MIN(event_time),MAX(event_time) FROM security_events
+        WHERE {job_event_sql("security_events")} AND autopsy_active=1 AND event_type='failed_login'
         AND source_ip IS NOT NULL AND json_extract(normalized_fields,'$.event_time_known')=1""",
-        (job["id"],),
+        (job["id"], job["id"]),
     ).fetchone()
     if not bounds[0]:
         return
@@ -133,16 +135,16 @@ def _reconcile_failed_logons(connection, job):
         latest = min(parse_timestamp(bounds[1]), datetime.max.replace(tzinfo=UTC) - timedelta(seconds=seconds))
         end = (latest + timedelta(seconds=seconds)).isoformat().replace("+00:00", "Z")
         candidates = connection.execute(
-            """SELECT e.* FROM security_events e
+            f"""SELECT e.* FROM security_events e
             WHERE e.workspace_id=? AND e.owner_case_id=? AND e.training_run_id IS ? AND e.autopsy_active=1
             AND e.event_type='failed_login' AND e.event_time>=? AND e.event_time<=?
             AND json_extract(e.normalized_fields,'$.event_time_known')=1
-            AND EXISTS (SELECT 1 FROM security_events f WHERE f.import_job_id=? AND f.autopsy_active=1
+            AND EXISTS (SELECT 1 FROM security_events f WHERE {job_event_sql("f")} AND f.autopsy_active=1
                 AND f.event_type='failed_login' AND f.id>e.id AND f.source_ip=e.source_ip
                 AND json_extract(f.normalized_fields,'$.event_time_known')=1
                 AND f.event_time<=e.event_time AND julianday(f.event_time)>=julianday(e.event_time)-?/86400.0)
             ORDER BY e.event_time,e.id""",
-            (job["workspace_id"], job["case_id"], job["training_run_id"], bounds[0], end, job["id"], seconds),
+            (job["workspace_id"], job["case_id"], job["training_run_id"], bounds[0], end, job["id"], job["id"], seconds),
         )
         for row in candidates:
             evaluation = evaluate_dsl(connection, dsl, _event_dict(row))

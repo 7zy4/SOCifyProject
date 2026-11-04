@@ -138,7 +138,7 @@ def _record_from_mapping(record: dict[str, Any], row_number: int, source_name: s
         "description": str(record.get("description") or ""),
         "event_time": event_time,
         "raw_payload": raw,
-        "external_id": str(record.get("external_id") or record.get("id") or f"row-{row_number}"),
+        "external_id": str(record.get("external_id", record.get("id"))) if record.get("external_id", record.get("id")) is not None else f"row-{row_number}",
         "idempotency_key": f"import:{content_hash}:{row_number}",
         "parser_version": telemetry.get("parser_version", "socify-import-2"),
         "provenance": {"file_sha256": content_hash, "row": row_number, "format": "structured"},
@@ -783,6 +783,9 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
     if worker_id is not None and (job["status"] != "processing" or job["worker_id"] != worker_id):
         raise RuntimeError("import job is not leased by this worker")
     try:
+        registered_source = _import_source(job["source_id"], job["case_id"], job["workspace_id"], actor=job["executor_id"] or job["created_by"])
+        if job["source_id"] is not None and registered_source is None:
+            raise ValidationError("import source is unavailable in this case")
         content = _job_content(job)
         _, records = parse_records(job["filename"], content, job["format"], job["source_name"], json.loads(job["autopsy_options"]))
     except (ValueError, json.JSONDecodeError, csv.Error, ElementTree.ParseError) as exc:
@@ -853,6 +856,8 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
                 try:
                     if record.get("__parse_error"):
                         raise ValidationError("Record could not be parsed")
+                    if registered_source and record.get("source_type") in (None, "import", "training"):
+                        record["source_type"] = registered_source["type"]
                     if job["case_id"] is not None:
                         record["idempotency_key"] = (
                             f"pipeline:{hashlib.sha256(job['autopsy_options'].encode()).hexdigest()}:{record.get('idempotency_key', row_number)}"
@@ -866,6 +871,7 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
                         job["case_id"],
                         job_id if job["case_id"] is not None else None,
                         bool(job["active_version"]),
+                        import_row=row_number,
                     )
                     if job["case_id"] is not None:
                         _attach_import_result(job, event_id, alerts)
@@ -923,7 +929,7 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
         error_rate = rejected / checkpoint if checkpoint else 0
         get_db().execute(
             "UPDATE event_sources SET rows_ingested = rows_ingested + ?, error_rate = ?, last_sync = ?, status = ?, updated_at = ? WHERE id = ?",
-            (accepted, error_rate, completed, "connected" if accepted else "failed", completed, job["source_id"]),
+            (accepted, error_rate, completed, "connected" if accepted or skipped else "failed", completed, job["source_id"]),
         )
     record_audit(
         get_db(),
@@ -942,12 +948,12 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
             latest = (
                 get_db()
                 .execute(
-                    "SELECT MAX(id) FROM ingestion_jobs WHERE case_id = ? AND content_hash = ? AND status IN ('completed','completed_with_errors') AND accepted > 0",
-                    (job["case_id"], job["content_hash"]),
+                    "SELECT MAX(id) FROM ingestion_jobs WHERE case_id = ? AND content_hash = ? AND source_id IS ? AND source_name=? AND status IN ('completed','completed_with_errors') AND (accepted > 0 OR EXISTS (SELECT 1 FROM autopsy_event_occurrences o WHERE o.job_id=ingestion_jobs.id))",
+                    (job["case_id"], job["content_hash"], job["source_id"], job["source_name"]),
                 )
                 .fetchone()[0]
             )
-            if latest == job_id and accepted > 0:
+            if latest == job_id and (accepted or skipped):
                 activate_import(finished, actor=job["executor_id"] or job["created_by"])
                 from .windows_logon import reconcile_logons
 
@@ -969,6 +975,11 @@ def _import_case_authorized(job: sqlite3.Row) -> bool:
     from .autopsy_workspace import case_approved
 
     if not case_approved(job["case_id"]):
+        return False
+    if (
+        job["source_id"] is not None
+        and _import_source(job["source_id"], job["case_id"], job["workspace_id"], actor=job["executor_id"] or job["created_by"]) is None
+    ):
         return False
     case = (
         get_db().execute("SELECT status, archived_at FROM incident_cases WHERE id = ? AND workspace_id = ?", (job["case_id"], job["workspace_id"])).fetchone()
@@ -1110,17 +1121,41 @@ def _upload_options() -> tuple[int | None, dict[str, Any]]:
     return case_id, options
 
 
+def _import_source(source_id: int | None, case_id: int | None, workspace: int, *, actor: int | None = None):
+    if type(source_id) is not int:
+        return None
+    if case_id is not None:
+        from .autopsy_pipeline import case_full_access
+        from .autopsy_workspace import case_approved
+
+        if actor is not None:
+            row = get_db().execute("SELECT id,workspace_id,role FROM users WHERE id=? AND workspace_id=? AND is_active=1", (actor, workspace)).fetchone()
+            principal = dict(row) if row else None
+        else:
+            principal = current_user()
+        if not principal or not case_visible(case_id, principal) or not case_approved(case_id) or not case_full_access(case_id, principal):
+            return None
+    return (
+        get_db()
+        .execute(
+            "SELECT id,name,type FROM event_sources WHERE id=? AND workspace_id=? AND default_case_id IS ? AND is_active=1",
+            (source_id, workspace, case_id),
+        )
+        .fetchone()
+    )
+
+
 @ingestion_api.post("/api/imports/preview")
 @require_permission("events.create")
 def preview_import():
     try:
-        _, options = _upload_options()
+        case_id, options = _upload_options()
         filename, content, selected_format, source_id, training_run_id = _upload_payload()
         if not can_access_training_run(training_run_id):
             return error_response("TRAINING_RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
-        source = (
-            get_db().execute("SELECT name FROM event_sources WHERE id = ? AND workspace_id = ?", (source_id, workspace_id())).fetchone() if source_id else None
-        )
+        source = _import_source(source_id, case_id, workspace_id())
+        if source_id is not None and source is None:
+            return error_response("SOURCE_NOT_FOUND", "المصدر غير متاح في هذا النطاق", 404)
         format_name, records = parse_records(
             filename, content, selected_format, options.get("source_label") or (source["name"] if source else "file-import"), options
         )
@@ -1148,24 +1183,21 @@ def create_import():
         return error_response("UPLOAD_TOO_LARGE", "الملف يتجاوز الحجم المسموح", 413)
     if not can_access_training_run(training_run_id):
         return error_response("TRAINING_RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
-    source = (
-        get_db().execute("SELECT id, name FROM event_sources WHERE id = ? AND workspace_id = ? AND is_active = 1", (source_id, workspace_id())).fetchone()
-        if source_id
-        else None
-    )
-    if source_id and not source:
-        return error_response("SOURCE_NOT_FOUND", "المصدر غير موجود أو معطل", 404)
+    source = _import_source(source_id, case_id, workspace_id())
+    if source_id is not None and source is None:
+        return error_response("SOURCE_NOT_FOUND", "المصدر غير متاح في هذا النطاق", 404)
     source_name = options.get("source_label") or (source["name"] if source else "file-import")
     serialized_options = json.dumps(options, sort_keys=True, separators=(",", ":"))
     content_hash = hashlib.sha256(content).hexdigest()
-    duplicate = (
-        get_db()
-        .execute(
-            "SELECT * FROM ingestion_jobs WHERE workspace_id = ? AND content_hash = ? AND training_run_id IS ? AND case_id IS ? AND autopsy_options = ?",
-            (workspace_id(), content_hash, training_run_id, case_id, serialized_options),
+
+    def matching_import():
+        rows = get_db().execute(
+            "SELECT * FROM ingestion_jobs WHERE workspace_id = ? AND content_hash = ? AND training_run_id IS ? AND case_id IS ? AND autopsy_options = ? AND source_id IS ? AND source_name=? ORDER BY id DESC",
+            (workspace_id(), content_hash, training_run_id, case_id, serialized_options, source_id, source_name),
         )
-        .fetchone()
-    )
+        return next((row for row in rows if case_id is None or job_visible(row["id"])), None)
+
+    duplicate = matching_import()
     if duplicate:
         return jsonify({**_job_view(duplicate), "duplicate": True})
     queued = int(
@@ -1194,6 +1226,9 @@ def create_import():
             return error_response("INVALID_FILENAME", public_error_message(exc, "Specify a valid filename without a path"), 422)
     ciphertext = encrypt_secret(base64.b64encode(content).decode())
     with transaction():
+        duplicate = matching_import()
+        if duplicate:
+            return jsonify({**_job_view(duplicate), "duplicate": True})
         cursor = get_db().execute(
             """INSERT INTO ingestion_jobs
             (job_id, workspace_id, source_id, training_run_id, filename, format, content_hash, evidence_ciphertext,
@@ -1228,8 +1263,8 @@ def create_import():
             previous = (
                 get_db()
                 .execute(
-                    "SELECT 1 FROM ingestion_jobs WHERE case_id = ? AND content_hash = ? AND id != ? AND active_version = 1 AND status IN ('completed','completed_with_errors') AND accepted > 0 LIMIT 1",
-                    (case_id, content_hash, job_database_id),
+                    "SELECT 1 FROM ingestion_jobs WHERE case_id = ? AND content_hash = ? AND source_id IS ? AND source_name=? AND id != ? AND active_version = 1 AND status IN ('completed','completed_with_errors') AND (accepted > 0 OR skipped > 0) LIMIT 1",
+                    (case_id, content_hash, source_id, source_name, job_database_id),
                 )
                 .fetchone()
             )

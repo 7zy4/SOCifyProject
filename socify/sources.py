@@ -69,25 +69,26 @@ def _parse_stream_payload(raw_bytes: bytes, content_type: str, source_name: str)
     if len(raw_bytes) > int(current_app.config["MAX_CONTENT_LENGTH"]):
         raise ValidationError("payload exceeds configured upload limit")
     ct_lower = content_type.lower()
+    options = {"mapping": {}, "source_timezone": "UTC"}
     if "ndjson" in ct_lower or "jsonl" in ct_lower:
-        fmt, iterator = parse_records("stream.jsonl", raw_bytes, "jsonl", source_name)
+        fmt, iterator = parse_records("stream.jsonl", raw_bytes, "jsonl", source_name, options)
         return fmt, list(iterator)
     if "json" in ct_lower or raw_bytes.lstrip().startswith((b"{", b"[")):
         try:
             decoded = json.loads(raw_bytes.decode("utf-8-sig"))
             if isinstance(decoded, dict) and isinstance(decoded.get("events"), list):
                 serialized = json.dumps(decoded["events"], ensure_ascii=False).encode("utf-8")
-                fmt, iterator = parse_records("stream.json", serialized, "json", source_name)
+                fmt, iterator = parse_records("stream.json", serialized, "json", source_name, options)
                 return fmt, list(iterator)
             if isinstance(decoded, dict) and isinstance(decoded.get("event"), dict):
                 serialized = json.dumps([decoded["event"]], ensure_ascii=False).encode("utf-8")
-                fmt, iterator = parse_records("stream.json", serialized, "json", source_name)
+                fmt, iterator = parse_records("stream.json", serialized, "json", source_name, options)
                 return fmt, list(iterator)
         except json.JSONDecodeError:
             if raw_bytes.lstrip().startswith(b"{"):
-                fmt, iterator = parse_records("stream.jsonl", raw_bytes, "jsonl", source_name)
+                fmt, iterator = parse_records("stream.jsonl", raw_bytes, "jsonl", source_name, options)
                 return fmt, list(iterator)
-    fmt, iterator = parse_records("stream.log", raw_bytes, "auto", source_name)
+    fmt, iterator = parse_records("stream.log", raw_bytes, "auto", source_name, options)
     return fmt, list(iterator)
 
 
@@ -147,7 +148,7 @@ def _ingest_records_for_source(
                 get_db()
                 .execute(
                     """SELECT id, total FROM ingestion_jobs WHERE workspace_id = ? AND source_id = ? AND case_id = ?
-                   AND content_hash = ? AND status = 'completed' AND active_version = 1 AND accepted > 0 AND rejected = 0
+                   AND content_hash = ? AND status = 'completed' AND active_version = 1 AND (accepted > 0 OR skipped > 0) AND rejected = 0
                    ORDER BY id LIMIT 1""",
                     (ws_id, source_id, target_case_id, content_hash),
                 )
@@ -230,11 +231,9 @@ def _ingest_records_for_source(
             record["source"] = source_name
             if record.get("source_type") in (None, "import", "training"):
                 record["source_type"] = "http" if source_row["type"] == "http" else str(source_row["type"])
-            raw_payload = record.get("raw_payload")
-            if not isinstance(raw_payload, dict):
-                raw_payload = {}
-            explicit_ext_id = raw_payload.get("external_id") or raw_payload.get("id")
-            record["idempotency_key"] = f"siem:{source_id}:{explicit_ext_id}" if explicit_ext_id else f"siem:{source_id}:{content_hash}:{idx}"
+            record["idempotency_key"] = f"siem:{source_id}:{content_hash}:{idx}"
+            record["provenance"] = {**record.get("provenance", {}), "file_sha256": content_hash}
+            get_db().execute("SAVEPOINT source_row")
             try:
                 ev_id, triggered, duplicate = ingest_event(
                     get_db(),
@@ -245,23 +244,27 @@ def _ingest_records_for_source(
                     target_case_id,
                     job_db_id,
                     True,
+                    import_row=idx,
                 )
+                if target_case_id is not None and job_row is not None:
+                    _attach_import_result(job_row, ev_id, triggered)
                 if duplicate:
                     skipped += 1
                 else:
                     accepted += 1
                     alert_ids.extend(triggered)
-                    if target_case_id is not None and job_row is not None:
-                        _attach_import_result(job_row, ev_id, triggered)
+                get_db().execute("RELEASE SAVEPOINT source_row")
             except (ValueError, OverflowError, sqlite3.Error):
+                get_db().execute("ROLLBACK TO SAVEPOINT source_row")
+                get_db().execute("RELEASE SAVEPOINT source_row")
                 rejected += 1
 
         if job_db_id is not None and target_case_id is not None:
             from .autopsy_domain import custody, touch_case
 
             get_db().execute(
-                "UPDATE ingestion_jobs SET accepted = ?, rejected = ?, skipped = ?, total = ?, checkpoint = ? WHERE id = ?",
-                (accepted, rejected, skipped, len(records), len(records), job_db_id),
+                "UPDATE ingestion_jobs SET accepted = ?, rejected = ?, skipped = ?, total = ?, checkpoint = ?, status=? WHERE id = ?",
+                (accepted, rejected, skipped, len(records), len(records), "completed_with_errors" if rejected else "completed", job_db_id),
             )
             custody(
                 target_case_id,
@@ -303,6 +306,20 @@ def _ingest_records_for_source(
 @require_permission("sources.read")
 def list_sources():
     rows = get_db().execute("SELECT * FROM event_sources WHERE workspace_id = ? ORDER BY name", (workspace_id(),)).fetchall()
+    from .operational import operational_mode
+
+    if operational_mode():
+        from .autopsy_pipeline import case_full_access
+        from .autopsy_workspace import case_approved, selected_ids
+        from .cases import _case_row
+
+        selected = set(selected_ids()) if current_app.config["REQUIRE_INVESTIGATION_SELECTION"] else None
+        allowed = {
+            case_id
+            for case_id in {row["default_case_id"] for row in rows if row["default_case_id"] is not None}
+            if _case_row(case_id) and case_approved(case_id) and (selected is None or case_id in selected) and case_full_access(case_id)
+        }
+        rows = [row for row in rows if row["default_case_id"] is None or row["default_case_id"] in allowed]
     return jsonify([_source_view(row) for row in rows])
 
 

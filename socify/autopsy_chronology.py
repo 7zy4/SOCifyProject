@@ -13,6 +13,7 @@ from .case_counts import read_snapshot
 from .cases import _case_row
 from .chronology_time import record_clock, sql_utc_key, utc_key
 from .db import get_db
+from .event_identity import visible_provenance
 from .security import actor_id, current_user, error_response, has_permission, require_permission
 from .timeutils import parse_timestamp, utc_now
 from .validation import ValidationError, public_error_message
@@ -193,6 +194,10 @@ def chronology_page(case_id, page, limit):
                 .fetchall()
             )
             for event in rows:
+                event = dict(event)
+                occurrence = visible_provenance(get_db(), event["id"], current_user(), int(request.args["job_id"]) if request.args.get("job_id") else None)
+                if occurrence:
+                    event.update(ingested_at=occurrence["created_at"], time_basis=json.loads(occurrence["provenance"]).get("event_time_basis"))
                 known = bool(event["time_known"])
                 details[kind][event["id"]] = {
                     **dict(event),
