@@ -135,6 +135,12 @@ jobs:
             artifacts/brand/
             artifacts/soc-insights/
             artifacts/review-journeys/
+            artifacts/performance-charts/
+            artifacts/interface-interactions/
+            artifacts/usability_campaign/performance-decision-review/
+            artifacts/usability_campaign/performance-access-review/
+            artifacts/usability_campaign/source-transport-decisions/
+            artifacts/usability_campaign/blue-team-decisions/
             work/interface-review/
       - if: always()
         run: docker rm --force socify-ci-analysis

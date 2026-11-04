@@ -6,6 +6,7 @@ import threading
 import time
 from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from types import SimpleNamespace
 
 import pytest
 from cryptography import x509
@@ -37,6 +38,7 @@ def tls_source(tmp_path, monkeypatch):
     cert_file.write_bytes(certificate.public_bytes(serialization.Encoding.PEM))
     key_file.write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
     requests, attempted_addresses, dns_queries, server_names = [], [], [], []
+    responses = {}
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -80,7 +82,7 @@ def tls_source(tmp_path, monkeypatch):
                 self.send_response(403)
                 self.end_headers()
                 return
-            body = b"x" * 4096 if self.path == "/large" else b'{"title":"Retained source event"}\n'
+            body = b"x" * 4096 if self.path == "/large" else responses.get("body", b'{"title":"Retained source event"}\n')
             self.send_response(200)
             self.send_header("Content-Type", "application/x-ndjson")
             self.send_header("Content-Length", str(len(body) + 100 if self.path == "/truncated" else len(body)))
@@ -92,6 +94,7 @@ def tls_source(tmp_path, monkeypatch):
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    server_context.minimum_version = ssl.TLSVersion.TLSv1_2
     server_context.load_cert_chain(cert_file, key_file)
     server_context.set_servername_callback(lambda _socket, hostname, _context: server_names.append(hostname))
     server.socket = server_context.wrap_socket(server.socket, server_side=True)
@@ -114,8 +117,11 @@ def tls_source(tmp_path, monkeypatch):
         return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", port))]
 
     monkeypatch.setattr(ssl, "_create_default_https_context", lambda: client_context)
-    monkeypatch.setattr(socket, "socket", RoutedSocket)
-    monkeypatch.setattr(socket, "getaddrinfo", resolve)
+    monkeypatch.setattr(
+        outbound,
+        "socket",
+        SimpleNamespace(socket=RoutedSocket, getaddrinfo=resolve, SOCK_STREAM=socket.SOCK_STREAM, AF_INET=socket.AF_INET, AF_INET6=socket.AF_INET6),
+    )
     monkeypatch.setenv("HTTPS_PROXY", "https://unapproved-proxy.example:8443")
     try:
         yield {
@@ -125,6 +131,7 @@ def tls_source(tmp_path, monkeypatch):
             "dns_queries": dns_queries,
             "server_names": server_names,
             "context": client_context,
+            "responses": responses,
         }
     finally:
         server.shutdown()
