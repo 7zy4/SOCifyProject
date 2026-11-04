@@ -3,6 +3,23 @@
 Object.assign(autopsyLabels, { bookmark: SOCifyLocale.text("علامات السجلات المهمة"), timeline_view: SOCifyLocale.text("مناظر الخط الزمني"), query: SOCifyLocale.text("كلمات البحث"), color: SOCifyLocale.text("لون العلامة"), blue: SOCifyLocale.text("أزرق"), orange: SOCifyLocale.text("برتقالي"), gold: SOCifyLocale.text("ذهبي"), start: SOCifyLocale.text("بداية الفترة"), end: SOCifyLocale.text("نهاية الفترة"), suggested: SOCifyLocale.text("مقترح"), verified: SOCifyLocale.text("مثبت بدليل"), rejected: SOCifyLocale.text("مرفوض بدليل") });
 Object.assign(autopsyLabels, { documentation_time: SOCifyLocale.text("وقت التوثيق؛ ليس وقت وقوع الهجوم"), reported_action_time: SOCifyLocale.text("وقت إجراء مسجل بواسطة المنفذ"), investigator_observation_time: SOCifyLocale.text("وقت ملاحظة أدخله المحقق"), hypothesis_time: SOCifyLocale.text("توقيت فرضية غير مؤكدة"), escalation_time: SOCifyLocale.text("وقت إحالة داخل الفريق؛ ليس وقت وقوع الهجوم"), legacy_note: SOCifyLocale.text("ملاحظة محفوظة") });
 
+function autopsyTimeBasisLabel(value) {
+  const labels = {
+    source: "وقت مسجل في المصدر",
+    source_year_and_zone_declared: "وقت المصدر مع سنة ومنطقة زمنية معلنتين",
+    source_year_assumed_not_verified: "سنة المصدر مفترضة وغير متحققة",
+    ingestion_fallback_not_observed_time: "وقت استيراد بديل؛ لا يثبت وقت الحدث",
+    unknown_source_time: "توقيت مصدر غير معروف",
+    legacy_timestamp_not_verified: "توقيت محفوظ غير متحقق"
+  };
+  return Object.hasOwn(labels, value) ? SOCifyLocale.text(labels[value]) : autopsyLabel(value);
+}
+
+function autopsyGraphLabel(value) {
+  const labels = { Event: "السجل", Host: "الجهاز", Incident: "القضية", User: "المستخدم", IP: "عنوان IP", Process: "عملية النظام", FileHash: "بصمة الملف", Technique: "التقنية", Alert: "التنبيه", observed: "مرصود", mapped: "مرتبط بتقنية", derived: "مشتق" };
+  return Object.hasOwn(labels, value) ? SOCifyLocale.text(labels[value]) : value;
+}
+
 window.SOCifyAutopsy.investigation = async (caseId) => {
   const root = node("div");
   const viewport = node("div");
@@ -43,7 +60,10 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
           item.append(node("p", { text: payload.body || payload.details || payload.notes || payload.source || "" }));
           if (payload.decision) item.append(node("p", { text: SOCifyLocale.template`القرار: ${payload.decision}` }));
           if (event.kind === "response") item.append(node("p", { text: `${autopsyLabel(payload.phase)} · ${autopsyLabel(payload.status)}` }));
-          if (payload.evidence_id) item.append(node("p", { text: SOCifyLocale.template`دليل القضية ${payload.evidence_id}` }));
+          if (payload.evidence_id) {
+            const evidence = (autopsy.current.evidence || []).find((entry) => String(entry.id) === String(payload.evidence_id));
+            item.append(node("p", { dir: "auto", "data-user-content": true, text: `${SOCifyLocale.text("الدليل المرتبط")}: ${evidence ? `${evidence.title} · ${evidence.id}` : SOCifyLocale.text("الدليل غير متاح")}` }));
+          }
           item.append(button(SOCifyLocale.text("تفاصيل ملاحظة التحقيق"), () => autopsyModal(SOCifyLocale.text("سجل التحقيق وإصداره وأدلته"), autopsyRecordCard(event.record))));
         }
         if (event.future_time) item.append(node("p", { class: "notice", text: SOCifyLocale.text("طابع زمني مستقبلي يحتاج مراجعة؛ لا يدخل قياسات الاستجابة المؤكدة.") }));
@@ -51,7 +71,7 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
         continue;
       }
       const marks = data.bookmarks.filter((item) => item.payload.event_id === event.id);
-      const content = node("li", { class: marks.length ? `timeline-mark-${marks[0].payload.color || "blue"}` : "" }, [node("h3", { text: event.title }), node("p", { text: `${event.observed_time_known ? formatTime(event.event_time) : SOCifyLocale.text("وقت الحدث غير معروف؛ لا يُستبدل بوقت الاستيراد")} · ${event.source} · ${autopsyLabel(event.severity)}` }), node("p", { text: SOCifyLocale.template`أساس التوقيت: ${event.time_basis}` }), node("small", { text: SOCifyLocale.template`وقت الاستيراد: ${formatTime(event.ingested_at)}` })]);
+      const content = node("li", { class: marks.length ? `timeline-mark-${marks[0].payload.color || "blue"}` : "" }, [node("h3", { text: event.title }), node("p", { text: `${event.observed_time_known ? formatTime(event.event_time) : SOCifyLocale.text("وقت الحدث غير معروف؛ لا يُستبدل بوقت الاستيراد")} · ${event.source} · ${autopsyLabel(event.severity)}` }), node("p", { text: SOCifyLocale.template`أساس التوقيت: ${autopsyTimeBasisLabel(event.time_basis)}` }), node("small", { text: SOCifyLocale.template`وقت الاستيراد: ${formatTime(event.ingested_at)}` })]);
       for (const mark of marks) content.append(node("p", { text: `${mark.payload.title} · ${mark.payload.notes || ""} · ${(mark.payload.tags || []).join(", ")}` }));
       content.append(button(SOCifyLocale.text("تفاصيل السجل"), async () => { try { const detail = await api(`/api/cases/${caseId}/logs/${event.id}`); autopsyModal(SOCifyLocale.text("الدليل الخام والمطبع"), node("pre", { text: JSON.stringify(detail, null, 2) })); } catch (error) { handleError(error); } }));
       if (autopsy.current.can_update && autopsy.current.status !== "closed") content.append(button(SOCifyLocale.text("تمييز السجل وإضافة ملاحظة"), () => {
@@ -95,11 +115,11 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
     const position = positions.get(item.id);
     const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
     text.setAttribute("x", position.x); text.setAttribute("y", position.y); text.setAttribute("text-anchor", "middle"); text.setAttribute("fill", "var(--blue)");
-    text.textContent = displayText(`${item.type}: ${item.label}`).slice(0, 30);
+    text.textContent = displayText(`${autopsyGraphLabel(item.type)}: ${item.label}`).slice(0, 30);
     const title = document.createElementNS("http://www.w3.org/2000/svg", "title"); title.textContent = displayText(item.label); text.append(title); svg.append(text);
   }
   canvas.append(svg);
-  if (graph.nodes.length) graphBody.append(canvas, panel(SOCifyLocale.text("جدول العلاقات ومراجع الأدلة"), table([{ label: SOCifyLocale.text("الكيان"), value: "label" }, { label: SOCifyLocale.text("النوع"), value: "type" }, { label: SOCifyLocale.text("المرجع"), value: "reference_id" }, { label: SOCifyLocale.text("طبيعة الربط"), value: "provenance" }], graph.nodes)));
+  if (graph.nodes.length) graphBody.append(canvas, panel(SOCifyLocale.text("جدول العلاقات ومراجع الأدلة"), table([{ label: SOCifyLocale.text("الكيان"), value: "label" }, { label: SOCifyLocale.text("النوع"), value: (item) => autopsyGraphLabel(item.type) }, { label: SOCifyLocale.text("المرجع"), value: "reference_id" }, { label: SOCifyLocale.text("طبيعة الربط"), value: (item) => autopsyGraphLabel(item.provenance) }], graph.nodes)));
   root.append(panel(SOCifyLocale.text("رسم العلاقات داخل القضية"), graphBody));
   const attackBody = node("div", { class: "panel-body" });
   const search = node("input", { name: "attack_search", type: "search", maxlength: 100, placeholder: SOCifyLocale.text("T1059 أو اسم التقنية") });

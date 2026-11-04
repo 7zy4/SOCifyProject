@@ -28,4 +28,4 @@ Bundled fonts include Almarai and IBM Plex Sans. Sources: https://github.com/goo
 
 ## Interface and report fonts
 
-The current type system uses Bangers, Comic Neue, Cairo, Tajawal, IBM Plex Sans Arabic, IBM Plex Sans and JetBrains Mono. Fonts are bundled locally under SIL OFL 1.1 with the corresponding license beside each family. The added upstream sources, input hashes and converted WOFF2 hashes are recorded in `static/fonts/sources.json`; the retained IBM Plex Sans face uses the preceding interface manifest. `static/design-tokens.json` selects the active families. No runtime request to a font provider is required.
+The current type system uses Bangers, Cairo, IBM Plex Sans Arabic, IBM Plex Sans and JetBrains Mono. Fonts are bundled locally under SIL OFL 1.1 with the corresponding license beside each family. The added upstream sources, input hashes and converted WOFF2 hashes are recorded in `static/fonts/sources.json`; the retained IBM Plex Sans face uses the preceding interface manifest. `static/design-tokens.json` selects the active families. No runtime request to a font provider is required.

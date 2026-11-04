@@ -120,7 +120,9 @@ def test_completing_work_preserves_the_open_case_draft(app, language, assigned):
         section.locator("[name=objective]").fill("Confirm the retained identity evidence before closure")
         j.click("button", "إكمال المهمة", task_row(j, title))
         expect(section.locator("[name=objective]")).to_have_value("Confirm the retained identity evidence before closure")
-        j.click("button", "حفظ", section)
+        with j.page.expect_response(lambda response: response.url.endswith(f"/api/cases/{j.case_id}/context") and response.request.method == "PATCH") as saved:
+            j.click("button", "حفظ", section)
+        assert saved.value.status == 200
         assert j.state()["context"]["objective"] == "Confirm the retained identity evidence before closure"
         result["outcomes"] = ["open case draft preserved and saved after completing a task without reloading"]
         capture(j, result)

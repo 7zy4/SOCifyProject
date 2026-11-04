@@ -360,9 +360,52 @@ function autopsySLASummary(sla) {
   return result;
 }
 
+function autopsyResponseMetrics(metrics) {
+  const labels = {
+    detection_delay_seconds: "المدة حتى الرصد بالثواني",
+    first_response_delay_seconds: "المدة حتى أول استجابة بالثواني",
+    acknowledgement_delay_seconds: "المدة حتى الإقرار بالثواني",
+    containment_delay_seconds: "المدة حتى الاحتواء بالثواني",
+    recovery_delay_seconds: "المدة حتى التعافي بالثواني",
+    closure_delay_seconds: "المدة من الرصد حتى الإغلاق بالثواني",
+  };
+  const milestones = {
+    first_evidenced_activity: "أقدم نشاط مثبت بالدليل",
+    detection: "وقت الرصد المثبت",
+    first_response: "وقت أول استجابة مثبتة",
+    acknowledgement: "وقت إقرار الاستلام",
+    containment: "وقت الاحتواء المثبت",
+    recovery: "وقت التعافي المثبت",
+  };
+  const phases = { first_evidenced_activity: "أول نشاط مثبت", detection: "الرصد", first_response: "أول استجابة", acknowledgement: "إقرار الاستلام", containment: "الاحتواء", recovery: "التعافي", closure: "إغلاق القضية" };
+  const reasons = {
+    "negative interval excluded": "نهاية الفترة تسبق بدايتها؛ لم تُحسب المدة.",
+    "future timestamp": "وقت مستقبلي؛ لا يدخل القياسات المؤكدة.",
+    "missing or invalid timestamp": "وقت مفقود أو غير صالح؛ لا يمكن حساب المدة.",
+  };
+  const number = new Intl.NumberFormat(SOCifyLocale.language, { maximumFractionDigits: 6 });
+  const durations = table([
+    { label: SOCifyLocale.text("المقياس"), value: row => SOCifyLocale.text(row.label) },
+    { label: SOCifyLocale.text("القيمة"), value: row => node("span", { "data-response-duration": row.key, text: Number.isFinite(row.value) && row.value >= 0 ? number.format(row.value) : SOCifyLocale.text("غير مقاس") }) },
+  ], Object.entries(labels).map(([key, label]) => ({ key, label, value: metrics[key] })));
+  durations.classList.add("response-metric-durations");
+  const root = node("details", { class: "response-metrics" }, [node("summary", { text: SOCifyLocale.text("قياسات الاستجابة وأساس حسابها") }), durations]);
+  if (metrics.issues?.length) root.append(node("ul", { class: "response-metric-issues" }, metrics.issues.map(issue => {
+    const [phase, reason] = String(issue).split(": ");
+    return node("li", { text: `${SOCifyLocale.text(phases[phase] || "قياس الاستجابة")}: ${SOCifyLocale.text(reasons[reason] || "تعذر احتساب هذا القياس؛ راجع أوقات الاستجابة.")}` });
+  })));
+  const moments = Object.entries(milestones).filter(([key]) => metrics.milestones?.[key] && Number.isFinite(Date.parse(metrics.milestones[key])));
+  if (moments.length) root.append(table([
+    { label: SOCifyLocale.text("مراحل الاستجابة"), value: row => SOCifyLocale.text(row.label) },
+    { label: SOCifyLocale.text("وقت الحدث"), value: row => formatTime(row.value) },
+  ], moments.map(([key, label]) => ({ label, value: metrics.milestones[key] }))));
+  if (metrics.basis) root.append(node("p", { text: SOCifyLocale.text(metrics.basis) }));
+  return root;
+}
+
 window.SOCifyAutopsy.workflow = async (caseId) => {
   const data = await api(`/api/cases/${caseId}/workflow`), current = autopsy.current, base = `/api/cases/${caseId}`;
-  const root = node("div", { class: "panel-body" }, [autopsySLASummary(data.sla), node("details", {}, [node("summary", { text: SOCifyLocale.text("قياسات الاستجابة وأساس حسابها") }), node("pre", { text: JSON.stringify(data.metrics, null, 2) })])]);
+  const root = node("div", { class: "panel-body" }, [autopsySLASummary(data.sla), autopsyResponseMetrics(data.metrics)]);
   if (data.scope) root.append(node("details", {}, [node("summary", { text: SOCifyLocale.text("نطاق الفحص وحدوده") }), node("p", { text: SOCifyLocale.text(data.scope.limitations) }), table([{ label: SOCifyLocale.text("تقييم الأصل"), value: (row) => autopsyLabel(row.assessment) }, { label: SOCifyLocale.text("الأصول الموثقة"), value: "count" }], Object.entries(data.scope.counts_by_assessment).map(([assessment, count]) => ({ assessment, count }))), node("details", {}, [node("summary", { text: SOCifyLocale.text("أقدم ملاحظة وأدلتها · لا تثبت بداية الهجوم") }), node("pre", { text: JSON.stringify(data.scope.earliest_retained_observation, null, 2) })])]));
   if (current.can_manage && current.status !== "closed") {
     const policy = data.sla.policy, calendar = policy?.calendar;

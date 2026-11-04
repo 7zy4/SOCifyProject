@@ -1,8 +1,6 @@
-<p align="center"><img src="static/brand-mark.svg" width="72" alt="شعار SOCify"></p>
+<h1 align="center"><img src="docs/assets/brand-lockup.svg" width="420" alt="SOCify"></h1>
 
 <div dir="rtl">
-
-# SOCify
 
 منصة للتحقيق والاستجابة الأمنية: ارفع سجلاتك، راجع التنبيهات، وثّق الأدلة والقرار، ثم أصدر تقرير القضية. واجهة عربية وإنجليزية، مع وضعين داكن وفاتح.
 

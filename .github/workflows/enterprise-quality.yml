@@ -137,6 +137,8 @@ jobs:
             artifacts/review-journeys/
             artifacts/performance-charts/
             artifacts/interface-interactions/
+            artifacts/interface-final-review/
+            artifacts/interaction-final-review/
             artifacts/usability_campaign/performance-decision-review/
             artifacts/usability_campaign/performance-access-review/
             artifacts/usability_campaign/source-transport-decisions/

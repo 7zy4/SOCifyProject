@@ -185,9 +185,7 @@ def test_case_local_access_removal_is_safe_and_recoverable(app, language, scenar
                     colleague.case_id, colleague.case_url = j.case_id, j.case_url
                     grant(colleague, person)
                     manager.click("button", "سحب الوصول", dialog)
-                    expect(dialog.locator("[role=alert]")).to_contain_text(
-                        manager.text("تغيرت القضية؛ حدّث قبل الحفظ") if language == "ar" else "The case changed"
-                    )
+                    expect(dialog.locator("[role=alert]")).to_contain_text(manager.text("راجع تحديثات القضية قبل متابعة الحفظ"))
                     assert j.page.request.get(j.base + f"/api/cases/{j.case_id}").status == 200
                 if scenario in {"membership-stale-regrant", "membership-stale-case"}:
                     discard(manager, dialog)

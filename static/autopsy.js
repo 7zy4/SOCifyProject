@@ -459,21 +459,29 @@ function autopsyRecordCard(record) {
   if (record.kind === "analysis" && (/^(email_static_triage|eml_static_v1|v[0-9]+_email_static_triage)$/.test(record.payload.method))) {
     return node("article", { class: "card record-card email-record" }, [node("h3", { text: record.payload.title }), autopsyEmailView(record.payload), node("p", { text: formatTime(record.updated_at) })]);
   }
+  const heading = record.payload.title || record.payload.name || autopsyLabel(record.kind);
   const rows = node("tbody");
-  const values = node("table", { class: "alert-property-table", "aria-label": record.payload.title || record.payload.name || autopsyLabel(record.kind) }, rows);
+  const values = node("table", { class: "alert-property-table", "aria-label": heading }, rows);
   Object.entries(record.payload).forEach(([key, value]) => {
-    if (value === null || value === "") return;
+    if (value === null || value === "" || ((key === "title" || key === "name") && value === heading)) return;
+    const spec = autopsy.catalog.record_schemas[record.kind]?.[key];
     let display = Array.isArray(value) ? value.map((item, index) => {
       if (typeof item !== "object" || item === null) return item;
       if (!item.question) return JSON.stringify(item);
       const parent = value.findIndex(other => other?.id === item.parent_id);
       const assessment = item.assessment === "hypothesis" ? SOCifyLocale.text("الفرضية") : autopsyLabel(item.assessment);
       return `${index + 1}. ${item.question}: ${item.answer || ""} · ${assessment || ""}${item.evidence_id ? SOCifyLocale.template` · دليل ${item.evidence_id}` : ""}${item.parent_id && parent >= 0 ? SOCifyLocale.template` · مرتبط بالسؤال ${parent + 1}` : ""}`;
-    }).join("\n") : typeof value === "object" ? JSON.stringify(value) : autopsyLabel(value);
+    }).join("\n") : typeof value === "object" ? JSON.stringify(value) : spec?.choices ? autopsyLabel(value) : value;
     if (key.endsWith("_at") || key === "event_time") display = formatTime(value);
     if (record.kind === "corrective" && key === "status" && value === "open") display = SOCifyLocale.text("مفتوح");
-    let content = node("td", {}, node("span", { dir: "auto", text: display }));
+    let content = node("td", {}, node("span", { dir: "auto", ...(!spec?.choices ? { "data-user-content": true } : {}), text: display }));
     if (autopsy.catalog.record_schemas[record.kind]?.[key]?.user) content = node("td", { "data-user-content": true, text: autopsy.team.members.find(member => member.id === value)?.name || SOCifyLocale.text("المستخدم غير متاح") });
+    if (key === "evidence_id") {
+      const evidence = (autopsy.current?.evidence || []).find(item => String(item.id) === String(value));
+      content = node("td", {}, node("span", evidence
+        ? { "data-user-content": true, dir: "auto", text: `${evidence.title} · ${value}` }
+        : { text: SOCifyLocale.text("الدليل غير متاح") }));
+    }
     if (key === "task_id") content = node("td", {}, [node("a", { href: `/cases/${autopsy.current.id}?tab=summary#case-task-${value}`, text: SOCifyLocale.text("فتح المهمة") })]);
     if (key === "root_cause_id" || key === "why_id") {
       const caseId = autopsy.current.id;
@@ -490,7 +498,7 @@ function autopsyRecordCard(record) {
     }
     rows.append(node("tr", {}, [node("th", { scope: "row", text: autopsyLabel(key) }), content]));
   });
-  const card = node("article", { class: "card record-card" }, [node("h3", { text: record.payload.title || record.payload.name || autopsyLabel(record.kind) }), values, node("p", { text: formatTime(record.updated_at) })]);
+  const card = node("article", { class: "card record-card" }, [node("h3", { "data-user-content": true, dir: "auto", text: heading }), values, node("p", { text: formatTime(record.updated_at) })]);
   if (autopsy.current.can_update && (autopsy.current.status !== "closed" || record.kind === "corrective") && autopsy.catalog.record_schemas[record.kind]) card.append(button(SOCifyLocale.text("تعديل"), () => autopsyEditRecord(record.kind, record)));
   return card;
 }
@@ -587,8 +595,17 @@ async function autopsyCaseTasks(current) {
       const update = async (row, control) => {
         control.disabled = true;
         notice.hidden = true;
+        const contextForm = body.closest(".case-view")?.querySelector('form[data-case-form="context"]');
         try {
           const updated = await api(`/api/incidents/${current.id}/tasks/${row.id}`, { method: "PATCH", body: { status: "completed", expected_status: row.status } });
+          // Advance only the draft based on the exact version this task changed.
+          // An intervening case edit must still require the analyst's review.
+          if (body.isConnected && contextForm?.isConnected &&
+              contextForm.caseVersion === updated.case_version_before &&
+              contextForm.caseContext === JSON.stringify(current.context) &&
+              !contextForm.dataset.caseNeedsReview && !contextForm.dataset.caseUnavailable &&
+              !contextForm.dataset.caseConflict && !contextForm.dataset.caseCommitted &&
+              contextForm.dataset.saving !== "true") contextForm.caseVersion = updated.case_version;
           if (current.version === updated.case_version_before) current.version = updated.case_version;
           await load(page, focus);
         } catch (error) { notice.textContent = error.message; notice.hidden = false; }
@@ -708,6 +725,25 @@ function autopsyRetainSummaryDraft(form, replacement, current) {
   form.append(node("details", { class: "case-form-review span-2" }, [node("summary", { text: SOCifyLocale.text("مراجعة تحديثات القضية") }), stackedTable([{ label: SOCifyLocale.text("الحقل"), value: "label" }, { label: SOCifyLocale.text("القيمة الحالية"), value: "value" }], facts), accept]));
 }
 
+function autopsyRevealCaseTab(nav) {
+  const active = nav?.querySelector('[aria-current="page"]');
+  if (!active) return;
+  const reveal = () => {
+    if (!nav.isConnected) { observer.disconnect(); return; }
+    if (nav.scrollWidth <= nav.clientWidth) return;
+    const bounds = nav.getBoundingClientRect(), selected = active.getBoundingClientRect();
+    const left = bounds.left + nav.clientLeft, right = left + nav.clientWidth;
+    const delta = selected.width > nav.clientWidth
+      ? (getComputedStyle(nav).direction === "rtl" ? selected.right - right : selected.left - left)
+      : selected.left < left ? selected.left - left : selected.right > right ? selected.right - right : 0;
+    if (Math.abs(delta) > 1) nav.scrollBy({ left: delta, behavior: "instant" });
+  };
+  const observer = new ResizeObserver(reveal);
+  observer.observe(nav);
+  observer.observe(active);
+  reveal();
+}
+
 async function autopsyCase(caseId, { refresh = false, savedForm = null } = {}) {
   if (!refresh && !SOCifyDrafts.confirmDiscard(workspace, true)) return;
   if (window.SOCifyWorkbench?.sections.includes(state.section)) { await window.SOCifyWorkbench.start(state.section); return; }
@@ -805,6 +841,7 @@ async function autopsyCase(caseId, { refresh = false, savedForm = null } = {}) {
     }
   }
   finish(root);
+  autopsyRevealCaseTab(root.querySelector(".case-tabs"));
   if (retainedFocus && active?.isConnected) active.focus({ preventScroll: true });
   autopsyAcknowledgeCaseIntake([current.id]);
   if (selected === "summary" && /^#case-task-\d+$/.test(location.hash)) {
