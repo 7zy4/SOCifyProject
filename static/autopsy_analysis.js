@@ -1,5 +1,53 @@
 "use strict";
 
+function autopsyReputationCard(record, sample = null) {
+  const p = record.payload;
+  const text = (ar, en) => SOCifyLocale.language === "ar" ? ar : en;
+  const heading = text("نتيجة سمعة مستوردة", "Imported reputation assessment");
+  const rows = node("tbody");
+  const add = (label, value) => rows.append(node("tr", {}, [
+    node("th", { scope: "row", text: label }),
+    node("td", {}, typeof value === "string" ? node("span", { dir: "auto", text: value }) : value),
+  ]));
+  if (sample) add(SOCifyLocale.text("العينة"), node("bdi", { dir: "auto", "data-user-content": true, text: sample.filename }));
+  add(text("بصمة العينة", "Sample SHA-256"), node("bdi", { dir: "ltr", text: p.sha256 }));
+  add(SOCifyLocale.text("المصدر"), p.source);
+  add(text("وقت الفحص في المصدر", "Source analysis time"), formatTime(p.examined_at));
+  add(text("وقت الاستيراد", "Import time"), formatTime(p.imported_at));
+  add(text("التحقق من المصدر", "Source verification"), text("تقرير مستورد غير متحقق", "Unverified imported report"));
+  const categories = {
+    malicious: text("أبلغ عن ضرر", "Reported malicious"),
+    suspicious: text("أبلغ عن اشتباه", "Reported suspicious"),
+    undetected: text("لم يكتشف", "Undetected"),
+    harmless: text("صنّفه حميدًا", "Reported harmless"),
+    "type-unsupported": text("نوع غير مدعوم", "Unsupported type"),
+    timeout: text("انتهت المهلة", "Timeout"),
+    "confirmed-timeout": text("انتهاء مهلة مؤكد", "Confirmed timeout"),
+    failure: text("تعذر الفحص", "Scan failure"),
+  };
+  const counts = Object.entries(p.stats || {}).map(([key, count]) => ({ category: categories[key] || key, count }));
+  for (const result of counts) add(`${text("المحركات", "Engines")} · ${result.category}`, String(result.count));
+  add(text("بصمة التقرير الأصلي", "Original report SHA-256"), node("bdi", { dir: "ltr", text: p.source_sha256 }));
+  const card = node("article", { class: "card record-card reputation-record" }, [
+    node("h3", { text: heading }),
+    node("table", { class: "alert-property-table", "aria-label": heading }, rows),
+    node("p", { class: "notice", text: text("عدد الاكتشافات لا يثبت سلامة الملف أو تنفيذه.", "The detection count does not establish safety or execution.") }),
+  ]);
+  if (p.engines?.length) card.append(node("details", {}, [
+    node("summary", { text: text("تفاصيل كل محرك", "Individual engine results") }),
+    ...p.engines.map(engine => {
+      const engineRows = [
+        [text("المحرك", "Engine"), engine.engine],
+        [text("التصنيف المبلّغ", "Reported classification"), categories[engine.category] || engine.category],
+        [SOCifyLocale.text("النتيجة"), engine.result || "—"],
+      ].map(([label, value]) => node("tr", {}, [node("th", { scope: "row", text: label }), node("td", { dir: "auto", text: value })]));
+      return node("table", { class: "alert-property-table", "aria-label": engine.engine }, node("tbody", {}, engineRows));
+    }),
+  ]));
+  if (p.evidence_id && permission("evidence.download")) card.append(linkedButton(SOCifyLocale.text("تنزيل الأصل"), `/api/incidents/${autopsy.current.id}/evidence/${p.evidence_id}/content`));
+  return card;
+}
+
 function autopsyStaticVerdict(value) {
   const labels = { high_risk: "مؤشرات خطورة مرتفعة", suspicious: "يحتاج إلى مراجعة", low_signal_static_only: "لا مؤشرات بارزة في الفحص الساكن" };
   return SOCifyLocale.text(labels[value] || value);
@@ -192,13 +240,54 @@ window.SOCifyAutopsy.analysis = async (caseId) => {
     const choices = [...samples.items.map((sample) => ({ value: `sample_id:${sample.id}`, label: SOCifyLocale.template`عينة: ${sample.filename} · ${sample.sha256}` })), ...indicators.filter((item) => item.payload.type === "sha256").map((item) => ({ value: `indicator_id:${item.id}`, label: SOCifyLocale.template`مؤشر SHA-256: ${item.payload.value}` }))];
     const subject = autopsyChoice("subject", choices, "", true);
     const file = node("input", { name: "vt_report", type: "file", required: true, accept: ".json,application/json" });
-    const form = node("form", { class: "form-grid panel-body" }, [field(SOCifyLocale.text("العينة أو البصمة المعروفة"), subject.control, true), field(SOCifyLocale.text("تقرير JSON محفوظ محليًا"), file), node("button", { type: "submit", class: "button primary", text: SOCifyLocale.text("استيراد نتيجة الفحص") })]);
-    form.addEventListener("submit", async (event) => { event.preventDefault(); try { const [key, value] = subject.input.autopsyValue().split(":"); const data = new FormData(); data.set(key, value); data.set("file", file.files[0]); await api(`/api/cases/${caseId}/reputation/virustotal`, { method: "POST", body: data }); await autopsyCase(caseId); } catch (error) { handleError(error); } });
+    const error = node("p", { class: "notice span-2 reputation-import-error", role: "alert", hidden: true });
+    const submit = node("button", { type: "submit", class: "button primary", text: SOCifyLocale.text("استيراد نتيجة الفحص") });
+    const form = node("form", { class: "form-grid panel-body" }, [field(SOCifyLocale.text("العينة أو البصمة المعروفة"), subject.control, true), field(SOCifyLocale.text("تقرير JSON محفوظ محليًا"), file), submit, error]);
+    let committed = false;
+    let submittedLocation = null;
+    const sameLocation = () => `${location.pathname}${location.search}` === submittedLocation;
+    const saved = node("p", { role: "status", class: "notice span-2 reputation-import-saved", hidden: true });
+    const retry = button(SOCifyLocale.text("إعادة المحاولة"), refresh);
+    retry.hidden = true;
+    form.append(saved, retry);
+    async function refresh() {
+      if (!sameLocation()) return;
+      retry.disabled = true;
+      saved.hidden = false;
+      saved.textContent = SOCifyLocale.language === "ar" ? "تم حفظ النتيجة" : "Result saved";
+      const previous = workspace.firstElementChild;
+      try { await autopsyCase(caseId, { refresh: true }); }
+      catch (_) {
+        if (!sameLocation()) return;
+        // A tool view may replace its workspace while refreshing. Retain the saved form and its GET-only recovery.
+        if (!form.isConnected && previous) finish(previous);
+        saved.textContent = SOCifyLocale.language === "ar" ? "تم حفظ النتيجة؛ تعذر تحديث العرض" : "Result saved; the view could not be refreshed";
+        retry.hidden = false;
+      } finally { retry.disabled = false; }
+    }
+    form.addEventListener("input", () => { error.hidden = true; });
+    form.addEventListener("change", () => { error.hidden = true; });
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (committed || submit.disabled) return;
+      error.hidden = true;
+      const frozen = [...form.querySelectorAll("input,button")].filter(control => !control.disabled);
+      try {
+        const [key, value] = subject.input.autopsyValue().split(":");
+        const data = new FormData(); data.set(key, value); data.set("file", file.files[0]);
+        submittedLocation = `${location.pathname}${location.search}`;
+        frozen.forEach(control => { control.disabled = true; });
+        await api(`/api/cases/${caseId}/reputation/virustotal`, { method: "POST", body: data });
+        committed = true;
+        await refresh();
+      } catch (failure) { error.textContent = failure.message; error.hidden = false; }
+      finally { if (!committed) frozen.forEach(control => { control.disabled = false; }); }
+    });
     if (choices.length) root.append(panel("VirusTotal", form, true));
   }
   for (const kind of ["reputation", "analysis"]) {
     const records = await api(`/api/cases/${caseId}/records?kind=${kind}&limit=100`);
-    if (records.items.length) root.append(panel(autopsyLabel(kind), node("div", { class: "record-grid" }, records.items.map(autopsyRecordCard)), true));
+    if (records.items.length) root.append(panel(autopsyLabel(kind), node("div", { class: "record-grid" }, records.items.map(record => kind === "reputation" ? autopsyReputationCard(record, samples.items.find(sample => sample.id === record.payload.sample_id)) : autopsyRecordCard(record))), true));
   }
   return root;
 };

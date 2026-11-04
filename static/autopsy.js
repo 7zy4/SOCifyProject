@@ -450,6 +450,7 @@ async function autopsyCases(page = null, query = null) {
 }
 
 function autopsyRecordCard(record) {
+  if (record.kind === "reputation") return autopsyReputationCard(record);
   if(record.kind === "analysis" && record.payload.analysis_type === "local_detection") {
     return node("article", { class: "card record-card" }, [node("h3", { text: SOCifyLocale.text("نتيجة فحص السجلات") }), autopsyDetectionResult(record, autopsy.current.id), node("p", { text: formatTime(record.updated_at) })]);
   }

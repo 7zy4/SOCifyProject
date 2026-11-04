@@ -13,6 +13,11 @@
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
   document.cookie = `socify-language=${language}; Path=/; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
   const english = {
+  "عدد الأصول الموثقة": "Documented assets",
+  "الملاحظات المستبعدة من تحديد أقدم نشاط": "Observations excluded from earliest activity",
+  "السجلات المرتبطة تاريخيًا": "Historically linked logs",
+  "ملاحظات القياس": "Measurement notes",
+  "بصمة التقرير لا تطابق العينة أو المؤشر المحدد": "The report hash does not match the selected sample or indicator",
   "انقطع رد المصدر قبل اكتماله؛ أعد المحاولة": "The source response ended before completion; try again",
   "المصدر غير مصرح للسحب؛ راجع إعدادات الاتصال": "The source is not approved for retrieval; review its connection settings",
   "يلزم عنوان HTTPS صالح": "Enter a valid HTTPS address",

@@ -1,10 +1,13 @@
 import copy
+import hashlib
+import io
 
 import pytest
 from defusedxml import ElementTree as ET
+from docx import Document
 
 from socify.autopsy_domain import canonical
-from socify.autopsy_report_render import directional_html, lines, render_html, report_blocks, report_table, sections
+from socify.autopsy_report_render import directional_html, lines, render_docx, render_html, report_blocks, report_table, sections
 
 
 def test_investigation_report_keeps_the_record_content_and_identity_without_storage_wrappers():
@@ -101,3 +104,45 @@ def test_latin_isolation_handles_long_unbroken_values_without_removing_spaces_or
     root = ET.fromstring("<root>" + directional_html(source) + "</root>")
     assert "".join(root.itertext()) == source
     assert len(root.findall("bdi")) == 2
+
+
+def test_report_explains_generated_scope_and_timing_without_rewriting_retained_evidence():
+    literal = "Retained text / نص محفوظ: containment: negative interval excluded; checked_clear; alert_review; <script>"
+    payload = {
+        "case": {"title": "تحقيق / Investigation", "reference": "CASE-DIAGNOSTICS", "status": "escalated"},
+        "revision": 1,
+        "context": {"reason": "alert_review"},
+        "metrics": {
+            "containment_delay_seconds": None,
+            "acknowledgement_delay_seconds": 0,
+            "issues": [
+                "containment: negative interval excluded",
+                "recovery: future timestamp",
+                "detection: missing or invalid timestamp",
+                "unknown: retained diagnostic",
+            ],
+        },
+        "scope": {"asset_records": 2, "counts_by_assessment": {"checked_clear": 1, "confirmed": 1}, "excluded_observations": 1},
+        "evidence": [{"id": 1, "title": "Retained evidence", "details": literal, "sha256": "a" * 64}],
+    }
+    original = canonical(payload)
+    expected_hash = hashlib.sha256(original.encode()).hexdigest()
+    content = dict(sections(payload))
+    metrics = "\n".join(text for _, text in lines(content["قياسات مراحل الاستجابة"]))
+    scope = "\n".join(text for _, text in lines(content["نطاق الفحص وحدود الاستنتاج"]))
+    assert "وقت الاحتواء المثبت: نهاية الفترة تسبق بدايتها؛ لم تُحسب المدة" in metrics
+    assert "وقت التعافي المثبت: طابع زمني مستقبلي؛ استُبعد من القياس" in metrics
+    assert "وقت الرصد المثبت: الوقت مفقود أو غير صالح؛ لم تُحسب المدة" in metrics
+    assert "unknown: retained diagnostic" in metrics
+    assert "المدة حتى الاحتواء بالثواني: غير قابل للحساب" in metrics
+    assert "المدة حتى الإقرار بالثواني: 0" in metrics
+    assert "عدد الأصول الموثقة: 2" in scope and "فُحص ضمن نطاق موثق: 1" in scope and "متأثر مؤكد: 1" in scope
+    assert content["الهدف وقرار التنبيه ونتيجة الهجوم"]["reason"] == "مراجعة تنبيه"
+    rendered = render_html(payload)
+    assert expected_hash in rendered and "مصعّدة" in rendered and "&lt;script&gt;" in rendered
+    document = Document(io.BytesIO(render_docx(payload)))
+    cells = [cell.text for table in document.tables for row in table.rows for cell in row.cells]
+    assert literal in cells and "غير قابل للحساب" in cells and "0" in cells
+    assert "عدد الأصول الموثقة" in cells and "فُحص ضمن نطاق موثق" in cells and "مصعّدة" in cells
+    assert hashlib.sha256(canonical(payload).encode()).hexdigest() == expected_hash
+    assert canonical(payload) == original

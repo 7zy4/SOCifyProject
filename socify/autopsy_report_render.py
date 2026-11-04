@@ -124,9 +124,17 @@ LABELS = {
     "task_id": "المهمة المرتبطة",
     "scope": "نطاق الفحص وحدود الاستنتاج",
     "counts_by_assessment": "تقييم أصول النطاق",
+    "asset_records": "عدد الأصول الموثقة",
+    "confirmed": "متأثر مؤكد",
+    "suspected": "مشتبه",
+    "checked_clear": "فُحص ضمن نطاق موثق",
+    "unexamined": "لم يُفحص",
+    "undetermined": "غير محسوم",
+    "excluded_observations": "الملاحظات المستبعدة من تحديد أقدم نشاط",
     "earliest_retained_observation": "أقدم ملاحظة محفوظة مدعومة بدليل",
     "counts": "موجز الأدلة المتاحة",
     "normalized_logs": "السجلات المطبعّة",
+    "historical_normalized_logs": "السجلات المرتبطة تاريخيًا",
     "status_at_preparation": "حالة القضية عند إعداد النسخة",
     "created_at": "وقت الإنشاء",
     "closed_at": "وقت الإغلاق",
@@ -160,6 +168,7 @@ LABELS = {
     "containment_delay_seconds": "المدة حتى الاحتواء بالثواني",
     "recovery_delay_seconds": "المدة حتى التعافي بالثواني",
     "missing_or_inconsistent_times": "الأوقات الناقصة أو غير المتسقة",
+    "issues": "ملاحظات القياس",
     "evidence_type": "نوع الدليل",
     "source": "المصدر",
     "confidence": "الثقة",
@@ -255,6 +264,13 @@ ENUM_LABELS = {
     "new": "مسودة",
     "open": "مفتوحة",
     "investigating": "قيد التحقيق",
+    "triaged": "تم الفرز",
+    "escalated": "مصعّدة",
+    "contained": "تم الاحتواء",
+    "remediated": "تمت المعالجة",
+    "recovered": "تم التعافي",
+    "resolved": "تم الحل",
+    "cancelled": "ملغاة",
     "awaiting_review": "بانتظار المراجعة",
     "closed": "مغلقة",
     "reopened": "أعيد فتحها",
@@ -423,6 +439,34 @@ def report_table(value, *, localize=False):
     return f'<table class="qa-table report-facts"><thead><tr><th{copy}>الحقل</th><th{copy}>القيمة</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>"
 
 
+def section_content(section, value):
+    """Translate generated decisions and diagnostics, never retained evidence text."""
+    if section == "context":
+        reasons = {
+            "alert_review": "مراجعة تنبيه",
+            "suspicious_activity": "نشاط مشتبه به",
+            "threat_hunt": "صيد تهديد",
+            "user_report": "بلاغ مستخدم",
+            "forensic_review": "فحص أدلة رقمية",
+            "other": "أخرى",
+        }
+        return {key: reasons.get(cell, cell) if key == "reason" and isinstance(cell, str) else cell for key, cell in value.items()}
+    if section == "metrics" and isinstance(value.get("issues"), list):
+        phases = {key: LABELS[key] for key in ("first_evidenced_activity", "detection", "acknowledgement", "containment", "recovery", "first_response")}
+        phases["closure"] = LABELS["closed_at"]
+        explanations = {
+            "future timestamp": "طابع زمني مستقبلي؛ استُبعد من القياس",
+            "missing or invalid timestamp": "الوقت مفقود أو غير صالح؛ لم تُحسب المدة",
+            "negative interval excluded": "نهاية الفترة تسبق بدايتها؛ لم تُحسب المدة",
+        }
+        issues = []
+        for issue in value["issues"]:
+            phase, separator, explanation = issue.partition(": ") if isinstance(issue, str) else (None, None, None)
+            issues.append(f"{phases[phase]}: {explanations[explanation]}" if separator and phase in phases and explanation in explanations else issue)
+        return {**value, "issues": issues}
+    return value
+
+
 def sections(payload):
     assessment = payload.get("investigation_assessment")
     if assessment:
@@ -435,7 +479,7 @@ def sections(payload):
             yield "مراجعة المدير", {key: assessment[key] for key in ("manager_decision", "manager_comment", "acknowledged_by", "acknowledged_at")}
     for key in ("summary", "case", "context", "metrics", "scope", "members", "alerts"):
         if payload.get(key):
-            yield LABELS[key], payload[key]
+            yield LABELS[key], section_content(key, payload[key])
     for kind in (
         "asset",
         "indicator",

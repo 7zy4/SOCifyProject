@@ -230,7 +230,8 @@ def revision(j, path):
 
 
 def download(j, path, format_name):
-    link = revision(j, path).get_by_role("link", name=j.text(f"تنزيل {format_name.upper()}"), exact=True)
+    label = j.page.evaluate("format => SOCifyLocale.template`تنزيل ${format}`", format_name.upper())
+    link = revision(j, path).get_by_role("link", name=label, exact=True)
     expect(link).to_have_attribute("href", f"{path}/files/{format_name}")
     with j.page.expect_download() as pending:
         link.click()
@@ -244,11 +245,20 @@ def normalized_text(text):
 
 def assert_pdf_cell(text, caption, expected):
     """Read a whole labelled value; a zero inside 10/30/120 is never zero."""
-    label = "".join(normalized_text(caption).split())
+    # Poppler's Cairo glyph extraction reorders these Arabic ligatures. These
+    # exact alternatives were verified against the native PDF pages, not fuzzy
+    # matches: a missing row or a different whole numeric value must still fail.
+    extracted_labels = {
+        "المدة حتى الإقرار بالثواني": "المدة حىت اإلقرار بالثواني",
+        "المدة حتى الاحتواء بالثواني": "المدة حىت االحتواء بالثواني",
+        "المدة حتى التعافي بالثواني": "المدة حىت التعافي بالثواني",
+    }
+    labels = {"".join(normalized_text(item).split()) for item in (caption, extracted_labels.get(caption, caption))}
+    labels |= {label[::-1] for label in labels}
     values = []
     for line in normalized_text(text).splitlines():
         compact = "".join(line.split())
-        for candidate in (label, label[::-1]):
+        for candidate in labels:
             if candidate in compact:
                 values.append(compact.replace(candidate, "", 1).strip(":|"))
                 break
@@ -259,7 +269,10 @@ def assert_pdf_cell(text, caption, expected):
             assert Decimal(value) == expected, (caption, value, expected)
         else:
             expected_text = "".join(normalized_text(expected).split())
-            assert value in (expected_text, expected_text[::-1]), (caption, value, expected)
+            variants = {expected_text, expected_text[::-1]}
+            if expected == "غير قابل للحساب":
+                variants.add("غريقابلللحساب")
+            assert value in variants, (caption, value, expected)
 
 
 def read_preview(j, path, result, markers):

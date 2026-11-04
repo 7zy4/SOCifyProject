@@ -145,6 +145,7 @@ dialog { border:3px solid var(--border-ink); border-radius:3px 8px 3px 5px; box-
 dialog::backdrop { background:rgb(10 13 15 / .78); }
 .email-result dl { display:grid; grid-template-columns:minmax(120px,.28fr) minmax(0,1fr); gap:8px 16px; }
 .email-result dd { margin:0; overflow-wrap:anywhere; }
+.email-result details > .cell-meta { overflow-wrap:anywhere; }
 .email-result .email-body { background:var(--panel-2); color:var(--text); border:2px solid var(--line); }
 .pagination,.pagination p { font-size:14px; color:var(--text); }
 /* Only the mark, account tabs and account fields live on authentication pages. */
@@ -361,6 +362,10 @@ dialog::backdrop { background:rgb(10 13 15 / .78); }
 .telemetry-view .network-results, .telemetry-view .endpoint-results { display: grid; gap: 16px; min-width: 0; }
 .telemetry-view .evidence-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .telemetry-view .evidence-links .button { min-width: 48px; }
+.telemetry-view .network-detail { min-width: 0; }
+.telemetry-view .network-detail .alert-property-table { min-width: 0; table-layout: fixed; }
+.telemetry-view .network-detail .alert-property-table th { width: 40%; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.telemetry-view .network-detail .alert-property-table td { min-width: 0; }
 .telemetry-view .network-detail:empty { display: none; }
 .telemetry-view .compact-empty { padding: 16px 0; margin: 0; }
 .telemetry-view .alert-property-table td { overflow-wrap: anywhere; }
