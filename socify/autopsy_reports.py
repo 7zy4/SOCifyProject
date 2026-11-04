@@ -127,8 +127,16 @@ def build_snapshot(case, revision: int, profile: str):
         payload["limitations"].append("نسخة منقحة تقتصر على البيانات الإحصائية والحالة؛ لا تصلح وحدها لاعتماد إغلاق القضية.")
         return payload
     records = bounded_rows(
-        "SELECT * FROM autopsy_records WHERE case_id = ? AND COALESCE(json_extract(payload, '$.visibility'), 'team') != 'private' ORDER BY id",
-        (case_id,),
+        """SELECT r.*,
+           CASE WHEN trim(COALESCE(author.name,'') || COALESCE(author.name_ar,'') || COALESCE(author.name_en,'')) != ''
+                THEN socify_user_name(author.name,author.name_ar,author.name_en) END AS created_by_name,
+           CASE WHEN trim(COALESCE(editor.name,'') || COALESCE(editor.name_ar,'') || COALESCE(editor.name_en,'')) != ''
+                THEN socify_user_name(editor.name,editor.name_ar,editor.name_en) END AS updated_by_name
+           FROM autopsy_records r
+           LEFT JOIN users author ON author.id=r.created_by AND author.workspace_id=?
+           LEFT JOIN users editor ON editor.id=r.updated_by AND editor.workspace_id=?
+           WHERE r.case_id=? AND COALESCE(json_extract(r.payload, '$.visibility'), 'team') != 'private' ORDER BY r.id""",
+        (case["workspace_id"], case["workspace_id"], case_id),
         2000,
     )
     for row in records:

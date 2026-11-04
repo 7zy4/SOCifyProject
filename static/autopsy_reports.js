@@ -46,6 +46,8 @@ const autopsyReportLabels = {
   id: SOCifyLocale.text("المعرف"),
   created_at: SOCifyLocale.text("وقت الإنشاء"),
   created_by: SOCifyLocale.text("معرف المؤلف"),
+  created_by_name: SOCifyLocale.language === "ar" ? "المؤلف" : "Author",
+  updated_by_name: SOCifyLocale.language === "ar" ? "آخر محرر" : "Last editor",
   updated_at: SOCifyLocale.text("آخر تعديل"),
   reference: SOCifyLocale.text("مرجع القضية"),
   source_version: SOCifyLocale.text("إصدار القضية"),
@@ -99,18 +101,30 @@ function autopsyReportFieldLabel(key) {
   return autopsyReportLabels[key] || (autopsy.catalog.report_labels?.[key] ? SOCifyLocale.text(autopsy.catalog.report_labels[key]) : autopsyLabel(key));
 }
 
-function autopsyReportPreview(value, depth = 0, fieldKey = "", view = null, path = []) {
+function autopsyReportPreview(value, depth = 0, fieldKey = "", view = null, path = [], recordContext = "") {
   if (value === null || typeof value !== "object") {
     let text = value === null ? "—" : String(value);
+    if (fieldKey === "basis" && typeof value === "string") {
+      const translated = SOCifyLocale.text(value);
+      if (typeof translated === "string") text = translated;
+    }
+    if (["phase", "status"].includes(fieldKey) && typeof value === "string" && Object.prototype.hasOwnProperty.call(autopsyLabels, value)) text = autopsyLabel(value);
     if (fieldKey === "profile") text = value === "full" ? SOCifyLocale.text("كامل للاستخدام الداخلي المصرح") : value === "metadata_only_v1" ? SOCifyLocale.text("منقح: بيانات إحصائية وحالة فقط") : text;
     if (["created_at", "updated_at", "generated_at", "event_time", "performed_at", "closed_at"].includes(fieldKey) && typeof value === "string" && Number.isFinite(Date.parse(value))) text = formatTime(value);
     return node("span", { "data-user-content": "true", text });
   }
   if (depth >= 8) return node("p", { text: SOCifyLocale.text("تفاصيل إضافية متاحة في ملف JSON الكامل.") });
   const entries = (Array.isArray(value) ? value.map((item, index) => {
-    const identity = item && typeof item === "object" && ["question", "reference", "title", "name", "original_filename", "id"].find(key => item[key] !== null && item[key] !== undefined && item[key] !== "");
-    return [identity ? `${autopsyReportFieldLabel(identity)}: ${item[identity]}` : `${SOCifyLocale.text("العنصر")} ${index + 1}`, item];
-  }) : Object.entries(value).filter(([key]) => !["schema", "revision", "version", "source_version", "parser_version"].includes(key))).filter(([, item]) => autopsyReportHasContent(item));
+    let source = item;
+    let identity = item && typeof item === "object" && ["question", "reference", "title", "name", "original_filename"].find(key => item[key] !== null && item[key] !== undefined && item[key] !== "");
+    if (!identity && item?.payload && typeof item.payload === "object") {
+      identity = ["title", "name"].find(key => typeof item.payload[key] === "string" && item.payload[key].trim());
+      if (identity) source = item.payload;
+    }
+    if (!identity && item && typeof item === "object" && item.id !== null && item.id !== undefined && item.id !== "") identity = "id";
+    return [identity ? `${autopsyReportFieldLabel(identity)}: ${source[identity]}` : `${SOCifyLocale.text("العنصر")} ${index + 1}`, item];
+  }) : Object.entries(value).filter(([key]) => !["schema", "revision", "version", "source_version", "parser_version"].includes(key)
+    && !(recordContext === "record" && ["id", "kind", "created_by", "updated_by"].includes(key)))).filter(([, item]) => autopsyReportHasContent(item));
   if (!entries.length) return node("p", { text: SOCifyLocale.text("لا توجد عناصر مسجلة") });
   const body = node("dl", { class: "report-data" });
   for (const [index, [key, item]] of entries.slice(0, 100).entries()) {
@@ -119,8 +133,9 @@ function autopsyReportPreview(value, depth = 0, fieldKey = "", view = null, path
     const detail = node("dd");
     if (item !== null && typeof item === "object") {
       const entryPath = [...path, index], identity = JSON.stringify(entryPath);
+      const childRecordContext = fieldKey === "records" ? "records" : Array.isArray(value) && recordContext === "records" ? "record" : "";
       const expand = node("details", { open: view?.has(identity) || false }, node("summary", { text: Array.isArray(item) ? SOCifyLocale.template`عناصر مسجلة: ${item.length}` : SOCifyLocale.text("عرض التفاصيل") }));
-      const populate = () => { if (expand.open && expand.children.length === 1) expand.append(autopsyReportPreview(item, depth + 1, key, view, entryPath)); };
+      const populate = () => { if (expand.open && expand.children.length === 1) expand.append(autopsyReportPreview(item, depth + 1, key, view, entryPath, childRecordContext)); };
       expand.addEventListener("toggle", () => { if (view && expand.isConnected) { if (expand.open) view.add(identity); else view.delete(identity); } populate(); });
       populate();
       detail.append(expand);

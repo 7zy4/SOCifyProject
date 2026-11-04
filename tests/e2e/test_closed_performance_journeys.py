@@ -126,9 +126,11 @@ def test_completed_work_keeps_its_scope_and_recovery_path(app, database, languag
             assert counter(j, "أغلقت خلال الفترة") == 1
             expect(queue.locator(f"a[href='/cases/{j.case_id}']")).to_be_visible()
             assert parse_qs(urlsplit(j.page.url).query)["queue"] == ["closed"]
-            metrics = j.page.locator("section.panel").filter(has=j.page.get_by_role("heading", name=j.text("وسيط المدد الموثقة"), exact=True))
-            measured = metrics.locator("tbody tr").first.get_by_role("cell").last
-            assert measured.inner_text().translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")) == ("0 من 1" if language == "ar" else "0 of 1")
+            metrics = j.page.locator(".performance-durations")
+            measured = metrics.locator(".performance-duration-row").first.locator(".performance-sample")
+            assert measured.inner_text().translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")) == (
+                "حالات قابلة للحساب 0 من 1" if language == "ar" else "Cases measured 0 of 1"
+            )
         elif scenario.endswith("member-filter"):
             assert counter(manager, "أغلقت خلال الفترة") == 2
             analyst_name = j.page.evaluate("state.user.name")

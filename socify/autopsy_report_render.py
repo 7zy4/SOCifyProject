@@ -140,6 +140,12 @@ LABELS = {
     "user_id": "معرف العضو",
     "created_by": "معرف المؤلف",
     "updated_by": "معرف آخر محرر",
+    "created_by_name": "المؤلف",
+    "updated_by_name": "آخر محرر",
+    "first_response_delay_seconds": "المدة حتى أول استجابة بالثواني",
+    "closure_delay_seconds": "المدة من الرصد حتى الإغلاق بالثواني",
+    "first_response": "وقت أول استجابة مثبتة",
+    "milestones": "مراحل الاستجابة",
     "added_by": "أضافه العضو",
     "added_at": "وقت حفظ الدليل",
     "id": "المعرف",
@@ -204,7 +210,7 @@ LABELS = {
     "generated_at": "وقت إعداد النسخة",
     "evidence_id": "مرجع الدليل",
     "performed_at": "وقت التنفيذ",
-    "performed_by": "المنفذ",
+    "performed_by": "من نفذ الإجراء",
     "conclusion": "الاستنتاج",
     "limitations_text": "حدود الاستنتاج",
     "event_time": "وقت الحدث",
@@ -449,7 +455,10 @@ def sections(payload):
         if records:
             yield (
                 LABELS[kind],
-                [{**record.get("payload", {}), **{key: value for key, value in record.items() if key not in {"payload", "kind"}}} for record in records],
+                [
+                    {**record.get("payload", {}), **{key: value for key, value in record.items() if key not in {"payload", "kind", "created_by", "updated_by"}}}
+                    for record in records
+                ],
             )
     for title, key in (
         ("فحص المحتوى والترميزات", "content_inspection"),

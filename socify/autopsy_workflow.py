@@ -3,7 +3,10 @@ import json
 import math
 import re
 import statistics
+from collections import OrderedDict
 from datetime import UTC, date, datetime, time, timedelta
+from functools import lru_cache
+from threading import Lock
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import Blueprint, jsonify, request
@@ -18,6 +21,8 @@ from .timeutils import iso_now, parse_timestamp, utc_now
 from .validation import ValidationError, public_error_message
 
 autopsy_workflow_api = Blueprint("autopsy_workflow", __name__)
+_calendar_admissions: OrderedDict[tuple, None] = OrderedDict()
+_calendar_admission_lock = Lock()
 RECIPES = {
     "windows_auth": {
         "title": "مصادر مصادقة Windows",
@@ -120,6 +125,14 @@ def validate_calendar(value):
     return {"mode": "business", "timezone": name, "weekdays": sorted(days), "start_hour": start, "end_hour": end, "holidays": sorted(set(holidays))}
 
 
+def _business_window(day, calendar, zone, holidays):
+    if day.weekday() not in calendar["weekdays"] or day.isoformat() in holidays:
+        return None
+    opening = datetime.combine(day, time(hour=calendar["start_hour"]), zone).replace(fold=0).astimezone(UTC)
+    closing = datetime.combine(day + timedelta(days=calendar["end_hour"] // 24), time(hour=calendar["end_hour"] % 24), zone).replace(fold=1).astimezone(UTC)
+    return opening, closing
+
+
 def _windows(start, end, calendar):
     if end <= start:
         return
@@ -143,8 +156,75 @@ def _windows(start, end, calendar):
         day += timedelta(days=1)
 
 
+@lru_cache(maxsize=128)
+def _year_work_totals(year, key):
+    """Bounded, case-independent prefix totals; preserve the daily DST policy."""
+    timezone, weekdays, start_hour, end_hour, holiday_dates = key
+    calendar = {"weekdays": weekdays, "start_hour": start_hour, "end_hour": end_hour}
+    zone = UTC if timezone.upper() in ("UTC", "ETC/UTC") else ZoneInfo(timezone)
+    holidays = set(holiday_dates)
+    first = date(year, 1, 1)
+    totals = [0.0]
+    for offset in range((date(year, 12, 31) - first).days + 1):
+        window = _business_window(first + timedelta(days=offset), calendar, zone, holidays)
+        totals.append(totals[-1] + max(0, (window[1] - window[0]).total_seconds()) if window else totals[-1])
+    return tuple(totals)
+
+
+def _calendar_reused(key):
+    # Single-use calendars should not build whole years outside their window.
+    with _calendar_admission_lock:
+        reused = key in _calendar_admissions
+        _calendar_admissions[key] = None
+        _calendar_admissions.move_to_end(key)
+        if len(_calendar_admissions) > 128:
+            _calendar_admissions.popitem(last=False)
+        return reused
+
+
+def _calendar_admission_info():
+    with _calendar_admission_lock:
+        return {"currsize": len(_calendar_admissions), "maxsize": 128}
+
+
+def _clear_calendar_cache():
+    with _calendar_admission_lock:
+        _calendar_admissions.clear()
+    _year_work_totals.cache_clear()
+
+
 def business_seconds(start, end, calendar):
-    return sum((right - left).total_seconds() for left, right in _windows(start, end, calendar))
+    if end <= start:
+        return 0
+    if calendar["mode"] == "24x7":
+        return (end - start).total_seconds()
+    zone = UTC if calendar["timezone"].upper() in ("UTC", "ETC/UTC") else ZoneInfo(calendar["timezone"])
+    first, final = start.astimezone(zone).date(), end.astimezone(zone).date()
+    span = (final - first).days
+    if span > 3660:
+        raise ValidationError("الفترة تتجاوز عشر سنوات؛ يلزم مراجعة نطاق SLA")
+    # A full boundary year can contain an unrepresentable UTC day that is
+    # outside the requested interval. Keep the daily calculation there.
+    if span <= 28 or first.year == 1 or final.year == 9999:
+        return sum((right - left).total_seconds() for left, right in _windows(start, end, calendar))
+    key = (calendar["timezone"], tuple(calendar["weekdays"]), calendar["start_hour"], calendar["end_hour"], tuple(calendar["holidays"]))
+    if not _calendar_reused(key):
+        return sum((right - left).total_seconds() for left, right in _windows(start, end, calendar))
+    holidays = set(calendar["holidays"])
+    total = 0.0
+    # Only the boundary days depend on the case's exact timestamps.
+    for day in (first, final):
+        window = _business_window(day, calendar, zone, holidays)
+        if window:
+            total += max(0, (min(end, window[1]) - max(start, window[0])).total_seconds())
+    cursor = first + timedelta(days=1)
+    while cursor < final:
+        stop = final if cursor.year == final.year else date(cursor.year + 1, 1, 1)
+        prefix = _year_work_totals(cursor.year, key)
+        origin = date(cursor.year, 1, 1)
+        total += prefix[(stop - origin).days] - prefix[(cursor - origin).days]
+        cursor = stop
+    return total
 
 
 def _project_due(now, remaining, calendar):
@@ -158,17 +238,24 @@ def _project_due(now, remaining, calendar):
     return None
 
 
-def sla_status(case, now=None):
+def sla_status(case, now=None, *, retained_records=None):
     now = now or utc_now()
-    row = get_db().execute("SELECT * FROM autopsy_records WHERE case_id = ? AND kind = 'workflow_sla' ORDER BY id DESC LIMIT 1", (case["id"],)).fetchone()
-    if not row:
+    if retained_records is None:
+        row = get_db().execute("SELECT * FROM autopsy_records WHERE case_id = ? AND kind = 'workflow_sla' ORDER BY id DESC LIMIT 1", (case["id"],)).fetchone()
+        policy = json.loads(row["payload"]) if row else None
+        changes = (
+            get_db().execute("SELECT payload FROM autopsy_records WHERE case_id = ? AND kind = 'workflow_sla_action' ORDER BY id", (case["id"],)).fetchall()
+        )
+        actions = [json.loads(item["payload"]) for item in changes]
+    else:
+        policies = retained_records.get("workflow_sla", [])
+        policy = policies[-1] if policies else None
+        actions = retained_records.get("workflow_sla_action", [])
+    if policy is None:
         return {"configured": False, "status": "not_configured", "notification": "لم يحدد المدير سياسة SLA لهذه القضية"}
-    policy = json.loads(row["payload"])
     start, end = parse_timestamp(case["created_at"]), min(now, parse_timestamp(case["closed_at"])) if case["closed_at"] else now
-    changes = get_db().execute("SELECT payload FROM autopsy_records WHERE case_id = ? AND kind = 'workflow_sla_action' ORDER BY id", (case["id"],)).fetchall()
     paused, total_paused = None, 0.0
-    for item in changes:
-        action = json.loads(item["payload"])
+    for action in actions:
         moment = min(end, parse_timestamp(action["at"]))
         if action["action"] == "pause" and paused is None:
             paused = moment

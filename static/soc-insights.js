@@ -65,6 +65,183 @@ window.SOCifyInsights = (() => {
     await load();
     return panel(t("فحص المحتوى والترميزات", "Content and encoding inspection"),body,true);
   }
+  const precisePercent = value => (value > 0 && value < 1) || (value > 99 && value < 100);
+  const percent = value => {
+    if (!Number.isFinite(value)) return "—";
+    const formatter = new Intl.NumberFormat(SOCifyLocale.language, {style:"percent",maximumFractionDigits:precisePercent(value) ? 2 : 0});
+    if (value > 0 && value < 0.01) return `<${formatter.format(0.0001)}`;
+    if (value > 99.99 && value < 100) return `>${formatter.format(0.9999)}`;
+    return formatter.format(value / 100);
+  };
+  const chartDate = value => new Intl.DateTimeFormat(SOCifyLocale.language, {month:"short",day:"numeric",timeZone:"UTC",calendar:"gregory"}).format(new Date(value));
+  function chartSVG(tag, attributes = {}, children = []) {
+    const element = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, String(value));
+    for (const child of children) element.append(child);
+    return element;
+  }
+  function chartLegend(items) {
+    return node("ul", {class:"performance-legend"}, items.map(([name, kind, value]) => node("li", {}, [
+      node("span", {class:`performance-key ${kind}`,"aria-hidden":"true"}),
+      node("span", {text:name}),
+      value === undefined ? null : node("strong", {text:n(value)}),
+    ])));
+  }
+  function completionChart(data) {
+    const value = data.completion || {total:null,completed:null,pending:null,unmeasured:null,percentage:null};
+    const known = Number.isFinite(value.percentage);
+    const figure = node("div", {class:"performance-completion"});
+    const circle = node("div", {class:`performance-ring${known ? "" : " unavailable"}`});
+    circle.append(chartSVG("svg", {viewBox:"0 0 220 220", "aria-hidden":"true",focusable:"false"}, [
+      chartSVG("circle", {cx:110,cy:110,r:88,class:"performance-ring-edge"}),
+      chartSVG("circle", {cx:110,cy:110,r:88,class:"performance-ring-track"}),
+      ...(known ? [chartSVG("circle", {cx:110,cy:110,r:88,pathLength:100,class:"performance-ring-value","stroke-dasharray":`${value.percentage} ${100-value.percentage}`,transform:"rotate(-90 110 110)"})] : []),
+    ]));
+    circle.append(node("div", {class:"performance-ring-label"}, [
+      node("strong", {"data-completion-value":"",dir:"ltr",class:precisePercent(value.percentage)?"performance-precise-value":null,text:percent(value.percentage)}),
+      node("span", {text:t("مكتملة", "Completed")}),
+    ]));
+    figure.append(circle);
+    if (value.total !== null) figure.append(node("p", {class:"performance-completion-count","data-completion-count":"",text:`${n(value.completed)} ${t("من", "of")} ${n(value.total)}`}));
+    figure.append(node("p", {class:"performance-basis",text:t("القضايا المنشأة خلال الفترة", "Cases opened in this period")}));
+    if (value.total !== null) figure.append(chartLegend([
+      [t("مكتملة", "Completed"),"closed",value.completed],
+      [t("نشطة", "Active"),"opened",value.pending],
+      ...(value.unmeasured ? [[t("غير قابلة للحساب", "Not measurable"),"unknown",value.unmeasured]] : []),
+    ]));
+    if (!value.total) figure.append(node("p", {class:"performance-empty",text:value.total === 0 ? t("لا قضايا خلال الفترة", "No cases in this period") : t("لا قياس بعد", "Not measured yet")}));
+    return panel(t("إنجاز القضايا", "Case completion"), figure, true);
+  }
+  function trendBuckets(data) {
+    if (!data.trend.length) return [];
+    const day = 86400000;
+    const end = Date.parse(data.fetched_at.slice(0,10) + "T00:00:00Z");
+    const first = data.days === "all" ? Date.parse(data.trend[0].date + "T00:00:00Z") : end - Number(data.days) * day;
+    const span = Math.max(1, Math.floor((end-first)/day)+1);
+    const step = Math.max(1, Math.ceil(span / 8));
+    const buckets = Array.from({length:Math.ceil(span/step)}, (_, index) => ({
+      start:first+index*step*day, end:Math.min(end, first+((index+1)*step-1)*day), opened:0, closed:0,
+    }));
+    for (const row of data.trend) {
+      const index = Math.floor((Date.parse(row.date + "T00:00:00Z")-first)/(step*day));
+      if (buckets[index]) {buckets[index].opened += row.opened; buckets[index].closed += row.closed;}
+    }
+    return buckets;
+  }
+  function activityChart(data) {
+    const body = node("div", {class:"panel-body performance-trend"});
+    const buckets = trendBuckets(data);
+    const totals = data.trend.reduce((result, row) => ({opened:result.opened+row.opened,closed:result.closed+row.closed}), {opened:0,closed:0});
+    body.append(chartLegend([[t("أنشئت", "Opened"),"opened",totals.opened],[t("أغلقت", "Closed"),"closed",totals.closed]]));
+    if (!buckets.length) {
+      body.append(node("div", {class:"performance-chart-empty",text:t("لا حركة قضايا خلال الفترة", "No case activity in this period")}));
+    } else {
+      const highest = Math.max(1, ...buckets.flatMap(bucket => [bucket.opened,bucket.closed]));
+      const max = highest <= 4 ? highest : Math.ceil(highest / 4) * 4;
+      const divisions = Math.min(4, max);
+      const plot = node("div", {class:"performance-plot",dir:"ltr",role:"group","aria-label":t("حركة القضايا", "Case activity")});
+      const scale = node("div", {class:"performance-y-axis","aria-hidden":"true"}, Array.from({length:divisions+1}, (_, index) => node("span", {text:n(max-index*max/divisions)})));
+      const columns = node("div", {class:"performance-trend-columns"});
+      columns.style.setProperty("--bucket-count", String(buckets.length));
+      columns.style.setProperty("--chart-step", `${100/divisions}%`);
+      const detail = node("p", {class:"performance-trend-readout"});
+      const show = index => {
+        const bucket = buckets[index];
+        const dates = bucket.start === bucket.end ? chartDate(bucket.start) : `${chartDate(bucket.start)} – ${chartDate(bucket.end)}`;
+        detail.textContent = `${dates} · ${t("أنشئت", "Opened")} ${n(bucket.opened)} · ${t("أغلقت", "Closed")} ${n(bucket.closed)}`;
+        [...columns.children].forEach((item, i) => {
+          item.classList.toggle("selected", i === index);
+          item.setAttribute("aria-pressed", String(i === index));
+        });
+      };
+      for (const [index,bucket] of buckets.entries()) {
+        const dates = bucket.start === bucket.end ? chartDate(bucket.start) : `${chartDate(bucket.start)} – ${chartDate(bucket.end)}`;
+        const control = node("button", {type:"button",class:"performance-trend-bucket","aria-label":`${dates}: ${t("أنشئت", "Opened")} ${n(bucket.opened)}, ${t("أغلقت", "Closed")} ${n(bucket.closed)}`});
+        for (const key of ["opened","closed"]) {
+          const bar = node("span", {class:`performance-trend-bar ${key}`,"aria-hidden":"true"});
+          bar.style.height = `${100*bucket[key]/max}%`;
+          if (!bucket[key]) bar.classList.add("zero");
+          control.append(bar);
+        }
+        control.addEventListener("pointerenter", () => show(index));
+        control.addEventListener("focus", () => show(index));
+        control.addEventListener("click", () => show(index));
+        control.addEventListener("keydown", event => {
+          if (!["ArrowLeft","ArrowRight","Home","End"].includes(event.key)) return;
+          event.preventDefault();
+          const next = event.key === "Home" ? 0 : event.key === "End" ? buckets.length-1 : Math.max(0,Math.min(buckets.length-1,index+(event.key === "ArrowRight" ? 1 : -1)));
+          columns.children[next].focus();
+        });
+        columns.append(control);
+      }
+      plot.append(scale, columns);
+      const ticks = node("div", {class:"performance-x-axis",dir:"ltr","aria-hidden":"true"}, [buckets[0].start,buckets[Math.floor(buckets.length/2)].start,buckets.at(-1).end].map(date => node("span", {text:chartDate(date)})));
+      body.append(plot,ticks,detail);
+      show(buckets.length-1);
+    }
+    if (data.trend.length) {
+      const detail = node("details", {class:"performance-data"}, node("summary", {text:t("عرض الأرقام اليومية", "Daily figures")}));
+      detail.append(table([{label:t("التاريخ", "Date"),value:"date"},{label:t("أنشئت", "Opened"),value:r=>n(r.opened)},{label:t("أغلقت", "Closed"),value:r=>n(r.closed)}], data.trend));
+      body.append(detail);
+    }
+    return panel(t("حركة القضايا خلال الفترة", "Case activity during period"), body, true);
+  }
+  function speedChart(data) {
+    const value = data.speed || {on_time:0,late:0,unmeasured:0,included:0,compliance_percent:null};
+    const body = node("div", {class:"panel-body performance-speed"});
+    const score = node("div", {class:"performance-speed-score"}, [
+      node("strong", {"data-speed-value":"",dir:"ltr",class:precisePercent(value.compliance_percent)?"performance-precise-value":null,text:percent(value.compliance_percent)}),
+      node("span", {text:t("ضمن المهلة", "Within SLA")}),
+    ]);
+    const outcomes = node("div", {class:"performance-speed-outcomes"});
+    const strip = node("div", {class:"performance-segment-strip","aria-hidden":"true"});
+    for (const [key,kind] of [["on_time","closed"],["late","late"]]) {
+      const segment = node("span", {class:kind});
+      segment.style.flexGrow = String(value[key]);
+      strip.append(segment);
+    }
+    if (!value.included) strip.classList.add("unavailable");
+    outcomes.append(strip,chartLegend([[t("ضمن المهلة", "Within SLA"),"closed",value.on_time],[t("متأخرة", "Late"),"late",value.late]]));
+    outcomes.append(node("p", {class:"performance-basis",text:`${t("قضايا مغلقة قابلة للحساب", "Closed cases measured")} ${n(value.included)} ${t("من", "of")} ${n(value.included+value.unmeasured)}`}));
+    if (!value.included) outcomes.append(node("p", {class:"performance-empty",text:t("لا قياسات لمهلة الاستجابة", "No SLA measurements")}));
+    body.append(score,outcomes);
+    return panel(t("الالتزام بمهلة الاستجابة", "Response SLA compliance"),body,true);
+  }
+  function durationChart(data) {
+    const titles = {detection_delay_seconds:t("الرصد", "Detection"),acknowledgement_delay_seconds:t("إقرار الاستلام", "Acknowledgement"),containment_delay_seconds:t("الاحتواء", "Containment"),recovery_delay_seconds:t("التعافي", "Recovery"),closure_delay_seconds:t("الإغلاق", "Closure")};
+    const values = Object.entries(titles).map(([key,title]) => ({key,title,...data.metrics[key]}));
+    const max = Math.max(1,...values.map(item => item.median_seconds || 0));
+    const body = node("div", {class:"panel-body performance-durations"});
+    for (const item of values) {
+      const track = node("div", {class:"performance-duration-track","aria-hidden":"true"});
+      if (item.median_seconds !== null) {
+        const mark = node("span"); mark.style.width = `${100*item.median_seconds/max}%`; track.append(mark);
+      }
+      body.append(node("div", {class:"performance-duration-row"}, [
+        node("span", {text:item.title}),node("strong", {text:duration(item.median_seconds)}),track,
+        node("span", {class:"performance-sample",text:`${t("حالات قابلة للحساب", "Cases measured")} ${n(item.included)} ${t("من", "of")} ${n(item.included+item.excluded)}`}),
+      ]));
+    }
+    return panel(t("وسيط مدد القضايا المغلقة", "Median closed-case durations"),body,true);
+  }
+  function severityChart(data) {
+    const body = node("div", {class:"panel-body performance-severity"});
+    const strip = node("div", {class:"performance-severity-strip","aria-hidden":"true"});
+    const legend = node("ul", {class:"performance-severity-list"});
+    for (const severity of ["critical","high","medium","low"]) {
+      const count = data.severity[severity] || 0;
+      if (count) {const segment = node("span", {class:severity});segment.style.flexGrow = String(count);strip.append(segment);}
+      legend.append(node("li", {}, [node("span", {class:`severity ${severity}`,text:label(severity)}),node("strong", {text:n(count)})]));
+    }
+    if (!data.counts.open) strip.classList.add("unavailable");
+    body.append(node("div", {class:"performance-workload-total"}, [node("strong", {text:n(data.counts.open)}),node("span", {text:t("قضايا نشطة", "Active cases")})]), strip, legend);
+    body.append(node("dl", {class:"performance-attention"}, [
+      [t("تنبيهات دون قرار", "Alerts without a verdict"),data.counts.unreviewed_alerts],
+      [t("قضايا دون مسؤول", "Unassigned cases"),data.counts.unassigned],
+      [t("تجاوزت موعد القضية", "Past case deadline"),data.counts.overdue],
+    ].flatMap(([title,value]) => [node("dt", {text:title}),node("dd", {text:n(value)})])));
+    return panel(t("عبء العمل الحالي", "Current workload"),body,true);
+  }
   async function performance() {
     begin("performance");
     try {
@@ -75,28 +252,20 @@ window.SOCifyInsights = (() => {
       const title = personal ? t("أداء المحلل", "Analyst performance") : t("أداء الفريق", "Team performance");
       document.getElementById("section-title").textContent = title;
       document.title = `${title} | SOCify`;
-      const root = node("div", {class:"insights-view"}, pageHead(title, null));
+      const root = node("div", {class:"insights-view performance-view"}, pageHead(title, null));
       const nav = node("nav", {class:"channel-tabs", "aria-label":t("نطاق الأداء", "Performance scope")});
       const targets = [["me",t("أدائي", "My performance")]];
       if (data.can_manage) targets.unshift(["team",t("الفريق", "Team")]);
       for (const [value, name] of targets) nav.append(node("a", {class:"channel-tab", href:queueURL({member:value,page:1}), "aria-current":value===data.member?"page":null, text:name}));
-      root.append(nav);
       const days = node("select", {name:"days"}, [["7",t("آخر ٧ أيام", "Last 7 days")],["30",t("آخر ٣٠ يومًا", "Last 30 days")],["90",t("آخر ٩٠ يومًا", "Last 90 days")],["all",t("كل الفترات", "All time")]].map(([value,text])=>node("option", {value, selected:value===data.days, text})));
       const form = node("form", {class:"filter-row"}, [field(t("فترة الإنجاز", "Completion period"),days),node("input",{type:"hidden",name:"member",value:data.member}),node("input",{type:"hidden",name:"queue",value:data.queue_kind}),node("button",{class:"button primary",type:"submit",text:t("تطبيق", "Apply")})]);
-      root.append(form);
+      root.append(node("div", {class:"performance-toolbar"}, [nav,form]));
       root.append(node("div", {class:"insight-counters"}, [["open",t("قضايا نشطة", "Active cases")],["closed",t("أغلقت خلال الفترة", "Closed in period")],["awaiting_review",t("بانتظار المراجعة", "Awaiting review")],["pending_tasks",t("مهام معلقة", "Pending tasks")]].map(([key,text])=>node(key === "pending_tasks" ? "div" : "a",{class:"insight-counter",href:key === "pending_tasks" ? null : queueURL({queue:key,page:1},true),"aria-current":key === data.queue_kind ? "page" : null},[node("span",{text}),node("strong",{text:n(data.counts[key])})]))));
-      const row = node("div",{class:"insight-columns"});
-      const load = node("div",{class:"panel-body"});
-      for(const severity of ["critical","high","medium","low"]) load.append(node("div",{class:"insight-bar-row"},[node("span",{class:`severity ${severity}`,text:label(severity)}),node("progress",{max:Math.max(data.counts.open,1),value:data.severity[severity]||0,"aria-label":label(severity)}),node("strong",{text:n(data.severity[severity]||0)})]));
-      load.append(definition([[t("تنبيهات دون قرار", "Alerts without a verdict"),n(data.counts.unreviewed_alerts)],[t("قضايا دون مسؤول", "Unassigned cases"),n(data.counts.unassigned)],[t("تجاوزت موعد القضية", "Past case deadline"),n(data.counts.overdue)]]));
-      row.append(panel(t("عبء العمل الحالي", "Current workload"),load,true));
-      const metricTitles = {detection_delay_seconds:t("الرصد", "Detection"),acknowledgement_delay_seconds:t("إقرار الاستلام", "Acknowledgement"),containment_delay_seconds:t("الاحتواء", "Containment"),recovery_delay_seconds:t("التعافي", "Recovery"),closure_delay_seconds:t("الإغلاق", "Closure")};
-      row.append(panel(t("وسيط المدد الموثقة", "Median evidenced durations"),table([{label:t("المرحلة", "Stage"),value:r=>metricTitles[r.key]},{label:t("المدة", "Duration"),value:r=>duration(r.median_seconds)},{label:t("حالات قابلة للحساب", "Cases measured"),value:r=>`${n(r.included)} ${t("من", "of")} ${n(r.included+r.excluded)}`}],Object.keys(metricTitles).map(key=>({key,...data.metrics[key]}))),true));
-      root.append(row);
-      if(data.members.length) root.append(panel(t("الفريق والإنجاز", "Team delivery"),table([{label:t("المحلل", "Analyst"),value:r=>data.can_manage?node("a",{href:queueURL({member:r.id,page:1}),text:r.name}):userText(r.name)},{label:t("الدور", "Role"),value:r=>label(r.role)},{label:t("نشطة", "Active"),value:"open"},{label:t("مغلقة خلال الفترة", "Closed in period"),value:"closed"},{label:t("مهام أنجزها", "Tasks completed"),value:"tasks_completed"}],data.members),true));
-      if(data.trend.length) {
-        const trend=node("details",{class:"insight-method"},node("summary",{text:t("حركة القضايا خلال الفترة", "Case activity during period")}));
-        trend.append(table([{label:t("التاريخ", "Date"),value:"date"},{label:t("أنشئت", "Opened"),value:"opened"},{label:t("أغلقت", "Closed"),value:"closed"}],data.trend));root.append(trend);
+      root.append(node("div", {class:"performance-overview"}, [activityChart(data),completionChart(data)]));
+      root.append(node("div", {class:"performance-operations"}, [node("div", {class:"performance-pace"}, [speedChart(data),durationChart(data)]),severityChart(data)]));
+      if(data.members.length) {
+        const members = panel(t("الفريق والإنجاز", "Team delivery"),table([{label:t("المحلل", "Analyst"),value:r=>data.can_manage?node("a",{href:queueURL({member:r.id,page:1}),text:r.name}):userText(r.name)},{label:t("الدور", "Role"),value:r=>r.role === "instructor" ? t("مدرب", "Instructor") : label(r.role)},{label:t("نشطة", "Active"),value:r=>n(r.open)},{label:t("مغلقة خلال الفترة", "Closed in period"),value:r=>n(r.closed)},{label:t("مهام أنجزها", "Tasks completed"),value:r=>n(r.tasks_completed)}],data.members),true);
+        members.classList.add("performance-members");root.append(members);
       }
       const queueTitle = data.queue_kind === "closed" ? t("القضايا المغلقة", "Closed cases") : data.queue_kind === "awaiting_review" ? t("بانتظار المراجعة", "Awaiting review") : t("قائمة المتابعة", "Work queue");
       const emptyQueue = data.queue_kind === "closed" ? t("لا قضايا مغلقة خلال الفترة", "No cases closed in this period") : data.queue_kind === "awaiting_review" ? t("لا قضايا بانتظار المراجعة", "No cases awaiting review") : t("لا قضايا نشطة", "No active cases");
@@ -113,7 +282,7 @@ window.SOCifyInsights = (() => {
         queuePanel.append(paging);
       }
       root.append(queuePanel);
-      if(data.tasks.length) root.append(panel(`${t("المهام المعلقة", "Pending tasks")} · ${n(data.task_total)}`,table([{label:t("المهمة", "Task"),value:r=>node("a",{href:`/cases/${r.case_id}?tab=summary#case-task-${r.id}`,text:r.display_title})},{label:t("الحالة", "Status"),value:r=>label(r.status)}],data.tasks),true));
+      if(data.tasks.length) root.append(panel(`${t("المهام المعلقة", "Pending tasks")} · ${n(data.task_total)}`,stackedTable([{label:t("المهمة", "Task"),value:r=>node("a",{href:`/cases/${r.case_id}?tab=summary#case-task-${r.id}`,text:r.display_title})},{label:t("القضية", "Case"),value:r=>node("a",{href:`/cases/${r.case_id}`,"data-user-content":"true",text:`${r.case_reference} · ${r.case_title}`})},{label:t("الحالة", "Status"),value:r=>label(r.status)}],data.tasks),true));
       if(data.task_total>50)root.append(linkedButton(t("إدارة القضايا", "Case management"),"/cases"));
       finish(root);
       if(location.hash === "#performance-cases") {queuePanel.tabIndex=-1;queuePanel.focus({preventScroll:true});queuePanel.scrollIntoView({block:"start"});}

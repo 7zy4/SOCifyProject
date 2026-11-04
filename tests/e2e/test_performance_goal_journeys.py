@@ -159,15 +159,15 @@ def test_performance_supports_the_next_user_decision(app, monkeypatch, language,
             manager.click("link", "أدائي", manager.page.locator(".channel-tabs"))
             assert counter(manager, "قضايا نشطة") == counter(manager, "أغلقت خلال الفترة") == counter(manager, "مهام معلقة") == 0
             expect(manager.page.get_by_text(manager.text("لا قضايا نشطة"), exact=True)).to_be_visible()
-            assert manager.page.locator(".insight-columns table tbody tr").count() == 5
+            assert manager.page.locator(".performance-duration-row").count() == 5
             stages = (
                 ["الرصد", "إقرار الاستلام", "الاحتواء", "التعافي", "الإغلاق"]
                 if language == "ar"
                 else ["Detection", "Acknowledgement", "Containment", "Recovery", "Closure"]
             )
-            assert manager.page.locator(".insight-columns table tbody tr td:first-child").all_inner_texts() == stages
-            for row in manager.page.locator(".insight-columns table tbody tr").all():
-                assert row.get_by_role("cell").nth(1).inner_text() == "—"
+            assert manager.page.locator(".performance-duration-row > span:first-child").all_inner_texts() == stages
+            for row in manager.page.locator(".performance-duration-row").all():
+                assert row.locator("strong").inner_text() == "—"
             subject = manager
         elif scenario == "performance-personal-assignment":
             assert counter(j, "مهام معلقة") == 2

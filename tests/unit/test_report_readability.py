@@ -13,6 +13,10 @@ def test_investigation_report_keeps_the_record_content_and_identity_without_stor
                     "id": 42,
                     "kind": "timeline",
                     "version": 3,
+                    "created_by": 81,
+                    "updated_by": 82,
+                    "created_by_name": "Noura retained author",
+                    "updated_by_name": "Hadi retained reviewer",
                     "payload": {"title": "Reviewed login", "notes": "<b>Source retained</b>", "event_time": "2026-11-02T09:00:00Z", "evidence_id": 17},
                 }
             ]
@@ -25,6 +29,8 @@ def test_investigation_report_keeps_the_record_content_and_identity_without_stor
     assert text.count("المعرف: 42") == 1
     assert "ملاحظات التحقيق: <b>Source retained</b>" in text
     assert "مرجع الدليل: 17" in text and "2026-11-02T09:00:00Z" in text
+    assert "المؤلف: Noura retained author" in text and "آخر محرر: Hadi retained reviewer" in text
+    assert "معرف المؤلف" not in text and "معرف آخر محرر" not in text
     assert "payload" not in text and "notes:" not in text
     for document in (render_html(payload), report_table(content)):
         assert "&lt;b&gt;Source retained&lt;/b&gt;" in document

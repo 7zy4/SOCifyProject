@@ -8,7 +8,7 @@ from datetime import timedelta
 from flask import Blueprint, current_app, jsonify, request
 
 from .autopsy_pipeline import full_case_scope_sql
-from .autopsy_workflow import factual_metrics
+from .autopsy_workflow import factual_metrics, sla_status
 from .case_counts import consistent_read
 from .db import get_db
 from .operational import case_scope
@@ -188,6 +188,15 @@ def moment(value):
         return None
 
 
+def measured_percentage(numerator, denominator):
+    if not denominator:
+        return None
+    ratio = 100 * numerator / denominator
+    # At the 2,000-case scope limit, retain the final 0.05% rather than
+    # reporting complete success (or no success) for an incomplete result.
+    return ratio if 0 < ratio < 1 or 99 < ratio < 100 else round(ratio, 1)
+
+
 @soc_insights_api.get("/api/soc/performance")
 @require_permission("cases.read")
 @consistent_read
@@ -223,10 +232,11 @@ def performance():
     if len(cases) > 2000:
         return error_response("PERFORMANCE_SCOPE_TOO_LARGE", "حدد عضوًا أو نطاق تحقيق أصغر لعرض الأداء", 422)
     ids = [case["id"] for case in cases]
+    case_by_id = {case["id"]: case for case in cases}
     marks = ",".join("?" for _ in ids) or "NULL"
     records: dict[int, dict[str, list]] = defaultdict(lambda: defaultdict(list))
     for row in get_db().execute(
-        f"SELECT case_id,kind,payload FROM autopsy_records WHERE case_id IN ({marks}) AND kind IN ('response','foothold') AND COALESCE(json_extract(payload,'$.visibility'),'team')!='private'",
+        f"SELECT case_id,kind,payload FROM autopsy_records WHERE case_id IN ({marks}) AND kind IN ('response','foothold','workflow_sla','workflow_sla_action') AND COALESCE(json_extract(payload,'$.visibility'),'team')!='private' ORDER BY id",
         ids,
     ):
         records[row["case_id"]][row["kind"]].append(json.loads(row["payload"]))
@@ -253,6 +263,8 @@ def performance():
     outcomes: Counter[str] = Counter()
     measures = defaultdict(list)
     open_cases, closed_cases, review_cases = [], [], []
+    completion = {"total": 0, "completed": 0, "pending": 0, "unmeasured": 0}
+    speed = {"on_time": 0, "late": 0, "unmeasured": 0}
 
     def in_period(value):
         stamp = moment(value)
@@ -260,6 +272,11 @@ def performance():
 
     for case in cases:
         active = case["status"] not in {"closed", "cancelled"}
+        created, closed = moment(case["created_at"]), moment(case["closed_at"])
+        valid_closure = created is not None and closed is not None and created <= closed <= now
+        if case["status"] != "cancelled" and in_period(case["created_at"]):
+            completion["total"] += 1
+            completion["pending" if active else "completed" if valid_closure else "unmeasured"] += 1
         if active:
             open_cases.append(case)
             severity[case["severity"]] += 1
@@ -278,6 +295,11 @@ def performance():
             for key, value in metrics.items():
                 if key.endswith("_seconds"):
                     measures[key].append(value)
+            try:
+                sla = sla_status(case, now, retained_records=records[case["id"]]) if valid_closure else {"configured": False}
+                speed["unmeasured" if not sla["configured"] else "on_time" if sla["remaining_work_seconds"] >= 0 else "late"] += 1
+            except (ValueError, TypeError, KeyError, OverflowError):
+                speed["unmeasured"] += 1
     for task in tasks:
         if task["status"] in {"completed", "reviewed"} and in_period(task["completed_at"]) and task["completed_by"] in workload:
             workload[task["completed_by"]]["tasks_completed"] += 1
@@ -331,6 +353,17 @@ def performance():
             "severity": dict(severity),
             "verdicts": dict(outcomes),
             "metrics": metric_results,
+            "completion": {
+                **completion,
+                "basis": "created_in_period",
+                "percentage": measured_percentage(completion["completed"], completion["total"]) if not completion["unmeasured"] else None,
+            },
+            "speed": {
+                **speed,
+                "basis": "configured_case_sla",
+                "included": speed["on_time"] + speed["late"],
+                "compliance_percent": measured_percentage(speed["on_time"], speed["on_time"] + speed["late"]),
+            },
             "trend": [{"date": day, **values} for day, values in sorted(trend.items())],
             "members": list(workload.values()) if member_id is None else [workload[member_id]] if member_id in workload else [],
             "queue": [case_view(case) for case in queue[(page - 1) * 50 : page * 50]],
@@ -339,7 +372,10 @@ def performance():
             "queue_page": page,
             "queue_pages": pages,
             "queue_page_size": 50,
-            "tasks": pending[:50],
+            "tasks": [
+                {**task, "case_reference": case_by_id[task["case_id"]]["reference"], "case_title": case_by_id[task["case_id"]]["title"]}
+                for task in pending[:50]
+            ],
             "task_total": len(pending),
         }
     )
