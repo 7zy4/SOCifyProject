@@ -435,7 +435,7 @@ def review_alerts(j, reason, verdict="benign"):
         dialog.locator("input[name=attack_outcome]").fill(j.page.evaluate("autopsyLabel('unknown')"))
         dialog.locator("textarea[name=reason]").fill(reason)
         j.click("button", "حفظ", dialog)
-        j.click("button", "إغلاق", dialog)
+        expect(dialog).not_to_be_visible()
     alerts = j.page.evaluate("id=>api(`/api/cases/${id}/alerts`)", j.case_id)["items"]
     assert all(row["review"]["verdict"] == verdict for row in alerts)
 

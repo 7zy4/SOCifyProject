@@ -21,7 +21,7 @@ def test_recipient_can_read_bilingual_report_with_fonts_embedded_and_evidence_un
     original = copy.deepcopy(payload)
     content = render_docx(payload)
     document = Document(io.BytesIO(content))
-    text = "\n".join(document.element.xpath(".//w:t/text()"))
+    text = "".join(document.element.xpath(".//w:t/text()"))
     assert "تحقيق / Investigation" in text and "2026-11-02T09:00:00Z" in text
     assert "Reviewed login" in text
     assert any([cell.text for cell in row.cells] == ["المعرف", "7"] for table in document.tables for row in table.rows)
@@ -50,3 +50,42 @@ def test_recipient_can_read_bilingual_report_with_fonts_embedded_and_evidence_un
             assert fonts.attrib[f"{{{NS['w']}}}cs"] == "Cairo"
             assert style.find("w:rPr/w:sz", NS).attrib == style.find("w:rPr/w:szCs", NS).attrib
         assert not any(b'TargetMode="External"' in archive.read(name) for name in archive.namelist() if name.endswith(".rels"))
+
+
+def test_docx_preserves_latin_fragments_in_rtl_paragraphs_and_keeps_digest_identity_in_same_row():
+    url = "https://evidence.example.test/path/"
+    payload = {
+        "case": {"title": "تحقيق / Investigation", "reference": "CASE-DIRECTION"},
+        "revision": 1,
+        "records": {"root_cause": [{"payload": {"title": "تحليل / Analysis", "conclusion": "المصدر: " + url}}]},
+        "evidence": [
+            {"title": "Short evidence", "id": 2, "details": "ملاحظة قصيرة", "sha256": "a" * 64},
+            {"title": "Long evidence", "id": 9, "details": "ملاحظة طويلة " * 150, "sha256": "b" * 64},
+        ],
+    }
+    original = copy.deepcopy(payload)
+    document = Document(io.BytesIO(render_docx(payload)))
+    heading = next(paragraph for paragraph in document.paragraphs if "5 Whys" in paragraph.text)
+    latin_run = next(run for run in heading.runs if run.text == "5 Whys")
+    assert latin_run.font.rtl is False and latin_run.font.name == "IBM Plex Sans"
+    url_run = next(
+        run
+        for table in document.tables
+        for row in table.rows
+        for cell in row.cells
+        for paragraph in cell.paragraphs
+        for run in paragraph.runs
+        if run.text == url
+    )
+    assert url_run.font.rtl is False
+    evidence_table = document.tables[-1]
+    short_rows = list(evidence_table.rows)[:4]
+    assert all(row.cells[0].paragraphs[0].paragraph_format.keep_with_next for row in short_rows[:-1])
+    assert short_rows[-1].cells[0].paragraphs[0].paragraph_format.keep_with_next is False
+    digest_row = next(row for row in evidence_table.rows if row.cells[-1].text == "b" * 64)
+    assert "Long evidence" in digest_row.cells[0].text
+    assert digest_row._tr.xpath("./w:trPr/w:cantSplit")
+    long_notes = next(row for row in evidence_table.rows if row.cells[-1].text == payload["evidence"][1]["details"])
+    assert long_notes.cells[0].paragraphs[0].paragraph_format.keep_with_next is False
+    assert not long_notes._tr.xpath("./w:trPr/w:cantSplit")
+    assert payload == original

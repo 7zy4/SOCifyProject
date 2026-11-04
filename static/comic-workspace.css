@@ -378,6 +378,11 @@ dialog::backdrop { background:rgb(10 13 15 / .78); }
 .import-options { min-width: 0; }
 .import-options > summary { cursor: pointer; padding-block: .75rem; font-weight: 700; }
 .import-options[open] > .form-grid { margin-block-start: .75rem; }
+.import-form > .span-2 { min-width:0; max-width:100%; }
+.import-form fieldset { min-inline-size:0; max-inline-size:100%; margin-inline:0; }
+.import-form > .action-row .button { max-width:100%; white-space:normal; }
+.import-form > .span-2 > p,.import-form fieldset p { overflow-wrap:anywhere; }
+.import-form pre { direction:ltr; text-align:left; white-space:pre-wrap; overflow-wrap:anywhere; max-width:100%; max-height:32rem; overflow:auto; }
 .import-result { padding: 1rem; border: 2px solid var(--line); background: var(--panel); }
 .import-result > strong { overflow-wrap: anywhere; }
 .procedure-result { margin:16px 0; padding:12px 16px; border-inline-start:3px solid var(--accent); }

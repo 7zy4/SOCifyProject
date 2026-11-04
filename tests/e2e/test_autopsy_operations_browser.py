@@ -4,7 +4,7 @@ import threading
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 from werkzeug.serving import make_server
 
 from socify.security import totp_code
@@ -127,7 +127,7 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
             dialog.locator("input[name=attack_outcome]").fill("فاشل أو محجوب")
             dialog.locator("textarea[name=reason]").fill("Authorized synthetic activity confirmed by retained fixture")
             dialog.get_by_role("button", name="حفظ", exact=True).click()
-            dialog.get_by_role("button", name="إغلاق", exact=True).click()
+            expect(dialog).not_to_be_visible()
             page.get_by_role("cell", name="إيجابي كاذب · فاشل أو محجوب", exact=True).wait_for()
             page.get_by_role("link", name="التحقيق والخط الزمني", exact=True).click()
             page.get_by_role("button", name="إضافة الأسباب الجذرية", exact=True).click()

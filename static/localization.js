@@ -1682,6 +1682,7 @@
   "سبب الكشف": "Detection reason",
   "إصدار القاعدة": "Rule version",
   "مراجعة التنبيه": "Review alert",
+  "حُفظ قرار التنبيه؛ تعذر تحديث العرض.": "The alert decision was saved; the view could not be refreshed.",
   "تفاصيل التنبيه": "Alert details",
   "غير مسند": "Unassigned",
   "فتح التحقيق": "Open investigation",

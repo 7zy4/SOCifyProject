@@ -233,7 +233,7 @@ def test_last_false_positive_verdict_does_not_complete_the_case(app, monkeypatch
         dialog.locator("input[name=attack_outcome]").fill(j.page.evaluate("autopsyLabel('unknown')"))
         dialog.locator("textarea[name=reason]").fill("CHG-73 identifies an intentional non-executing detection test; retain the report for independent review.")
         j.click("button", "حفظ", dialog)
-        j.click("button", "إغلاق", dialog)
+        expect(dialog).not_to_be_visible()
         j.nav("الأداء")
         assert number(j.page.get_by_text(j.text("تنبيهات دون قرار"), exact=True).locator("+ dd").inner_text()) == 0, (
             "PRODUCT: decided alert remains in undecided attention count"

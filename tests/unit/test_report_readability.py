@@ -1,6 +1,10 @@
 import copy
 
-from socify.autopsy_report_render import lines, render_html, report_table, sections
+import pytest
+from defusedxml import ElementTree as ET
+
+from socify.autopsy_domain import canonical
+from socify.autopsy_report_render import directional_html, lines, render_html, report_blocks, report_table, sections
 
 
 def test_investigation_report_keeps_the_record_content_and_identity_without_storage_wrappers():
@@ -57,3 +61,43 @@ def test_report_questions_precede_answers_even_after_canonical_key_sorting():
     assert "<span data-ui-copy>السؤال</span>" in table
     imports = [{"accepted_records": 12, "original_filename": "collected.jsonl"}]
     assert list(lines(imports))[0] == (0, "اسم الأصل: collected.jsonl")
+
+
+@pytest.mark.parametrize(
+    ("source", "latin"),
+    [
+        ("الأسباب الجذرية و5 Whys", "5 Whys"),
+        ("الرابط: https://evidence.example.test/path/", "https://evidence.example.test/path/"),
+        ("وقت الحدث: 2026-10-20T10:01:00Z", "2026-10-20T10:01:00Z"),
+        ('الدليل: <img src="https://evidence.example.test/">', '<img src="https://evidence.example.test/">'),
+    ],
+)
+def test_mixed_direction_fragments_preserve_literal_evidence_and_isolate_latin_order(source, latin):
+    root = ET.fromstring("<root>" + directional_html(source) + "</root>")
+    assert "".join(root.itertext()) == source
+    assert any(node.attrib == {"dir": "ltr"} and node.text == latin for node in root.findall("bdi"))
+    assert root.find(".//img") is None
+
+
+def test_export_keeps_short_evidence_together_and_repeats_identity_only_with_long_record_digest():
+    short = {"id": 2, "title": "Retained evidence", "details": "فحص مختصر / Short review", "sha256": "a" * 64}
+    long = {"id": 9, "title": "Long evidence", "details": "ملاحظة طويلة / Long observation " * 100, "sha256": "b" * 64}
+    payload = {"case": {"title": "تحقيق / Investigation", "reference": "CASE-PAGING"}, "revision": 1, "evidence": [short, long]}
+    before = canonical(payload)
+    blocks = list(report_blocks(payload["evidence"]))
+    assert [compact for _, _, compact in blocks] == [True, False]
+    assert [line for _, block, _ in blocks for line in block] == list(lines(payload["evidence"]))
+    rendered = render_html(payload)
+    assert rendered.count('class="report-entry report-entry-compact"') == 1
+    assert rendered.count('class="report-integrity"') == 1
+    assert rendered.count("Long evidence") == 2
+    assert rendered.count("Retained evidence") == 1
+    assert long["sha256"] in rendered and short["sha256"] in rendered
+    assert canonical(payload) == before
+
+
+def test_latin_isolation_handles_long_unbroken_values_without_removing_spaces_or_newlines():
+    source = "  الدليل https://evidence.example.test/" + "a" * 4096 + " \n\tنهاية: " + "B" * 2048 + "  "
+    root = ET.fromstring("<root>" + directional_html(source) + "</root>")
+    assert "".join(root.itertext()) == source
+    assert len(root.findall("bdi")) == 2

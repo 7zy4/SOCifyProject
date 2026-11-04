@@ -309,11 +309,53 @@ window.SOCifyAutopsy.localDetection = async (caseId) => {
     root.append(form);
   }
   await refreshHistory(); root.append(history);
-  root.append(table([{ label: SOCifyLocale.text("التنبيه"), value: "reason" }, { label: SOCifyLocale.text("الخطر"), value: "severity" }, { label: SOCifyLocale.text("تقييم المحقق"), value: (row) => `${autopsyLabel(row.review.verdict)} · ${autopsyLabel(row.review.attack_outcome)}` }, { label: SOCifyLocale.text("مجموعة / نطاق"), value: (row) => `${row.review.group || "—"}${row.historical_derivation ? SOCifyLocale.text(" · نسخة تاريخية") : ""}${row.suppressed ? SOCifyLocale.text(" · إشعار مكبوت مؤقتًا") : ""}` }, { label: SOCifyLocale.text("المراجعة"), value: (row) => autopsyAction(SOCifyLocale.text("تفاصيل ومراجعة"), async () => {
-    const content = node("div", {}, node("pre", { text: JSON.stringify({ evidence: row.evidence, trace: row.trace, review: row.review }, null, 2) }));
-    if (autopsy.current.can_update && autopsy.current.status !== "closed") content.append(autopsyForm({ verdict: { required: true, choices: autopsy.catalog.verdicts }, attack_outcome: { required: true, choices: autopsy.catalog.outcomes }, group: { max: 100 }, suppressed_until: { timestamp: true }, reason: { required: true, max: 2000 } }, async (body) => { await api(base + `/alerts/${row.id}`, { method: "PATCH", body: { ...body, version: row.review_version, group: body.group || "", suppressed_until: body.suppressed_until || null } }); await autopsyCase(caseId); }, row.review));
-    autopsyModal(SOCifyLocale.text("الأدلة وقرار التنبيه منفصل عن نتيجة الهجوم"), content);
-  }) }], alerts.items));
+  const reviewControl = row => {
+    const control = autopsyAction(SOCifyLocale.text("تفاصيل ومراجعة"), async () => {
+      const evidence = node("div", { class: "dossier-content" });
+      const disclosure = node("details", {}, [node("summary", { text: SOCifyLocale.text("تفاصيل التنبيه") }), evidence]);
+      const content = node("div", {}, disclosure);
+      let loaded = false, loading = false;
+      const loadDetails = async () => {
+        if (loaded || loading) return;
+        loading = true;
+        evidence.setAttribute("aria-busy", "true");
+        evidence.replaceChildren(node("p", { role: "status", text: SOCifyLocale.text("جارٍ التحميل…") }));
+        try {
+          await window.SOCifyInsights.dossier({ ...row, case_id: caseId }, evidence);
+          loaded = true;
+        } catch (error) {
+          evidence.replaceChildren(node("p", { role: "alert", text: error.message }), autopsyAction(SOCifyLocale.text("إعادة المحاولة"), loadDetails));
+        } finally {
+          loading = false;
+          evidence.removeAttribute("aria-busy");
+        }
+      };
+      disclosure.addEventListener("toggle", () => { if (disclosure.open) loadDetails(); });
+      const view = location.pathname + location.search;
+      const refreshSavedReview = async () => {
+        if (location.pathname + location.search !== view) return;
+        try {
+          await autopsyCase(caseId);
+          if (location.pathname + location.search === view) document.querySelector(`[data-alert-review-id="${row.id}"]`)?.focus();
+        } catch (error) {
+          if (location.pathname + location.search !== view) return;
+          const retry = autopsyAction(SOCifyLocale.text("إعادة المحاولة"), refreshSavedReview, "primary");
+          finish(node("section", { class: "panel-body" }, [node("p", { role: "status", text: SOCifyLocale.text("حُفظ قرار التنبيه؛ تعذر تحديث العرض.") }), node("p", { class: "notice", role: "alert", text: error.message }), retry]));
+          retry.focus();
+        }
+      };
+      if (autopsy.current.can_update && autopsy.current.status !== "closed") content.append(autopsyForm({ verdict: { label: SOCifyLocale.text("قرار المحلل"), required: true, choices: autopsy.catalog.verdicts }, attack_outcome: { label: SOCifyLocale.text("نتيجة الهجوم"), required: true, choices: autopsy.catalog.outcomes }, group: { label: SOCifyLocale.text("مجموعة التنبيهات"), max: 100 }, suppressed_until: { label: SOCifyLocale.text("إخفاء الإشعار حتى"), timestamp: true }, reason: { label: SOCifyLocale.text("سبب القرار"), required: true, max: 2000 } }, async (body) => {
+        await api(base + `/alerts/${row.id}`, { method: "PATCH", body: { ...body, version: row.review_version, group: body.group || "", suppressed_until: body.suppressed_until || null } });
+        content.closest("dialog")?.close();
+        await refreshSavedReview();
+      }, row.review, { freezeWhileSaving: true }));
+      content.querySelector("textarea[name=reason]")?.setAttribute("dir", "auto");
+      autopsyModal(SOCifyLocale.text("مراجعة التنبيه"), content);
+    });
+    control.dataset.alertReviewId = row.id;
+    return control;
+  };
+  root.append(table([{ label: SOCifyLocale.text("التنبيه"), value: "reason" }, { label: SOCifyLocale.text("الخطر"), value: "severity" }, { label: SOCifyLocale.text("تقييم المحقق"), value: (row) => `${autopsyLabel(row.review.verdict)} · ${autopsyLabel(row.review.attack_outcome)}` }, { label: SOCifyLocale.text("مجموعة / نطاق"), value: (row) => `${row.review.group || "—"}${row.historical_derivation ? SOCifyLocale.text(" · نسخة تاريخية") : ""}${row.suppressed ? SOCifyLocale.text(" · إشعار مكبوت مؤقتًا") : ""}` }, { label: SOCifyLocale.text("المراجعة"), value: reviewControl }], alerts.items));
   paging("alerts_page",alerts);
   return panel(SOCifyLocale.text("الإثراء والكشف ومراجعة التنبيهات"), root, true);
 };

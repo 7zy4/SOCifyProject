@@ -84,7 +84,7 @@
         const detailId=`alert-details-${item.id}`;
         const detail=node("tr",{id:detailId,hidden:true},node("td",{colspan:8,class:"alert-detail-cell"}));
         const expandedContent=node("div",{class:"dossier-content"});
-        detail.querySelector("td").append(expandedContent,node("div",{class:"action-row"},[linkedButton(t("مراجعة التنبيه"),url(`/cases/${item.case_id}`,{tab:"analysis"})),linkedButton(t("السجلات والأدلة"),url(`/cases/${item.case_id}`,{tab:"logs"})),linkedButton(t("التقارير"),url("/reports",{case_id:item.case_id}))]));
+        detail.querySelector("td").append(expandedContent,node("div",{class:"action-row"},[linkedButton(t("مراجعة التنبيه"),url(`/cases/${item.case_id}`,{tab:"analysis",analysis:"detection"})),linkedButton(t("السجلات والأدلة"),url(`/cases/${item.case_id}`,{tab:"logs"})),linkedButton(t("التقارير"),url("/reports",{case_id:item.case_id}))]));
         let loaded=false;
         const expand=button("",async()=>{
           detail.hidden=!detail.hidden;expand.setAttribute("aria-expanded",String(!detail.hidden));ruleToggle.setAttribute("aria-expanded",String(!detail.hidden));

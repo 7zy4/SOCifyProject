@@ -485,11 +485,55 @@ def sections(payload):
             yield LABELS[key], content
 
 
+def directional_fragments(text):
+    """Isolate printable Latin runs without inserting controls into retained text."""
+    start = 0
+    while start < len(text):
+        latin = " " <= text[start] <= "~"
+        end = start + 1
+        while end < len(text) and (" " <= text[end] <= "~") == latin:
+            end += 1
+        fragment = text[start:end]
+        if latin and any(character.isalnum() for character in fragment):
+            leading = len(fragment) - len(fragment.lstrip(" "))
+            if start and fragment[leading:].startswith(": "):
+                leading += 2
+            trailing = len(fragment) - len(fragment.rstrip(" "))
+            if leading:
+                yield fragment[:leading], False
+            yield fragment[leading : len(fragment) - trailing], True
+            if trailing:
+                yield fragment[-trailing:], False
+        else:
+            yield fragment, False
+        start = end
+
+
+def directional_html(text):
+    return "".join(f'<bdi dir="ltr">{html.escape(fragment)}</bdi>' if latin else html.escape(fragment) for fragment, latin in directional_fragments(text))
+
+
+def report_blocks(value):
+    """Keep only bounded, short records together; long evidence stays splittable."""
+    records = value if isinstance(value, list) and value and all(isinstance(item, dict) for item in value) else None
+    for record in records or [None]:
+        content_lines = list(lines([record] if record is not None else value))
+        compact = record is not None and len(content_lines) <= 6 and sum(len(text) for _, text in content_lines) <= 900
+        yield record, content_lines, compact
+
+
+def integrity_reference(record, text):
+    label, separator, value = text.partition(": ")
+    if record is not None and separator and label == LABELS["sha256"] and len(value) == 64 and all(c in "0123456789abcdefABCDEF" for c in value):
+        return record_heading(record)
+    return None
+
+
 def line_html(text):
     label, separator, value = text.partition(": ")
     if separator:
-        return f'{html.escape(label)}: <bdi dir="auto">{html.escape(value)}</bdi>'
-    return f'<bdi dir="auto">{html.escape(text)}</bdi>'
+        return f'{directional_html(label)}: <bdi dir="auto">{directional_html(value)}</bdi>'
+    return f'<bdi dir="auto">{directional_html(text)}</bdi>'
 
 
 def render_html(payload) -> str:
@@ -497,20 +541,28 @@ def render_html(payload) -> str:
     content = []
     outline = []
     for index, (title, value) in enumerate(sections(payload), 1):
-        outline.append(f'<li><a href="#report-section-{index}">{html.escape(title)}</a></li>')
-        content_lines = list(lines(value))
+        outline.append(f'<li><a href="#report-section-{index}">{directional_html(title)}</a></li>')
         rows = []
-        for line_index, (depth, text) in enumerate(content_lines):
-            heading = " report-group-heading" if line_index + 1 < len(content_lines) and content_lines[line_index + 1][0] > depth else ""
-            rows.append(f'<p class="report-line depth-{min(depth, 3)}{heading}">{line_html(text)}</p>')
-        content.append(f'<section id="report-section-{index}" class="report-section"><h2>{html.escape(title)}</h2>{"".join(rows)}</section>')
+        for record, content_lines, compact in report_blocks(value):
+            block = []
+            for line_index, (depth, text) in enumerate(content_lines):
+                heading = " report-group-heading" if line_index + 1 < len(content_lines) and content_lines[line_index + 1][0] > depth else ""
+                row = f'<p class="report-line depth-{min(depth, 3)}{heading}">{line_html(text)}</p>'
+                reference = integrity_reference(record, text) if not compact else None
+                if reference:
+                    row = f'<div class="report-integrity"><p class="report-integrity-reference">{line_html(reference)}</p>{row}</div>'
+                block.append(row)
+            record_class = "report-entry report-entry-compact" if compact else "report-entry"
+            rows.append(f'<div class="{record_class}">{"".join(block)}</div>')
+        content.append(f'<section id="report-section-{index}" class="report-section"><h2>{directional_html(title)}</h2>{"".join(rows)}</section>')
     digest = hashlib.sha256(canonical(payload).encode()).hexdigest()
     title_class = ' class="report-title-long"' if len(case["title"]) > 100 else ""
-    cover = f'<header class="report-cover"><p class="report-wordmark" lang="en" dir="ltr">SOCify</p><p dir="ltr">TACTICAL WORKBENCH</p><p>تقرير فرز وتحقيق سريع في حادثة أمنية</p><h1{title_class}><bdi dir="auto">{html.escape(display(case["title"]))}</bdi></h1><p><bdi dir="ltr">{html.escape(case["reference"])}</bdi> · الإصدار {payload["revision"]}</p></header><p class="report-note">نسخة ثابتة من بيانات القضية عند إعدادها. اعتماد هذه النسخة محفوظ منفصلًا في سجل المنصة. البصمة أدناه تخص JSON المعياري، لا بايتات PDF.</p><p dir="ltr">SHA-256: <bdi>{digest}</bdi></p>'
+    cover = f'<header class="report-cover"><p class="report-wordmark" lang="en" dir="ltr">SOCify</p><p dir="ltr">TACTICAL WORKBENCH</p><p>تقرير فرز وتحقيق سريع في حادثة أمنية</p><h1{title_class}><bdi dir="auto">{directional_html(display(case["title"]))}</bdi></h1><p><bdi dir="ltr">{html.escape(case["reference"])}</bdi> · الإصدار {payload["revision"]}</p></header><p class="report-note">نسخة ثابتة من بيانات القضية عند إعدادها. اعتماد هذه النسخة محفوظ منفصلًا في سجل المنصة. البصمة أدناه تخص JSON المعياري، لا بايتات PDF.</p><p dir="ltr">SHA-256: <bdi>{digest}</bdi></p>'
     navigation = '<nav class="report-outline" aria-label="أقسام التقرير"><h2>محتويات التقرير</h2><ul>' + "".join(outline) + "</ul></nav>"
     style = (
         report_style()
         + ".report-cover{break-inside:avoid}.report-cover h1.report-title-long{font-size:20pt;line-height:1.5}.report-section{break-before:auto}.report-section:first-of-type{break-before:page}.report-line{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 10pt;font-size:14pt}.report-group-heading{break-after:avoid;font-weight:700}.depth-1{padding-inline-start:10pt}.depth-2,.depth-3{padding-inline-start:18pt}"
+        + '.report-section + .report-section h2{margin-top:18pt}.report-entry-compact,.report-integrity{break-inside:avoid}.report-integrity-reference{font-size:12pt;font-weight:700;margin-bottom:4pt}.report-entry bdi[dir="ltr"],.report-section h2 bdi[dir="ltr"]{unicode-bidi:isolate;direction:ltr}'
     )
     return f'<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{html.escape(case["reference"])}</title><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; font-src data:; img-src data:"><style>{style}</style></head><body>{cover}{navigation}{"".join(content)}</body></html>'
 
@@ -537,7 +589,12 @@ def bundled_report_asset_fetcher(url, timeout=10, ssl_context=None):
 def render_docx(payload) -> bytes:
     from docx import Document
     from docx.enum.table import WD_TABLE_DIRECTION
+    from docx.oxml import OxmlElement
     from docx.shared import Pt
+
+    def add_text(paragraph, text, bold=False):
+        for fragment, _ in directional_fragments(text):
+            add_report_run(paragraph, fragment, bold)
 
     document = Document()
     section = document.sections[0]
@@ -555,39 +612,48 @@ def render_docx(payload) -> bytes:
     document.add_heading("SOCify Tactical Workbench", 0)
     title = document.add_paragraph(style="Heading 1")
     set_direction(title)
-    add_report_run(title, display(payload["case"]["title"]), True)
+    add_text(title, display(payload["case"]["title"]), True)
     document.add_paragraph(display(payload["case"]["reference"]))
     notice = document.add_paragraph()
     set_direction(notice)
-    add_report_run(notice, "نسخة ثابتة؛ راجع سجل الاعتماد في المنصة. تعرض الأوقات كما سجلت، ولا يعني وقت إعداد التقرير وقت اكتشاف الحادث.")
+    add_text(notice, "نسخة ثابتة؛ راجع سجل الاعتماد في المنصة. تعرض الأوقات كما سجلت، ولا يعني وقت إعداد التقرير وقت اكتشاف الحادث.")
     for section_index, (title, value) in enumerate(sections(payload)):
         heading = document.add_paragraph(style="Heading 1")
         set_direction(heading)
-        add_report_run(heading, title, True)
+        add_text(heading, title, True)
         if section_index == 0:
             heading.paragraph_format.page_break_before = True
-        content_lines = list(lines(value))
         table = document.add_table(rows=0, cols=2)
         table.table_direction = WD_TABLE_DIRECTION.RTL
         table.autofit = False
         table.columns[0].width, table.columns[1].width = Pt(145), Pt(362)
-        for line_index, (depth, text) in enumerate(content_lines):
-            is_heading = line_index + 1 < len(content_lines) and content_lines[line_index + 1][0] > depth
-            label, separator, value = text.partition(": ")
-            cells = table.add_row().cells
-            if is_heading or not separator or label not in LABELS.values():
-                cell = cells[0].merge(cells[1])
-                paragraph = cell.paragraphs[0]
-                set_direction(paragraph)
-                paragraph.paragraph_format.keep_with_next = is_heading
-                paragraph.paragraph_format.space_before = Pt(8)
-                add_report_run(paragraph, text, is_heading)
-            else:
-                for index, content in enumerate((label, value)):
-                    paragraph = cells[index].paragraphs[0]
-                    set_direction(paragraph, any("\u0600" <= character <= "\u06ff" for character in content))
-                    paragraph.paragraph_format.space_after = Pt(6)
-                    add_report_run(paragraph, content, index == 0)
+        for record, content_lines, compact in report_blocks(value):
+            for line_index, (depth, text) in enumerate(content_lines):
+                is_heading = line_index + 1 < len(content_lines) and content_lines[line_index + 1][0] > depth
+                keep_next = is_heading or (compact and line_index + 1 < len(content_lines))
+                label, separator, value = text.partition(": ")
+                reference = integrity_reference(record, text) if not compact else None
+                row = table.add_row()
+                if integrity_reference(record, text):
+                    row._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+                cells = row.cells
+                if is_heading or not separator or label not in LABELS.values():
+                    cell = cells[0].merge(cells[1])
+                    paragraph = cell.paragraphs[0]
+                    set_direction(paragraph)
+                    paragraph.paragraph_format.keep_with_next = keep_next
+                    paragraph.paragraph_format.space_before = Pt(8)
+                    add_text(paragraph, text, is_heading)
+                else:
+                    for index, content in enumerate((label, value)):
+                        paragraph = cells[index].paragraphs[0]
+                        set_direction(paragraph, any("\u0600" <= character <= "\u06ff" for character in content))
+                        paragraph.paragraph_format.keep_with_next = keep_next
+                        paragraph.paragraph_format.space_after = Pt(6)
+                        add_text(paragraph, content, index == 0)
+                        if index == 0 and reference:
+                            paragraph.add_run().add_break()
+                            add_text(paragraph, reference)
     output = io.BytesIO()
     document.save(output)
     return output.getvalue()

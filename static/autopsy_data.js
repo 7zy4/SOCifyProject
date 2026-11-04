@@ -15,7 +15,7 @@ function autopsyImportForm(caseId) {
   const encoding = autopsySelect("encoding", ["utf-8-sig", "utf-8", "utf-16", "latin-1"], "utf-8-sig");
   const delimiter = node("select", { name: "delimiter" }, [[",", SOCifyLocale.text("فاصلة ,")], [";", SOCifyLocale.text("فاصلة منقوطة ;")], ["\t", "Tab"], ["|", SOCifyLocale.text("فاصل |")]].map(([value, label]) => node("option", { value, text: label })));
   const options = node("details", { class: "import-options span-2" }, [node("summary", { text: SOCifyLocale.text("خيارات الاستيراد") }), node("div", { class: "form-grid" }, [field(SOCifyLocale.text("مصدر جمع السجلات"), source), field(SOCifyLocale.text("الصيغة"), format), field(SOCifyLocale.text("المنطقة الزمنية للمصدر"), zone.control), field(SOCifyLocale.text("الترميز"), encoding), field(SOCifyLocale.text("فاصل CSV"), delimiter)])]);
-  const form = node("form", { class: "form-grid", "aria-label": SOCifyLocale.text("استيراد أدلة القضية") }, [field(SOCifyLocale.text("ملف السجلات أو الأدلة الشبكية"), file, true), options]);
+  const form = node("form", { class: "form-grid import-form", "aria-label": SOCifyLocale.text("استيراد أدلة القضية") }, [field(SOCifyLocale.text("ملف السجلات أو الأدلة الشبكية"), file, true), options]);
   const preview = node("div", { class: "span-2", "aria-live": "polite" });
   const mappingView = node("div", { class: "span-2" });
   const mapping = Object.create(null);
@@ -41,16 +41,22 @@ function autopsyImportForm(caseId) {
     previewButton.disabled = true;
     try {
       const result = await api(`/api/cases/${caseId}/imports/preview`, { method: "POST", body: body() });
-      preview.replaceChildren(node("p", { text: SOCifyLocale.template`الصيغة: ${result.format} · SHA-256: ${result.content_hash}` }), node("pre", { text: JSON.stringify(result.preview, null, 2) }));
+      preview.replaceChildren(node("p", { text: SOCifyLocale.template`الصيغة: ${result.format} · SHA-256: ${result.content_hash}` }), node("pre", { tabindex: 0, text: JSON.stringify(result.preview, null, 2) }));
       const header = result.preview.find((record) => record.raw_payload)?.raw_payload;
       if (header && typeof header === "object" && !mappingView.children.length) {
         const from = autopsyChoice("mapping_from", Object.keys(header), "", true);
         const to = autopsyChoice("mapping_to", autopsy.catalog.mapping_fields, "", true);
         const list = node("div", { "aria-live": "polite" });
+        const renderMappings = () => list.replaceChildren(...Object.entries(mapping).map(([sourceField, target]) => node("p", {}, [node("bdi", { text: `${sourceField} → ${target}` }), button(SOCifyLocale.text("إزالة الربط"), () => {
+          delete mapping[sourceField];
+          renderMappings();
+          markChanged();
+          from.input.focus();
+        })])));
         mappingView.append(node("fieldset", {}, [node("legend", { text: SOCifyLocale.text("ربط حقول المصدر بالحقول الموحّدة") }), field(SOCifyLocale.text("حقل المصدر"), from.control), field(SOCifyLocale.text("الحقل الموحّد"), to.control), button(SOCifyLocale.text("إضافة ربط حقل"), () => {
           try {
             mapping[from.input.autopsyValue()] = to.input.autopsyValue();
-            list.replaceChildren(...Object.entries(mapping).map(([sourceField, target]) => node("p", {}, [node("bdi", { text: `${sourceField} → ${target}` }), button(SOCifyLocale.text("إزالة الربط"), () => { delete mapping[sourceField]; list.replaceChildren(); markChanged(); })])));
+            renderMappings();
             markChanged();
           } catch (error) { handleError(error); }
         }), list]));

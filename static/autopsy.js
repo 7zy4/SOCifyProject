@@ -239,7 +239,7 @@ function autopsyReferenceChoice(name, source, required = false) {
   return { control, input };
 }
 
-function autopsyForm(schema, submit, initial = {}, { submitLabel = SOCifyLocale.text("حفظ") } = {}) {
+function autopsyForm(schema, submit, initial = {}, { submitLabel = SOCifyLocale.text("حفظ"), freezeWhileSaving = false } = {}) {
   const form = node("form", { class: "form-grid" });
   const getters = {};
   const choiceFields = new Map();
@@ -330,7 +330,7 @@ function autopsyForm(schema, submit, initial = {}, { submitLabel = SOCifyLocale.
     save.setAttribute("aria-busy", "true");
     save.textContent = SOCifyLocale.text("جارٍ الحفظ…");
     form.dataset.saving = "true";
-    const frozen = form.dataset.libraryForm || form.dataset.caseForm ? [...form.querySelectorAll("input,textarea,select,button")].filter(control => !control.disabled) : [];
+    const frozen = freezeWhileSaving || form.dataset.libraryForm || form.dataset.caseForm ? [...form.querySelectorAll("input,textarea,select,button")].filter(control => !control.disabled) : [];
     try {
       const values = Object.fromEntries(Object.entries(getters).map(([key, getter]) => [key, getter()]).filter(([, value]) => value !== null));
       frozen.forEach(control => { control.disabled = true; });

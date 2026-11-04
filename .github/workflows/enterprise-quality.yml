@@ -151,6 +151,11 @@ jobs:
             artifacts/usability_campaign/followup-decisions/
             artifacts/usability_campaign/native-delivery-decisions/
             artifacts/usability_campaign/occurrence-user-decisions/
+            artifacts/usability_campaign/import-mapping-decisions/
+            artifacts/usability_campaign/blind-review/alert-repair/
+            artifacts/usability_campaign/blind-review/alert-details/
+            artifacts/usability_campaign/blind-review/assessment-repair/browser/
+            artifacts/usability_campaign/ci-assessment-current/alert-review-independent/after/
             work/interface-review/
       - if: always()
         run: docker rm --force socify-ci-analysis

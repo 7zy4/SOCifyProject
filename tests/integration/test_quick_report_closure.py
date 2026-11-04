@@ -96,3 +96,47 @@ def test_legacy_resolved_case_can_return_to_canonical_review(autopsy_case, clien
         base + "/transitions", json={"status": "awaiting_review", "version": current["version"], "reason": "Review outstanding closure requirements"}
     )
     assert response.status_code == 200 and response.json["status"] == "awaiting_review"
+
+
+def test_pending_evidence_choices_do_not_satisfy_closure_requirements(autopsy_case, client, login_as):
+    base = f"/api/cases/{autopsy_case}"
+    initial_status = client.get(base).json["status"]
+    pending = {
+        **ANSWERS,
+        "incident_classification": "undetermined_pending_evidence",
+        "triage_verdict": "undetermined_pending_evidence",
+        "containment_status": "not_performed_pending_evidence",
+        "recommended_next_step": "collect_and_validate_evidence",
+    }
+    missing_before = client.get(base + "/quick-report").json["closure"]["missing"]
+    assert client.put(base + "/quick-report", json={"answers": pending}).status_code == 200
+    assert client.get(base + "/quick-report").json["closure"]["missing"] == missing_before
+    denied = client.post(base + "/quick-report/acknowledge", json={"decision": "closed", "case_version": client.get(base).json["version"]})
+    assert denied.status_code == 403
+    login_as("soc_manager")
+    denied = client.post(base + "/quick-report/acknowledge", json={"decision": "closed", "case_version": client.get(base).json["version"]})
+    assert denied.status_code == 409 and denied.json["error"]["code"] == "CASE_CLOSURE_INCOMPLETE"
+    assert client.get(base).json["status"] == initial_status
+
+
+def test_pending_evidence_save_invalidates_a_previous_report_snapshot(autopsy_case, client, login_as):
+    base = f"/api/cases/{autopsy_case}"
+    old_version = client.get(base).json["version"]
+    created = client.post(base + "/reports", json={"version": old_version})
+    assert created.status_code == 202, created.json
+    report_path = base + f"/reports/{created.json['id']}"
+    snapshot = client.get(report_path).json
+    pending = {
+        **ANSWERS,
+        "incident_classification": "undetermined_pending_evidence",
+        "triage_verdict": "undetermined_pending_evidence",
+        "containment_status": "not_performed_pending_evidence",
+        "recommended_next_step": "collect_and_validate_evidence",
+    }
+    assert client.put(base + "/quick-report", json={"answers": pending, "case_version": old_version}).status_code == 200
+    current_version = client.get(base).json["version"]
+    assert current_version > old_version
+    assert client.get(report_path).json["source_version"] == snapshot["source_version"] == old_version
+    login_as("soc_manager")
+    stale = client.post(report_path + "/approve", json={"version": current_version})
+    assert stale.status_code == 409 and stale.json["error"]["code"] == "STALE_REPORT"

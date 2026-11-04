@@ -98,3 +98,54 @@ def test_guided_dropdown_report_validation_printable_html_xss_safety_and_manager
     assert ack.status_code == 200, ack.json
     assert ack.json["report"]["status"] == "acknowledged"
     assert ack.json["report"]["manager_decision"] == "approved"
+
+
+def test_pending_evidence_is_a_truthful_documented_decision_without_response_side_effects(autopsy_case, client, database):
+    base = f"/api/cases/{autopsy_case}"
+    imported = client.post(
+        base + "/imports",
+        json={
+            "filename": "identity.json",
+            "content": json.dumps([{"title": "Authentication evidence", "process_name": "powershell.exe", "command_line": "powershell.exe -enc AAAA"}]),
+        },
+    )
+    assert imported.status_code in {200, 201}, imported.json
+    questions = client.get(base + "/quick-report").json["questions"]
+    classification = next(q for q in questions if q["id"] == "incident_classification")
+    assert classification["default"] == "" and classification["options"][0]["value"] == "phishing_bec"
+    answers = {q["id"]: q["options"][0]["value"] for q in questions}
+    answers.update(
+        incident_classification="undetermined_pending_evidence",
+        initial_vector="identity_vpn_login",
+        triage_verdict="undetermined_pending_evidence",
+        impact_scope="scope_under_assessment",
+        data_exposure="none_observed",
+        file_and_email_assessment="no_files_involved",
+        containment_status="not_performed_pending_evidence",
+        recommended_next_step="collect_and_validate_evidence",
+    )
+    before = {
+        "case": client.get(base).json,
+        "reviews": [tuple(row) for row in database.execute("SELECT * FROM autopsy_alert_reviews")],
+        "responses": [tuple(row) for row in database.execute("SELECT * FROM autopsy_records WHERE kind='response'")],
+        "alerts": [tuple(row) for row in database.execute("SELECT id,status FROM alerts")],
+        "context": tuple(database.execute("SELECT alert_verdict,attack_outcome FROM autopsy_case_context WHERE case_id=?", (autopsy_case,)).fetchone()),
+    }
+    saved = client.put(base + "/quick-report", json={"answers": answers, "executive_note": "Awaiting MFA and session evidence; no containment performed."})
+    assert saved.status_code == 200, saved.json
+    assert saved.json["report"]["answers"] == answers
+    html = client.get(f"/cases/{autopsy_case}/quick-report/print", headers={"X-SOCify-Language": "en"}).text
+    assert "Classification Pending Evidence" in html
+    assert "Unauthorized Access / Brute Force" not in html
+    assert "Undetermined — Awaiting Evidence" in html
+    assert "No Containment Performed — Awaiting Evidence" in html
+    assert "Collect and Validate Evidence Before Response" in html
+    after_case = client.get(base).json
+    assert after_case["status"] == before["case"]["status"]
+    assert after_case["version"] > before["case"]["version"]
+    assert before["reviews"] == [tuple(row) for row in database.execute("SELECT * FROM autopsy_alert_reviews")]
+    assert before["responses"] == [tuple(row) for row in database.execute("SELECT * FROM autopsy_records WHERE kind='response'")]
+    assert before["alerts"] == [tuple(row) for row in database.execute("SELECT id,status FROM alerts")]
+    assert before["context"] == tuple(
+        database.execute("SELECT alert_verdict,attack_outcome FROM autopsy_case_context WHERE case_id=?", (autopsy_case,)).fetchone()
+    )

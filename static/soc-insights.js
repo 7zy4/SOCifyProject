@@ -290,6 +290,10 @@ window.SOCifyInsights = (() => {
   }
   async function dossier(item, container) {
     const data=await api(`/api/cases/${item.case_id}/alerts/${item.id}/dossier`);
+    const context=item.case_title===undefined||item.assignee_name===undefined?await api(`/api/cases/${item.case_id}`):null;
+    const caseTitle=item.case_title??context?.title;
+    const owner=item.assignee_name??context?.members?.find(member=>member.user_id===context.assignee)?.name;
+    const linkedEvents=Number.isInteger(item.evidence_events)&&item.evidence_events>=0?n(item.evidence_events):`${n(data.events.length)}${data.events_truncated?"+":""}`;
     const root=node("div",{class:"dossier-view"});
     const details=detailTable(t("تفاصيل التنبيه", "Alert details"),[
       [t("معرف التنبيه", "Alert ID"),data.alert.alert_id],
@@ -297,10 +301,10 @@ window.SOCifyInsights = (() => {
       [t("الخطورة", "Severity"),node("span",{class:`severity ${data.alert.severity}`,text:label(data.alert.severity)})],
       [t("سبب الكشف", "Detection reason"),data.alert.reason],
       [t("وقت الكشف", "Detection time"),time(data.alert.detected_at)],
-      [t("القضية", "Case"),node("a",{href:`/cases/${item.case_id}`,text:`${data.case.reference} · ${item.case_title}`})],
+      [t("القضية", "Case"),node("a",{href:`/cases/${item.case_id}`,text:[data.case.reference,caseTitle].filter(Boolean).join(" · ")})],
       [t("حالة القضية", "Case status"),label(data.case.status)],
-      [t("المسؤول", "Owner"),item.assignee_name],
-      [t("السجلات المرتبطة", "Linked events"),n(item.evidence_events)],
+      [t("المسؤول", "Owner"),owner],
+      [t("السجلات المرتبطة", "Linked events"),linkedEvents],
       [t("الإغلاق", "Closed at"),time(data.case.closed_at)],
       [t("قرار المحلل", "Analyst verdict"),label(data.review?.verdict||"undetermined")],
       [t("نتيجة الهجوم", "Attack outcome"),label(data.review?.attack_outcome||"unknown")],

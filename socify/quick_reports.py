@@ -8,6 +8,8 @@ from flask import Blueprint, Response, jsonify, request
 
 from .audit import record_audit
 from .autopsy_domain import custody, touch_case
+from .autopsy_pipeline import visibility_sql
+from .case_counts import consistent_read
 from .cases import _case_row
 from .db import get_db, transaction
 from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
@@ -30,6 +32,7 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
             {"value": "data_exfiltration", "label": "تسريب بيانات أو اتصال C2 مشبوه (Data Exfiltration / C2)"},
             {"value": "policy_violation_recon", "label": "استطلاع شبكي / مخالفة سياسة أمنية (Reconnaissance / Policy Violation)"},
             {"value": "benign_activity", "label": "نشاط تشغيلي سليم / فحص مصرح (Authorized / Benign Activity)"},
+            {"value": "undetermined_pending_evidence", "label": "لم يتحدد التصنيف بعد (Classification Pending Evidence)"},
         ],
     },
     {
@@ -55,6 +58,7 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
             {"value": "suspicious_needs_deep_forensics", "label": "اشتباه مرتفع يتطلب أدوات جنائية ثقيلة (Suspicious — Needs Deep Forensics)"},
             {"value": "benign_true_positive", "label": "تنبيه صحيح لنشاط مصرح به (Benign True Positive / Authorized)"},
             {"value": "false_positive", "label": "إنذار كاذب / ضجيج قاعدة (False Positive)"},
+            {"value": "undetermined_pending_evidence", "label": "غير محدد بانتظار أدلة إضافية (Undetermined — Awaiting Evidence)"},
         ],
     },
     {
@@ -102,6 +106,7 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
             {"value": "monitoring_enhanced", "label": "تعزيز المراقبة دون حاجة لعزل فوري (Enhanced Monitoring)"},
             {"value": "pending_manager_authorization", "label": "بانتظار توجيه واعتماد مدير مركز العمليات (Pending SOC Manager Approval)"},
             {"value": "no_action_needed", "label": "لا يلزم إجراء احتواء (No Containment Needed)"},
+            {"value": "not_performed_pending_evidence", "label": "لم يُنفذ احتواء بانتظار الأدلة (No Containment Performed — Awaiting Evidence)"},
         ],
     },
     {
@@ -113,6 +118,10 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
             {"value": "block_iocs_and_reset_credentials", "label": "حظر المؤشرات المشبوهة وإعادة تعيين كلمات المرور (Block IOCs & Reset Credentials)"},
             {"value": "tune_detection_rule", "label": "ضبط قاعدة الكشف لتقليل الضجيج (Tune Detection Rule)"},
             {"value": "close_after_manager_review", "label": "إغلاق القضية بعد مراجعة واعتماد المدير (Close After Manager Review)"},
+            {
+                "value": "collect_and_validate_evidence",
+                "label": "جمع الأدلة والتحقق منها قبل اتخاذ قرار الاستجابة (Collect and Validate Evidence Before Response)",
+            },
         ],
     },
     {
@@ -131,6 +140,9 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
 QUESTION_OPTION_MAP: dict[str, dict[str, str]] = {q["id"]: {opt["value"]: opt["label"] for opt in q["options"]} for q in QUICK_REPORT_QUESTIONS}
 DEFAULT_ANSWERS: dict[str, str] = {}
 MANAGER_DECISIONS = {"approved", "needs_followup", "closed"}
+QUICK_REPORT_ALERT_LIMIT = 20
+QUICK_REPORT_NOTE_LIMIT = 10
+QUICK_REPORT_TEXT_LIMIT = 2000
 
 
 def migrate(connection: sqlite3.Connection) -> None:
@@ -210,6 +222,55 @@ def _report_view(row: sqlite3.Row | None) -> dict[str, Any] | None:
     }
 
 
+def _report_excerpt(value: object, limit: int = QUICK_REPORT_TEXT_LIMIT) -> str:
+    """Keep narrative excerpts bounded without rendering arbitrary payloads."""
+    if not isinstance(value, str):
+        return ""
+    return value[:limit] + ("…" if len(value) > limit else "")
+
+
+def _shared_evidence_notes(case_row: sqlite3.Row) -> tuple[list[dict[str, Any]], int]:
+    # Reports are shareable: private notes stay excluded even for their author
+    # or a manager. The route's full-case guard also protects partial origins.
+    scope, scope_args = visibility_sql("ce")
+    source = f"""FROM autopsy_records r
+        JOIN case_events ce ON ce.case_id=r.case_id AND ce.event_id=json_extract(r.payload,'$.event_id')
+        JOIN security_events e ON e.id=ce.event_id AND e.workspace_id=?
+        WHERE r.case_id=? AND r.kind='bookmark'
+        AND json_extract(r.payload,'$.visibility')='team'
+        AND ce.active_event=1 AND e.autopsy_active=1 AND {scope}"""
+    args = (case_row["workspace_id"], case_row["id"], *scope_args)
+    total = int(get_db().execute("SELECT COUNT(*) " + source, args).fetchone()[0])
+    rows = (
+        get_db()
+        .execute(
+            """SELECT r.id,r.payload,r.created_at,r.updated_at,e.id AS event_id,e.title AS event_title,
+            e.description,CASE WHEN ce.time_known=1 THEN ce.event_time END AS event_time """
+            + source
+            + " ORDER BY r.id DESC LIMIT ?",
+            (*args, QUICK_REPORT_NOTE_LIMIT),
+        )
+        .fetchall()
+    )
+    items = []
+    for row in rows:
+        payload = json.loads(row["payload"])
+        items.append(
+            {
+                "id": row["id"],
+                "title": _report_excerpt(payload.get("title"), 255),
+                "notes": _report_excerpt(payload.get("notes")),
+                "event_id": row["event_id"],
+                "event_title": _report_excerpt(row["event_title"], 255),
+                "event_time": row["event_time"],
+                "source_description": _report_excerpt(row["description"]),
+                "documented_at": row["created_at"],
+                "updated_at": row["updated_at"],
+            }
+        )
+    return items, total
+
+
 def _collect_case_auto_summary(case_row: sqlite3.Row) -> dict[str, Any]:
     case_id = int(case_row["id"])
     db = get_db()
@@ -218,12 +279,14 @@ def _collect_case_auto_summary(case_row: sqlite3.Row) -> dict[str, Any]:
     ).fetchone()
     logs_count = int(db.execute("SELECT COUNT(*) FROM case_events WHERE case_id = ? AND active_event = 1", (case_id,)).fetchone()[0])
     alerts_rows = db.execute(
-        """SELECT a.id, a.alert_id, a.severity, a.reason, a.status, a.detected_at
+        """SELECT a.id, a.alert_id, a.severity, a.reason, a.status, a.detected_at,
+                  review.payload AS review,review.changed_at AS reviewed_at
            FROM case_alerts ca
            JOIN alerts a ON a.id = ca.alert_id
-           WHERE ca.case_id = ?
-           ORDER BY a.id DESC LIMIT 20""",
-        (case_id,),
+           LEFT JOIN autopsy_alert_reviews review ON review.alert_id=a.id AND review.case_id=ca.case_id
+           WHERE ca.case_id = ? AND a.workspace_id=?
+           ORDER BY a.id DESC LIMIT ?""",
+        (case_id, case_row["workspace_id"], QUICK_REPORT_ALERT_LIMIT),
     ).fetchall()
     alerts_total = int(db.execute("SELECT COUNT(*) FROM case_alerts WHERE case_id = ?", (case_id,)).fetchone()[0])
 
@@ -260,7 +323,18 @@ def _collect_case_auto_summary(case_row: sqlite3.Row) -> dict[str, Any]:
                 }
             )
 
-    watchlist_alerts = [dict(r) for r in alerts_rows if str(r["reason"]).startswith("[Watchlist Match]")]
+    alerts = []
+    for row in alerts_rows:
+        item = dict(row)
+        review = json.loads(item.pop("review") or "{}")
+        item["review"] = {
+            "verdict": _report_excerpt(review.get("verdict", "undetermined"), 30),
+            "attack_outcome": _report_excerpt(review.get("attack_outcome", "unknown"), 30),
+            "reason": _report_excerpt(review.get("reason")),
+        }
+        alerts.append(item)
+    evidence_notes, evidence_notes_count = _shared_evidence_notes(case_row)
+    watchlist_alerts = [r for r in alerts if str(r["reason"]).startswith("[Watchlist Match]")]
     return {
         "case": {
             "id": case_id,
@@ -276,7 +350,11 @@ def _collect_case_auto_summary(case_row: sqlite3.Row) -> dict[str, Any]:
         },
         "logs_count": logs_count,
         "alerts_count": alerts_total,
-        "alerts": [dict(r) for r in alerts_rows],
+        "alerts": alerts,
+        "alerts_limit": QUICK_REPORT_ALERT_LIMIT,
+        "evidence_notes": evidence_notes,
+        "evidence_notes_count": evidence_notes_count,
+        "evidence_notes_limit": QUICK_REPORT_NOTE_LIMIT,
         "watchlist_hits_count": len(watchlist_alerts),
         "watchlist_hits": watchlist_alerts,
         "static_triage_items": static_items,
@@ -285,6 +363,7 @@ def _collect_case_auto_summary(case_row: sqlite3.Row) -> dict[str, Any]:
 
 @quick_reports_api.get("/api/cases/<int:case_id>/quick-report")
 @require_permission("cases.read")
+@consistent_read
 def get_quick_report(case_id: int):
     from .autopsy_reports import closure_readiness
 
@@ -562,6 +641,7 @@ def _badge_tone(raw: object) -> str:
 
 @quick_reports_api.get("/cases/<int:case_id>/quick-report/print")
 @require_permission("cases.read")
+@consistent_read
 def print_quick_report(case_id: int):
     case = _case_row(case_id)
     if not case:
@@ -620,6 +700,58 @@ def print_quick_report(case_id: int):
         )
     else:
         alerts_rows_html = '<tr><td colspan="4" data-ui-copy>لا توجد تنبيهات مسجلة في القضية حتى لحظة التقرير.</td></tr>'
+
+    # Deliberately use a small, explicit projection; never dump review or log JSON.
+    evidence_context = [
+        '<h2 class="section-title">' + _fmt_bilingual("التقييم والملاحظات (Assessment and Notes)") + "</h2>",
+    ]
+    if len(summary["alerts"]) < summary["alerts_count"]:
+        shown, total = len(summary["alerts"]), summary["alerts_count"]
+        evidence_context.append("<p>" + _fmt_bilingual(f"المعروض {shown} من {total} (Showing {shown} of {total})") + "</p>")
+    for alert in summary["alerts"]:
+        review = alert["review"]
+        evidence_context.append(
+            '<section class="note-box report-narrative"><h3><code dir="ltr">'
+            + _esc(alert["alert_id"])
+            + "</code></h3><p>"
+            + _fmt_bilingual("حكم التنبيه (Alert verdict)")
+            + ": <span data-ui-copy>"
+            + _esc(ENUM_LABELS.get(review["verdict"], review["verdict"]))
+            + "</span> · "
+            + _fmt_bilingual("نتيجة الهجوم (Attack outcome)")
+            + ": <span data-ui-copy>"
+            + _esc(ENUM_LABELS.get(review["attack_outcome"], review["attack_outcome"]))
+            + '</span></p><p dir="auto">'
+            + _esc(review["reason"])
+            + "</p></section>"
+        )
+    evidence_context.append("<h3>" + _fmt_bilingual("ملاحظات الأدلة المشتركة (Shared Evidence Notes)") + "</h3>")
+    if len(summary["evidence_notes"]) < summary["evidence_notes_count"]:
+        shown, total = len(summary["evidence_notes"]), summary["evidence_notes_count"]
+        evidence_context.append("<p>" + _fmt_bilingual(f"المعروض {shown} من {total} (Showing {shown} of {total})") + "</p>")
+    for note in summary["evidence_notes"]:
+        evidence_context.append(
+            '<section class="note-box report-narrative"><h3 dir="auto">'
+            + _esc(note["title"])
+            + "</h3><p>"
+            + _fmt_bilingual("مرجع السجل (Log reference)")
+            + f': {_esc(note["event_id"])} · <bdi dir="auto">{_esc(note["event_title"])}</bdi><br>'
+            + _fmt_bilingual("وقت الحدث (Event time)")
+            + ' (UTC): <bdi class="mono" dir="ltr">'
+            + _esc(note["event_time"])
+            + "</bdi><br>"
+            + _fmt_bilingual("وقت التوثيق (Documentation time)")
+            + ' (UTC): <bdi class="mono" dir="ltr">'
+            + _esc(note["documented_at"])
+            + '</bdi></p><p dir="auto">'
+            + _esc(note["notes"])
+            + "</p><p><strong>"
+            + _fmt_bilingual("وصف الدليل (Evidence description)")
+            + ':</strong> <bdi dir="auto">'
+            + _esc(note["source_description"])
+            + "</bdi></p></section>"
+        )
+    evidence_context_html = "".join(evidence_context)
 
     if summary["static_triage_items"]:
         triage_rows_html = "".join(
@@ -685,6 +817,8 @@ def print_quick_report(case_id: int):
       <thead data-ui-copy><tr><th>المعرف</th><th>الخطورة</th><th>القاعدة / سبب التنبيه</th><th>وقت الرصد</th></tr></thead>
       <tbody>{alerts_rows_html}</tbody>
     </table>
+
+    {evidence_context_html}
 
     <h2 class="section-title" data-ui-copy>فحص الملفات والبريد</h2>
     <table class="evidence-table">
