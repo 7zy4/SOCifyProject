@@ -43,7 +43,8 @@ from tests.integration.test_source_https_transport import tls_source  # noqa: F4
 
 ARTIFACTS = Path("artifacts/usability_campaign/native-delivery-decisions")
 PUBLIC_URL = "https://raw.githubusercontent.com/7zy4/SOCifyProject/154c1ae8352b62e5fd2749f306c42ffddc7c3f22/fixtures/import/events.json"
-PUBLIC_SHA256 = "4510583353c18c71f4ae84f44600c7d10f10ef3050241bad24d0477740bcbd57"
+# Pinned digest of the public fixture above, not an authentication credential.
+PUBLIC_SHA256 = "4510583353c18c71f4ae84f44600c7d10f10ef3050241bad24d0477740bcbd57"  # pragma: allowlist secret
 NATIVE = sys.platform == "linux"
 # These are predefined scenario evidence, not approvals created to satisfy a
 # report gate. No real person, signature, system execution or external owner is
