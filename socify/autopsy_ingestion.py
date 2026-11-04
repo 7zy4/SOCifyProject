@@ -8,7 +8,7 @@ from typing import Any
 from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
 from werkzeug.utils import secure_filename
 
-from .autopsy_domain import custody, touch_case
+from .autopsy_domain import custody, normalize_indicator, touch_case
 from .autopsy_pipeline import activate_import, event_visible, job_visible, visibility_sql
 from .case_counts import cached_case_count, consistent_read
 from .cases import _attach_event, _case_row
@@ -23,6 +23,7 @@ from .validation import ValidationError, public_error_message
 autopsy_ingestion_api = Blueprint("autopsy_ingestion", __name__)
 SEARCH_COUNT_LIMIT = 10000
 FTS_PREDICATE = "autopsy_log_search MATCH ?"
+IP_PREDICATE = "EXISTS (SELECT 1 FROM security_events ip_event WHERE ip_event.id=ce.event_id AND (socify_log_ip(ip_event.source_ip)=? OR socify_log_ip(ip_event.destination_ip)=?))"
 
 
 def import_view(row):
@@ -192,6 +193,16 @@ def original_import(case_id: int, job_id: int):
     )
 
 
+def _canonical_log_ip(value):
+    """Compare endpoint identities without rewriting the retained evidence."""
+    if not isinstance(value, str):
+        return None
+    try:
+        return normalize_indicator("ip", value.strip())
+    except ValueError:
+        return None
+
+
 def log_query(case_id: int) -> tuple[str, list[Any]]:
     clauses = ["ce.case_id = ?"]
     args: list[Any] = [case_id]
@@ -212,12 +223,20 @@ def log_query(case_id: int) -> tuple[str, list[Any]]:
     if len(query) > 200:
         raise ValidationError("نص البحث يتجاوز الحد المسموح")
     if query:
-        words = [word for word in re.findall(r"[\w.-]+", query) if any(char.isalnum() for char in word)][:20]
-        if words:
-            clauses.append(FTS_PREDICATE)
-            args.append(" AND ".join('"' + word + '"' for word in words))
+        address = _canonical_log_ip(query)
+        if address is not None:
+            # FTS tokenizes IPv6 punctuation and loses address identity. Apply
+            # exact canonical comparison only after case/batch visibility.
+            get_db().create_function("socify_log_ip", 1, _canonical_log_ip, deterministic=True)
+            clauses.append(IP_PREDICATE)
+            args.extend((address, address))
         else:
-            clauses.append("0 = 1")
+            words = [word for word in re.findall(r"[\w.-]+", query) if any(char.isalnum() for char in word)][:20]
+            if words:
+                clauses.append(FTS_PREDICATE)
+                args.append(" AND ".join('"' + word + '"' for word in words))
+            else:
+                clauses.append("0 = 1")
     ranges = {}
     for key, operator in (("start", ">="), ("end", "<=")):
         if request.args.get(key):
@@ -248,11 +267,13 @@ def metadata_scope(where, args):
         count = cached_case_count(args[0], job_id=job_id, active_only=job_id is None)
         if count is not None:
             return source, where, count, "eq"
-    if FTS_PREDICATE in where:
+    if FTS_PREDICATE in where or IP_PREDICATE in where:
         count = get_db().execute(f"SELECT COUNT(*) FROM (SELECT 1 FROM {source} WHERE {where} LIMIT ?)", (*args, SEARCH_COUNT_LIMIT + 1)).fetchone()[0]
         if count > SEARCH_COUNT_LIMIT:
-            predicate = "EXISTS (SELECT 1 FROM autopsy_log_search WHERE autopsy_log_search.rowid=ce.event_id AND autopsy_log_search MATCH ?)"
-            return "case_events ce", where.replace(FTS_PREDICATE, predicate), SEARCH_COUNT_LIMIT, "gte"
+            if FTS_PREDICATE in where:
+                predicate = "EXISTS (SELECT 1 FROM autopsy_log_search WHERE autopsy_log_search.rowid=ce.event_id AND autopsy_log_search MATCH ?)"
+                return "case_events ce", where.replace(FTS_PREDICATE, predicate), SEARCH_COUNT_LIMIT, "gte"
+            return source, where, SEARCH_COUNT_LIMIT, "gte"
         return source, where, count, "eq"
     return source, where, get_db().execute(f"SELECT COUNT(*) FROM {source} WHERE {where}", args).fetchone()[0], "eq"
 

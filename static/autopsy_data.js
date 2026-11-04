@@ -227,7 +227,7 @@ async function autopsyLogsPanel(caseId) {
   }) });
   if (selectedJob) root.append(node("p", { text: SOCifyLocale.text("تعرض سجلات نسخة محددة، وقد تكون تاريخية.") }), linkedButton(SOCifyLocale.text("عرض النسخ الفعالة"), autopsyCaseURL(caseId, { tab: "logs", job_id: null, page: null })));
   if (imports.items.length) root.append(panel(SOCifyLocale.text("أصول الاستيراد والمعالجة"), table(jobColumns, imports.items), true));
-  const search = node("input", { type: "search", name: "q", value: query, maxlength: 200 });
+  const search = node("input", { type: "search", name: "q", dir: "auto", value: query, maxlength: 200 });
   const form = node("form", { class: "filter-row", "aria-label": SOCifyLocale.text("بحث سجلات القضية") }, [field(SOCifyLocale.text("عنوان أو عنوان شبكة أو مستخدم أو مضيف"), search), node("button", { type: "submit", class: "button ghost", text: SOCifyLocale.text("بحث السجلات") })]);
   form.addEventListener("submit", (event) => { event.preventDefault(); window.location.assign(autopsyCaseURL(caseId, { tab: "logs", q: search.value, page: null })); });
   const exports = node("div", { class: "action-row" });
