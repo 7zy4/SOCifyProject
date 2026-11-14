@@ -41,7 +41,7 @@ jobs:
           pdftotext -bbox-layout "$RUNNER_TEMP/socify-long-report/long-report.pdf" "$RUNNER_TEMP/socify-long-report/bbox.xml"
           python -m tests.container.verify_report_layout --output "$RUNNER_TEMP/socify-long-report" --bbox "$RUNNER_TEMP/socify-long-report/bbox.xml"
           pdftoppm -png -scale-to 1400 "$RUNNER_TEMP/socify-long-report/long-report.pdf" "$RUNNER_TEMP/socify-long-report/page"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: report-layout
@@ -49,7 +49,7 @@ jobs:
             ${{ runner.temp }}/socify-long-report/manifest.json
             ${{ runner.temp }}/socify-long-report/long-report.pdf
             ${{ runner.temp }}/socify-long-report/page-*.png
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: coverage
@@ -70,7 +70,7 @@ jobs:
       - run: git ls-files -z | xargs -0 detect-secrets-hook -c 1 --baseline .secrets.baseline --exclude-files '^(data/enterprise-attack-v20.0.json|fixtures/windows/sysmon-sample.evtx.b64)$'
       - run: cyclonedx-py requirements requirements.txt --output-reproducible --of JSON -o sbom.json
       - run: pip-licenses --format=json --with-urls --output-file=licenses.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: supply-chain-evidence
           path: |
@@ -127,7 +127,7 @@ jobs:
                           annotation = annotation.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
                           print(f"::error title=Browser acceptance failure::{annotation}")
           PY
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: browser-results
@@ -188,7 +188,7 @@ jobs:
           xvfb-run --auto-servernum --server-args="-screen 0 1600x1200x24"
           python -m pytest -m e2e "tests/e2e/test_native_${DECISION_SUITE}_decisions.py"
           "--junitxml=artifacts/native-${DECISION_SUITE}-junit.xml"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: native-${{ matrix.suite }}-decisions
@@ -236,11 +236,11 @@ jobs:
       - run: python -m scripts.benchmark_reference
       - uses: ./.github/actions/analysis-backend
       - run: python -m scripts.benchmark_autopsy --events 1000000 --concurrency 20 --requests 100 --output artifacts/performance-autopsy.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: performance-reference
           path: artifacts/performance-reference.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: performance-autopsy
           path: artifacts/performance-autopsy.json
