@@ -564,7 +564,11 @@ def test_report_record_identity_filter_preserves_payload_and_evidence_references
             collapsed = preview.locator("details:not([open]) > summary")
             if not collapsed.count():
                 break
-            collapsed.first.click()
+            # Details render their content on the toggle event; wait for it before looking for the next closed level.
+            summary = collapsed.first.element_handle()
+            assert summary is not None
+            summary.click()
+            j.page.wait_for_function("summary => summary.parentElement.open && summary.parentElement.children.length > 1", arg=summary)
         expect(preview.locator("details:not([open])")).to_have_count(0)
         expect(preview.locator("img,svg,script")).to_have_count(0)
         author = preview.get_by_text("Author", exact=True).locator("..")

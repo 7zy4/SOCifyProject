@@ -84,7 +84,8 @@ def test_account_language_and_labelled_network_report(app, language, width):
             assert ("تصنيف الحادثة" if language == "ar" else "Incident Classification") in decisions
             assert ("Incident Classification" if language == "ar" else "تصنيف الحادثة") not in decisions
             assert "نورة — مراجعة تنبيه الشبكة" in page.locator(".report-title").inner_text()
-            assert page.locator(".note-box").inner_text().endswith("حفظ")
+            # Alert assessments and the manager decision reuse the note-box style; this is the investigator summary.
+            assert page.locator(".note-box:not(.report-narrative):not(.manager-box)").inner_text().endswith("حفظ")
             if language == "en":
                 authored = page.locator("[data-ui-copy]").all_inner_texts()
                 untranslated = [text for text in authored if re.search(r"[\u0600-\u06ff]", text)]

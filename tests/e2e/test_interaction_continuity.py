@@ -96,7 +96,8 @@ def test_reflow_focus_and_live_motion_preference_remain_operable(app, language):
         page.emulate_media(reduced_motion="reduce")
         expect(dark).to_have_attribute("aria-pressed", "true")
         expect(page.locator("html")).to_have_attribute("data-theme", "dark")
-        page.wait_for_function("new DOMMatrix(getComputedStyle(document.querySelector('.theme-switch-thumb')).transform).m41 === 80")
+        # wait_for_function re-evaluates a non-function string with eval() on every animation frame; the product CSP refuses that.
+        expect(page.locator(".theme-switch-thumb")).to_have_css("transform", "matrix(1, 0, 0, 1, 80, 0)")
         stopped = page.locator(".theme-switch-thumb").evaluate("e => getComputedStyle(e).transform")
         page.wait_for_timeout(120)
         assert page.locator(".theme-switch-thumb").evaluate("e => getComputedStyle(e).transform") == stopped

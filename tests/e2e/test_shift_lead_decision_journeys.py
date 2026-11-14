@@ -386,8 +386,10 @@ def test_source_owner_reopens_closed_work_before_receiving_later_evidence(app, m
         assert latest_path != prior_path and latest["sha256"] != prior["sha256"]
         assert len(latest["payload"]["imports"]) == len(prior["payload"]["imports"]) + 1
         assert report(manager, prior_path)["payload"] == prior["payload"]
+        # The report card also offers "download selected format", which defaults to the same PDF address.
+        pdf_label = "تنزيل PDF" if manager.page.evaluate("SOCifyLocale.language") == "ar" else "Download PDF"
         with manager.page.expect_download() as download:
-            manager.page.locator(f'a[href="{prior_pdf}"]').click()
+            manager.page.get_by_role("link", name=pdf_label, exact=True).and_(manager.page.locator(f'a[href="{prior_pdf}"]')).click()
         assert Path(download.value.path()).read_bytes() == prior_bytes
         result["original_pdf_sha256"] = hashlib.sha256(prior_bytes).hexdigest()
         result["outcomes"] = [

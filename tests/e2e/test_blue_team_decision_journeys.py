@@ -298,7 +298,11 @@ def test_ipv6_search_finds_equivalent_retained_addresses_without_merging_another
             collapsed = record_data.locator("details:not([open]) > summary:visible")
             if not collapsed.count():
                 break
-            collapsed.first.click()
+            # Details render their content on the toggle event; wait for it before looking for the next closed level.
+            summary = collapsed.first.element_handle()
+            assert summary is not None
+            summary.click()
+            j.page.wait_for_function("summary => summary.parentElement.open && summary.parentElement.children.length > 1", arg=summary)
         expect(record_data.get_by_text(note, exact=True)).to_be_visible()
         capture(j, scenario, language, "reported")
         result["plan_id"] = "NEXT-32"
