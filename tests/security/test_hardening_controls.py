@@ -14,7 +14,7 @@ from socify.timeutils import utc_now
 from tests.conftest import DEMO_LOGIN_VALUE
 
 CREDENTIALS = {"email": "analyst@socify.local", "password": DEMO_LOGIN_VALUE}
-WRONG = {"email": "analyst@socify.local", "password": "Incorrect-Password-2026!"}
+WRONG = {"email": "analyst@socify.local", "password": "Incorrect-Password-2026!"}  # pragma: allowlist secret
 
 
 def _variant(app: Flask, **overrides: object) -> Flask:
@@ -54,7 +54,7 @@ def test_account_limit_is_scoped_to_the_real_client_address(app):
 def test_one_address_cannot_rotate_accounts_past_the_address_limit(app):
     limited = _variant(app, RATE_LIMIT_LOGIN_IP_ATTEMPTS=3).test_client()
     for index in range(3):
-        assert limited.post("/api/auth/login", json={"email": f"user{index}@example.test", "password": "Incorrect-Password-2026!"}).status_code == 401
+        assert limited.post("/api/auth/login", json={"email": f"user{index}@example.test", "password": WRONG["password"]}).status_code == 401
     assert limited.post("/api/auth/login", json=CREDENTIALS).status_code == 429
     unlimited = _variant(app, RATE_LIMIT_LOGIN_IP_ATTEMPTS=0).test_client()
     assert unlimited.post("/api/auth/login", json=CREDENTIALS).status_code == 200
@@ -89,7 +89,7 @@ def test_rejected_invitations_are_limited_without_counting_validation_mistakes(a
     limited = _variant(app, RATE_LIMIT_REGISTER_ATTEMPTS=2).test_client()
     account = {"name": "Invited analyst", "email": "invited@example.test", "password": "Training-Safe-Password-2026!"}
     for _ in range(4):
-        assert limited.post("/api/auth/register", json={**account, "password": "short"}).status_code == 422
+        assert limited.post("/api/auth/register", json={**account, "password": "short"}).status_code == 422  # pragma: allowlist secret
     for _ in range(2):
         rejected = limited.post("/api/auth/register", json={**account, "invitation_token": "x" * 40})
         assert rejected.status_code == 422 and rejected.json["error"]["code"] == "INVALID_INVITATION"
