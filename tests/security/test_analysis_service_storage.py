@@ -4,8 +4,10 @@ import pytest
 
 from scripts.run_analysis_service import clear_scratch, singleton
 from socify import analysis_sandbox
+from tests.conftest import linux_only
 
 
+@linux_only
 def test_scratch_cleanup_removes_restricted_directories_without_following_links(tmp_path):
     scratch = tmp_path / "scratch"
     scratch.mkdir()
@@ -36,6 +38,7 @@ def test_scratch_cleanup_failure_stops_service_instead_of_accepting_next_case(tm
         clear_scratch([tmp_path])
 
 
+@linux_only
 def test_analysis_lease_is_readonly_empty_and_excludes_concurrent_service(tmp_path):
     lock = tmp_path / "analysis.lock"
     with singleton(lock):
@@ -51,6 +54,7 @@ def test_analysis_lease_is_readonly_empty_and_excludes_concurrent_service(tmp_pa
         pytest.fail("Lease file accepted mutable case data")
 
 
+@linux_only
 @pytest.mark.parametrize("missing", [b"fchmodat2", b"clone3"])
 def test_missing_security_critical_syscall_resolution_fails_before_loading_filter(monkeypatch, missing):
     library = analysis_sandbox.ctypes.CDLL("libseccomp.so.2", use_errno=True)

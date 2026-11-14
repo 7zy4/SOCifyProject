@@ -5,6 +5,7 @@ from socify.autopsy_worker import run_autopsy_worker_once
 from socify.db import get_db
 from socify.import_worker import run_import_worker_once
 from socify.timeutils import iso_now
+from tests.conftest import linux_only
 
 
 def test_import_quota_cancel_then_resume_after_worker_restart_preserves_evidence(autopsy_case, app, client):
@@ -50,6 +51,7 @@ def test_observable_url_is_preserved_as_data_without_network_or_dns(autopsy_case
     assert client.get(base + "/records?kind=indicator").json["items"][0]["payload"]["value"] == url
 
 
+@linux_only
 def test_analysis_restart_backoff_preserves_snapshot_then_recovers_without_manual_retry(autopsy_case, app, client, database, monkeypatch, tmp_path):
     base = f"/api/cases/{autopsy_case}"
     queued = client.post(base + "/reports", json={"version": client.get(base).json["version"]}).json

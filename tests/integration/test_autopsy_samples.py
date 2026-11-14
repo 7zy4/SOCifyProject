@@ -9,6 +9,7 @@ import pytest
 from socify.autopsy_samples import parse_vt_report
 from socify.autopsy_static_analysis import analyze_sample
 from socify.autopsy_worker import run_autopsy_worker_once
+from tests.conftest import linux_only
 
 
 def sample_upload(client, case_id, content=b"Synthetic specimen; never execute", name="sample.bin"):
@@ -30,6 +31,7 @@ def vt_document(sha):
     }
 
 
+@linux_only
 def test_quarantine_local_analysis_and_manual_virustotal_join_the_case(autopsy_case, app, client, login_as, database):
     content = b"Synthetic EICAR-STANDARD-ANTIVIRUS-TEST-FILE acceptance marker; not malware"
     created = sample_upload(client, autopsy_case, content)

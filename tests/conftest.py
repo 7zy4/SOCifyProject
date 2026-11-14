@@ -1,5 +1,6 @@
 import shutil
 import sqlite3
+import sys
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -13,6 +14,9 @@ from socify.schema import ensure_schema
 from socify.seeding import seed_demo_data
 
 DEMO_LOGIN_VALUE = "Training-Safe-Password-2026!"
+
+# The isolation, POSIX permission and native rendering contracts are verified on Linux, where the product runs.
+linux_only = pytest.mark.skipif(sys.platform != "linux", reason="requires Linux isolation, POSIX file permissions or native rendering libraries")
 
 
 @pytest.fixture

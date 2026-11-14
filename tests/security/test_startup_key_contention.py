@@ -3,8 +3,10 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from scripts.prepare_codespace import prepare
+from tests.conftest import linux_only
 
 
+@linux_only
 def test_concurrent_startups_observe_complete_identical_private_keys(tmp_path):
     destination = tmp_path / "instance" / "codespaces.env"
 

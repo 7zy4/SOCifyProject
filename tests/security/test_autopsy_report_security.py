@@ -7,8 +7,10 @@ import pytest
 from socify.autopsy_domain import canonical
 from socify.autopsy_report_render import FORMATS, lines, render_files
 from socify.autopsy_worker import deny_network, run_autopsy_worker_once
+from tests.conftest import linux_only
 
 
+@linux_only
 def test_reports_use_text_wordmark_and_reject_image_fetches():
     from weasyprint.urls import URLFetchingError
 
@@ -27,6 +29,7 @@ def test_reports_use_text_wordmark_and_reject_image_fetches():
         assert "SOCify" in archive.read("word/document.xml").decode()
 
 
+@linux_only
 def test_rendered_reports_escape_active_content_and_never_resolve_network(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "font-cache"))
     monkeypatch.setattr(socket, "create_connection", deny_network)

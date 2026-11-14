@@ -7,9 +7,12 @@ from pathlib import Path
 
 import pytest
 
+from tests.conftest import linux_only
+
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts/start_analysis.sh"
 
 
+@linux_only
 @pytest.mark.parametrize(
     ("refresh", "different_mount", "stop_fails", "replaced"),
     [(True, False, False, True), (False, False, False, False), (True, True, False, False), (True, False, True, False)],

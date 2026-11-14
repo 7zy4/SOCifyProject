@@ -9,6 +9,7 @@ from test_autopsy_teams import new_member, switch
 
 from socify.autopsy_worker import run_autopsy_worker_once
 from socify.autopsy_yara import validate_input
+from tests.conftest import linux_only
 
 
 def rule_pack():
@@ -25,6 +26,7 @@ def rule_pack():
     }
 
 
+@linux_only
 def test_local_yara_pack_isolated_publish_snapshot_sample_and_report(autopsy_case, app, client, login_as, database):
     base = f"/api/cases/{autopsy_case}"
     payload = rule_pack()

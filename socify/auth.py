@@ -12,8 +12,10 @@ from flask_wtf.csrf import generate_csrf
 
 from .audit import record_audit
 from .db import get_db, inserted_id, transaction
+from .maintenance import prune_if_due
 from .recovery_codes import hash_recovery_code, verify_recovery_code
 from .security import (
+    ROLE_PERMISSIONS,
     actor_id,
     current_user,
     decrypt_secret,
@@ -21,6 +23,7 @@ from .security import (
     error_response,
     generate_totp_secret,
     login_required,
+    matching_totp_counter,
     password_error,
     require_permission,
     verify_totp,
@@ -71,17 +74,46 @@ def _identifier_hash(email: str) -> str:
     return hashlib.sha256(raw + email.strip().lower().encode()).hexdigest()
 
 
-def _rate_limited(email: str, ip_address: str) -> bool:
-    cutoff = (utc_now() - timedelta(seconds=int(current_app.config["RATE_LIMIT_LOGIN_WINDOW_SECONDS"]))).isoformat().replace("+00:00", "Z")
-    count = (
+def _window_start() -> str:
+    return (utc_now() - timedelta(seconds=int(current_app.config["RATE_LIMIT_LOGIN_WINDOW_SECONDS"]))).isoformat().replace("+00:00", "Z")
+
+
+def _failures(identity: str, ip_address: str) -> int:
+    return int(
         get_db()
         .execute(
             "SELECT COUNT(*) FROM login_attempts WHERE identifier_hash = ? AND ip_address = ? AND succeeded = 0 AND occurred_at >= ?",
-            (_identifier_hash(email), ip_address, cutoff),
+            (_identifier_hash(identity), ip_address, _window_start()),
         )
         .fetchone()[0]
     )
-    return int(count) >= int(current_app.config["RATE_LIMIT_LOGIN_ATTEMPTS"])
+
+
+def _rate_limited(email: str, ip_address: str) -> bool:
+    return _failures(email, ip_address) >= int(current_app.config["RATE_LIMIT_LOGIN_ATTEMPTS"])
+
+
+def _address_rate_limited(ip_address: str) -> bool:
+    """Bound failures from one address across every account, so rotating usernames does not reset the limit."""
+    limit = int(current_app.config.get("RATE_LIMIT_LOGIN_IP_ATTEMPTS") or 0)
+    if limit <= 0:
+        return False
+    count = (
+        get_db()
+        .execute("SELECT COUNT(*) FROM login_attempts WHERE ip_address = ? AND succeeded = 0 AND occurred_at >= ?", (ip_address, _window_start()))
+        .fetchone()[0]
+    )
+    return int(count) >= limit
+
+
+def attempts_exhausted(identity: str, limit_key: str) -> bool:
+    """Failure-only limiter for unauthenticated endpoints; successful requests are never counted."""
+    limit = int(current_app.config.get(limit_key) or 0)
+    return limit > 0 and _failures(identity, request.remote_addr or "unknown") >= limit
+
+
+def record_failed_attempt(identity: str) -> None:
+    _record_attempt(identity, request.remote_addr or "unknown", False)
 
 
 def _record_attempt(email: str, ip_address: str, succeeded: bool) -> None:
@@ -107,7 +139,7 @@ def _backup_code_valid(user_id: int, code: str) -> bool:
     return False
 
 
-def _mfa_valid(user_id: int, candidate: object) -> bool:
+def _mfa_valid(user_id: int, candidate: object, consume: bool = False) -> bool:
     enrollment = get_db().execute("SELECT secret_ciphertext, enabled FROM mfa_enrollments WHERE user_id = ?", (user_id,)).fetchone()
     if not enrollment or not enrollment["enabled"]:
         return True
@@ -118,7 +150,19 @@ def _mfa_valid(user_id: int, candidate: object) -> bool:
         secret = decrypt_secret(enrollment["secret_ciphertext"])
     except ValueError:
         return False
-    return verify_totp(secret, candidate) if len(candidate) == 6 else _backup_code_valid(user_id, candidate)
+    if len(candidate) != 6:
+        return _backup_code_valid(user_id, candidate)
+    counter = matching_totp_counter(secret, candidate)
+    if counter is None:
+        return False
+    if not consume:
+        return True
+    # A code that already opened a session cannot open another one inside its validity window.
+    accepted = get_db().execute(
+        "UPDATE mfa_enrollments SET last_totp_counter = ? WHERE user_id = ? AND (last_totp_counter IS NULL OR last_totp_counter < ?)",
+        (counter, user_id, counter),
+    )
+    return accepted.rowcount == 1
 
 
 def _start_session(user: sqlite3.Row) -> dict[str, Any]:
@@ -150,6 +194,7 @@ def _start_session(user: sqlite3.Row) -> dict[str, Any]:
     )
     get_db().execute("UPDATE users SET last_login = ? WHERE id = ?", (iso_now(), row["id"]))
     record_audit(get_db(), "login", "auth", row["id"], actor=int(row["id"]), workspace=int(row["workspace_id"] or 1))
+    prune_if_due(get_db())
     return {"id": row["id"], "email": row["email"], "name": row["name"], "role": row["role"], "workspace_id": row["workspace_id"] or 1}
 
 
@@ -160,7 +205,7 @@ def _login_response(data: dict[str, Any]):
     if not _bounded_utf8(email, 320) or not isinstance(email, str) or not _bounded_utf8(password, 72) or not email.strip() or not password:
         return error_response("INVALID_CREDENTIALS", "بيانات الدخول غير صحيحة", 401)
     normalized_email = email.strip().lower()
-    if _rate_limited(normalized_email, ip_address):
+    if _rate_limited(normalized_email, ip_address) or _address_rate_limited(ip_address):
         return error_response("LOGIN_RATE_LIMITED", "تجاوزت الحد المسموح لمحاولات الدخول. حاول لاحقًا", 429)
     user = (
         get_db()
@@ -186,7 +231,7 @@ def _login_response(data: dict[str, Any]):
                 workspace=int(user["workspace_id"] or 1),
             )
         return error_response("INVALID_CREDENTIALS", "بيانات الدخول غير صحيحة", 401)
-    if not _mfa_valid(int(user["id"]), data.get("mfa_code")):
+    if not _mfa_valid(int(user["id"]), data.get("mfa_code"), consume=True):
         _record_attempt(normalized_email, ip_address, False)
         enrollment = get_db().execute("SELECT enabled FROM mfa_enrollments WHERE user_id = ?", (user["id"],)).fetchone()
         if enrollment and enrollment["enabled"] and not data.get("mfa_code"):
@@ -237,6 +282,16 @@ def register_page():
 
 
 def _register(data: dict[str, Any]):
+    if attempts_exhausted("registration", "RATE_LIMIT_REGISTER_ATTEMPTS"):
+        return error_response("REGISTRATION_RATE_LIMITED", "محاولات تسجيل مرفوضة كثيرة من هذا العنوان. حاول لاحقًا", 429)
+    response = _register_account(data)
+    # Only rejected invitations and existing accounts count; ordinary validation mistakes never lock a real user out.
+    if response[1] in {403, 409} or (response[1] == 422 and response[0].get_json()["error"]["code"] == "INVALID_INVITATION"):
+        record_failed_attempt("registration")
+    return response
+
+
+def _register_account(data: dict[str, Any]):
     from .operational import operational_mode
 
     if operational_mode() or not current_app.config["ALLOW_REGISTRATION"]:
@@ -376,8 +431,6 @@ def me():
 
 
 def current_permissions(role: str) -> set[str]:
-    from .security import ROLE_PERMISSIONS
-
     return ROLE_PERMISSIONS.get(role, set())
 
 
@@ -577,7 +630,7 @@ def update_user(user_id: int):
     data = _payload()
     updates: dict[str, Any] = {}
     if "role" in data:
-        if data["role"] not in {"analyst", "soc_manager", "admin", "instructor", "auditor"}:
+        if not isinstance(data["role"], str) or data["role"] not in ROLE_PERMISSIONS:
             return error_response("INVALID_ROLE", "الدور غير صالح", 422)
         updates["role"] = data["role"]
     if "is_active" in data:

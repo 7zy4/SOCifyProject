@@ -8,6 +8,7 @@ import pytest
 
 from scripts import start_demo
 from scripts.prepare_demo import TEAM, provision
+from tests.conftest import linux_only
 
 
 def old_incomplete(directory):
@@ -66,6 +67,7 @@ def test_existing_non_demo_directory_is_preserved(tmp_path):
     assert list(tmp_path.iterdir()) == [directory]
 
 
+@linux_only
 def test_real_demo_credentials_ignore_global_database_and_survive_restart(tmp_path, monkeypatch):
     directory = tmp_path / "demo"
     provision(directory)

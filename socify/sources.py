@@ -513,13 +513,20 @@ def test_source(source_id: int):
 
 @sources_api.post("/api/sources/<int:source_id>/ingest")
 def source_webhook_ingest(source_id: int):
+    from .auth import attempts_exhausted, record_failed_attempt
+
+    limiter = f"source-ingest:{source_id}"
+    if attempts_exhausted(limiter, "RATE_LIMIT_SOURCE_KEY_ATTEMPTS"):
+        return error_response("SOURCE_KEY_RATE_LIMITED", "محاولات كثيرة بمفتاح مصدر غير صالح من هذا العنوان. حاول لاحقًا", 429)
     token = _extract_source_token()
     if not token:
+        record_failed_attempt(limiter)
         return error_response("INVALID_SOURCE_KEY", "مفتاح إرسال المصدر مفقود أو غير صالح", 401)
     row = get_db().execute("SELECT * FROM event_sources WHERE id = ? AND is_active = 1", (source_id,)).fetchone()
     expected_hash = str(row["ingest_token_hash"]) if row and row["ingest_token_hash"] else ""
     provided_hash = hashlib.sha256(token.encode()).hexdigest()
     if not row or not expected_hash or not hmac.compare_digest(provided_hash, expected_hash):
+        record_failed_attempt(limiter)
         return error_response("INVALID_SOURCE_KEY", "مفتاح إرسال المصدر مفقود أو غير صالح", 401)
     raw_bytes = request.get_data(cache=False)
     target_case = row["default_case_id"]

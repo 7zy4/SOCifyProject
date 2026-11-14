@@ -10,7 +10,7 @@ import struct
 import time
 from collections.abc import Callable
 from datetime import timedelta
-from typing import Any, TypeVar, cast
+from typing import Any, cast
 
 from cryptography.fernet import Fernet, InvalidToken
 from flask import current_app, g, jsonify, redirect, request, session, url_for
@@ -19,8 +19,6 @@ from .db import get_db
 from .outbound import resolve_external_target
 from .timeutils import iso_now, utc_now
 from .validation import ValidationError
-
-F = TypeVar("F", bound=Callable[..., Any])
 
 ROLE_PERMISSIONS: dict[str, set[str]] = {
     "analyst": {
@@ -209,7 +207,7 @@ def current_user() -> dict[str, Any] | None:
     return user
 
 
-def login_required(function: F) -> F:
+def login_required[F: Callable[..., Any]](function: F) -> F:
     @functools.wraps(function)
     def wrapped(*args: object, **kwargs: object):
         if current_user() is None:
@@ -240,7 +238,7 @@ def effective_permissions(user: dict[str, Any]) -> set[str]:
     return permissions
 
 
-def require_permission(permission: str) -> Callable[[F], F]:
+def require_permission[F: Callable[..., Any]](permission: str) -> Callable[[F], F]:
     def decorator(function: F) -> F:
         @functools.wraps(function)
         def wrapped(*args: object, **kwargs: object):
@@ -331,11 +329,20 @@ def totp_code(secret: str, moment: int | None = None) -> str:
     return f"{value:06d}"
 
 
-def verify_totp(secret: str, candidate: str, moment: int | None = None) -> bool:
+def matching_totp_counter(secret: str, candidate: str, moment: int | None = None) -> int | None:
+    """Return the 30-second counter the code belongs to, so a caller can refuse to accept it twice."""
     if not re.fullmatch(r"\d{6}", candidate):
-        return False
+        return None
     base = int(time.time() if moment is None else moment)
-    return any(hmac.compare_digest(totp_code(secret, base + offset * 30), candidate) for offset in (-1, 0, 1))
+    matched = None
+    for offset in (-1, 0, 1):
+        if hmac.compare_digest(totp_code(secret, base + offset * 30), candidate):
+            matched = (base + offset * 30) // 30
+    return matched
+
+
+def verify_totp(secret: str, candidate: str, moment: int | None = None) -> bool:
+    return matching_totp_counter(secret, candidate, moment) is not None
 
 
 def password_error(password: object) -> str | None:

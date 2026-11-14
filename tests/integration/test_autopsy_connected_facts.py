@@ -3,8 +3,10 @@ from datetime import UTC, datetime
 
 from socify.autopsy_scope import investigation_scope
 from socify.autopsy_worker import run_autopsy_worker_once
+from tests.conftest import linux_only
 
 
+@linux_only
 def test_evidenced_scope_ioc_branching_cause_corrective_and_war_room_share_report(autopsy_case, app, client):
     base = f"/api/cases/{autopsy_case}"
     assert (

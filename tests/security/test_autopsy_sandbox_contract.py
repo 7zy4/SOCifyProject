@@ -12,6 +12,7 @@ from types import SimpleNamespace
 import pytest
 
 from socify import analysis_sandbox
+from tests.conftest import linux_only
 
 
 def test_yara_validation_does_not_initialize_native_report_engines(tmp_path, monkeypatch):
@@ -37,6 +38,7 @@ def test_yara_validation_does_not_initialize_native_report_engines(tmp_path, mon
     assert json.loads((tmp_path / "validation").read_text())["valid"]
 
 
+@linux_only
 @pytest.mark.parametrize("operation,invalid", [("sample", False), ("sample", True), ("report", False), ("probe", False)])
 def test_analysis_dispatch_limits_and_artifact_contract_independent_of_os_policy(tmp_path, monkeypatch, operation, invalid):
     content = b"Synthetic EICAR-STANDARD-ANTIVIRUS-TEST-FILE"
@@ -91,6 +93,7 @@ def test_analysis_entrypoint_rejects_invalid_operation_oversized_input_and_outpu
     assert not (tmp_path / "done").exists()
 
 
+@linux_only
 def test_os_boundary_fails_closed_without_dedicated_container_contract(tmp_path, monkeypatch):
     limits = []
     monkeypatch.setattr(analysis_sandbox.resource, "setrlimit", lambda key, value: limits.append((key, value)))
@@ -110,6 +113,7 @@ def test_os_boundary_fails_closed_without_dedicated_container_contract(tmp_path,
         analysis_sandbox.harden(tmp_path)
 
 
+@linux_only
 def test_landlock_permission_adapter_allows_only_runtime_reads_and_job_directory_writes(tmp_path, monkeypatch):
     observed = []
 
@@ -136,6 +140,7 @@ def test_landlock_permission_adapter_allows_only_runtime_reads_and_job_directory
         analysis_sandbox._checked(-1)
 
 
+@linux_only
 def test_probe_detects_absent_scratch_and_metadata_isolation(tmp_path):
     roots = [tmp_path / name for name in ("temporary", "shared", "ipc")]
     for root in roots:

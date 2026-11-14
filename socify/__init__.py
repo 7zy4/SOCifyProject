@@ -1,9 +1,11 @@
 import logging
+import time
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, render_template, request
+from flask import Flask, g, render_template, request
 from flask_wtf.csrf import CSRFError, CSRFProtect, generate_csrf
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .attack import attack_api
 from .auth import auth_api
@@ -56,6 +58,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         app.config.update(test_config)
     if app.config.get("DEMO_MODE") and app.config["ENV_NAME"] != "development":
         raise RuntimeError("Demo account switching is restricted to development")
+    proxy_hops = int(app.config.get("TRUSTED_PROXY_HOPS") or 0)
+    if proxy_hops > 0:
+        # Only the client address is taken from the proxy chain; scheme and host stay governed by SOCIFY_HTTPS and TRUSTED_HOSTS.
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=proxy_hops, x_proto=0, x_host=0, x_port=0, x_prefix=0)  # type: ignore[method-assign]
     if app.config["ENV_NAME"] == "development" and app.config.get("CODESPACE_PUBLIC_HOST"):
         app.wsgi_app = CodespacesProxy(app.wsgi_app, app.config["CODESPACE_PUBLIC_HOST"])  # type: ignore[method-assign]
 
@@ -110,6 +116,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
 
     @app.before_request
     def prepare_request():
+        g.request_started = time.perf_counter()
         request.environ["socify.correlation_id"] = correlation_id()
         if any(type(value) is int and not 1 <= value <= 9223372036854775807 for value in (request.view_args or {}).values()):
             return error_response("INVALID_IDENTIFIER", "معرف المورد خارج النطاق المسموح", 404)
@@ -118,7 +125,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             and request.path.startswith("/api/")
             and (request.blueprint is not None or request.path.split("/", 3)[2] in {"training", "scores", "scenarios", "lab"})
             and request.blueprint not in {"auth", "cases", "teams", "sources", "watchlist", "quick_reports"}
-            and request.endpoint not in {"platform.audit_logs", "platform.role_matrix"}
+            and request.endpoint not in {"platform.audit_logs", "platform.role_matrix", "platform.health_api"}
             and not str(request.blueprint or "").startswith("autopsy")
         ):
             return error_response("CASE_CONTEXT_REQUIRED", "استخدم الأداة من داخل قضية مصرح بها؛ مسارات التدريب العامة متقاعدة", 410)
@@ -145,6 +152,19 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         if request.path.startswith("/api/") or request.path.startswith("/health/") or response.mimetype == "text/html":
             response.headers.setdefault("Cache-Control", "no-store")
+        started = g.pop("request_started", None)
+        if started is not None and request.endpoint != "static" and not request.path.startswith("/health/"):
+            # The path excludes the query string; bodies, headers and credentials are never logged.
+            user = g.get("current_user")
+            app.logger.info(
+                "request method=%s path=%s status=%s duration_ms=%.1f correlation_id=%s user_id=%s",
+                request.method,
+                request.path,
+                response.status_code,
+                (time.perf_counter() - started) * 1000,
+                correlation_id(),
+                user["id"] if isinstance(user, dict) else "-",
+            )
         return response
 
     @app.errorhandler(CSRFError)

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .db import inserted_id
+from .maintenance import prune_if_due
 from .recovery_codes import protect_existing_recovery_codes
 from .timeutils import iso_now
 
@@ -731,6 +732,7 @@ CREATE TABLE IF NOT EXISTS outbox_events (
 
 
 COLUMN_MIGRATIONS: dict[str, dict[str, str]] = {
+    "mfa_enrollments": {"last_totp_counter": "INTEGER"},
     "case_tasks": {"system_key": "TEXT"},
     "users": {
         "name_ar": "TEXT NOT NULL DEFAULT ''",
@@ -1098,6 +1100,7 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         migrate_quick_reports(connection)
         seed_builtin_rules(connection)
         protect_existing_recovery_codes(connection)
+        prune_if_due(connection)
         connection.commit()
     except Exception:
         connection.rollback()

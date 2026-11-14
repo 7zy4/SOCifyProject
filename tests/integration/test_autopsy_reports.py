@@ -10,6 +10,7 @@ from socify.autopsy_domain import canonical
 from socify.autopsy_report_render import bundled_report_asset_fetcher
 from socify.autopsy_reports import case_metrics, duration
 from socify.autopsy_worker import run_autopsy_worker_once
+from tests.conftest import linux_only
 
 
 def request_report(client, case_id, profile="full"):
@@ -22,6 +23,7 @@ def transition(client, case_id, status, path="/api/cases"):
     return client.post(f"{path}/{case_id}/transitions", json={"status": status, "version": version, "reason": "Documented investigation decision"})
 
 
+@linux_only
 @pytest.mark.parametrize("quick_close", [False, True], ids=["case-transition", "manager-review"])
 def test_local_report_formats_snapshot_review_and_closure(autopsy_case, app, client, login_as, database, user_ids, quick_close):
     case_id = autopsy_case
@@ -208,6 +210,7 @@ def test_stale_approval_and_closure_cannot_use_legacy_override(autopsy_case, app
     assert client.post(own, json={"version": version, "override_reason": "Documented small-team independent review exception"}).status_code == 200
 
 
+@linux_only
 def test_report_bola_redaction_and_revoked_worker_access(autopsy_case, app, client, login_as, user_ids):
     created = request_report(client, autopsy_case).json
     base = f"/api/cases/{autopsy_case}"
@@ -233,6 +236,7 @@ def test_report_bola_redaction_and_revoked_worker_access(autopsy_case, app, clie
     assert "Internal incident review" not in downloaded.text
 
 
+@linux_only
 @pytest.mark.parametrize("url", ["https://example.com/font.woff2", "file:///etc/passwd", "data:text/html;base64,QQ==", "data:font/woff2;base64,QQ=="])
 def test_renderer_rejects_every_unbundled_resource(url):
     from weasyprint.urls import URLFetchingError

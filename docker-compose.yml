@@ -36,6 +36,7 @@ services:
       SOCIFY_DATABASE: /data/socify.db
       SOCIFY_HTTPS: "0"
       SOCIFY_TRUSTED_HOSTS: localhost,127.0.0.1
+      SOCIFY_TRUSTED_PROXIES: "1"
       SOCIFY_ANALYSIS_SOCKET: /analysis-ipc/analysis.sock
     networks:
       - socify-internal

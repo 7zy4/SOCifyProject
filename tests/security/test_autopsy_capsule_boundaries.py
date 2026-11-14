@@ -8,6 +8,7 @@ import pytest
 
 from socify import autopsy_capsules
 from socify.autopsy_worker import run_autopsy_worker_once
+from tests.conftest import linux_only
 
 
 def rebuild(content, mutation):
@@ -26,6 +27,7 @@ def rebuild(content, mutation):
     return output.getvalue()
 
 
+@linux_only
 def test_complete_backup_reencrypts_samples_evidence_reports_and_keeps_legacy_bytes(autopsy_case, app, client, login_as, database, user_ids):
     base = f"/api/cases/{autopsy_case}"
     login_as("soc_manager")

@@ -7,6 +7,7 @@ import pytest
 
 from scripts.bootstrap_team import create_manager, generate_manager_file, generate_recovery_file, reset_password
 from socify.security import encrypt_secret, generate_totp_secret, totp_code
+from tests.conftest import linux_only
 
 
 def test_internal_bootstrap_preserves_existing_accounts_and_creates_private_team(app, database):
@@ -114,6 +115,7 @@ def test_local_recovery_confirmation_mismatch_preserves_the_original_password(ap
     assert "غير متطابقتين" in capsys.readouterr().err
 
 
+@linux_only
 def test_generated_recovery_file_is_private_and_authenticates_the_existing_account(app, database):
     user_id = create_manager(app, "generated@example.test", "Generated recovery", "Existing team", secrets.token_urlsafe(24))
     original = tuple(database.execute("SELECT email,role,team,workspace_id FROM users WHERE id=?", (user_id,)).fetchone())
@@ -126,6 +128,7 @@ def test_generated_recovery_file_is_private_and_authenticates_the_existing_accou
     assert app.test_client().post("/api/auth/login", json={"email": "generated@example.test", "password": password}).status_code == 200
 
 
+@linux_only
 def test_generated_recovery_cli_prints_only_the_file_path(app, database, monkeypatch, capsys):
     from scripts import bootstrap_team
 
@@ -142,6 +145,7 @@ def test_generated_recovery_cli_prints_only_the_file_path(app, database, monkeyp
     assert password not in output.out + output.err
 
 
+@linux_only
 def test_failed_recovery_file_write_does_not_reset_the_password(app, database, monkeypatch):
     from scripts import bootstrap_team
 
@@ -158,6 +162,7 @@ def test_failed_recovery_file_write_does_not_reset_the_password(app, database, m
     assert not list((Path(app.config["DATABASE"]).parent / ".account-recovery").glob("*.txt"))
 
 
+@linux_only
 def test_generated_recovery_rejects_symbolic_directories(app, database, tmp_path):
     user_id = create_manager(app, "symlink@example.test", "Symlink owner", "Existing team", secrets.token_urlsafe(24))
     original = database.execute("SELECT password_hash FROM users WHERE id=?", (user_id,)).fetchone()[0]
@@ -190,6 +195,7 @@ def test_recovery_rejects_unknown_email_before_prompting(app, monkeypatch, capsy
     assert "الحساب غير موجود" in capsys.readouterr().err
 
 
+@linux_only
 def test_generated_manager_creation_adds_one_user_and_preserves_all_existing_records(app, database):
     before = [tuple(row) for row in database.execute("SELECT * FROM users ORDER BY id")]
     workspaces = database.execute("SELECT COUNT(*) FROM training_workspaces").fetchone()[0]
@@ -209,6 +215,7 @@ def test_generated_manager_creation_adds_one_user_and_preserves_all_existing_rec
     assert database.execute("SELECT COUNT(*) FROM users").fetchone()[0] == len(before) + 1
 
 
+@linux_only
 def test_generated_manager_cli_does_not_prompt_or_print_credentials(app, monkeypatch, capsys):
     from scripts import bootstrap_team
 
@@ -225,6 +232,7 @@ def test_generated_manager_cli_does_not_prompt_or_print_credentials(app, monkeyp
     assert destination.read_text().strip() not in output.out + output.err
 
 
+@linux_only
 def test_failed_generated_manager_creation_preserves_existing_database(app, database, monkeypatch):
     from scripts import bootstrap_team
 
@@ -240,6 +248,7 @@ def test_failed_generated_manager_creation_preserves_existing_database(app, data
     assert not list((Path(app.config["DATABASE"]).parent / ".account-recovery").glob("*.txt"))
 
 
+@linux_only
 def test_generated_manager_creation_rejects_production_and_mixed_case_duplicates(app, database):
     database.execute("UPDATE users SET email='Analyst@SOCify.Local' WHERE email='analyst@socify.local'")
     before = [tuple(row) for row in database.execute("SELECT * FROM users ORDER BY id")]

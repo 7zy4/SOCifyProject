@@ -13,6 +13,7 @@ import pytest
 
 from socify.analysis_transport import receive, remote_artifacts, send
 from socify.autopsy_worker import compute_artifacts, read_artifact
+from tests.conftest import linux_only
 
 
 def syscall_probe(connection):
@@ -39,6 +40,7 @@ def syscall_probe(connection):
     directory.cleanup()
 
 
+@linux_only
 def test_real_kernel_seccomp_blocks_network_and_fork_but_preserves_native_font_threads():
     context = multiprocessing.get_context("spawn")
     parent, child = context.Pipe(duplex=False)
@@ -57,6 +59,7 @@ def test_real_kernel_seccomp_blocks_network_and_fork_but_preserves_native_font_t
             process.join(timeout=5)
 
 
+@linux_only
 def test_analysis_child_cannot_read_coordinator_database_keys_or_process_memory(tmp_path):
     private = tmp_path / "coordinator-private.db"
     private.write_text("Synthetic company evidence visible only to the coordinator")
@@ -77,6 +80,7 @@ def test_local_analysis_rejects_unknown_operation_and_oversized_input(monkeypatc
         compute_artifacts({"content": "x" * (24 * 1024 * 1024 + 1)}, "sample", [], 1)
 
 
+@linux_only
 def test_analysis_output_must_be_regular_single_link_and_bounded(tmp_path):
     output = tmp_path / "artifact"
     output.write_bytes(b"bounded result")
@@ -109,6 +113,7 @@ def test_analysis_transport_rejects_incomplete_and_oversized_messages():
         assert receive(server, 100) == {"result": "bounded"}
 
 
+@linux_only
 @pytest.mark.parametrize("response", [{"error": "DENIED"}, {"files": {"wrong": ""}}, {"files": {"analysis": "invalid-base64"}}])
 def test_remote_analysis_validates_result_protocol(tmp_path, response):
     path = str(tmp_path / "server.sock")
@@ -131,6 +136,7 @@ def test_remote_analysis_validates_result_protocol(tmp_path, response):
             thread.join(timeout=5)
 
 
+@linux_only
 def test_yara_result_is_real_and_preserves_sample_sha256():
     content = b"Synthetic EICAR-STANDARD-ANTIVIRUS-TEST-FILE acceptance marker"
     result = json.loads(
@@ -145,6 +151,7 @@ def test_yara_result_is_real_and_preserves_sample_sha256():
     assert result["yara_matches"][0]["rule"] == "SOCify_EICAR_Test_Marker"
 
 
+@linux_only
 def test_analysis_jobs_cannot_persist_case_data_in_shared_scratch_or_ipc():
     written = json.loads(compute_artifacts({"paths": {}, "scratch_persistence_test": True}, "probe", ["probe"], 30)["probe"])
     assert written["denied"]["ipc_permission_change"] is True
