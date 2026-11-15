@@ -31,6 +31,8 @@ PUBLIC = {
     ("GET", "/api/auth/csrf"): (200, None),
     ("GET", "/health/live"): (200, None),
     ("GET", "/health/ready"): (200, None),
+    # Aggregate counts for operators; deploy/nginx.conf refuses it, so only the internal network can scrape it.
+    ("GET", "/health/metrics"): (200, None),
     ("POST", "/api/sources/<int:source_id>/ingest"): (401, "INVALID_SOURCE_KEY"),
     ("GET", "/"): (302, "/login"),
     ("GET", "/test"): (302, "/analysis-library"),  # redirect only; the target page requires an account

@@ -34,6 +34,95 @@ def health_ready():
     return jsonify({"status": "ready", "database": "available", "schema_version": version["value"] if version else "unknown"})
 
 
+IMPORT_STATES = ("queued", "processing", "interrupted", "completed", "completed_with_errors", "failed", "cancelled")
+ANALYSIS_STATES = ("queued", "processing", "completed", "failed", "cancelled")
+
+
+def _state_counts(sql: str, states: tuple[str, ...]) -> dict[str, int]:
+    """Counts per known state; anything else is reported as "other", so label values never come from stored text."""
+    counts = dict.fromkeys((*states, "other"), 0)
+    for state, count in get_db().execute(sql).fetchall():
+        counts[state if state in states else "other"] += int(count)
+    return counts
+
+
+def _age_seconds(sql: str) -> float:
+    oldest = get_db().execute(sql).fetchone()[0]
+    if not oldest:
+        return 0.0
+    from .timeutils import parse_timestamp, utc_now
+
+    return max((utc_now() - parse_timestamp(str(oldest))).total_seconds(), 0.0)
+
+
+@platform_api.get("/health/metrics")
+def health_metrics():
+    """Prometheus text format, read from SQLite on each request.
+
+    Counts and ages only: no case, user, workspace or file values and no label taken from stored text. deploy/nginx.conf
+    refuses this path, so it is reachable only from the internal container network.
+    """
+    now = iso_now()
+    families: list[tuple[str, str, list[tuple[str, float]]]] = [
+        ("socify_schema_version", "Last applied schema migration.", [("", float(get_db().execute("PRAGMA user_version").fetchone()[0]))]),
+        (
+            "socify_database_bytes",
+            "Size of the main database file.",
+            [("", float(get_db().execute("SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()").fetchone()[0]))],
+        ),
+        (
+            "socify_import_jobs",
+            "Import jobs by state.",
+            [
+                (f'{{state="{state}"}}', float(count))
+                for state, count in _state_counts("SELECT status, COUNT(*) FROM ingestion_jobs GROUP BY status", IMPORT_STATES).items()
+            ],
+        ),
+        (
+            "socify_analysis_jobs",
+            "Isolated analysis, detection and report jobs by state.",
+            [
+                (f'{{state="{state}"}}', float(count))
+                for state, count in _state_counts("SELECT state, COUNT(*) FROM autopsy_jobs GROUP BY state", ANALYSIS_STATES).items()
+            ],
+        ),
+        (
+            "socify_import_oldest_waiting_seconds",
+            "Age of the oldest queued or interrupted import job.",
+            [("", _age_seconds("SELECT MIN(COALESCE(available_at, created_at)) FROM ingestion_jobs WHERE status IN ('queued', 'interrupted')"))],
+        ),
+        (
+            "socify_analysis_oldest_waiting_seconds",
+            "Age of the oldest queued analysis job.",
+            [("", _age_seconds("SELECT MIN(COALESCE(available_at, created_at)) FROM autopsy_jobs WHERE state = 'queued'"))],
+        ),
+        (
+            "socify_expired_leases",
+            "Jobs still marked processing after their worker lease expired.",
+            [
+                (
+                    '{queue="import"}',
+                    float(get_db().execute("SELECT COUNT(*) FROM ingestion_jobs WHERE status = 'processing' AND lease_expires_at <= ?", (now,)).fetchone()[0]),
+                ),
+                (
+                    '{queue="analysis"}',
+                    float(get_db().execute("SELECT COUNT(*) FROM autopsy_jobs WHERE state = 'processing' AND lease_expires_at <= ?", (now,)).fetchone()[0]),
+                ),
+            ],
+        ),
+        (
+            "socify_active_sessions",
+            "Signed-in sessions that are neither revoked nor expired.",
+            [("", float(get_db().execute("SELECT COUNT(*) FROM auth_sessions WHERE revoked_at IS NULL AND expires_at > ?", (now,)).fetchone()[0]))],
+        ),
+    ]
+    lines = []
+    for name, description, samples in families:
+        lines += [f"# HELP {name} {description}", f"# TYPE {name} gauge"]
+        lines += [f"{name}{labels} {value:g}" for labels, value in samples]
+    return current_app.response_class("\n".join(lines) + "\n", mimetype="text/plain", content_type="text/plain; version=0.0.4; charset=utf-8")
+
+
 @platform_api.get("/api/health")
 @login_required
 def health_api():
