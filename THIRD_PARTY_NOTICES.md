@@ -14,7 +14,7 @@ The bundled ATT&CK reference records and optional STIX snapshot loader use mater
 
 ## Python dependencies
 
-Runtime dependencies and pinned versions are listed in `requirements.txt`. Each dependency remains under its own upstream license.
+Direct runtime dependencies are listed in `requirements.in`; `requirements.txt` pins every runtime package, including transitive ones, with its hashes. Each dependency remains under its own upstream license.
 
 Local defensive processing/reporting dependencies: WeasyPrint (BSD, `https://github.com/Kozea/WeasyPrint`), python-docx (MIT, `https://github.com/python-openxml/python-docx`), dpkt (BSD, `https://github.com/kbandla/dpkt`), PyYAML (MIT, `https://github.com/yaml/pyyaml`), yara-python (Apache 2.0 binding with the upstream YARA engine's own notices, `https://github.com/VirusTotal/yara-python`), and maxminddb (Apache 2.0, `https://github.com/maxmind/MaxMind-DB-Reader-python`). These libraries do not imply an installed GeoIP database, threat feed, YARA rule collection, sandbox, or external VirusTotal integration. Any separately imported intelligence, GeoIP or rule data retains its own license and version requirements.
 

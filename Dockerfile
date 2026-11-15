@@ -1,10 +1,11 @@
-FROM python:3.12-slim AS builder
+# Base images are pinned to the multi-platform index digest; Dependabot (docker) updates tag and digest together.
+FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b AS builder
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
 WORKDIR /build
 COPY requirements.txt .
-RUN --mount=type=secret,id=build_ca if [ -f /run/secrets/build_ca ]; then export PIP_CERT=/run/secrets/build_ca; fi; python -m venv /venv && /venv/bin/pip install --upgrade pip && /venv/bin/pip install -r requirements.txt
+RUN --mount=type=secret,id=build_ca if [ -f /run/secrets/build_ca ]; then export PIP_CERT=/run/secrets/build_ca; fi; python -m venv /venv && /venv/bin/pip install --upgrade pip && /venv/bin/pip install --require-hashes -r requirements.txt
 
-FROM python:3.12-slim AS runtime
+FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b AS runtime
 RUN --mount=type=secret,id=build_ca,mode=0444 build_ca_path=/etc/ssl/certs/ca-certificates.crt; if [ -f /run/secrets/build_ca ]; then build_ca_path=/run/secrets/build_ca; fi; sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources && apt-get -o Acquire::https::CaInfo="$build_ca_path" update && apt-get -o Acquire::https::CaInfo="$build_ca_path" install --yes --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 && rm -rf /var/lib/apt/lists/*
 ENV PATH=/venv/bin:$PATH PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 SOCIFY_ENV=production SOCIFY_DATABASE=/data/socify.db SOCIFY_HOST=0.0.0.0 SOCIFY_PORT=5000
 RUN groupadd --gid 10001 socify && useradd --uid 10001 --gid socify --no-create-home --shell /usr/sbin/nologin socify && mkdir -p /app /data /analysis-ipc && chown -R socify:socify /app /data /analysis-ipc

@@ -38,7 +38,7 @@
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
+python -m pip install --require-hashes -r requirements.txt
 
 docker build --target analysis -t socify-analysis .
 bash scripts/start_analysis.sh
@@ -46,6 +46,19 @@ export SOCIFY_ANALYSIS_SOCKET=/tmp/socify-local-analysis-ipc/analysis.sock
 
 python -m scripts.bootstrap_team --email owner@example.com --name "مالك المنصة" --team "فريق العمليات"
 python run.py
+```
+
+</div>
+
+- `requirements.txt` و`requirements-dev.txt` ملفات قفل بالبصمات مولّدة على Linux وPython 3.12، فيرفض pip أي حزمة لا تطابق بصمتها. على Windows ثبّت من المصدر المقروء: `python -m pip install -r requirements.in` (ولبيئة التطوير `requirements-dev.in`)، لأن القفل لا يحوي حزم Windows مثل `colorama`.
+- لتغيير اعتمادية عدّل ملف `.in` ثم أعد توليد القفل داخل Linux وPython 3.12:
+
+<div dir="ltr">
+
+```bash
+python -m pip install pip-tools==7.4.1
+pip-compile --generate-hashes --strip-extras --output-file=requirements.txt requirements.in
+pip-compile --generate-hashes --strip-extras --output-file=requirements-dev.txt requirements-dev.in
 ```
 
 </div>
