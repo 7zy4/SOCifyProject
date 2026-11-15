@@ -15,6 +15,8 @@ from socify.db import connect_path
 from socify.schema import ensure_schema
 from socify.seeding import seed_demo_data
 
+BENCHMARK_LOGIN_VALUE = "Benchmark-Only-Password-2026!"
+
 
 def percentile(values: list[float], percent: float) -> float:
     ordered = sorted(values)
@@ -77,8 +79,9 @@ def run(output: Path, bulk_count: int, import_count: int, samples: int) -> dict[
         database_path = Path(directory) / "benchmark.db"
         connection = connect_path(str(database_path), True)
         ensure_schema(connection)
-        seed_demo_data(connection, "Benchmark-Only-Password-2026!")
-        actor = int(connection.execute("SELECT id FROM users WHERE role = 'admin'").fetchone()[0])
+        seed_demo_data(connection, BENCHMARK_LOGIN_VALUE)
+        actor_row = connection.execute("SELECT id, email FROM users WHERE role = 'admin'").fetchone()
+        actor, actor_email = int(actor_row[0]), str(actor_row[1])
         bulk_started = time.perf_counter()
         bulk_events(connection, bulk_count, actor)
         bulk_seconds = time.perf_counter() - bulk_started
@@ -97,10 +100,10 @@ def run(output: Path, bulk_count: int, import_count: int, samples: int) -> dict[
             }
         )
         client = application.test_client()
-        with client.session_transaction() as session:
-            session["user_id"] = actor
-            session["workspace_id"] = 1
-            session["user_role"] = "admin"
+        # Sign in like a browser, so every measured request pays the recorded-session check it pays in production.
+        signed_in = client.post("/api/auth/login", json={"email": actor_email, "password": BENCHMARK_LOGIN_VALUE})
+        if signed_in.status_code != 200:
+            raise RuntimeError(f"benchmark sign-in failed with status {signed_in.status_code}")
 
         import_payload = "\n".join(
             json.dumps(

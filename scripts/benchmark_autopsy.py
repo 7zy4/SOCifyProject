@@ -70,14 +70,20 @@ def main():
             }
         )
         connection = connect_path(str(path))
-        seed_demo_data(connection, secrets.token_urlsafe(28) + "Aa9!")
-        actor = connection.execute("SELECT id FROM users WHERE role='soc_manager'").fetchone()[0]
+        login_value = secrets.token_urlsafe(28) + "Aa9!"
+        seed_demo_data(connection, login_value)
+        actor, actor_email = connection.execute("SELECT id, email FROM users WHERE role='soc_manager'").fetchone()
         case_id = None
+        # One real sign-in; every simulated reader reuses that recorded session, as concurrent tabs of one browser would.
+        signed_in = app.test_client()
+        ensure(signed_in.post("/api/auth/login", json={"email": actor_email, "password": login_value}).status_code == 200, "sign in")
+        with signed_in.session_transaction() as saved:
+            browser_session = dict(saved)
 
         def client_for_actor():
             client = app.test_client()
             with client.session_transaction() as session:
-                session.update(user_id=actor, workspace_id=1, user_role="soc_manager")
+                session.update(browser_session)
             if case_id is not None:
                 ensure(client.post("/api/investigation-selection", json={"case_ids": [case_id]}).status_code == 200, "reader scope selection")
             return client
@@ -165,7 +171,7 @@ def main():
                 "storage_seed_events": max(0, options.events - 10000),
                 "concurrent_clients": options.concurrency,
                 "requests": options.requests,
-                "authentication": "synthetic test sessions; CSRF measured separately by real browser tests",
+                "authentication": "one real sign-in; its recorded session is checked on every request; CSRF measured separately by real browser tests",
                 "transport": "Flask test client including application validation, SQL and JSON serialization; excludes ingress/TLS latency",
                 "fts_hit_count": "Exact below 10000; declared lower bound above 10000 with exact has_next for each returned page",
             },
