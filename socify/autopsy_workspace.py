@@ -14,7 +14,9 @@ autopsy_workspace_api = Blueprint("autopsy_workspace", __name__)
 ASSIGN_LOGS_ENDPOINT = "teams.assign_logs"
 UPDATE_ASSIGNMENT_ENDPOINT = "teams.update_assignment"
 CASE_READ_ENDPOINTS = frozenset({"autopsy.case_get", "cases.case_detail"})
-SELECTION_FREE_BLUEPRINTS = ("ui", "autopsy_workspace")
+# Pages render their own approval and selection state, and the approval and selection API must work before both exist.
+PAGE_BLUEPRINT = "ui"
+CASE_GATE_BLUEPRINT = "autopsy_workspace"
 
 
 def migrate(connection):
@@ -99,11 +101,11 @@ def guard_workspace():
             case_id = row["case_id"]
     if not case_id or not current_user() or not _case_row(case_id):
         return None
-    if request.blueprint == SELECTION_FREE_BLUEPRINTS[0]:
+    if request.blueprint == PAGE_BLUEPRINT:
         return None
     if request.endpoint in CASE_READ_ENDPOINTS and request.method == "GET":
         return None
-    if request.blueprint == SELECTION_FREE_BLUEPRINTS[1]:
+    if request.blueprint == CASE_GATE_BLUEPRINT:
         return None
     if not case_approved(case_id):
         return error_response("CASE_APPROVAL_REQUIRED", "بانتظار اعتماد المدير؛ أعمال القضية مقفلة", 409)

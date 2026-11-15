@@ -10,7 +10,7 @@ from werkzeug.routing import IntegerConverter
 
 from socify import OPERATIONAL_BLUEPRINT_PREFIX, OPERATIONAL_BLUEPRINTS, OPERATIONAL_LEGACY_ENDPOINTS, RETIRED_API_PREFIXES
 from socify.autopsy_pipeline import PARTIAL_SCOPE_BLUEPRINT, PARTIAL_SCOPE_READ_ENDPOINTS, PARTIAL_SCOPE_TIMELINE_ENDPOINT
-from socify.autopsy_workspace import ASSIGN_LOGS_ENDPOINT, CASE_READ_ENDPOINTS, SELECTION_FREE_BLUEPRINTS, UPDATE_ASSIGNMENT_ENDPOINT
+from socify.autopsy_workspace import ASSIGN_LOGS_ENDPOINT, CASE_GATE_BLUEPRINT, CASE_READ_ENDPOINTS, PAGE_BLUEPRINT, UPDATE_ASSIGNMENT_ENDPOINT
 from tests.conftest import issue_session
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
@@ -207,7 +207,7 @@ def test_policy_names_used_by_request_guards_exist(app):
     named = set(OPERATIONAL_LEGACY_ENDPOINTS) | {ASSIGN_LOGS_ENDPOINT, UPDATE_ASSIGNMENT_ENDPOINT, PARTIAL_SCOPE_TIMELINE_ENDPOINT}
     named |= set(CASE_READ_ENDPOINTS) | set(PARTIAL_SCOPE_READ_ENDPOINTS)
     assert named <= endpoints, sorted(named - endpoints)
-    blueprints = set(OPERATIONAL_BLUEPRINTS) | set(SELECTION_FREE_BLUEPRINTS) | {PARTIAL_SCOPE_BLUEPRINT}
+    blueprints = set(OPERATIONAL_BLUEPRINTS) | {PAGE_BLUEPRINT, CASE_GATE_BLUEPRINT, PARTIAL_SCOPE_BLUEPRINT}
     assert blueprints <= set(app.blueprints), sorted(blueprints - set(app.blueprints))
     assert any(name.startswith(OPERATIONAL_BLUEPRINT_PREFIX) for name in app.blueprints)
     segments = {rule.rule.split("/")[2] for rule in app.url_map.iter_rules() if rule.rule.startswith("/api/")}

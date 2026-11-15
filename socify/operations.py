@@ -13,7 +13,12 @@ def verify_database(path: str) -> dict[str, object]:
         integrity = str(connection.execute("PRAGMA integrity_check").fetchone()[0])
         foreign_keys = list(connection.execute("PRAGMA foreign_key_check").fetchall())
         version = connection.execute("SELECT value FROM schema_meta WHERE key = 'schema_version'").fetchone()
-        return {"integrity": integrity, "foreign_key_violations": len(foreign_keys), "schema_version": version["value"] if version else None}
+        return {
+            "integrity": integrity,
+            "foreign_key_violations": len(foreign_keys),
+            "schema_version": version["value"] if version else None,
+            "migration_version": int(connection.execute("PRAGMA user_version").fetchone()[0]),
+        }
     finally:
         connection.close()
 

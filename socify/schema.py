@@ -1078,28 +1078,35 @@ def _execute_schema(connection: sqlite3.Connection, schema: str) -> None:
         raise ValueError("incomplete schema statement")
 
 
-def ensure_schema(connection: sqlite3.Connection) -> None:
+def baseline_schema(connection: sqlite3.Connection) -> None:
+    """Migration 1 (socify.migrations): the start-up set-up exactly as it ran before migrations were numbered."""
     from .autopsy_schema import migrate
+
+    _execute_schema(connection, BASE_SCHEMA)
+    _ensure_columns(connection)
+    seed_reference_data(connection)
+    _normalize_existing_rows(connection)
+    _migrate_legacy_incidents(connection)
+    _execute_schema(connection, INDEX_SCHEMA)
+    migrate(connection)
+    from .autopsy_workspace import migrate as migrate_workspace
+    from .builtin_rules import seed_builtin_rules
+    from .quick_reports import migrate as migrate_quick_reports
+    from .watchlist import migrate as migrate_watchlist
+
+    migrate_workspace(connection)
+    migrate_watchlist(connection)
+    migrate_quick_reports(connection)
+    seed_builtin_rules(connection)
+    protect_existing_recovery_codes(connection)
+
+
+def ensure_schema(connection: sqlite3.Connection) -> None:
+    from .migrations import apply_migrations
 
     connection.execute("BEGIN IMMEDIATE")
     try:
-        _execute_schema(connection, BASE_SCHEMA)
-        _ensure_columns(connection)
-        seed_reference_data(connection)
-        _normalize_existing_rows(connection)
-        _migrate_legacy_incidents(connection)
-        _execute_schema(connection, INDEX_SCHEMA)
-        migrate(connection)
-        from .autopsy_workspace import migrate as migrate_workspace
-        from .builtin_rules import seed_builtin_rules
-        from .quick_reports import migrate as migrate_quick_reports
-        from .watchlist import migrate as migrate_watchlist
-
-        migrate_workspace(connection)
-        migrate_watchlist(connection)
-        migrate_quick_reports(connection)
-        seed_builtin_rules(connection)
-        protect_existing_recovery_codes(connection)
+        apply_migrations(connection)
         prune_if_due(connection)
         connection.commit()
     except Exception:
