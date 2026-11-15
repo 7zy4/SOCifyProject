@@ -1114,7 +1114,24 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         raise
 
 
-def insert_outbox(connection: sqlite3.Connection, workspace_id: int, event_type: str, payload: dict[str, Any]) -> int:
+def outbox_has_reader() -> bool:
+    """Only the legacy event stream (socify.visualization.event_stream) reads outbox_events, and operational mode retires it.
+
+    Without an application context the mode is unknown, so rows are still written as before; the only such producer is the
+    standalone playbook worker, and operational mode retires the API that creates playbook runs.
+    """
+    from flask import has_app_context
+
+    if not has_app_context():
+        return True
+    from .operational import operational_mode
+
+    return not operational_mode()
+
+
+def insert_outbox(connection: sqlite3.Connection, workspace_id: int, event_type: str, payload: dict[str, Any]) -> int | None:
+    if not outbox_has_reader():
+        return None
     cursor = connection.execute(
         "INSERT INTO outbox_events (workspace_id, event_type, payload, created_at) VALUES (?, ?, ?, ?)",
         (workspace_id, event_type, json.dumps(payload, ensure_ascii=False, separators=(",", ":")), iso_now()),
