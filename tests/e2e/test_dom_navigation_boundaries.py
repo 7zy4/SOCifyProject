@@ -32,32 +32,22 @@ def test_modified_select_values_cannot_change_navigation_or_download_target(app)
                 }
                 autopsy.current.reports=[{id:71}];
                 root=await SOCifyAutopsy.reports(caseId); workspace.append(root);
-                const select=root.querySelector('.report-revision select');
-                const download=select.closest('.report-downloads').querySelector('a');
-                const originalHref=download.getAttribute('href');
-                const values=[...select.options].map(option=>option.value);
-                for(const value of hostile) {
-                  select.add(new Option(value,value)); select.value=value;
-                  select.dispatchEvent(new Event('change',{bubbles:true}));
-                  if(download.getAttribute('href') !== originalHref) throw new Error('Unsafe download navigation');
-                }
-                select.value='json'; select.dispatchEvent(new Event('change',{bubbles:true}));
-                const validHref=download.getAttribute('href');
+                // Each format has its own link; there is no selector whose value could retarget a download.
+                const selectors=root.querySelectorAll('.report-revision select').length;
                 const links=[...root.querySelectorAll('.report-revision a')].map(a=>a.getAttribute('href'));
                 if(window.__injected) throw new Error('Injected content executed');
                 root.remove(); root=null;
                 report.formats=['../../private','javascript:alert(1)'];
                 root=await SOCifyAutopsy.reports(caseId); workspace.append(root);
                 const invalidControls=root.querySelectorAll('.report-revision select,.report-revision a').length;
-                return {values,validHref,links,invalidControls,caseUrl:location.href,originalUrl:before};
+                return {selectors,links,invalidControls,caseUrl:location.href,originalUrl:before};
               } finally { root?.remove(); api=originalApi; autopsy.current.reports=originalReports; }
             }""",
             j.case_id,
         )
-        assert evidence["values"] == ["pdf", "json"]
         path = f"/api/cases/{j.case_id}/reports/71/files/"
-        assert evidence["validHref"] == path + "json"
-        assert set(evidence["links"]) == {path + "pdf", path + "json"}
+        assert evidence["selectors"] == 0
+        assert sorted(evidence["links"]) == [path + "json", path + "pdf"]
         assert evidence["invalidControls"] == 0
         assert evidence["caseUrl"] == evidence["originalUrl"]
         result["kind"] = "adversarial DOM component check with controlled response fixture"

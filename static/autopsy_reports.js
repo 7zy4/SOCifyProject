@@ -351,13 +351,6 @@ window.SOCifyAutopsy.reports = async (caseId) => {
     ]);
     const links = node("div", { class: "action-row report-downloads" });
     const available = report.formats.filter(format => ["json", "html", "pdf", "md", "docx"].includes(format));
-    if (available.length) {
-      const paths = new Map(available.map(format => [format, `/api/cases/${caseId}/reports/${report.id}/files/${encodeURIComponent(format)}`]));
-      const formats = node("select", { "aria-label": SOCifyLocale.text("صيغة التقرير") }, available.map((format) => node("option", { value: format, selected: format === "pdf", text: format.toUpperCase() })));
-      const download = linkedButton(SOCifyLocale.text("تنزيل الصيغة المختارة"), paths.get(formats.value));
-      formats.addEventListener("change", () => { const path = paths.get(formats.value); if (path) download.href = path; });
-      card.append(node("div", { class: "report-downloads action-row" }, [field(SOCifyLocale.text("صيغة التقرير"), formats), download]));
-    }
     for (const format of available) links.append(linkedButton(SOCifyLocale.template`تنزيل ${format.toUpperCase()}`, `/api/cases/${caseId}/reports/${report.id}/files/${format}`));
     card.append(links);
     if (report.payload) {

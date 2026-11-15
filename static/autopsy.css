@@ -89,7 +89,6 @@
 .report-data details > summary { cursor: pointer; color: var(--blue); }
 .report-data .report-data { margin-block-start: .8rem; display: block; }
 .report-downloads { padding-block: .8rem; }
-.report-downloads label { margin: 0; min-width: min(100%, 12rem); }
 .report-revision > p:last-of-type { overflow-wrap: anywhere; }
 @media (max-width: 600px) { .report-data { display: block; } .report-data > dd { padding-inline-start: .6rem; } .report-downloads > * { flex: 1 1 100%; } }
 .choice-control .search-choice::-webkit-calendar-picker-indicator { opacity: 0; }
