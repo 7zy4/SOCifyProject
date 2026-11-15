@@ -117,6 +117,7 @@ SOCifyProject/
 | معالجة مشكلة | [استكشاف الأعطال](docs/troubleshooting.md) |
 | إعداد الأمان وحدود الثقة | [دليل الأمان](docs/security-guide.md) · [نموذج التهديد](docs/threat-model.md) |
 | التكامل مع المنصة | [مواصفات API](docs/api/openapi.yaml) |
+| فهم أسماء الجداول القديمة | [مسرد المخطط](docs/glossary.md) |
 
 ## الترخيص
 
