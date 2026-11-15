@@ -1,4 +1,5 @@
 import json
+import logging
 import sqlite3
 import time
 import uuid
@@ -10,6 +11,9 @@ from .playbooks import _apply_action
 from .schema import insert_outbox
 from .timeutils import iso_now, utc_now
 from .validation import public_error_message
+
+# One line per processed run: identifiers, final state and timing only; step errors stay in the run record.
+log = logging.getLogger("socify.workers")
 
 
 def _future(seconds: int) -> str:
@@ -210,5 +214,11 @@ def run_worker_once(connection: sqlite3.Connection, worker_id: str | None = None
     run_id = claim_playbook_run(connection, identity, lease_seconds)
     if run_id is None:
         return None
-    process_playbook_run(connection, run_id, identity, lease_seconds)
+    started = time.perf_counter()
+    try:
+        state = process_playbook_run(connection, run_id, identity, lease_seconds)
+    except Exception as exc:
+        log.warning("playbook_run_failed run_id=%s error_type=%s duration_ms=%.1f", run_id, type(exc).__name__, (time.perf_counter() - started) * 1000)
+        raise
+    log.info("playbook_run_finished run_id=%s state=%s duration_ms=%.1f", run_id, state, (time.perf_counter() - started) * 1000)
     return run_id

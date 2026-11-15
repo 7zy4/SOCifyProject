@@ -118,6 +118,11 @@ jobs:
                   root = ElementTree.parse(report).getroot()
                   for suite in root.iter("testsuite"):
                       summary.write(f"Tests: {suite.get('tests')}; failures: {suite.get('failures')}; errors: {suite.get('errors')}; skipped: {suite.get('skipped')}\n\n")
+                  # GitHub keeps only the first 10 error annotations of a step, so the complete list comes first.
+                  failed = [f"{case.get('classname')}.{case.get('name')}" for case in root.iter("testcase") if case.findall("failure") or case.findall("error")]
+                  if failed:
+                      listing = "\n".join(failed).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                      print(f"::error title=Browser acceptance failures ({len(failed)} tests)::{listing}")
                   for case in root.iter("testcase"):
                       for failure in (*case.findall("failure"), *case.findall("error")):
                           name = html.escape(f"{case.get('classname')}.{case.get('name')}")

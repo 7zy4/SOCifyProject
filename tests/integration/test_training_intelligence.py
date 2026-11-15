@@ -3,6 +3,7 @@ from collections.abc import Callable
 from datetime import datetime
 
 from flask.testing import FlaskClient
+from werkzeug.http import parse_options_header
 
 
 def scenario_id(client: FlaskClient) -> int:
@@ -248,7 +249,7 @@ def test_e2e_35_graph_and_timeline_have_traceable_relations(client: FlaskClient,
     assert len(timeline.json["items"]) == 10
     exported = client.get(f"/api/visualizations/graph/export?training_run_id={run_id}")
     assert exported.status_code == 200
-    assert exported.headers["Content-Disposition"].endswith("socify-attack-graph.json")
+    assert parse_options_header(exported.headers["Content-Disposition"]) == ("attachment", {"filename": "socify-attack-graph.json"})
 
 
 def test_e2e_37_sse_replay_uses_monotonic_cursor(client: FlaskClient, login_as: Callable[[str], None]) -> None:

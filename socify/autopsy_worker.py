@@ -8,6 +8,7 @@ import subprocess  # nosec B404
 import sys
 import sysconfig
 import tempfile
+import time
 from datetime import timedelta
 from pathlib import Path
 
@@ -211,12 +212,27 @@ def job_authorized(job):
     )
 
 
+def _log_finished(job, state, error_code, attempt, started):
+    """One line per finished job: identifiers, state and timing only; payloads and file names stay out of the log."""
+    logging.getLogger("socify.workers").info(
+        "autopsy_job_finished job_id=%s kind=%s case_id=%s state=%s error_code=%s attempt=%s duration_ms=%.1f",
+        job["id"],
+        job["kind"],
+        job["case_id"],
+        state,
+        error_code or "-",
+        attempt if attempt is not None else "-",
+        (time.perf_counter() - started) * 1000,
+    )
+
+
 def run_autopsy_worker_once(identity="local-autopsy-worker"):
     job = claim_job(identity)
     if not job:
         return None
     if job["worker_id"] != identity or not current_job_claim(job):
         return job["id"]
+    started = time.perf_counter()
     error, files, analysis = None, None, None
     try:
         if not job_authorized(job):
@@ -265,6 +281,7 @@ def run_autopsy_worker_once(identity="local-autopsy-worker"):
         else:
             raise ValueError("Unknown local analysis job")
     except JobClaimLostError:
+        _log_finished(job, "claim_lost", None, None, started)
         return job["id"]
     except Exception as exc:
         current_app.logger.error("autopsy_job_failed id=%s error_type=%s", job["id"], type(exc).__name__)
@@ -277,33 +294,44 @@ def run_autopsy_worker_once(identity="local-autopsy-worker"):
             if isinstance(exc, TimeoutError)
             else "LOCAL_RENDER_FAILED"
         )
-    with transaction():
-        current = current_job_claim(job)
-        if not current:
-            return job["id"]
-        if not job_authorized(job):
-            error = "ACCESS_REVOKED"
-        if error == "ANALYSIS_UNAVAILABLE" and current["attempts"] < 3:
-            available = (utc_now() + timedelta(seconds=5 * 2 ** (current["attempts"] - 1))).isoformat().replace("+00:00", "Z")
-            get_db().execute(
-                "UPDATE autopsy_jobs SET state='queued',error_code=?,available_at=?,worker_id=NULL,lease_expires_at=NULL WHERE id=?",
-                (error, available, job["id"]),
-            )
-            return job["id"]
-        if error is None and files is not None:
-            for kind, content in files.items():
+    outcome: tuple[str, str | None, int | None] | None = None
+    try:
+        with transaction():
+            current = current_job_claim(job)
+            if not current:
+                outcome = ("claim_lost", None, None)
+                return job["id"]
+            if not job_authorized(job):
+                error = "ACCESS_REVOKED"
+            if error == "ANALYSIS_UNAVAILABLE" and current["attempts"] < 3:
+                available = (utc_now() + timedelta(seconds=5 * 2 ** (current["attempts"] - 1))).isoformat().replace("+00:00", "Z")
                 get_db().execute(
-                    "INSERT OR IGNORE INTO autopsy_report_files(report_id, format, content, sha256) VALUES (?, ?, ?, ?)",
-                    (parameters["report_id"], kind, cipher().encrypt(content), hashlib.sha256(content).hexdigest()),
+                    "UPDATE autopsy_jobs SET state='queued',error_code=?,available_at=?,worker_id=NULL,lease_expires_at=NULL WHERE id=?",
+                    (error, available, job["id"]),
                 )
-            custody(job["case_id"], "report_rendered", {"report_id": parameters["report_id"], "formats": sorted(files)}, actor=job["created_by"])
-        result = {"report_id": json.loads(job["parameters"]).get("report_id")}
-        if error is None and analysis is not None:
-            from .autopsy_api import insert_record
+                outcome = ("queued", error, current["attempts"])
+                return job["id"]
+            if error is None and files is not None:
+                for kind, content in files.items():
+                    get_db().execute(
+                        "INSERT OR IGNORE INTO autopsy_report_files(report_id, format, content, sha256) VALUES (?, ?, ?, ?)",
+                        (parameters["report_id"], kind, cipher().encrypt(content), hashlib.sha256(content).hexdigest()),
+                    )
+                custody(job["case_id"], "report_rendered", {"report_id": parameters["report_id"], "formats": sorted(files)}, actor=job["created_by"])
+            result = {"report_id": json.loads(job["parameters"]).get("report_id")}
+            if error is None and analysis is not None:
+                from .autopsy_api import insert_record
 
-            result = {"record_id": insert_record(job["case_id"], "analysis", analysis, actor=job["created_by"])}
-        get_db().execute(
-            "UPDATE autopsy_jobs SET state = ?, result = ?, error_code = ?, completed_at = ?, worker_id = NULL, lease_expires_at = NULL WHERE id = ?",
-            ("failed" if error else "completed", canonical(result), error, iso_now(), job["id"]),
-        )
+                result = {"record_id": insert_record(job["case_id"], "analysis", analysis, actor=job["created_by"])}
+            get_db().execute(
+                "UPDATE autopsy_jobs SET state = ?, result = ?, error_code = ?, completed_at = ?, worker_id = NULL, lease_expires_at = NULL WHERE id = ?",
+                ("failed" if error else "completed", canonical(result), error, iso_now(), job["id"]),
+            )
+            outcome = ("failed" if error else "completed", error, current["attempts"])
+    except BaseException:
+        outcome = None  # the state change did not commit, so nothing finished
+        raise
+    finally:
+        if outcome:
+            _log_finished(job, *outcome, started)
     return job["id"]

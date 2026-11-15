@@ -11,7 +11,7 @@ def test_local_worker_process_shares_case_database_and_encryption_keys(autopsy_c
     )
     assert created.status_code == 202
     with local_worker_services(app.config) as processes:
-        deadline = time.monotonic() + 15
+        deadline = time.monotonic() + 60  # spawned workers import the whole app; the loop exits as soon as the job settles
         while time.monotonic() < deadline:
             status = client.get(f"/api/cases/{autopsy_case}/imports/{created.json['id']}").json
             if status["status"] in {"completed", "completed_with_errors", "failed"}:
@@ -43,7 +43,7 @@ def test_local_supervisor_processes_pending_playbooks_without_duplicate_effects(
     identifier = _queued_run(client, app, [{"action": "notify_training_team"}], "local-supervised-playbook")
     with local_worker_services(app.config) as processes:
         assert {process.name for process in processes} == {"socify-local-import", "socify-local-autopsy", "socify-local-playbook"}
-        deadline = time.monotonic() + 15
+        deadline = time.monotonic() + 60  # spawned workers import the whole app; the loop exits as soon as the job settles
         while time.monotonic() < deadline:
             run = client.get(f"/api/playbook-runs/{identifier}").json
             if run["state"] in {"succeeded", "failed"}:

@@ -12,6 +12,7 @@ from .autopsy_pipeline import case_full_access
 from .autopsy_report_render import FORMATS
 from .cases import _case_row, _history
 from .db import get_db, inserted_id, transaction
+from .file_names import attachment_disposition
 from .security import actor_id, cipher, current_user, error_response, has_permission, require_permission
 from .timeutils import iso_now
 from .validation import ValidationError, public_error_message
@@ -351,7 +352,7 @@ def download_report(case_id: int, report_id: int, report_format: str):
     with transaction():
         custody(case_id, "report_downloaded", {"report_id": report_id, "format": report_format, "sha256": row["sha256"]})
     response = Response(content, mimetype=FORMATS[report_format])
-    response.headers["Content-Disposition"] = f'attachment; filename="SOCify-case-{case_id}-report-{report_id}.{report_format}"'
+    response.headers["Content-Disposition"] = attachment_disposition(f"SOCify-case-{case_id}-report-{report_id}.{report_format}")
     response.headers["X-Content-SHA256"] = row["sha256"]
     response.headers["Cache-Control"] = "private, no-store"
     response.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; font-src data:; sandbox"

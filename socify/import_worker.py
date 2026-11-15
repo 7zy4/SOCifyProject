@@ -1,10 +1,16 @@
+import logging
 import sqlite3
+import time
 import uuid
 from datetime import timedelta
 
 from .db import database_is_busy, transaction
 from .ingestion import _process_job
 from .timeutils import iso_now, utc_now
+
+# One line per finished job: identifiers, counts, state and timing only. File names, record content and
+# exception messages never enter the log; the job row keeps the reviewable detail.
+log = logging.getLogger("socify.workers")
 
 
 def _future(seconds: int) -> str:
@@ -62,9 +68,11 @@ def run_import_worker_once(connection: sqlite3.Connection, worker_id: str | None
     job_id = claim_import_job(connection, identity, lease_seconds)
     if job_id is None:
         return None
+    started = time.perf_counter()
     try:
-        _process_job(job_id, identity, lease_seconds)
+        job = _process_job(job_id, identity, lease_seconds)
     except Exception as exc:
+        status, retries = "missing", None
         with transaction(connection):
             row = connection.execute("SELECT retry_count FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
             if row:
@@ -75,6 +83,24 @@ def run_import_worker_once(connection: sqlite3.Connection, worker_id: str | None
                     lease_expires_at = NULL, last_error = ?, updated_at = ? WHERE id = ?""",
                     (status, retries, _future(min(60, 2 ** max(0, retries - 1))), type(exc).__name__, iso_now(), job_id),
                 )
+        log.warning(
+            "import_job_failed job_id=%s state=%s attempt=%s error_type=%s duration_ms=%.1f",
+            job_id,
+            status,
+            retries,
+            type(exc).__name__,
+            (time.perf_counter() - started) * 1000,
+        )
         if not isinstance(exc, (RuntimeError, sqlite3.Error)):
             raise
+        return job_id
+    log.info(
+        "import_job_finished job_id=%s case_id=%s state=%s accepted=%s rejected=%s duration_ms=%.1f",
+        job_id,
+        job["case_id"],
+        job["status"],
+        job["accepted"],
+        job["rejected"],
+        (time.perf_counter() - started) * 1000,
+    )
     return job_id

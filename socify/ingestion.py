@@ -20,7 +20,7 @@ from .audit import record_audit
 from .autopsy_pipeline import activate_import, job_visible
 from .db import get_db, inserted_id, transaction
 from .events import ingest_event
-from .file_names import evidence_filename
+from .file_names import attachment_disposition, evidence_filename
 from .operational import case_visible, operational_mode
 from .schema import public_id
 from .security import (
@@ -1382,6 +1382,6 @@ def import_evidence(job_id: int):
         return error_response("IMPORT_EVIDENCE_INVALID", public_error_message(exc, "Import evidence is unavailable or failed integrity validation"), 409)
     record_audit(get_db(), "read", "import_evidence", job_id, details={"sha256": row["content_hash"]})
     response = Response(content, mimetype="application/octet-stream")
-    response.headers["Content-Disposition"] = f"attachment; filename={row['filename']}"
+    response.headers["Content-Disposition"] = attachment_disposition(row["filename"])
     response.headers["Digest"] = f"sha-256={base64.b64encode(bytes.fromhex(row['content_hash'])).decode()}"
     return response

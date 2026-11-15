@@ -17,6 +17,7 @@ from .autopsy_api import manager
 from .autopsy_domain import canonical, custody, text_value
 from .cases import _case_row, _reference
 from .db import get_db, inserted_id, transaction
+from .file_names import attachment_disposition
 from .ingestion import _job_content
 from .request_limits import StructureLimitError, validate_json_structure
 from .security import actor_id, cipher, current_user, decrypt_secret, encrypt_secret, error_response, has_permission, require_permission, workspace_id
@@ -616,7 +617,7 @@ def export_case_capsule(case_id: int):
         content,
         mimetype="application/zip",
         headers={
-            "Content-Disposition": f'attachment; filename="SOCify-case-{case_id}-{profile}.zip"',
+            "Content-Disposition": attachment_disposition(f"SOCify-case-{case_id}-{profile}.zip"),
             "Cache-Control": "no-store",
             "X-Content-SHA256": digest(content),
             "Content-Security-Policy": "default-src 'none'; sandbox",
@@ -725,7 +726,7 @@ def capsule_file(case_id: int, archive_id: int, member: str):
         files[member],
         mimetype="application/octet-stream",
         headers={
-            "Content-Disposition": 'attachment; filename="imported-capsule-evidence.bin"',
+            "Content-Disposition": attachment_disposition("imported-capsule-evidence.bin"),
             "X-Content-SHA256": digest(files[member]),
             "Cache-Control": "no-store",
             "Content-Security-Policy": "default-src 'none'; sandbox",

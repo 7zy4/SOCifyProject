@@ -10,7 +10,7 @@ from .autopsy_api import insert_record, manager
 from .autopsy_domain import canonical, custody, text_value
 from .cases import _case_row
 from .db import get_db, inserted_id, transaction
-from .file_names import evidence_filename
+from .file_names import attachment_disposition, evidence_filename
 from .security import actor_id, cipher, current_user, encrypt_secret, error_response, has_permission, require_permission
 from .timeutils import iso_now
 from .validation import ValidationError, public_error_message
@@ -133,7 +133,7 @@ def download_sample(case_id: int, sample_id: int):
         content,
         mimetype="application/octet-stream",
         headers={
-            "Content-Disposition": f'attachment; filename="quarantined-{sample_id}.bin"',
+            "Content-Disposition": attachment_disposition(f"quarantined-{sample_id}.bin"),
             "Content-Security-Policy": "default-src 'none'; sandbox",
             "X-Content-SHA256": row["sha256"],
             "Cache-Control": "no-store",

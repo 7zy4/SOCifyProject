@@ -8,6 +8,7 @@ from typing import Any
 from flask import Blueprint, Response, g, jsonify, request, stream_with_context
 
 from .db import get_db
+from .file_names import attachment_disposition
 from .security import actor_id, can_access_training_run, current_user, error_response, has_permission, require_permission, workspace_id
 from .timeutils import iso_timestamp
 from .validation import ValidationError, public_error_message
@@ -292,7 +293,7 @@ def export_graph():
     return Response(
         json.dumps(result, ensure_ascii=False, separators=(",", ":")),
         mimetype="application/json",
-        headers={"Content-Disposition": "attachment; filename=socify-attack-graph.json"},
+        headers={"Content-Disposition": attachment_disposition("socify-attack-graph.json")},
     )
 
 

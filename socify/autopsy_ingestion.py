@@ -15,6 +15,7 @@ from .cases import _attach_event, _case_row
 from .chronology_time import sql_utc_key, utc_key
 from .db import connect_readonly, get_db, transaction
 from .events import _event_view
+from .file_names import attachment_disposition
 from .ingestion import _job_content, _job_view, cancel_import, create_import, preview_import, resume_import
 from .security import actor_id, current_user, error_response, has_permission, require_permission
 from .timeutils import iso_now
@@ -189,7 +190,7 @@ def original_import(case_id: int, job_id: int):
     return Response(
         content,
         mimetype="application/octet-stream",
-        headers={"Content-Disposition": f"attachment; filename={secure_filename(job['filename']) or 'evidence.bin'}", "X-Evidence-SHA256": job["content_hash"]},
+        headers={"Content-Disposition": attachment_disposition(secure_filename(job["filename"]) or "evidence.bin"), "X-Evidence-SHA256": job["content_hash"]},
     )
 
 
@@ -464,7 +465,7 @@ def export_case_logs(case_id: int):
         stream_with_context(generate()),
         mimetype=media,
         headers={
-            "Content-Disposition": f"attachment; filename={secure_filename(case['reference'])}-logs.{format_name}",
+            "Content-Disposition": attachment_disposition(f"{secure_filename(case['reference'])}-logs.{format_name}"),
             "X-Redaction-Policy": "metadata_only_v1" if redaction == "1" else "unredacted",
         },
     )

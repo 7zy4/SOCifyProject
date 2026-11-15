@@ -9,6 +9,7 @@ from flask import Blueprint, Response, jsonify, request
 
 from .audit import record_audit
 from .db import get_db, inserted_id
+from .file_names import attachment_disposition
 from .report_brand import report_style
 from .schema import public_id
 from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
@@ -467,7 +468,7 @@ def assessment_report(assessment_id: int):
         ).encode()
         response = Response(content, mimetype="text/html")
         extension = "html"
-    response.headers["Content-Disposition"] = f"attachment; filename={assessment['assessment_id']}.{extension}"
+    response.headers["Content-Disposition"] = attachment_disposition(f"{assessment['assessment_id']}.{extension}")
     response.headers["Digest"] = f"sha-256={base64.b64encode(hashlib.sha256(content).digest()).decode()}"
     return response
 

@@ -10,6 +10,7 @@ from flask import Blueprint, Response, jsonify, request
 from .audit import record_audit
 from .db import get_db, inserted_id, transaction
 from .detection import SEVERITIES, evaluate_rules
+from .file_names import attachment_disposition
 from .schema import insert_outbox, public_id
 from .security import actor_id, can_access_training_run, current_user, error_response, require_permission, training_scope_sql, workspace_id
 from .timeutils import iso_now, iso_timestamp
@@ -510,5 +511,5 @@ def export_events():
     return Response(
         buffer.getvalue(),
         mimetype="text/csv; charset=utf-8",
-        headers={"Content-Disposition": "attachment; filename=socify-events.csv", "X-Content-Type-Options": "nosniff"},
+        headers={"Content-Disposition": attachment_disposition("socify-events.csv"), "X-Content-Type-Options": "nosniff"},
     )

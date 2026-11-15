@@ -12,6 +12,7 @@ from flask import Blueprint, Response, current_app, jsonify, request
 from .audit import record_audit, record_training_action
 from .autopsy_pipeline import visibility_sql
 from .db import get_db, inserted_id, transaction
+from .file_names import attachment_disposition
 from .operational import case_scope, case_visible, operational_mode
 from .report_brand import report_style
 from .schema import insert_outbox
@@ -1002,7 +1003,7 @@ def evidence_content(case_id: int, evidence_id: int):
         content,
         mimetype="application/octet-stream",
         headers={
-            "Content-Disposition": f"attachment; filename=evidence-{evidence_id}.txt",
+            "Content-Disposition": attachment_disposition(f"evidence-{evidence_id}.txt"),
             "X-Evidence-SHA256": evidence["sha256"],
             "Cache-Control": "no-store",
             "X-Content-Type-Options": "nosniff",
@@ -1324,5 +1325,5 @@ def get_report(case_id: int):
     return Response(
         row["content"],
         mimetype=mimetype,
-        headers={"Content-Disposition": f"attachment; filename={case['reference']}.{report_format}", "X-Report-SHA256": row["sha256"]},
+        headers={"Content-Disposition": attachment_disposition(f"{case['reference']}.{report_format}"), "X-Report-SHA256": row["sha256"]},
     )
