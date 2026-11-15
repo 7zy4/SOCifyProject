@@ -7,6 +7,7 @@ from .autopsy_api import records_for_case
 from .autopsy_ingestion import log_query, metadata_scope
 from .autopsy_pipeline import case_full_access
 from .case_counts import consistent_read
+from .case_policy import case_policy
 from .cases import _case_row, annotate_technique
 from .chronology_time import sql_utc_key
 from .db import get_db
@@ -19,6 +20,7 @@ autopsy_investigation_api = Blueprint("autopsy_investigation", __name__)
 
 
 @autopsy_investigation_api.get("/api/cases/<int:case_id>/timeline")
+@case_policy(batch_member={"GET"})
 @require_permission("cases.read")
 @consistent_read
 def case_timeline(case_id: int):

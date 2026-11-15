@@ -6,6 +6,7 @@ from flask import Blueprint, jsonify, request
 
 from .autopsy_domain import KINDS, canonical, custody, member_has_open_work, text_value, touch_case, validate_record
 from .case_counts import cached_case_count, consistent_read
+from .case_policy import case_policy
 from .cases import _case_row, _case_view, create_case, list_cases
 from .db import get_db, inserted_id, transaction
 from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
@@ -352,6 +353,7 @@ def case_claim(case_id: int):
 
 
 @autopsy_api.get("/api/cases/<int:case_id>")
+@case_policy(before_approval={"GET"}, batch_member={"GET"})
 @require_permission("cases.read")
 def case_get(case_id: int):
     return case_summary(case_id)

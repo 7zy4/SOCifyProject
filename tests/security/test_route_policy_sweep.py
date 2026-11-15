@@ -4,13 +4,13 @@ The sweep walks the whole URL map, so a new route is checked without being liste
 written out on purpose: changing any of them should be a visible decision in review.
 """
 
+import inspect
 from urllib.parse import urlsplit
 
 from werkzeug.routing import IntegerConverter
 
 from socify import OPERATIONAL_BLUEPRINT_PREFIX, OPERATIONAL_BLUEPRINTS, OPERATIONAL_LEGACY_ENDPOINTS, RETIRED_API_PREFIXES
-from socify.autopsy_pipeline import PARTIAL_SCOPE_BLUEPRINT, PARTIAL_SCOPE_READ_ENDPOINTS, PARTIAL_SCOPE_TIMELINE_ENDPOINT
-from socify.autopsy_workspace import ASSIGN_LOGS_ENDPOINT, CASE_GATE_BLUEPRINT, CASE_READ_ENDPOINTS, PAGE_BLUEPRINT, UPDATE_ASSIGNMENT_ENDPOINT
+from socify.case_policy import ANY_METHOD, CasePolicy
 from tests.conftest import issue_session
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
@@ -202,22 +202,74 @@ def test_retired_legacy_routes_are_exactly_the_documented_set(app, user_ids):
     assert not other, other
 
 
-def test_policy_names_used_by_request_guards_exist(app):
+def test_operational_routing_names_exist(app):
     endpoints = set(app.view_functions)
-    rules = {rule.endpoint: rule for rule in app.url_map.iter_rules()}
-    named = set(OPERATIONAL_LEGACY_ENDPOINTS) | {ASSIGN_LOGS_ENDPOINT, UPDATE_ASSIGNMENT_ENDPOINT, PARTIAL_SCOPE_TIMELINE_ENDPOINT}
-    named |= set(CASE_READ_ENDPOINTS) | set(PARTIAL_SCOPE_READ_ENDPOINTS)
-    assert named <= endpoints, sorted(named - endpoints)
-    blueprints = set(OPERATIONAL_BLUEPRINTS) | {PAGE_BLUEPRINT, CASE_GATE_BLUEPRINT, PARTIAL_SCOPE_BLUEPRINT}
-    assert blueprints <= set(app.blueprints), sorted(blueprints - set(app.blueprints))
+    assert set(OPERATIONAL_LEGACY_ENDPOINTS) <= endpoints, sorted(set(OPERATIONAL_LEGACY_ENDPOINTS) - endpoints)
+    assert set(OPERATIONAL_BLUEPRINTS) <= set(app.blueprints), sorted(set(OPERATIONAL_BLUEPRINTS) - set(app.blueprints))
     assert any(name.startswith(OPERATIONAL_BLUEPRINT_PREFIX) for name in app.blueprints)
     segments = {rule.rule.split("/")[2] for rule in app.url_map.iter_rules() if rule.rule.startswith("/api/")}
     assert set(RETIRED_API_PREFIXES) <= segments, sorted(set(RETIRED_API_PREFIXES) - segments)
-    # guard_workspace reads these request details; a renamed argument would silently skip the case check.
-    assert "assignment_id" in rules[UPDATE_ASSIGNMENT_ENDPOINT].arguments
-    assert all(
-        "GET" in (rules[name].methods or set()) for name in set(CASE_READ_ENDPOINTS) | set(PARTIAL_SCOPE_READ_ENDPOINTS) | {PARTIAL_SCOPE_TIMELINE_ENDPOINT}
-    )
+
+
+# Views exempt from part of the case guards (socify.case_policy). Every other view that names a case is strict: the case
+# must be approved, selected and fully accessible. Adding a row here is the visible decision to relax a view.
+BATCH_MEMBER_ANY = CasePolicy(batch_member=ANY_METHOD)
+RELAXED_CASE_VIEWS = {
+    "ui.dashboard": CasePolicy(before_approval=ANY_METHOD, batch_member=frozenset({"GET"})),  # the page shows the approval state itself
+    "autopsy_workspace.review_case": CasePolicy(before_approval=ANY_METHOD),  # creates the approval
+    "autopsy_workspace.link_cases": CasePolicy(before_approval=ANY_METHOD),
+    "autopsy.case_get": CasePolicy(before_approval=frozenset({"GET"}), batch_member=frozenset({"GET"})),
+    "cases.case_detail": CasePolicy(before_approval=frozenset({"GET"}), batch_member=frozenset({"GET"})),
+    "autopsy_investigation.case_timeline": CasePolicy(batch_member=frozenset({"GET"})),
+    # Import and log views filter by batch themselves, so a batch-scoped member may use them.
+    **{
+        f"autopsy_ingestion.{name}": BATCH_MEMBER_ANY
+        for name in (
+            "case_import_access",
+            "case_import_activate",
+            "case_import_cancel",
+            "case_import_create",
+            "case_import_detail",
+            "case_import_list",
+            "case_import_preview",
+            "case_import_resume",
+            "case_log_detail",
+            "case_logs",
+            "export_case_logs",
+            "original_import",
+            "select_log_exhibit",
+        )
+    },
+    # The case is not in the URL: it comes from the JSON body or from the stored assignment.
+    "teams.assign_logs": CasePolicy(case_from="body"),
+    "teams.update_assignment": CasePolicy(case_from="assignment"),
+}
+
+
+def test_relaxed_case_views_are_exactly_the_reviewed_set(app):
+    declared = {endpoint: view.case_policy for endpoint, view in app.view_functions.items() if hasattr(view, "case_policy")}
+    assert declared == RELAXED_CASE_VIEWS
+    rules = {rule.endpoint: rule for rule in app.url_map.iter_rules()}
+    for endpoint, policy in declared.items():
+        methods = rules[endpoint].methods or set()
+        # A relaxation for a method the route does not answer would be dead text that looks like a rule.
+        named = (policy.before_approval | policy.batch_member) - ANY_METHOD if ANY_METHOD in (policy.before_approval, policy.batch_member) else set()
+        assert not named
+        for relaxed in (policy.before_approval, policy.batch_member):
+            assert relaxed == ANY_METHOD or relaxed <= methods, (endpoint, sorted(relaxed - methods))
+        if policy.case_from == "url":
+            assert any("case_id" in rule.arguments for rule in app.url_map.iter_rules() if rule.endpoint == endpoint), endpoint
+        else:
+            assert "case_id" not in rules[endpoint].arguments, endpoint
+    assert "assignment_id" in rules["teams.update_assignment"].arguments
+
+
+def test_a_view_declared_under_another_decorator_is_not_silently_strict(app):
+    # The declaration must reach the function Flask dispatches; a decorator that does not copy attributes would hide it.
+    undeclared = {
+        endpoint for endpoint, view in app.view_functions.items() if not hasattr(view, "case_policy") and hasattr(inspect.unwrap(view), "case_policy")
+    }
+    assert not undeclared, sorted(undeclared)
 
 
 def test_anonymous_assignment_update_is_refused_without_a_server_error(app):

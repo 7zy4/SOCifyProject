@@ -1,6 +1,7 @@
 from flask import Blueprint, redirect, render_template, request
 from flask_wtf.csrf import generate_csrf
 
+from .case_policy import ANY_METHOD, case_policy
 from .operational import operational_mode
 from .security import current_user, login_required
 
@@ -43,6 +44,7 @@ def index():
 @ui.get("/my-tasks")
 @ui.get("/analysis-library")
 @ui.get("/cases/<int:case_id>")
+@case_policy(before_approval=ANY_METHOD, batch_member={"GET"})
 @login_required
 def dashboard(case_id: int | None = None):
     if operational_mode():

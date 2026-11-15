@@ -3,20 +3,13 @@
 from flask import Blueprint, current_app, jsonify, request, session
 
 from .audit import record_audit
+from .case_policy import ANY_METHOD, case_policy, declared_policy
 from .db import get_db, transaction
 from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
 from .timeutils import iso_now
 from .validation import public_error_message
 
 autopsy_workspace_api = Blueprint("autopsy_workspace", __name__)
-
-# Endpoint names used by guard_workspace; tests/security/test_route_policy_sweep.py checks them against the URL map.
-ASSIGN_LOGS_ENDPOINT = "teams.assign_logs"
-UPDATE_ASSIGNMENT_ENDPOINT = "teams.update_assignment"
-CASE_READ_ENDPOINTS = frozenset({"autopsy.case_get", "cases.case_detail"})
-# Pages render their own approval and selection state, and the approval and selection API must work before both exist.
-PAGE_BLUEPRINT = "ui"
-CASE_GATE_BLUEPRINT = "autopsy_workspace"
 
 
 def migrate(connection):
@@ -84,13 +77,14 @@ def selection_scope_sql(alias="c"):
 def guard_workspace():
     from .cases import _case_row
 
+    policy = declared_policy()
     case_id = (request.view_args or {}).get("case_id")
-    if request.endpoint == ASSIGN_LOGS_ENDPOINT:
+    if policy.case_from == "body":
         data = request.get_json(silent=True)
         candidate = data.get("case_id") if isinstance(data, dict) else None
         if type(candidate) is int and 1 <= candidate <= 9223372036854775807:
             case_id = candidate
-    elif request.endpoint == UPDATE_ASSIGNMENT_ENDPOINT and current_user():
+    elif policy.case_from == "assignment" and current_user():
         # Without an account there is no workspace to search; the view's permission check answers 401.
         row = (
             get_db()
@@ -101,11 +95,7 @@ def guard_workspace():
             case_id = row["case_id"]
     if not case_id or not current_user() or not _case_row(case_id):
         return None
-    if request.blueprint == PAGE_BLUEPRINT:
-        return None
-    if request.endpoint in CASE_READ_ENDPOINTS and request.method == "GET":
-        return None
-    if request.blueprint == CASE_GATE_BLUEPRINT:
+    if request.method in policy.before_approval:
         return None
     if not case_approved(case_id):
         return error_response("CASE_APPROVAL_REQUIRED", "بانتظار اعتماد المدير؛ أعمال القضية مقفلة", 409)
@@ -150,6 +140,7 @@ def selection_set():
 
 
 @autopsy_workspace_api.post("/api/cases/<int:case_id>/approval")
+@case_policy(before_approval=ANY_METHOD)
 @require_permission("cases.override")
 def review_case(case_id):
     from .autopsy_domain import custody, text_value
@@ -188,6 +179,7 @@ def review_case(case_id):
 
 
 @autopsy_workspace_api.post("/api/cases/<int:case_id>/relationships")
+@case_policy(before_approval=ANY_METHOD)
 @require_permission("cases.override")
 def link_cases(case_id):
     from .autopsy_domain import text_value

@@ -11,6 +11,7 @@ from flask import Blueprint, Response, current_app, jsonify, request
 
 from .audit import record_audit, record_training_action
 from .autopsy_pipeline import visibility_sql
+from .case_policy import case_policy
 from .db import get_db, inserted_id, transaction
 from .file_names import attachment_disposition
 from .operational import case_scope, case_visible, operational_mode
@@ -551,6 +552,7 @@ def case_from_alert(alert_id: int):
 
 
 @cases_api.get("/api/incidents/<int:case_id>")
+@case_policy(before_approval={"GET"}, batch_member={"GET"})
 @require_permission("cases.read")
 def case_detail(case_id: int):
     if operational_mode():

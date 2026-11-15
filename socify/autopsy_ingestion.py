@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 from .autopsy_domain import custody, normalize_indicator, touch_case
 from .autopsy_pipeline import activate_import, event_visible, job_visible, visibility_sql
 from .case_counts import cached_case_count, consistent_read, read_snapshot
+from .case_policy import ANY_METHOD, case_policy
 from .cases import _attach_event, _case_row
 from .chronology_time import sql_utc_key, utc_key
 from .db import connect_readonly, get_db, transaction
@@ -47,6 +48,7 @@ def _job_for_case(case_id: int, job_id: int):
 
 
 @autopsy_ingestion_api.post("/api/cases/<int:case_id>/imports/preview")
+@case_policy(batch_member=ANY_METHOD)
 @require_permission("evidence.add")
 def case_import_preview(case_id: int):
     if not _case_row(case_id):
@@ -55,6 +57,7 @@ def case_import_preview(case_id: int):
 
 
 @autopsy_ingestion_api.post("/api/cases/<int:case_id>/imports")
+@case_policy(batch_member=ANY_METHOD)
 @require_permission("evidence.add")
 def case_import_create(case_id: int):
     if not _case_row(case_id):
@@ -63,6 +66,7 @@ def case_import_create(case_id: int):
 
 
 @autopsy_ingestion_api.get("/api/cases/<int:case_id>/imports")
+@case_policy(batch_member=ANY_METHOD)
 @require_permission("cases.read")
 def case_import_list(case_id: int):
     if not _case_row(case_id):
@@ -72,6 +76,7 @@ def case_import_list(case_id: int):
 
 
 @autopsy_ingestion_api.get("/api/cases/<int:case_id>/imports/<int:job_id>")
+@case_policy(batch_member=ANY_METHOD)
 @require_permission("cases.read")
 def case_import_detail(case_id: int, job_id: int):
     job = _job_for_case(case_id, job_id)
@@ -91,6 +96,7 @@ def case_import_detail(case_id: int, job_id: int):
 
 
 @autopsy_ingestion_api.post("/api/cases/<int:case_id>/imports/<int:job_id>/resume")
+@case_policy(batch_member=ANY_METHOD)
 @require_permission("evidence.add")
 def case_import_resume(case_id: int, job_id: int):
     if not _job_for_case(case_id, job_id):
@@ -99,6 +105,7 @@ def case_import_resume(case_id: int, job_id: int):
 
 
 @autopsy_ingestion_api.post("/api/cases/<int:case_id>/imports/<int:job_id>/cancel")
+@case_policy(batch_member=ANY_METHOD)
 @require_permission("evidence.add")
 def case_import_cancel(case_id: int, job_id: int):
     if not _job_for_case(case_id, job_id):
@@ -107,6 +114,7 @@ def case_import_cancel(case_id: int, job_id: int):
 
 
 @autopsy_ingestion_api.post("/api/cases/<int:case_id>/imports/<int:job_id>/activate")
+@case_policy(batch_member=ANY_METHOD)
 @require_permission("cases.assign")
 def case_import_activate(case_id: int, job_id: int):
     data = request.get_json(silent=True)
@@ -134,6 +142,7 @@ def case_import_activate(case_id: int, job_id: int):
 
 
 @autopsy_ingestion_api.put("/api/cases/<int:case_id>/imports/<int:job_id>/access")
+@case_policy(batch_member=ANY_METHOD)
 @require_permission("cases.assign")
 def case_import_access(case_id: int, job_id: int):
     data = request.get_json(silent=True)
@@ -176,6 +185,7 @@ def case_import_access(case_id: int, job_id: int):
 
 
 @autopsy_ingestion_api.get("/api/cases/<int:case_id>/imports/<int:job_id>/original")
+@case_policy(batch_member=ANY_METHOD)
 @require_permission("evidence.download")
 def original_import(case_id: int, job_id: int):
     job = _job_for_case(case_id, job_id)
@@ -282,6 +292,7 @@ def metadata_scope(where, args):
 
 
 @autopsy_ingestion_api.get("/api/cases/<int:case_id>/logs")
+@case_policy(batch_member=ANY_METHOD)
 @require_permission("cases.read")
 @consistent_read
 def case_logs(case_id: int):
@@ -316,6 +327,7 @@ def case_logs(case_id: int):
 
 
 @autopsy_ingestion_api.get("/api/cases/<int:case_id>/logs/<int:event_id>")
+@case_policy(batch_member=ANY_METHOD)
 @require_permission("cases.read")
 @consistent_read
 def case_log_detail(case_id: int, event_id: int):
@@ -332,6 +344,7 @@ def case_log_detail(case_id: int, event_id: int):
 
 
 @autopsy_ingestion_api.post("/api/cases/<int:case_id>/logs/<int:event_id>/exhibit")
+@case_policy(batch_member=ANY_METHOD)
 @require_permission("evidence.add")
 def select_log_exhibit(case_id: int, event_id: int):
     with transaction():
@@ -383,6 +396,7 @@ def _csv_cell(value: object) -> str:
 
 
 @autopsy_ingestion_api.get("/api/cases/<int:case_id>/logs/export")
+@case_policy(batch_member=ANY_METHOD)
 @require_permission("cases.export")
 def export_case_logs(case_id: int):
     case = _case_row(case_id)

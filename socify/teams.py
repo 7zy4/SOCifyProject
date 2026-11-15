@@ -6,6 +6,7 @@ from datetime import timedelta
 from flask import Blueprint, jsonify, request
 
 from .audit import record_audit
+from .case_policy import case_policy
 from .db import get_db, inserted_id, transaction
 from .operational import case_scope, case_visible, operational_mode
 from .security import actor_id, current_user, error_response, has_permission, login_required, require_permission, workspace_id
@@ -217,6 +218,7 @@ def role_policy(role):
 
 
 @teams_api.post("/api/team/assignments")
+@case_policy(case_from="body")
 @login_required
 def assign_logs():
     from .cases import _case_row, _history
@@ -305,6 +307,7 @@ def assign_logs():
 
 
 @teams_api.patch("/api/team/assignments/<int:assignment_id>")
+@case_policy(case_from="assignment")
 @login_required
 def update_assignment(assignment_id):
     if not has_permission(current_user(), "cases.update"):
