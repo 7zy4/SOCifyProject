@@ -33,7 +33,10 @@ jobs:
       - run: python -m scripts.generate_openapi
       - run: git diff --exit-code docs/api/openapi.yaml
       - uses: ./.github/actions/analysis-backend
-      - run: python -m pytest -q --cov=socify --cov-branch --cov-report=xml --cov-report=term-missing --cov-fail-under=90
+      - run: python -m pytest -q --cov=socify --cov-branch --cov-report=xml --cov-report=term-missing --cov-fail-under=90 --junitxml=artifacts/quality-junit.xml
+      - name: Publish unit and integration failure details
+        if: always()
+        run: python -m scripts.junit_summary artifacts/quality-junit.xml "Unit and integration tests" --coverage coverage.xml
       - run: sudo apt-get update && sudo apt-get install --yes poppler-utils
       - name: Validate long bilingual report with the isolated native renderer
         run: |
@@ -101,37 +104,7 @@ jobs:
         run: python -m scripts.audit_brand
       - name: Publish browser failure details in the job summary
         if: always()
-        run: |
-          python - <<'PY'
-          import html
-          import os
-          from pathlib import Path
-
-          report = Path("artifacts/browser-junit.xml")
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
-              summary.write("## Browser acceptance\n\n")
-              if not report.is_file():
-                  summary.write("The browser test runner did not produce a JUnit report. Inspect the preceding setup step.\n")
-              else:
-                  from defusedxml import ElementTree
-
-                  root = ElementTree.parse(report).getroot()
-                  for suite in root.iter("testsuite"):
-                      summary.write(f"Tests: {suite.get('tests')}; failures: {suite.get('failures')}; errors: {suite.get('errors')}; skipped: {suite.get('skipped')}\n\n")
-                  # GitHub keeps only the first 10 error annotations of a step, so the complete list comes first.
-                  failed = [f"{case.get('classname')}.{case.get('name')}" for case in root.iter("testcase") if case.findall("failure") or case.findall("error")]
-                  if failed:
-                      listing = "\n".join(failed).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-                      print(f"::error title=Browser acceptance failures ({len(failed)} tests)::{listing}")
-                  for case in root.iter("testcase"):
-                      for failure in (*case.findall("failure"), *case.findall("error")):
-                          name = html.escape(f"{case.get('classname')}.{case.get('name')}")
-                          message = html.escape(failure.get("message", "")[:4000])
-                          summary.write(f"<h3>{name}</h3><pre>{message}</pre>\n")
-                          annotation = f"{case.get('classname')}.{case.get('name')}: {failure.get('message', '')[:2000]}"
-                          annotation = annotation.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-                          print(f"::error title=Browser acceptance failure::{annotation}")
-          PY
+        run: python -m scripts.junit_summary artifacts/browser-junit.xml "Browser acceptance"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
