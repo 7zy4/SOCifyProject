@@ -51,6 +51,7 @@ python run.py
 </div>
 
 - `requirements.txt` و`requirements-dev.txt` ملفات قفل بالبصمات مولّدة على Linux وPython 3.12، فيرفض pip أي حزمة لا تطابق بصمتها. على Windows ثبّت من المصدر المقروء: `python -m pip install -r requirements.in` (ولبيئة التطوير `requirements-dev.in`)، لأن القفل لا يحوي حزم Windows مثل `colorama`.
+- `requirements-audit.txt` يخص أداة SBOM وحدها، وتثبّته مهمة الأمان في بيئة مستقلة لأنها تتطلب `lxml` أقدم من الذي يعمل به التطبيق؛ بذلك تعمل الاختبارات بنسخ الإنتاج نفسها، ويتحقق `tests/unit/test_dependency_locks.py` من تطابق النسخ المشتركة بين القفلين.
 - لتغيير اعتمادية عدّل ملف `.in` ثم أعد توليد القفل داخل Linux وPython 3.12:
 
 <div dir="ltr">
@@ -59,6 +60,7 @@ python run.py
 python -m pip install pip-tools==7.4.1
 pip-compile --generate-hashes --strip-extras --output-file=requirements.txt requirements.in
 pip-compile --generate-hashes --strip-extras --output-file=requirements-dev.txt requirements-dev.in
+pip-compile --generate-hashes --strip-extras --output-file=requirements-audit.txt requirements-audit.in
 ```
 
 </div>

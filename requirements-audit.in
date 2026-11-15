@@ -1,0 +1,4 @@
+# Supply-chain evidence tools, installed by the security job in an environment of their own.
+# They stay out of requirements-dev.txt because cyclonedx-bom needs lxml<6 while the application runs lxml 6,
+# so the tests use the same lxml as the production image.
+cyclonedx-bom==7.5.0

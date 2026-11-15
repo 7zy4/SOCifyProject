@@ -73,7 +73,12 @@ jobs:
       - run: python -m bandit -c pyproject.toml -r socify scripts app.py run.py
       - run: python -m pip_audit -r requirements.txt
       - run: git ls-files -z | xargs -0 detect-secrets-hook -c 1 --baseline .secrets.baseline --exclude-files '^(data/enterprise-attack-v20.0.json|fixtures/windows/sysmon-sample.evtx.b64)$'
-      - run: cyclonedx-py requirements requirements.txt --output-reproducible --of JSON -o sbom.json
+      - name: Generate the SBOM with a tool kept apart from the tested environment
+        # cyclonedx-bom needs lxml<6, so it has its own lock and virtual environment; the tests use the production lxml.
+        run: |
+          python -m venv "$RUNNER_TEMP/sbom"
+          "$RUNNER_TEMP/sbom/bin/python" -m pip install --require-hashes -r requirements-audit.txt
+          "$RUNNER_TEMP/sbom/bin/cyclonedx-py" requirements requirements.txt --output-reproducible --of JSON -o sbom.json
       - run: pip-licenses --format=json --with-urls --output-file=licenses.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
