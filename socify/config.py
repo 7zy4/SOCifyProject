@@ -29,6 +29,7 @@ def build_config() -> dict[str, object]:
     credential_key = os.environ.get("SOCIFY_CREDENTIAL_KEY")
     if environment == "production" and not credential_key:
         raise RuntimeError("SOCIFY_CREDENTIAL_KEY is required in production; reuse the previous SOCIFY_SECRET_KEY value if data was encrypted without it")
+    previous_credential_key = os.environ.get("SOCIFY_CREDENTIAL_KEY_PREVIOUS") or None
     database = os.environ.get("SOCIFY_DATABASE", str(Path.cwd() / "socify.db"))
     trusted_hosts = [item.strip() for item in os.environ.get("SOCIFY_TRUSTED_HOSTS", "localhost,127.0.0.1").split(",") if item.strip()]
     codespace_name = os.environ.get("CODESPACE_NAME", "").strip()
@@ -60,6 +61,7 @@ def build_config() -> dict[str, object]:
         "PERMANENT_SESSION_LIFETIME": _integer("SOCIFY_SESSION_SECONDS", 28800),
         "ALLOW_REGISTRATION": _boolean("SOCIFY_ALLOW_REGISTRATION", False),
         "CREDENTIAL_KEY": credential_key or effective_secret,
+        "CREDENTIAL_KEY_PREVIOUS": previous_credential_key,
         "TRUSTED_HOSTS": trusted_hosts,
         "TRUSTED_PROXY_HOPS": min(max(_integer("SOCIFY_TRUSTED_PROXIES", 0), 0), 5),
         "RATE_LIMIT_LOGIN_ATTEMPTS": _integer("SOCIFY_LOGIN_ATTEMPTS", 5),

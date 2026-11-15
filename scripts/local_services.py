@@ -43,6 +43,7 @@ def local_worker_services(configuration):
             "DATABASE",
             "SECRET_KEY",
             "CREDENTIAL_KEY",
+            "CREDENTIAL_KEY_PREVIOUS",
             "TESTING",
             "ENV_NAME",
             "DEMO_MODE",

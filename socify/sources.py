@@ -1,4 +1,3 @@
-import base64
 import hashlib
 import hmac
 import json
@@ -19,6 +18,7 @@ from .schema import public_id
 from .security import (
     actor_id,
     decrypt_secret,
+    encrypt_bytes,
     encrypt_secret,
     error_response,
     require_permission,
@@ -178,7 +178,7 @@ def _ingest_records_for_source(
                     "alerts_triggered": 0,
                     "alert_ids": [],
                 }
-            ciphertext = encrypt_secret(base64.b64encode(raw_bytes).decode())
+            ciphertext = encrypt_bytes(raw_bytes)
             cursor = get_db().execute(
                 """INSERT INTO ingestion_jobs
                    (job_id, workspace_id, source_id, training_run_id, case_id, filename, original_filename, format,

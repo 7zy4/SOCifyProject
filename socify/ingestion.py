@@ -27,8 +27,8 @@ from .security import (
     actor_id,
     can_access_training_run,
     current_user,
-    decrypt_secret,
-    encrypt_secret,
+    decrypt_bytes,
+    encrypt_bytes,
     error_response,
     has_permission,
     require_permission,
@@ -756,7 +756,7 @@ def _job_content(row: sqlite3.Row) -> bytes:
     if not ciphertext:
         raise ValidationError("raw import evidence is unavailable")
     try:
-        content = base64.b64decode(decrypt_secret(str(ciphertext)), validate=True)
+        content = decrypt_bytes(str(ciphertext))
     except (ValueError, binascii.Error) as exc:
         raise ValidationError("raw import evidence cannot be decrypted") from exc
     if len(content) != int(row["raw_size"]) or not hashlib.sha256(content).hexdigest() == row["content_hash"]:
@@ -1224,7 +1224,7 @@ def create_import():
             original_filename = text_value(original_filename, 255, True)
         except ValueError as exc:
             return error_response("INVALID_FILENAME", public_error_message(exc, "Specify a valid filename without a path"), 422)
-    ciphertext = encrypt_secret(base64.b64encode(content).decode())
+    ciphertext = encrypt_bytes(content)
     with transaction():
         duplicate = matching_import()
         if duplicate:

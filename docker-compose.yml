@@ -33,6 +33,7 @@ services:
       SOCIFY_ENV: production
       SOCIFY_SECRET_KEY: ${SOCIFY_SECRET_KEY:?Set SOCIFY_SECRET_KEY to a random value of at least 32 bytes}
       SOCIFY_CREDENTIAL_KEY: ${SOCIFY_CREDENTIAL_KEY:?Set SOCIFY_CREDENTIAL_KEY to a separate random value}
+      SOCIFY_CREDENTIAL_KEY_PREVIOUS: ${SOCIFY_CREDENTIAL_KEY_PREVIOUS:-}
       SOCIFY_DATABASE: /data/socify.db
       SOCIFY_HTTPS: "0"
       SOCIFY_TRUSTED_HOSTS: localhost,127.0.0.1
@@ -70,6 +71,7 @@ services:
       SOCIFY_ENV: production
       SOCIFY_SECRET_KEY: ${SOCIFY_SECRET_KEY:?Set SOCIFY_SECRET_KEY to a random value of at least 32 bytes}
       SOCIFY_CREDENTIAL_KEY: ${SOCIFY_CREDENTIAL_KEY:?Set SOCIFY_CREDENTIAL_KEY to a separate random value}
+      SOCIFY_CREDENTIAL_KEY_PREVIOUS: ${SOCIFY_CREDENTIAL_KEY_PREVIOUS:-}
       SOCIFY_DATABASE: /data/socify.db
       SOCIFY_ANALYSIS_SOCKET: /analysis-ipc/analysis.sock
     network_mode: none
@@ -130,6 +132,7 @@ services:
       SOCIFY_ENV: production
       SOCIFY_SECRET_KEY: ${SOCIFY_SECRET_KEY:?Set SOCIFY_SECRET_KEY to a random value of at least 32 bytes}
       SOCIFY_CREDENTIAL_KEY: ${SOCIFY_CREDENTIAL_KEY:?Set SOCIFY_CREDENTIAL_KEY to a separate random value}
+      SOCIFY_CREDENTIAL_KEY_PREVIOUS: ${SOCIFY_CREDENTIAL_KEY_PREVIOUS:-}
       SOCIFY_DATABASE: /data/socify.db
     volumes:
       - socify-data:/data
@@ -158,6 +161,7 @@ services:
       SOCIFY_ENV: production
       SOCIFY_SECRET_KEY: ${SOCIFY_SECRET_KEY:?Set SOCIFY_SECRET_KEY to a random value of at least 32 bytes}
       SOCIFY_CREDENTIAL_KEY: ${SOCIFY_CREDENTIAL_KEY:?Set SOCIFY_CREDENTIAL_KEY to a separate random value}
+      SOCIFY_CREDENTIAL_KEY_PREVIOUS: ${SOCIFY_CREDENTIAL_KEY_PREVIOUS:-}
       SOCIFY_DATABASE: /data/socify.db
       SOCIFY_PLAYBOOK_INLINE_EXECUTION: "0"
     network_mode: none

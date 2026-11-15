@@ -12,7 +12,7 @@ from collections.abc import Callable
 from datetime import timedelta
 from typing import Any, cast
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from flask import current_app, g, jsonify, redirect, request, session, url_for
 
 from .db import get_db
@@ -292,13 +292,18 @@ def training_scope_sql(column: str) -> tuple[str, list[object]]:
     return f" AND ({column} IS NULL OR {column} IN (SELECT id FROM training_runs WHERE workspace_id = ? AND user_id = ?))", [workspace_id(), actor_id()]
 
 
-def cipher() -> Fernet:
+def fernet_for(configured: str | bytes) -> Fernet:
+    raw = configured if isinstance(configured, bytes) else str(configured).encode()
+    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(raw).digest()))
+
+
+def cipher() -> MultiFernet:
+    """Encrypts with the current key; decrypts with it or, during a rotation, with the previous key (socify.key_rotation)."""
     configured = current_app.config.get("CREDENTIAL_KEY")
     if not configured:
         raise RuntimeError("credential encryption key is not configured")
-    raw = configured if isinstance(configured, bytes) else str(configured).encode()
-    key = base64.urlsafe_b64encode(hashlib.sha256(raw).digest())
-    return Fernet(key)
+    previous = current_app.config.get("CREDENTIAL_KEY_PREVIOUS")
+    return MultiFernet([fernet_for(configured), *([fernet_for(previous)] if previous and previous != configured else [])])
 
 
 def encrypt_secret(value: str) -> str:
@@ -310,6 +315,23 @@ def decrypt_secret(value: str) -> str:
         return cipher().decrypt(value.encode()).decode()
     except InvalidToken as exc:
         raise ValueError("stored credential cannot be decrypted with the configured key") from exc
+
+
+# Binary evidence is encrypted as it is. Rows written before this marker existed hold base64 text inside the token.
+BINARY_MARKER = "b1:"
+
+
+def encrypt_bytes(content: bytes) -> str:
+    return BINARY_MARKER + cipher().encrypt(content).decode()
+
+
+def decrypt_bytes(value: str) -> bytes:
+    if value.startswith(BINARY_MARKER):
+        try:
+            return cipher().decrypt(value[len(BINARY_MARKER) :].encode())
+        except InvalidToken as exc:
+            raise ValueError("stored content cannot be decrypted with the configured key") from exc
+    return base64.b64decode(decrypt_secret(value), validate=True)
 
 
 def generate_totp_secret() -> str:

@@ -1,4 +1,3 @@
-import base64
 import hashlib
 import io
 import json
@@ -20,7 +19,18 @@ from .db import get_db, inserted_id, transaction
 from .file_names import attachment_disposition
 from .ingestion import _job_content
 from .request_limits import StructureLimitError, validate_json_structure
-from .security import actor_id, cipher, current_user, decrypt_secret, encrypt_secret, error_response, has_permission, require_permission, workspace_id
+from .security import (
+    actor_id,
+    cipher,
+    current_user,
+    decrypt_secret,
+    encrypt_bytes,
+    encrypt_secret,
+    error_response,
+    has_permission,
+    require_permission,
+    workspace_id,
+)
 from .timeutils import iso_now
 from .validation import ValidationError, public_error_message
 
@@ -480,7 +490,7 @@ def restore_capsule(content, manifest, data, files):
             job_id="CAP-" + uuid.uuid4().hex,
             created_by=principal,
             executor_id=principal,
-            evidence_ciphertext=encrypt_secret(base64.b64encode(payload).decode()),
+            evidence_ciphertext=encrypt_bytes(payload),
             status="completed" if source.get("status") in {"completed", "completed_with_errors"} else "cancelled",
             autopsy_options=canonical(restored_options),
         )
