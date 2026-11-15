@@ -74,7 +74,10 @@ def test_inactive_account_and_missing_session_are_rejected(app, client, login_as
     login_as("analyst")
     database.execute("UPDATE users SET is_active = 0 WHERE id = ?", (user_ids["analyst"],))
     assert client.get("/api/auth/me").status_code == 401
-    login_as("admin")
+    # A browser session naming an account without a recorded server-side session (what login_as used to create).
+    with client.session_transaction() as state:
+        state.clear()
+        state.update(user_id=user_ids["admin"], workspace_id=1, user_role="admin")
     app.config["TESTING"] = False
     assert client.get("/api/auth/me").status_code == 401
     app.config["SESSION_COOKIE_SECURE"] = True

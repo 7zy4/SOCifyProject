@@ -6,7 +6,9 @@ threads = int(os.environ.get("SOCIFY_THREADS", "4"))
 timeout = int(os.environ.get("SOCIFY_REQUEST_TIMEOUT", "60"))
 graceful_timeout = 30
 keepalive = 5
-accesslog = "-"
+# The application logs one line per request without the query string (socify/__init__.py); Gunicorn's access
+# line would repeat it with the full query string and the ingress address instead of the client's.
+accesslog = None
 errorlog = "-"
 capture_output = True
 # Process management uses the container supervisor; the root filesystem is read-only.

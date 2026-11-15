@@ -3,6 +3,7 @@ import pytest
 from socify import create_app
 from socify.autopsy_worker import job_authorized
 from socify.db import get_db
+from tests.conftest import issue_session
 from tests.integration.test_soc_workbench import alert
 
 
@@ -195,7 +196,7 @@ def test_concurrent_decisions_have_one_winner(v4, client, login_as, user_ids, da
     def review(decision):
         browser = v4.test_client()
         with browser.session_transaction() as state:
-            state.update(user_id=user_ids["soc_manager"], workspace_id=1)
+            state.update(user_id=user_ids["soc_manager"], workspace_id=1, session_id=issue_session(v4, user_ids["soc_manager"]))
         barrier.wait(timeout=5)
         return browser.post(f"/api/cases/{case}/approval", json={"decision": decision, "version": 1, "reason": "Concurrent manager decision"}).status_code
 

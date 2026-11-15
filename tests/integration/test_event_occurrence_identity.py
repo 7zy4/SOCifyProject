@@ -4,6 +4,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
+from tests.conftest import issue_session
+
 
 def observation(identifier="gateway-001", **changes):
     return {
@@ -146,6 +148,7 @@ def test_concurrent_reexports_share_one_event_and_retain_both_jobs(autopsy_case,
         with app.test_client() as concurrent_client:
             with concurrent_client.session_transaction() as session:
                 session["user_id"], session["workspace_id"], session["user_role"] = user_ids["analyst"], 1, "analyst"
+                session["session_id"] = issue_session(app, user_ids["analyst"])
             return upload(concurrent_client, autopsy_case, [observation()], pretty=pretty)[0]
 
     with ThreadPoolExecutor(max_workers=2) as pool:
@@ -168,6 +171,7 @@ def test_simultaneous_connector_and_file_keep_one_event_and_one_rule_proof(autop
         with app.test_client() as concurrent_client:
             with concurrent_client.session_transaction() as session:
                 session["user_id"], session["workspace_id"], session["user_role"] = user_ids["analyst"], 1, "analyst"
+                session["session_id"] = issue_session(app, user_ids["analyst"])
             if channel == "file":
                 result = concurrent_client.post(base + "/imports", json={"filename": "events.json", "content": payload, "source_id": source["id"]})
             else:

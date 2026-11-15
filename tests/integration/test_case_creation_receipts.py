@@ -6,6 +6,8 @@ from threading import Barrier
 
 import pytest
 
+from tests.conftest import issue_session
+
 BODY = {"title": "Gateway incident", "reason": "alert_review", "objective": "Determine affected identities and response", "classification": "confidential"}
 PATH = "/api/cases"
 KEY = {"Idempotency-Key": "case-intake-operation-001"}
@@ -172,6 +174,7 @@ def test_simultaneous_creation_retries_commit_once(app, database, user_ids, monk
         with app.test_client() as client:
             with client.session_transaction() as session:
                 session["user_id"] = user_ids["analyst"]
+                session["session_id"] = issue_session(app, user_ids["analyst"])
                 session["workspace_id"] = 1
             response = client.post(PATH, json=BODY, headers=KEY)
             return response.status_code, response.json["id"]

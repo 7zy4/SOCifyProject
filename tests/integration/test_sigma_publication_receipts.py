@@ -7,6 +7,7 @@ from threading import Barrier
 
 import pytest
 
+from tests.conftest import issue_session
 from tests.integration.test_autopsy_intelligence_detection import FIXTURES, SIGMA
 
 BODY = {"source": SIGMA, "fixtures": FIXTURES, "reason": "Reviewed expected gateway matches"}
@@ -118,6 +119,7 @@ def test_concurrent_retries_commit_and_audit_once(app, database, user_ids, monke
         with app.test_client() as client:
             with client.session_transaction() as session:
                 session["user_id"] = user_ids["soc_manager"]
+                session["session_id"] = issue_session(app, user_ids["soc_manager"])
                 session["workspace_id"] = 1
             response = client.post(PATH, json=BODY, headers=KEY)
             return response.status_code, response.json

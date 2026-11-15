@@ -7,6 +7,7 @@ from contextlib import closing
 import bcrypt
 
 from app import app, ensure_phase1_schema
+from tests.conftest import issue_session
 
 
 class PhaseOneTests(unittest.TestCase):
@@ -64,6 +65,7 @@ class PhaseOneTests(unittest.TestCase):
     def auth(self, uid):
         with self.client.session_transaction() as s:
             s["user_id"] = uid
+            s["session_id"] = issue_session(self.client.application, uid)
 
     def event(self):
         return self.client.post(

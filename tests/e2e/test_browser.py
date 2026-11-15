@@ -7,6 +7,8 @@ import pytest
 from playwright.sync_api import sync_playwright
 from werkzeug.serving import make_server
 
+from tests.conftest import issue_session
+
 
 def launch_browser(playwright):
     channel = os.environ.get("SOCIFY_BROWSER_CHANNEL")
@@ -365,6 +367,7 @@ def test_browser_team_registration_invitation_and_assignment(app, client, databa
             with client.session_transaction() as session:
                 session["user_id"] = owner["id"]
                 session["workspace_id"] = owner["workspace_id"]
+                session["session_id"] = issue_session(client.application, owner["id"], owner["workspace_id"])
             job = client.post("/api/imports", json={"filename": "assigned.jsonl", "content": '{"source":"team-browser","title":"Team browser evidence"}'}).json
             case = client.post("/api/incidents", json={"title": "Assigned browser investigation"}).json
             assert client.post(f"/api/incidents/{case['id']}/imports", json={"job_id": job["id"]}).status_code == 200

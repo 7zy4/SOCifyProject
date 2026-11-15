@@ -1,6 +1,7 @@
 import hashlib
 
 from socify.timeutils import iso_now
+from tests.conftest import issue_session
 
 
 def new_member(database, template_id, role, email):
@@ -15,7 +16,7 @@ def new_member(database, template_id, role, email):
 def switch(client, identifier):
     with client.session_transaction() as state:
         state.clear()
-        state.update(user_id=identifier, workspace_id=1)
+        state.update(user_id=identifier, workspace_id=1, session_id=issue_session(client.application, identifier))
 
 
 def test_case_log_assignment_grants_new_role_membership_and_revocation_takes_effect(autopsy_case, client, database, login_as, user_ids):

@@ -1,6 +1,7 @@
 import hashlib
 
 from socify.security import ROLE_PERMISSIONS
+from tests.conftest import issue_session
 
 LOGIN_VALUE = "Team-Integration-Safe-2026!"
 
@@ -12,6 +13,7 @@ def account(client, database, email, **options):
     with client.session_transaction() as session:
         session.clear()
         session["user_id"] = row["id"]
+        session["session_id"] = issue_session(client.application, row["id"], row["workspace_id"])
         session["workspace_id"] = row["workspace_id"]
     return dict(row)
 
@@ -20,6 +22,7 @@ def switch(client, user):
     with client.session_transaction() as session:
         session.clear()
         session["user_id"] = user["id"]
+        session["session_id"] = issue_session(client.application, user["id"], user["workspace_id"])
         session["workspace_id"] = user["workspace_id"]
 
 

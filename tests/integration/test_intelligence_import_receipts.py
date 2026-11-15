@@ -7,6 +7,8 @@ from threading import Barrier
 
 import pytest
 
+from tests.conftest import issue_session
+
 PATH = "/api/autopsy/intelligence"
 KEY = {"Idempotency-Key": "intelligence-import-001"}
 BODY = {
@@ -128,6 +130,7 @@ def test_concurrent_retries_commit_once(app, database, user_ids, monkeypatch):
         with app.test_client() as client:
             with client.session_transaction() as session:
                 session["user_id"] = user_ids["soc_manager"]
+                session["session_id"] = issue_session(app, user_ids["soc_manager"])
                 session["workspace_id"] = 1
             response = client.post(PATH, json=BODY, headers=KEY)
             return response.status_code, response.json

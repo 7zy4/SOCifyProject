@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 import shutil
 import sqlite3
 import sys
@@ -12,11 +14,40 @@ from socify import create_app
 from socify.db import connect_path
 from socify.schema import ensure_schema
 from socify.seeding import seed_demo_data
+from socify.timeutils import utc_now
 
 DEMO_LOGIN_VALUE = "Training-Safe-Password-2026!"
 
 # The isolation, POSIX permission and native rendering contracts are verified on Linux, where the product runs.
 linux_only = pytest.mark.skipif(sys.platform != "linux", reason="requires Linux isolation, POSIX file permissions or native rendering libraries")
+
+
+def issue_session(app: Flask, user_id: int, workspace_id: int = 1) -> str:
+    """Record a server-side session as a successful login does and return the browser's raw session identifier.
+
+    Requests are authenticated through auth_sessions in tests exactly as in production; there is no test-only bypass.
+    """
+    raw = secrets.token_urlsafe(32)
+    now = utc_now()
+    connection = sqlite3.connect(str(app.config["DATABASE"]))
+    try:
+        connection.execute(
+            "INSERT INTO auth_sessions (session_hash, user_id, workspace_id, created_at, last_seen_at, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                hashlib.sha256(raw.encode()).hexdigest(),
+                user_id,
+                workspace_id,
+                now.isoformat().replace("+00:00", "Z"),
+                now.isoformat().replace("+00:00", "Z"),
+                (now + app.permanent_session_lifetime).isoformat().replace("+00:00", "Z"),
+                "127.0.0.1",
+                "pytest",
+            ),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+    return raw
 
 
 @pytest.fixture
@@ -89,13 +120,14 @@ def user_ids(database: sqlite3.Connection) -> dict[str, int]:
 
 
 @pytest.fixture
-def login_as(client: FlaskClient, user_ids: dict[str, int]) -> Callable[[str], None]:
+def login_as(app: Flask, client: FlaskClient, user_ids: dict[str, int]) -> Callable[[str], None]:
     def authenticate(role: str) -> None:
         with client.session_transaction() as browser_session:
             browser_session.clear()
             browser_session["user_id"] = user_ids[role]
             browser_session["workspace_id"] = 1
             browser_session["user_role"] = role
+            browser_session["session_id"] = issue_session(app, user_ids[role])
 
     return authenticate
 

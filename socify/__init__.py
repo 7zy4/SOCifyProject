@@ -48,6 +48,12 @@ from .visualization import visualization_api
 
 csrf = CSRFProtect()
 
+# Operational-mode routing policy; tests/security/test_route_policy_sweep.py checks every name against the URL map.
+RETIRED_API_PREFIXES = frozenset({"training", "scores", "scenarios", "lab"})
+OPERATIONAL_BLUEPRINTS = frozenset({"auth", "cases", "teams", "sources", "watchlist", "quick_reports"})
+OPERATIONAL_LEGACY_ENDPOINTS = frozenset({"platform.audit_logs", "platform.role_matrix", "platform.health_api"})
+OPERATIONAL_BLUEPRINT_PREFIX = "autopsy"
+
 
 def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     root = Path(__file__).parent.parent
@@ -123,10 +129,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         if (
             operational_mode()
             and request.path.startswith("/api/")
-            and (request.blueprint is not None or request.path.split("/", 3)[2] in {"training", "scores", "scenarios", "lab"})
-            and request.blueprint not in {"auth", "cases", "teams", "sources", "watchlist", "quick_reports"}
-            and request.endpoint not in {"platform.audit_logs", "platform.role_matrix", "platform.health_api"}
-            and not str(request.blueprint or "").startswith("autopsy")
+            and (request.blueprint is not None or request.path.split("/", 3)[2] in RETIRED_API_PREFIXES)
+            and request.blueprint not in OPERATIONAL_BLUEPRINTS
+            and request.endpoint not in OPERATIONAL_LEGACY_ENDPOINTS
+            and not str(request.blueprint or "").startswith(OPERATIONAL_BLUEPRINT_PREFIX)
         ):
             return error_response("CASE_CONTEXT_REQUIRED", "استخدم الأداة من داخل قضية مصرح بها؛ مسارات التدريب العامة متقاعدة", 410)
         if operational_mode():

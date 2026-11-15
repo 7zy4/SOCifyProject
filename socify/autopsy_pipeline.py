@@ -5,6 +5,11 @@ from .db import get_db
 from .security import actor_id, current_user
 from .validation import ValidationError
 
+# Requests a batch-scoped member may still make; tests/security/test_route_policy_sweep.py checks the names against the URL map.
+PARTIAL_SCOPE_READ_ENDPOINTS = frozenset({"autopsy.case_get", "cases.case_detail", "ui.dashboard"})
+PARTIAL_SCOPE_BLUEPRINT = "autopsy_ingestion"
+PARTIAL_SCOPE_TIMELINE_ENDPOINT = "autopsy_investigation.case_timeline"
+
 
 def guard_batch_scope():
     from flask import request
@@ -19,9 +24,9 @@ def guard_batch_scope():
         return None
     if case_full_access(case_id):
         return None
-    allowed = request.endpoint in {"autopsy.case_get", "cases.case_detail", "ui.dashboard"} and request.method == "GET"
-    allowed = allowed or request.blueprint == "autopsy_ingestion"
-    allowed = allowed or request.endpoint == "autopsy_investigation.case_timeline" and request.method == "GET"
+    allowed = request.endpoint in PARTIAL_SCOPE_READ_ENDPOINTS and request.method == "GET"
+    allowed = allowed or request.blueprint == PARTIAL_SCOPE_BLUEPRINT
+    allowed = allowed or request.endpoint == PARTIAL_SCOPE_TIMELINE_ENDPOINT and request.method == "GET"
     if not allowed:
         return error_response("BATCH_SCOPE_REQUIRED", "صلاحيتك تخص دفعات محددة؛ عرض سياق القضية الكامل يتطلب الوصول إلى جميع دفعاتها", 403)
     return None

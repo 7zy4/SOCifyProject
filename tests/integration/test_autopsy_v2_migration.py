@@ -9,6 +9,7 @@ from socify.db import connect_path, connect_readonly
 from socify.operations import backup_database, migration_dry_run, restore_database, verify_database
 from socify.schema import ensure_schema
 from socify.security import cipher
+from tests.conftest import issue_session
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "v2" / "synthetic-v2.db.gz"
 PRESERVED = (
@@ -86,7 +87,7 @@ def test_actual_v2_database_migration_preserves_evidence_reports_relations_and_b
         connection.close()
     client = app.test_client()
     with client.session_transaction() as state:
-        state.update(user_id=actor, workspace_id=1)
+        state.update(user_id=actor, workspace_id=1, session_id=issue_session(app, actor))
     assert client.get(f"/api/cases/{metadata['case_id']}").status_code == 200
     assert client.get(f"/api/cases/{metadata['case_id']}").json["approval"]["source"] == "v3_migration"
     assert client.post("/api/investigation-selection", json={"case_ids": [metadata["case_id"]]}).status_code == 200

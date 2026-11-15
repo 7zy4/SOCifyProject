@@ -2,6 +2,8 @@ import json
 
 import pytest
 
+from tests.conftest import issue_session
+
 
 @pytest.fixture
 def assigned(autopsy_case, client, login_as, user_ids):
@@ -171,7 +173,7 @@ def test_other_workspace_cannot_enumerate_or_update_assignments(assigned, client
     ).lastrowid
     with client.session_transaction() as session:
         session.clear()
-        session.update(user_id=member, workspace_id=tenant, user_role="soc_manager")
+        session.update(user_id=member, workspace_id=tenant, user_role="soc_manager", session_id=issue_session(client.application, member, tenant))
     assert client.get("/api/team/assignments?scope=team").json["total"] == 0
     assert client.patch(f"/api/team/assignments/{assigned['id']}", json={"status": "completed"}).status_code == 404
 

@@ -159,8 +159,6 @@ def _touch_session(record, now: str) -> None:
 
 
 def _session_valid(user_id: int) -> bool:
-    if current_app.config.get("TESTING") and not session.get("session_id"):
-        return True
     raw = session.get("session_id")
     if not isinstance(raw, str):
         return False

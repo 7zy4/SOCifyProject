@@ -10,6 +10,12 @@ from .validation import public_error_message
 
 autopsy_workspace_api = Blueprint("autopsy_workspace", __name__)
 
+# Endpoint names used by guard_workspace; tests/security/test_route_policy_sweep.py checks them against the URL map.
+ASSIGN_LOGS_ENDPOINT = "teams.assign_logs"
+UPDATE_ASSIGNMENT_ENDPOINT = "teams.update_assignment"
+CASE_READ_ENDPOINTS = frozenset({"autopsy.case_get", "cases.case_detail"})
+SELECTION_FREE_BLUEPRINTS = ("ui", "autopsy_workspace")
+
 
 def migrate(connection):
     connection.execute("""CREATE TABLE IF NOT EXISTS case_approvals (
@@ -77,12 +83,13 @@ def guard_workspace():
     from .cases import _case_row
 
     case_id = (request.view_args or {}).get("case_id")
-    if request.endpoint == "teams.assign_logs":
+    if request.endpoint == ASSIGN_LOGS_ENDPOINT:
         data = request.get_json(silent=True)
         candidate = data.get("case_id") if isinstance(data, dict) else None
         if type(candidate) is int and 1 <= candidate <= 9223372036854775807:
             case_id = candidate
-    elif request.endpoint == "teams.update_assignment":
+    elif request.endpoint == UPDATE_ASSIGNMENT_ENDPOINT and current_user():
+        # Without an account there is no workspace to search; the view's permission check answers 401.
         row = (
             get_db()
             .execute("SELECT case_id FROM team_log_assignments WHERE id=? AND workspace_id=?", ((request.view_args or {})["assignment_id"], workspace_id()))
@@ -92,11 +99,11 @@ def guard_workspace():
             case_id = row["case_id"]
     if not case_id or not current_user() or not _case_row(case_id):
         return None
-    if request.blueprint == "ui":
+    if request.blueprint == SELECTION_FREE_BLUEPRINTS[0]:
         return None
-    if request.endpoint in {"autopsy.case_get", "cases.case_detail"} and request.method == "GET":
+    if request.endpoint in CASE_READ_ENDPOINTS and request.method == "GET":
         return None
-    if request.blueprint == "autopsy_workspace":
+    if request.blueprint == SELECTION_FREE_BLUEPRINTS[1]:
         return None
     if not case_approved(case_id):
         return error_response("CASE_APPROVAL_REQUIRED", "بانتظار اعتماد المدير؛ أعمال القضية مقفلة", 409)

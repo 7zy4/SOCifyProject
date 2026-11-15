@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.conftest import DEMO_LOGIN_VALUE
+from tests.conftest import DEMO_LOGIN_VALUE, issue_session
 
 ARTIFACTS = Path("artifacts/security-review/event-occurrence-independent")
 
@@ -220,6 +220,7 @@ def test_same_source_facts_are_independent_between_workspaces(autopsy_case, clie
     with app.test_client() as other:
         with other.session_transaction() as session:
             session["user_id"], session["workspace_id"], session["user_role"] = other_user, other_workspace, "analyst"
+            session["session_id"] = issue_session(app, other_user, other_workspace)
         created = other.post("/api/cases", json={"title": "Separate workspace investigation"})
         assert created.status_code == 201, created.json
         case_id = created.json["id"]
@@ -270,6 +271,7 @@ def test_export_revocation_never_falls_back_to_a_restricted_original(autopsy_cas
         with app.test_client() as manager:
             with manager.session_transaction() as session:
                 session["user_id"], session["workspace_id"], session["user_role"] = user_ids["soc_manager"], 1, "soc_manager"
+                session["session_id"] = issue_session(app, user_ids["soc_manager"])
             revoked = manager.put(
                 base + f"/imports/{visible['id']}/access", json={"restricted": True, "members": [], "reason": "Revoke before first streamed row"}
             )
@@ -339,6 +341,7 @@ def test_export_rechecks_case_membership_and_account_state(autopsy_case, client,
         with app.test_client() as manager:
             with manager.session_transaction() as session:
                 session["user_id"], session["workspace_id"], session["user_role"] = user_ids["soc_manager"], 1, "soc_manager"
+                session["session_id"] = issue_session(app, user_ids["soc_manager"])
             if revocation == "case_membership":
                 result = manager.delete(
                     base + f"/members/{user_ids['analyst']}",

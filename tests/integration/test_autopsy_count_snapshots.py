@@ -3,6 +3,7 @@ from flask import session
 
 from socify.autopsy_api import case_summary
 from socify.db import get_db, transaction
+from tests.conftest import issue_session
 
 
 def import_logs(client, base, filename, titles):
@@ -58,7 +59,7 @@ def test_rolled_back_summary_cannot_poison_counts_when_a_committed_edit_reuses_t
     assert totals(client, base) == (2, 2, 2)
     event = client.get(base + "/logs").json["items"][0]["id"]
     with app.test_request_context():
-        session.update(user_id=user_ids["analyst"], workspace_id=1)
+        session.update(user_id=user_ids["analyst"], workspace_id=1, session_id=issue_session(app, user_ids["analyst"]))
         with pytest.raises(RuntimeError, match="Rollback fixture"), transaction():
             get_db().execute("DELETE FROM case_events WHERE case_id=? AND event_id=?", (autopsy_case, event))
             assert case_summary(autopsy_case).json["counts"]["events"] == 1

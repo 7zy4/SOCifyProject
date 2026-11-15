@@ -5,6 +5,7 @@ import sqlite3
 import pytest
 
 from socify import cases, create_app
+from tests.conftest import issue_session
 
 
 def prepared_case(client, login_as):
@@ -199,6 +200,7 @@ def test_retained_evidence_survives_application_restart(app, client, login_as, u
     with restarted.test_client() as restored_client:
         with restored_client.session_transaction() as session:
             session["user_id"] = user_ids["soc_manager"]
+            session["session_id"] = issue_session(restarted, user_ids["soc_manager"])
             session["workspace_id"] = 1
             session["user_role"] = "soc_manager"
         response = restored_client.get(f"/api/incidents/{case_id}/evidence/{evidence_id}/content")

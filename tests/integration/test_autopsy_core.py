@@ -2,6 +2,8 @@ import sqlite3
 
 import pytest
 
+from tests.conftest import issue_session
+
 
 def test_case_first_context_membership_and_retired_routes(autopsy_case, app, client, database, login_as):
     case = client.get(f"/api/cases/{autopsy_case}").json
@@ -143,6 +145,7 @@ def test_recipient_acknowledges_escalation_with_separate_response(autopsy_case, 
     assert client.patch(path, json={"version": 1, "payload": {**body, "status": "acknowledged"}}).status_code == 403
     with client.session_transaction() as state:
         state["user_id"] = recipient
+        state["session_id"] = issue_session(client.application, recipient)
         state["workspace_id"] = 1
     acknowledged = client.patch(path, json={"version": 1, "payload": {**body, "status": "acknowledged"}})
     assert acknowledged.status_code == 200
