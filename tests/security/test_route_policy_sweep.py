@@ -35,7 +35,6 @@ PUBLIC = {
     ("GET", "/health/metrics"): (200, None),
     ("POST", "/api/sources/<int:source_id>/ingest"): (401, "INVALID_SOURCE_KEY"),
     ("GET", "/"): (302, "/login"),
-    ("GET", "/test"): (302, "/analysis-library"),  # redirect only; the target page requires an account
 }
 
 # Legacy training-platform API retired in operational mode: answered 410 before any view runs.

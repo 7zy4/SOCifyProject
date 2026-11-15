@@ -13,7 +13,7 @@ from socify.operations import backup_database, migration_dry_run, restore_databa
 def test_platform_read_models_and_ui_routes(client: FlaskClient, login_as: Callable[[str], None]) -> None:
     assert client.get("/health/live").json["status"] == "live"
     assert client.get("/health/ready").json["status"] == "ready"
-    assert client.get("/test").status_code == 302
+    assert client.get("/test").status_code == 404  # the old redirect-only route was removed
     assert client.get("/dashboard").status_code == 302
     login_as("admin")
     for path in (

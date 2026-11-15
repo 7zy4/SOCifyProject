@@ -1,4 +1,4 @@
-from flask import Blueprint, redirect, render_template, request, url_for
+from flask import Blueprint, redirect, render_template, request
 from flask_wtf.csrf import generate_csrf
 
 from .operational import operational_mode
@@ -12,11 +12,6 @@ def index():
     if operational_mode():
         return redirect("/cases" if current_user() else "/login")
     return render_template("index.html", user=current_user())
-
-
-@ui.get("/test")
-def test_redirect():
-    return redirect(url_for("ui.dashboard"))
 
 
 @ui.get("/dashboard")
