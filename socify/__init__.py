@@ -76,6 +76,12 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         return {"product_name": app.config["PRODUCT_NAME"] if operational_mode() else "SOCify", "operational": operational_mode()}
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+
+    @app.before_request
+    def start_request_timer():
+        # Registered before CSRFProtect, so a request it rejects still gets the usual request log line.
+        g.request_started = time.perf_counter()
+
     csrf.init_app(app)
     app.teardown_appcontext(close_db)
     for blueprint in (
@@ -122,7 +128,6 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
 
     @app.before_request
     def prepare_request():
-        g.request_started = time.perf_counter()
         request.environ["socify.correlation_id"] = correlation_id()
         if any(type(value) is int and not 1 <= value <= 9223372036854775807 for value in (request.view_args or {}).values()):
             return error_response("INVALID_IDENTIFIER", "معرف المورد خارج النطاق المسموح", 404)
