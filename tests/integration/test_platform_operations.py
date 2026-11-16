@@ -100,44 +100,6 @@ def test_backup_restore_and_migration_drill(app, tmp_path: Path) -> None:
         migration_dry_run(str(tmp_path / "missing.db"))
 
 
-def test_scenario_authoring_versioning_and_state_machine(client: FlaskClient, login_as: Callable[[str], None]) -> None:
-    login_as("instructor")
-    payload = {
-        "name": "Synthetic chain",
-        "description": "Safe isolated training chain",
-        "difficulty": "beginner",
-        "objectives": ["Investigate a synthetic event"],
-        "steps": [
-            {
-                "name": "Synthetic login",
-                "event": {"event_type": "failed_login", "source": "training", "title": "Synthetic"},
-                "mitre_ids": ["T1110"],
-                "hint": "Inspect the source IP",
-            }
-        ],
-    }
-    created = client.post("/api/scenarios", json=payload)
-    assert created.status_code == 201
-    scenario_id = created.json["id"]
-    assert client.get(f"/api/scenarios/{scenario_id}").status_code == 200
-    assert client.post(f"/api/scenarios/{scenario_id}/transition", json={"state": "published"}).status_code == 409
-    for state in ("validated", "published", "ready"):
-        response = client.post(f"/api/scenarios/{scenario_id}/transition", json={"state": state})
-        assert response.status_code == 200
-    cloned = client.post(f"/api/scenarios/{scenario_id}/clone", json={"name": "Synthetic chain copy"})
-    assert cloned.status_code == 201
-    versioned = client.post(f"/api/scenarios/{scenario_id}/versions", json={**payload, "difficulty": "advanced"})
-    assert versioned.status_code == 201
-    assert versioned.json["version"] == 2
-    for bad in (
-        {},
-        {**payload, "steps": []},
-        {**payload, "difficulty": "impossible"},
-        {**payload, "steps": [{"name": "Unsafe", "event": {"url": "https://public.example"}}]},
-    ):
-        assert client.post("/api/scenarios", json=bad).status_code == 422
-
-
 def test_attack_catalog_search_coverage_and_navigator(client: FlaskClient, login_as: Callable[[str], None]) -> None:
     login_as("analyst")
     search = client.get("/api/attack/techniques?q=Brute")

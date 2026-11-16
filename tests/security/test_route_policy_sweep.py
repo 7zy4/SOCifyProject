@@ -42,9 +42,6 @@ RETIRED = {
     ("GET", "/api/alerts"),
     ("GET", "/api/alerts/<int:alert_id>"),
     ("POST", "/api/alerts/<int:alert_id>/triage"),
-    ("GET", "/api/assessments/<int:assessment_id>"),
-    ("POST", "/api/assessments/<int:assessment_id>"),
-    ("GET", "/api/assessments/<int:assessment_id>/report"),
     ("GET", "/api/attack/catalogs"),
     ("POST", "/api/attack/catalogs/<version>/activate"),
     ("GET", "/api/attack/coverage"),
@@ -75,7 +72,6 @@ RETIRED = {
     ("POST", "/api/iocs/<int:ioc_id>/enrich"),
     ("POST", "/api/iocs/extract"),
     ("POST", "/api/lab/event"),
-    ("GET", "/api/leaderboards"),
     ("POST", "/api/playbook-runs"),
     ("GET", "/api/playbook-runs/<int:run_id>"),
     ("POST", "/api/playbook-runs/<int:run_id>/approve"),
@@ -99,28 +95,9 @@ RETIRED = {
     ("POST", "/api/rules/<int:rule_id>/test"),
     ("POST", "/api/rules/<int:rule_id>/toggle"),
     ("GET", "/api/rules/<int:rule_id>/versions"),
-    ("GET", "/api/scenarios"),
-    ("POST", "/api/scenarios"),
-    ("GET", "/api/scenarios/<int:scenario_id>"),
-    ("POST", "/api/scenarios/<int:scenario_id>/clone"),
-    ("POST", "/api/scenarios/<int:scenario_id>/transition"),
-    ("POST", "/api/scenarios/<int:scenario_id>/versions"),
-    ("GET", "/api/scores/me"),
     ("GET", "/api/settings"),
     ("GET", "/api/stats"),
     ("GET", "/api/stream/events"),
-    ("GET", "/api/training/runs"),
-    ("POST", "/api/training/runs"),
-    ("GET", "/api/training/runs/<int:run_id>"),
-    ("GET", "/api/training/runs/<int:run_id>/ground-truth"),
-    ("POST", "/api/training/runs/<int:run_id>/ground-truth"),
-    ("POST", "/api/training/runs/<int:run_id>/hints"),
-    ("POST", "/api/training/runs/<int:run_id>/pause"),
-    ("POST", "/api/training/runs/<int:run_id>/play"),
-    ("POST", "/api/training/runs/<int:run_id>/restart"),
-    ("POST", "/api/training/runs/<int:run_id>/resume"),
-    ("GET", "/api/training/runs/<int:run_id>/score"),
-    ("POST", "/api/training/runs/<int:run_id>/submit"),
     ("GET", "/api/visualizations/graph"),
     ("GET", "/api/visualizations/graph/export"),
     ("GET", "/api/visualizations/timeline"),
@@ -207,8 +184,31 @@ def test_operational_routing_names_exist(app):
     assert set(OPERATIONAL_LEGACY_ENDPOINTS) <= endpoints, sorted(set(OPERATIONAL_LEGACY_ENDPOINTS) - endpoints)
     assert set(OPERATIONAL_BLUEPRINTS) <= set(app.blueprints), sorted(set(OPERATIONAL_BLUEPRINTS) - set(app.blueprints))
     assert any(name.startswith(OPERATIONAL_BLUEPRINT_PREFIX) for name in app.blueprints)
-    segments = {rule.rule.split("/")[2] for rule in app.url_map.iter_rules() if rule.rule.startswith("/api/")}
-    assert set(RETIRED_API_PREFIXES) <= segments, sorted(set(RETIRED_API_PREFIXES) - segments)
+    # A retired prefix answers 410 for every path under it, so no view that still serves requests may live there.
+    served = {
+        rule.rule.split("/")[2]
+        for rule in app.url_map.iter_rules()
+        if rule.rule.startswith("/api/")
+        and (
+            rule.endpoint.split(".")[0] in OPERATIONAL_BLUEPRINTS
+            or rule.endpoint.startswith(OPERATIONAL_BLUEPRINT_PREFIX)
+            or rule.endpoint in OPERATIONAL_LEGACY_ENDPOINTS
+        )
+    }
+    assert not served & set(RETIRED_API_PREFIXES), sorted(served & set(RETIRED_API_PREFIXES))
+
+
+def test_removed_legacy_paths_still_answer_gone(app, user_ids):
+    # The training platform's API was deleted, not hidden: old clients get a stable 410 instead of a bare 404.
+    _operational(app, csrf=False)
+    client = app.test_client()
+    for anonymous in (True, False):
+        if not anonymous:
+            with client.session_transaction() as state:
+                state.update(user_id=user_ids["admin"], workspace_id=1, user_role="admin", session_id=issue_session(app, user_ids["admin"]))
+        for prefix in sorted(RETIRED_API_PREFIXES):
+            for method, path in (("GET", f"/api/{prefix}"), ("POST", f"/api/{prefix}/1/anything"), ("GET", f"/api/{prefix}/runs/1")):
+                assert _outcome(client, method, path)[:2] == (410, "CASE_CONTEXT_REQUIRED"), (anonymous, method, path)
 
 
 # Views exempt from part of the case guards (socify.case_policy). Every other view that names a case is strict: the case

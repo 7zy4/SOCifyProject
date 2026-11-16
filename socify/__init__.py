@@ -37,19 +37,17 @@ from .platform import platform_api
 from .playbooks import playbooks_api
 from .request_limits import BoundedRequest, NumericInputError, StructureLimitError
 from .schema import ensure_schema
-from .scoring import scoring_api
 from .security import correlation_id, error_response
 from .soc_insights import soc_insights_api
 from .sources import sources_api
 from .teams import teams_api
-from .training import training_api
 from .ui import ui
 from .visualization import visualization_api
 
 csrf = CSRFProtect()
 
 # Operational-mode routing policy; tests/security/test_route_policy_sweep.py checks every name against the URL map.
-RETIRED_API_PREFIXES = frozenset({"training", "scores", "scenarios", "lab"})
+RETIRED_API_PREFIXES = frozenset({"training", "scores", "scenarios", "assessments", "leaderboards", "lab"})
 OPERATIONAL_BLUEPRINTS = frozenset({"auth", "cases", "teams", "sources", "watchlist", "quick_reports"})
 OPERATIONAL_LEGACY_ENDPOINTS = frozenset({"platform.audit_logs", "platform.role_matrix", "platform.health_api"})
 OPERATIONAL_BLUEPRINT_PREFIX = "autopsy"
@@ -108,12 +106,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         cases_api,
         sources_api,
         ingestion_api,
-        training_api,
         attack_api,
         hunting_api,
         visualization_api,
         playbooks_api,
-        scoring_api,
         platform_api,
         teams_api,
     ):

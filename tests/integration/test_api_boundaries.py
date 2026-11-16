@@ -41,8 +41,6 @@ import pytest
         ("post", "/api/sources", {"name": "Source", "type": "file", "endpoint": 3}, 422, "INVALID_SOURCE_ENDPOINT"),
         ("post", "/api/sources", {"name": "Source", "type": "file", "credential": ""}, 422, "INVALID_SOURCE_CREDENTIAL"),
         ("post", "/api/sources", {"name": "Source", "type": "file", "is_active": 1}, 422, "INVALID_SOURCE_STATE"),
-        ("post", "/api/scenarios", [], 400, "INVALID_JSON"),
-        ("post", "/api/scenarios", {}, 422, "INVALID_SCENARIO"),
         ("post", "/api/playbooks", [], 400, "INVALID_JSON"),
         ("post", "/api/playbooks", {}, 422, "INVALID_PLAYBOOK"),
         ("post", "/api/playbooks", {"name": "Playbook", "steps": []}, 422, "INVALID_PLAYBOOK_STEPS"),
@@ -96,9 +94,6 @@ def test_invalid_requests_have_stable_errors(client, login_as, method, path, pay
         ("delete", "/api/events/99999", {}),
         ("patch", "/api/sources/99999", {}),
         ("post", "/api/sources/99999/test", {}),
-        ("get", "/api/scenarios/99999", None),
-        ("post", "/api/scenarios/99999/transition", {}),
-        ("post", "/api/scenarios/99999/versions", {}),
         ("post", "/api/playbooks/99999/preview", {}),
     ],
 )

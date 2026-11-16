@@ -123,24 +123,6 @@ def test_closure_override_records_reason(client, login_as, database):
     assert json.loads(row["details"])["override_reason"] == "Approved documented training exception"
 
 
-def test_private_case_subresources_deny_other_trainee(client, login_as, database):
-    case_id, evidence_id = prepared_case(client, login_as)
-    scenario = client.get("/api/scenarios").json["items"][0]["id"]
-    run_id = client.post("/api/training/runs", json={"scenario_id": scenario}).json["id"]
-    database.execute("UPDATE incident_cases SET training_run_id = ? WHERE id = ?", (run_id, case_id))
-    url = f"/api/incidents/{case_id}"
-    assert client.post(url + "/transitions", json=closure_payload()).status_code == 200
-    login_as("analyst")
-    for suffix in ("", "/report", "/report?format=html", f"/evidence/{evidence_id}", f"/evidence/{evidence_id}/content"):
-        response = client.get(url + suffix)
-        assert response.status_code == 404
-        assert "Training evidence" not in response.text
-    assert client.get("/api/incidents").json["total"] == 0
-    assert client.patch(url, json={"title": "Unauthorized replacement"}).status_code == 404
-    assert client.post(url + "/notes", json={"body": "Unauthorized note"}).status_code == 404
-    assert client.post(url + "/transitions", json={"status": "reopened", "reason": "Unauthorized reopen"}).status_code == 404
-
-
 def test_evidence_content_encrypted_preserved_and_downloaded_after_closure(client, login_as, database):
     case_id, evidence_id = prepared_case(client, login_as)
     url = f"/api/incidents/{case_id}"

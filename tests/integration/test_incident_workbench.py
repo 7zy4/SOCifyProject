@@ -91,21 +91,3 @@ def test_case_enum_inputs_are_rejected_without_server_error(client, login_as):
     task_id = client.get(url).json["tasks"][0]["id"]
     assert client.patch(f"{url}/tasks/{task_id}", json={"status": []}).status_code == 422
     assert client.post(url + "/imports", json={"job_id": True}).status_code == 422
-
-
-def test_incident_actions_cannot_cross_training_scope(client, login_as):
-    login_as("soc_manager")
-    scenario_id = client.get("/api/scenarios").json["items"][0]["id"]
-    run_id = client.post("/api/training/runs", json={"scenario_id": scenario_id}).json["id"]
-    private_id = client.post("/api/incidents", json={"title": "Private incident", "training_run_id": run_id}).json["id"]
-    job_id = client.post("/api/imports", json={"filename": "private.jsonl", "training_run_id": run_id, "content": '{"source":"private-case"}'}).json["id"]
-    shared_id = client.post("/api/incidents", json={"title": "Shared incident"}).json["id"]
-    assert client.post(f"/api/incidents/{shared_id}/imports", json={"job_id": job_id}).status_code == 404
-    login_as("analyst")
-    assert client.post(f"/api/incidents/{private_id}/imports", json={"job_id": job_id}).status_code == 404
-    assert (
-        client.post(
-            f"/api/incidents/{private_id}/techniques", json={"technique_id": "T1110", "assessment": "suggested", "reason": "Unauthorized finding"}
-        ).status_code
-        == 404
-    )

@@ -205,32 +205,6 @@ def test_e2e_44_cross_workspace_case_event_and_score_ids_are_hidden(
     assert client.get(f"/api/incidents/{other_case}").status_code == 404
 
 
-def test_training_run_object_scope_hides_another_trainee(
-    client: FlaskClient,
-    login_as: Callable[[str], None],
-    database: sqlite3.Connection,
-    user_ids: dict[str, int],
-) -> None:
-    scenario_version = database.execute("SELECT id FROM scenario_versions LIMIT 1").fetchone()[0]
-    database.execute(
-        "INSERT INTO training_runs (run_id, workspace_id, scenario_version_id, user_id, difficulty, seed, state, current_step, playback_rate, started_at, snapshot) VALUES ('RUN-INSTRUCTOR', 1, ?, ?, 'beginner', 1, 'running', 0, 1, ?, '{}')",
-        (scenario_version, user_ids["instructor"], iso_now()),
-    )
-    run_id = database.execute("SELECT id FROM training_runs WHERE run_id = 'RUN-INSTRUCTOR'").fetchone()[0]
-    login_as("analyst")
-    assert client.get(f"/api/training/runs/{run_id}").status_code == 404
-    assert client.get(f"/api/training/runs/{run_id}/score").status_code == 404
-    login_as("admin")
-    created = client.post("/api/events", json={"source": "private-instructor-source", "title": "Private training event", "training_run_id": run_id})
-    assert created.status_code == 201
-    login_as("analyst")
-    dashboard = client.get("/api/dashboard").json
-    assert all(item["source"] != "private-instructor-source" for item in dashboard["top_sources"])
-    assert all(item["source"] != "private-instructor-source" for item in client.get("/api/stats").json["top_sources"])
-    login_as("admin")
-    assert any(item["source"] == "private-instructor-source" for item in client.get("/api/dashboard").json["top_sources"])
-
-
 def test_source_secret_is_encrypted_and_redacted_from_audit(
     client: FlaskClient,
     login_as: Callable[[str], None],

@@ -6,61 +6,6 @@ from socify.security import totp_code
 from tests.conftest import DEMO_LOGIN_VALUE
 
 
-def start(client, login_as, role):
-    login_as(role)
-    scenario = client.get("/api/scenarios").json["items"][0]
-    result = client.post("/api/training/runs", json={"scenario_id": scenario["id"], "seed": 7})
-    assert result.status_code == 201
-    return result.json["id"]
-
-
-def test_detection_window_and_watermark_do_not_cross_training_runs(client, login_as):
-    first = start(client, login_as, "instructor")
-    second = start(client, login_as, "analyst")
-    login_as("admin")
-
-    def emit(run, index):
-        return client.post(
-            "/api/events",
-            json={
-                "source": "isolation-fixture",
-                "event_type": "failed_login",
-                "source_ip": "192.0.2.10",
-                "username": "same-synthetic-user",
-                "event_time": f"2026-10-20T10:0{index}:00Z",
-                "training_run_id": run,
-            },
-        )
-
-    for index in range(4):
-        assert emit(first, index).json["detections"] == []
-    assert emit(second, 4).json["detections"] == []
-    created = []
-    for index in range(5, 9):
-        response = emit(second, index)
-        created.append(response.json["id"])
-    assert len(response.json["detections"]) == 1
-    login_as("analyst")
-    alert = client.get(f"/api/alerts/{response.json['detections'][0]}").json
-    for event in alert["events"]:
-        assert client.get(f"/api/events/{event['id']}").status_code == 200
-    assert set(created).issubset({event["id"] for event in alert["events"]})
-
-
-def test_same_idempotency_key_in_different_runs_never_returns_private_event(client, login_as):
-    private = start(client, login_as, "admin")
-    first = client.post("/api/events", headers={"Idempotency-Key": "shared-client-key"}, json={"source": "private-fixture", "training_run_id": private})
-    own = start(client, login_as, "analyst")
-    second = client.post("/api/events", headers={"Idempotency-Key": "shared-client-key"}, json={"source": "own-fixture", "training_run_id": own})
-    assert second.status_code == 201
-    assert second.json["id"] != first.json["id"]
-    assert client.get(f"/api/events/{second.json['id']}").json["source"] == "own-fixture"
-    assert (
-        client.post("/api/events", headers={"Idempotency-Key": "shared-client-key"}, json={"source": "own-fixture", "training_run_id": own}).json["duplicate"]
-        is True
-    )
-
-
 @pytest.mark.parametrize("action", ["retry", "cancel"])
 def test_response_mutations_require_object_access(client, login_as, database, action):
     login_as("admin")
@@ -127,42 +72,6 @@ def test_oversized_bcrypt_input_never_crashes_authentication(client, password):
     assert client.post("/api/auth/login", json={"email": "analyst@socify.local", "password": password}).status_code == 401
 
 
-def test_private_evidence_cannot_be_attached_to_shared_case(client, login_as):
-    private = start(client, login_as, "admin")
-    event = client.post("/api/events", json={"source": "private-evidence", "training_run_id": private}).json["id"]
-    shared = client.post("/api/incidents", json={"title": "Shared case"}).json["id"]
-    assert client.post(f"/api/incidents/{shared}/events", json={"event_id": event}).status_code == 404
-    inferred = client.post("/api/incidents", json={"title": "Private inferred case", "event_ids": [event]})
-    assert inferred.status_code == 201
-    assert inferred.json["training_run_id"] == private
-    login_as("analyst")
-    assert client.get(f"/api/incidents/{inferred.json['id']}").status_code == 404
-
-
-@pytest.mark.parametrize(
-    "patch",
-    [
-        {"scoring_policy": {"detection": "bad"}},
-        {"scoring_policy": {"detection": -20, "response": 120}},
-        {"duration_minutes": "bad"},
-        {"difficulty": []},
-        {"steps": [{"name": "Step", "event": {}, "ground_truth": []}]},
-    ],
-)
-def test_malformed_scenario_is_rejected_without_partial_write(client, login_as, database, patch):
-    login_as("admin")
-    before = database.execute("SELECT COUNT(*) FROM attack_scenarios").fetchone()[0]
-    payload = {
-        "name": "Scenario boundary",
-        "description": "Training fixture",
-        "objectives": ["Investigate"],
-        "steps": [{"name": "Step", "event": {"source": "fixture"}}],
-        **patch,
-    }
-    assert client.post("/api/scenarios", json=payload).status_code == 422
-    assert database.execute("SELECT COUNT(*) FROM attack_scenarios").fetchone()[0] == before
-
-
 @pytest.mark.parametrize("field,value", [("field", []), ("operator", {}), ("logic", [])])
 def test_rule_enums_reject_non_scalar_json(client, login_as, field, value):
     login_as("admin")
@@ -180,22 +89,6 @@ def test_playbook_steps_validate_types_before_writing(client, login_as, field, v
     login_as("admin")
     step = {"action": "notify_training_team", field: value}
     assert client.post("/api/playbooks", json={"name": "Invalid step", "steps": [step]}).status_code == 422
-
-
-def test_indicator_observations_do_not_cross_training_runs(client, login_as):
-    private = start(client, login_as, "admin")
-    event = client.post("/api/events", json={"source": "private-ioc", "source_ip": "192.0.2.243", "training_run_id": private}).json["id"]
-    indicator = client.post("/api/iocs/extract", json={"event_id": event}).json["items"][0]["id"]
-    own = start(client, login_as, "analyst")
-    assert indicator not in {item["id"] for item in client.get("/api/iocs").json["items"]}
-    assert client.post(f"/api/iocs/{indicator}/enrich").status_code == 404
-    own_event = client.post("/api/events", json={"source": "own-ioc", "source_ip": "192.0.2.243", "training_run_id": own}).json["id"]
-    assert client.post("/api/iocs/extract", json={"event_id": own_event}).status_code == 200
-    visible = next(item for item in client.get("/api/iocs").json["items"] if item["id"] == indicator)
-    assert visible["context"]["event_id"] == own_event
-    login_as("admin")
-    visible = next(item for item in client.get("/api/iocs").json["items"] if item["id"] == indicator)
-    assert visible["first_seen"] <= visible["last_seen"]
 
 
 @pytest.mark.parametrize("action", ["collect_evidence", "escalate_to_manager"])
