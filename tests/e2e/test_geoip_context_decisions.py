@@ -11,7 +11,7 @@ import pytest
 from playwright.sync_api import expect
 
 import tests.e2e.test_review_workflow as review_module
-from tests.e2e.test_browser import assert_accessible
+from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_case_continuity_journeys import panel, record_dialog
 from tests.e2e.test_followup_handoff_journeys import manager_case
 from tests.e2e.test_investigation_link_journeys import choose, records

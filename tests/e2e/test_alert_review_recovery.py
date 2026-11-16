@@ -7,8 +7,8 @@ import pytest
 from playwright.sync_api import expect
 
 import tests.e2e.test_review_workflow as sessions
+from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_alert_review_feedback import fill_review, import_alert, open_review
-from tests.e2e.test_browser import assert_accessible
 from tests.e2e.test_detection_workflow_journeys import open_detection
 
 ARTIFACTS = Path("artifacts/usability_campaign/ci-assessment-current/alert-review-independent/after")

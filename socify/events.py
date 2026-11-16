@@ -1,22 +1,16 @@
-import csv
 import hashlib
-import io
 import json
 import sqlite3
 from typing import Any
 
-from flask import Blueprint, Response, jsonify, request
+from flask import request
 
-from .audit import record_audit
-from .db import get_db, inserted_id, transaction
+from .db import get_db, inserted_id
 from .detection import SEVERITIES, evaluate_rules
-from .file_names import attachment_disposition
 from .schema import public_id
-from .security import actor_id, can_access_training_run, current_user, error_response, require_permission, training_scope_sql, workspace_id
+from .security import current_user
 from .timeutils import iso_now, iso_timestamp
-from .validation import ValidationError, public_error_message
-
-events_api = Blueprint("events", __name__)
+from .validation import ValidationError
 
 EVENT_STATUSES = {"open", "investigating", "resolved", "false_positive"}
 SORT_FIELDS = {"event_time": "event_time", "ingested_at": "ingested_at", "severity": "severity", "source": "source", "event_type": "event_type", "id": "id"}
@@ -317,196 +311,8 @@ def _event_view(row: sqlite3.Row, include_raw: bool = False) -> dict[str, Any]:
     return item
 
 
-@events_api.get("/api/events")
-@require_permission("events.read")
-def list_events():
-    try:
-        page = max(int(request.args.get("page", 1)), 1)
-        page_size = min(max(int(request.args.get("page_size", request.args.get("limit", 50))), 1), 100)
-    except ValueError:
-        return error_response("INVALID_PAGINATION", "قيم الترقيم غير صالحة", 400)
-    clauses = ["workspace_id = ?"]
-    parameters: list[object] = [workspace_id()]
-    if request.args.get("include_derived") != "1":
-        clauses.append("source != 'rules_engine'")
-    scope, scope_parameters = training_scope_sql("training_run_id")
-    if scope:
-        clauses.append(scope.removeprefix(" AND "))
-        parameters.extend(scope_parameters)
-    filters = {"severity": "severity", "status": "status", "source": "source", "event_type": "event_type", "training_run_id": "training_run_id"}
-    for query_name, column in filters.items():
-        value = request.args.get(query_name)
-        if value:
-            clauses.append(f"{column} = ?")
-            parameters.append(value)
-    start = request.args.get("start")
-    end = request.args.get("end")
-    if start:
-        try:
-            start = iso_timestamp(start)
-        except ValueError as exc:
-            return error_response("INVALID_TIME_RANGE", public_error_message(exc, "Specify a valid time range with timezone"), 422)
-        clauses.append("event_time >= ?")
-        parameters.append(start)
-    if end:
-        try:
-            end = iso_timestamp(end)
-        except ValueError as exc:
-            return error_response("INVALID_TIME_RANGE", public_error_message(exc, "Specify a valid time range with timezone"), 422)
-        clauses.append("event_time <= ?")
-        parameters.append(end)
-    query_text = request.args.get("q", "").strip()
-    if query_text:
-        if len(query_text) > 200:
-            return error_response("QUERY_TOO_LONG", "نص البحث يتجاوز الحد المسموح", 422)
-        clauses.append("(title LIKE ? OR description LIKE ? OR source_ip LIKE ? OR username LIKE ? OR hostname LIKE ?)")
-        escaped = "%" + query_text.replace("%", "\\%").replace("_", "\\_") + "%"
-        parameters.extend([escaped] * 5)
-    sort = SORT_FIELDS.get(request.args.get("sort", "event_time"))
-    direction = {"asc": "ASC", "desc": "DESC"}.get(request.args.get("direction", "desc").lower())
-    if sort is None or direction is None:
-        return error_response("INVALID_SORT", "حقل الفرز أو اتجاهه غير مسموح", 422)
-    where = " AND ".join(clauses)
-    total = int(get_db().execute(f"SELECT COUNT(*) FROM security_events WHERE {where}", parameters).fetchone()[0])
-    rows = (
-        get_db()
-        .execute(
-            f"SELECT * FROM security_events WHERE {where} ORDER BY {sort} {direction}, id DESC LIMIT ? OFFSET ?",
-            (*parameters, page_size, (page - 1) * page_size),
-        )
-        .fetchall()
-    )
-    return jsonify({"items": [_event_view(row) for row in rows], "total": total, "page": page, "page_size": page_size})
-
-
-@events_api.post("/api/events")
-@require_permission("events.create")
-def create_event():
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return error_response("INVALID_JSON", "يلزم إرسال كائن JSON صالح", 400)
-    header_key = request.headers.get("Idempotency-Key")
-    if header_key:
-        data["idempotency_key"] = header_key
-    try:
-        with transaction():
-            training_run_id = data.get("training_run_id")
-            if not can_access_training_run(training_run_id):
-                return error_response("TRAINING_RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
-            event_id, alerts, duplicate = ingest_event(get_db(), data, actor_id(), workspace_id(), training_run_id)
-            if not duplicate:
-                record_audit(get_db(), "create", "event", event_id, details={"source": data.get("source"), "alerts": alerts})
-    except ValueError as exc:
-        return error_response("INVALID_EVENT", public_error_message(exc, "Check the event fields"), 422)
-    row = get_db().execute("SELECT event_id FROM security_events WHERE id = ?", (event_id,)).fetchone()
-    status = 200 if duplicate else 201
-    return jsonify({"id": event_id, "event_id": row["event_id"], "detections": alerts, "duplicate": duplicate}), status, {"Location": f"/api/events/{event_id}"}
-
-
-@events_api.post("/api/lab/event")
-@require_permission("training.run")
-def create_lab_event():
-    response = create_event()
-    if isinstance(response, tuple) and len(response) == 3 and isinstance(response[1], int) and response[1] < 300:
-        return response[0], 200, response[2]
-    return response
-
-
-@events_api.get("/api/events/<int:event_id>")
-@require_permission("events.read")
-def event_detail(event_id: int):
-    row = get_db().execute("SELECT * FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, workspace_id())).fetchone()
-    if not row or not can_access_training_run(row["training_run_id"]):
-        return error_response("EVENT_NOT_FOUND", "السجل غير موجود", 404)
-    return jsonify(_event_view(row))
-
-
-@events_api.get("/api/events/<int:event_id>/raw")
-@require_permission("events.read")
-def event_raw(event_id: int):
-    row = get_db().execute("SELECT * FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, workspace_id())).fetchone()
-    if not row or not can_access_training_run(row["training_run_id"]):
-        return error_response("EVENT_NOT_FOUND", "السجل غير موجود", 404)
-    return jsonify(_event_view(row, include_raw=True))
-
-
-@events_api.put("/api/events/<int:event_id>")
-@require_permission("alerts.triage")
-def update_event(event_id: int):
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return error_response("INVALID_JSON", "يلزم إرسال كائن JSON صالح", 400)
-    row = (
-        get_db()
-        .execute("SELECT status, severity, assigned_to, training_run_id FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, workspace_id()))
-        .fetchone()
-    )
-    if not row or not can_access_training_run(row["training_run_id"]):
-        return error_response("EVENT_NOT_FOUND", "السجل غير موجود", 404)
-    updates: dict[str, Any] = {}
-    if "status" in data:
-        if data["status"] not in EVENT_STATUSES:
-            return error_response("INVALID_EVENT_STATUS", "حالة السجل غير صالحة", 422)
-        updates["status"] = data["status"]
-    if "assigned_to" in data:
-        assignee = data["assigned_to"]
-        if assignee is not None and (
-            not isinstance(assignee, int)
-            or not get_db().execute("SELECT 1 FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (assignee, workspace_id())).fetchone()
-        ):
-            return error_response("INVALID_ASSIGNEE", "المحلل المحدد غير متاح", 422)
-        updates["assigned_to"] = assignee
-    if "severity" in data:
-        if data["severity"] not in SEVERITIES:
-            return error_response("INVALID_SEVERITY", "درجة الخطورة غير صالحة", 422)
-        updates["severity"] = data["severity"]
-    if not updates:
-        return error_response("NO_CHANGES", "لم تُرسل حقول قابلة للتعديل", 422)
-    assignments = ", ".join(f"{field} = ?" for field in updates)
-    get_db().execute(f"UPDATE security_events SET {assignments} WHERE id = ?", (*updates.values(), event_id))
-    record_audit(get_db(), "update", "event", event_id, details={"changed_fields": list(updates)})
-    return jsonify({"id": event_id, **updates})
-
-
-@events_api.delete("/api/events/<int:event_id>")
-@require_permission("events.delete")
-def delete_event(event_id: int):
-    row = get_db().execute("SELECT id, training_run_id FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, workspace_id())).fetchone()
-    if not row or not can_access_training_run(row["training_run_id"]):
-        return error_response("EVENT_NOT_FOUND", "السجل غير موجود", 404)
-    record_audit(get_db(), "delete_denied", "event", event_id, "denied", {"reason": "immutable_evidence_policy"})
-    return error_response("EVENT_IMMUTABLE", "السجلات أدلة غير قابلة للحذف؛ استخدم سياسة الاحتفاظ المعتمدة", 409)
-
-
 def _csv_cell(value: object) -> str:
     text = "" if value is None else str(value)
     if text.lstrip().startswith(("=", "+", "-", "@", "\t", "\r")):
         return "'" + text
     return text
-
-
-@events_api.get("/api/events/export")
-@require_permission("events.read")
-def export_events():
-    scope, parameters = training_scope_sql("training_run_id")
-    rows = (
-        get_db()
-        .execute(
-            f"""SELECT event_id, event_time, source, severity, event_type, title, source_ip, destination_ip, username, hostname, status
-        FROM security_events WHERE workspace_id = ?{scope} ORDER BY event_time DESC LIMIT 10000""",
-            (workspace_id(), *parameters),
-        )
-        .fetchall()
-    )
-    buffer = io.StringIO()
-    writer = csv.writer(buffer)
-    fields = ["event_id", "event_time", "source", "severity", "event_type", "title", "source_ip", "destination_ip", "username", "hostname", "status"]
-    writer.writerow(fields)
-    for row in rows:
-        writer.writerow([_csv_cell(row[field]) for field in fields])
-    record_audit(get_db(), "export", "events", None, details={"count": len(rows)})
-    return Response(
-        buffer.getvalue(),
-        mimetype="text/csv; charset=utf-8",
-        headers={"Content-Disposition": attachment_disposition("socify-events.csv"), "X-Content-Type-Options": "nosniff"},
-    )

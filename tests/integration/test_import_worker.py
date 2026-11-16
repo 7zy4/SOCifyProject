@@ -4,9 +4,9 @@ from socify.db import get_db
 from socify.import_worker import claim_import_job, run_import_worker_once
 
 
-def _queue_import(client, app, content: str, filename: str):
+def _queue_import(autopsy_case, client, app, content: str, filename: str):
     app.config["IMPORT_INLINE_EXECUTION"] = False
-    response = client.post("/api/imports", json={"filename": filename, "format": "jsonl", "content": content})
+    response = client.post(f"/api/cases/{autopsy_case}/imports", json={"filename": filename, "format": "jsonl", "content": content})
     assert response.status_code == 202
     assert response.json["status"] == "queued"
     return response.json["id"]
@@ -27,23 +27,21 @@ def _json_lines(count: int, source: str) -> str:
     )
 
 
-def test_import_worker_processes_queue_and_reports_health(client, app, login_as):
-    login_as("analyst")
-    job_id = _queue_import(client, app, _json_lines(3, "worker-import"), "worker.jsonl")
+def test_import_worker_processes_queue_and_reports_health(autopsy_case, client, app, login_as):
+    job_id = _queue_import(autopsy_case, client, app, _json_lines(3, "worker-import"), "worker.jsonl")
     health = client.get("/api/health").json["import_jobs"]
     assert health == {"queued": 1, "processing": 0, "failed": 0, "expired_leases": 0}
     with app.app_context():
         assert run_import_worker_once(get_db(), "import-worker-one", lease_seconds=10) == job_id
         assert run_import_worker_once(get_db(), "import-worker-one", lease_seconds=10) is None
-    completed = client.get(f"/api/imports/{job_id}").json
+    completed = client.get(f"/api/cases/{autopsy_case}/imports/{job_id}").json
     assert completed["status"] == "completed"
     assert completed["accepted"] == 3
     assert completed["checkpoint"] == 3
 
 
-def test_import_worker_recovers_checkpoint_after_crash(client, app, login_as, database, monkeypatch):
-    login_as("analyst")
-    job_id = _queue_import(client, app, _json_lines(150, "checkpoint-worker"), "checkpoint.jsonl")
+def test_import_worker_recovers_checkpoint_after_crash(autopsy_case, client, app, login_as, database, monkeypatch):
+    job_id = _queue_import(autopsy_case, client, app, _json_lines(150, "checkpoint-worker"), "checkpoint.jsonl")
     from socify import ingestion
 
     original = ingestion.ingest_event
@@ -68,13 +66,12 @@ def test_import_worker_recovers_checkpoint_after_crash(client, app, login_as, da
         assert run_import_worker_once(get_db(), "import-worker-restarted", lease_seconds=10) == job_id
     completed = database.execute("SELECT status, accepted, checkpoint FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
     assert dict(completed) == {"status": "completed", "accepted": 150, "checkpoint": 150}
-    assert database.execute("SELECT COUNT(*) FROM security_events WHERE source = 'checkpoint-worker'").fetchone()[0] == 150
+    assert database.execute("SELECT COUNT(*) FROM security_events WHERE import_job_id = ?", (job_id,)).fetchone()[0] == 150
 
 
-def test_import_workers_claim_distinct_jobs(client, app, login_as, database):
-    login_as("analyst")
-    first = _queue_import(client, app, _json_lines(1, "claim-first"), "claim-first.jsonl")
-    second = _queue_import(client, app, _json_lines(1, "claim-second"), "claim-second.jsonl")
+def test_import_workers_claim_distinct_jobs(autopsy_case, client, app, login_as, database):
+    first = _queue_import(autopsy_case, client, app, _json_lines(1, "claim-first"), "claim-first.jsonl")
+    second = _queue_import(autopsy_case, client, app, _json_lines(1, "claim-second"), "claim-second.jsonl")
     claimed_a = claim_import_job(database, "import-worker-a", lease_seconds=10)
     claimed_b = claim_import_job(database, "import-worker-b", lease_seconds=10)
     assert claimed_a is not None
@@ -83,12 +80,11 @@ def test_import_workers_claim_distinct_jobs(client, app, login_as, database):
     assert claim_import_job(database, "import-worker-c", lease_seconds=10) is None
 
 
-def test_import_queue_enforces_backpressure(client, app, login_as):
-    login_as("analyst")
+def test_import_queue_enforces_backpressure(autopsy_case, client, app, login_as):
     app.config["MAX_PENDING_IMPORT_JOBS"] = 1
-    _queue_import(client, app, _json_lines(1, "bounded-first"), "bounded-first.jsonl")
+    _queue_import(autopsy_case, client, app, _json_lines(1, "bounded-first"), "bounded-first.jsonl")
     rejected = client.post(
-        "/api/imports",
+        f"/api/cases/{autopsy_case}/imports",
         json={"filename": "bounded-second.jsonl", "format": "jsonl", "content": _json_lines(1, "bounded-second")},
     )
     assert rejected.status_code == 429

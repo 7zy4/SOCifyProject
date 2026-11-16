@@ -13,7 +13,7 @@ from flask import request as flask_request
 from playwright.sync_api import expect
 
 import tests.e2e.test_review_workflow as review_module
-from tests.e2e.test_browser import assert_accessible
+from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_review_workflow import review_session
 
 ARTIFACTS = Path("artifacts/usability_campaign/import-mapping-decisions")

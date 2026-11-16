@@ -164,9 +164,9 @@ def test_evidence_integrity_failure_never_returns_unverified_content(client, log
     assert "wrong-content" not in response.text
 
 
-def test_evidence_reference_without_retained_content_is_explicit(client, login_as):
+def test_evidence_reference_without_retained_content_is_explicit(client, login_as, store_event):
     login_as("soc_manager")
-    event_id = client.post("/api/events", json={"source": "evidence-reference", "title": "Source event"}).json["id"]
+    event_id = store_event({"source": "evidence-reference", "title": "Source event"})
     case_id = client.post("/api/incidents", json={"title": "Referenced evidence", "event_ids": [event_id]}).json["id"]
     url = f"/api/incidents/{case_id}"
     evidence_id = client.get(url).json["evidence"][0]["id"]

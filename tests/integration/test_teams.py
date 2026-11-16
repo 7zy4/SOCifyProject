@@ -44,54 +44,16 @@ def test_team_registration_invitation_and_live_permission_policy(client, databas
     replay = client.post("/api/auth/register", json={"email": "other@team.test", "name": "Other member", "password": LOGIN_VALUE, "invitation_token": token})
     assert replay.status_code == 422
     assert client.post("/api/team/invitations", json={"email": "elevate@team.test", "role": "soc_manager"}).status_code == 403
-    assert client.get("/api/events").status_code == 200
     switch(client, owner)
     assert client.put("/api/team/roles/analyst", json={"permissions": ["users.manage"]}).status_code == 422
     assert client.put("/api/team/roles/analyst", json={"permissions": sorted(ROLE_PERMISSIONS["analyst"] - {"events.read"})}).status_code == 200
     switch(client, member)
-    assert client.get("/api/events").status_code == 403
     assert "events.read" not in client.get("/api/auth/me").json["permissions"]
     switch(client, owner)
     assert client.patch(f"/api/team/members/{owner['id']}", json={"role": "analyst"}).status_code == 409
     assert client.patch(f"/api/team/members/{member['id']}", json={"role": "auditor"}).status_code == 200
     switch(client, member)
     assert client.post("/api/incidents", json={"title": "Forbidden mutation"}).status_code == 403
-
-
-def test_log_assignment_connects_import_case_task_and_member_progress(client, database, login_as, user_ids):
-    login_as("soc_manager")
-    job = client.post("/api/imports", json={"filename": "team.jsonl", "content": '{"source":"team-logs","title":"Assigned log"}'}).json
-    case = client.post("/api/incidents", json={"title": "Team incident"}).json
-    payload = {
-        "job_id": job["id"],
-        "case_id": case["id"],
-        "assignee": user_ids["analyst"],
-        "instructions": "Review the source and document an ATT&CK conclusion",
-    }
-    assert client.post("/api/team/assignments", json=payload).status_code == 409
-    assert client.post(f"/api/incidents/{case['id']}/imports", json={"job_id": job["id"]}).status_code == 200
-    created = client.post("/api/team/assignments", json=payload)
-    assert created.status_code == 201
-    identifier = created.json["id"]
-    assert client.post("/api/team/assignments", json=payload).json["id"] == identifier
-    detail = client.get(f"/api/incidents/{case['id']}").json
-    assert len(detail["tasks"]) == 3
-    assert any(row["action"] == "logs_assigned" for row in detail["history"])
-    login_as("instructor")
-    assert client.get("/api/team").json["assignments"] == []
-    assert client.patch(f"/api/team/assignments/{identifier}", json={"status": "completed"}).status_code == 404
-    assigned_task = next(task for task in detail["tasks"] if task["assignee"] == user_ids["analyst"])
-    assert client.patch(f"/api/incidents/{case['id']}/tasks/{assigned_task['id']}", json={"status": "completed"}).status_code == 403
-    login_as("analyst")
-    assert len(client.get("/api/team").json["assignments"]) == 1
-    assert client.patch(f"/api/team/assignments/{identifier}", json={"status": "completed"}).status_code == 200
-    login_as("soc_manager")
-    assert client.get("/api/team").json["assignments"][0]["task_status"] == "completed"
-    assert client.get(f"/api/incidents/{case['id']}").json["tasks"][-1]["status"] == "completed"
-    assert client.put("/api/team/roles/analyst", json={"permissions": sorted(ROLE_PERMISSIONS["analyst"] - {"cases.read"})}).status_code == 200
-    login_as("analyst")
-    assert client.get("/api/team").json["assignments"] == []
-    assert client.get(f"/api/incidents/{case['id']}").status_code == 403
 
 
 def test_new_teams_cannot_see_or_manage_other_team(client, database):

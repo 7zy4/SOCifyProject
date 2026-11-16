@@ -6,7 +6,7 @@ from conftest import DEMO_LOGIN_VALUE
 from playwright.sync_api import sync_playwright
 from werkzeug.serving import make_server
 
-from tests.e2e.test_browser import assert_accessible, launch_browser, new_page
+from tests.e2e.browser_helpers import assert_accessible, launch_browser, new_page
 from tests.unit.test_windows_logon import logon_xml
 
 

@@ -37,7 +37,7 @@ def test_platform_read_models_and_ui_routes(client: FlaskClient, login_as: Calla
         response = client.get(path)
         assert response.status_code == 200
         assert 'dir="rtl"' in response.text
-    for path in ("/api/health", "/api/dashboard", "/api/stats", "/api/profile", "/api/settings", "/api/admin/role-matrix"):
+    for path in ("/api/health", "/api/admin/role-matrix"):
         assert client.get(path).status_code == 200
     assert client.get("/api/audit?page=invalid").status_code == 400
     audit = client.get("/api/audit?page=1&page_size=10&action=login&resource=session")
@@ -98,30 +98,6 @@ def test_backup_restore_and_migration_drill(app, tmp_path: Path) -> None:
         restore_database(str(tmp_path / "missing.db"), str(restored))
     with pytest.raises(ValueError):
         migration_dry_run(str(tmp_path / "missing.db"))
-
-
-def test_event_filters_mutations_and_validation(client: FlaskClient, login_as: Callable[[str], None], event_payload: dict[str, object]) -> None:
-    login_as("admin")
-    created = client.post("/api/events", json=event_payload, headers={"Idempotency-Key": "platform-operations-event"})
-    assert created.status_code == 201
-    event_id = created.json["id"]
-    for query, status in (
-        ("page=bad", 400),
-        ("sort=unknown", 422),
-        ("start=not-a-date", 422),
-        ("end=not-a-date", 422),
-        ("q=" + "x" * 201, 422),
-        ("severity=medium&status=open&source=acceptance-fixture&event_type=failed_login&direction=asc", 200),
-    ):
-        assert client.get(f"/api/events?{query}").status_code == status
-    assert client.get(f"/api/events/{event_id}").status_code == 200
-    assert client.get(f"/api/events/{event_id}/raw").json["raw_payload"]["synthetic"] is True
-    assert client.put(f"/api/events/{event_id}", json={}).status_code == 422
-    assert client.put(f"/api/events/{event_id}", json={"status": "invalid"}).status_code == 422
-    assert client.put(f"/api/events/{event_id}", json={"severity": "high", "status": "investigating"}).status_code == 200
-    assert client.delete(f"/api/events/{event_id}").status_code == 409
-    assert client.get("/api/events/999999").status_code == 404
-    assert client.post("/api/events", json={"source": "fixture", "event_type": "test", "title": "x", "severity": "impossible"}).status_code == 422
 
 
 def test_source_crud_validation_and_explicit_connector_status(client: FlaskClient, login_as: Callable[[str], None]) -> None:

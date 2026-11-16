@@ -6,7 +6,7 @@ from email.policy import SMTP
 import pytest
 from playwright.sync_api import expect
 
-from tests.e2e.test_browser import assert_accessible
+from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_review_workflow import ARTIFACTS, review_session
 
 

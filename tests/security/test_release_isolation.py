@@ -16,10 +16,10 @@ def test_active_mfa_cannot_be_disabled_by_reenrollment(client, login_as):
     assert client.post("/api/auth/login", json={"email": "analyst@socify.local", "password": DEMO_LOGIN_VALUE}).status_code == 428
 
 
-def test_closed_case_cannot_receive_new_event_or_alert_evidence(client, login_as, database):
+def test_closed_case_cannot_receive_new_event_or_alert_evidence(client, login_as, database, store_event):
     login_as("admin")
     case = client.post("/api/incidents", json={"title": "Locked evidence"}).json["id"]
-    event = client.post("/api/events", json={"source": "lock-fixture"}).json["id"]
+    event = store_event({"source": "lock-fixture"})
     database.execute("UPDATE incident_cases SET status = 'closed' WHERE id = ?", (case,))
     for suffix, payload in [("events", {"event_id": event}), ("alerts", {"alert_id": 99999})]:
         response = client.post(f"/api/incidents/{case}/{suffix}", json=payload)
@@ -41,23 +41,11 @@ def test_oversized_bcrypt_input_never_crashes_authentication(client, password):
     assert client.post("/api/auth/login", json={"email": "analyst@socify.local", "password": password}).status_code == 401
 
 
-@pytest.mark.parametrize("field,value", [("field", []), ("operator", {}), ("logic", [])])
-def test_rule_enums_reject_non_scalar_json(client, login_as, field, value):
-    login_as("admin")
-    condition = (
-        {"field": "source", "operator": "equals", "value": "lab"}
-        if field != "logic"
-        else {"logic": "and", "conditions": [{"field": "source", "operator": "exists"}]}
-    )
-    condition[field] = value
-    assert client.post("/api/rules", json={"name": "Invalid scalar", "dsl": {"condition": condition}}).status_code == 422
-
-
-def test_scope_migration_is_repeatable_and_preserves_events(client, login_as, database):
+def test_scope_migration_is_repeatable_and_preserves_events(client, login_as, database, store_event):
     from socify.schema import ensure_schema
 
     login_as("admin")
-    event = client.post("/api/events", json={"source": "migration-fixture", "source_ip": "192.0.2.234", "idempotency_key": "legacy-key"}).json["id"]
+    event = store_event({"source": "migration-fixture", "source_ip": "192.0.2.234", "idempotency_key": "legacy-key"}, "admin")
     # An indicator written before observations had their own table: the event it was seen in lives only in its context.
     indicator = database.execute(
         "INSERT INTO ioc_indicators (workspace_id, type, value, first_seen, last_seen, confidence, source, context, tags) VALUES (1, 'ip', '192.0.2.234', ?, ?, 0.5, 'SOCify extraction', ?, '[]')",

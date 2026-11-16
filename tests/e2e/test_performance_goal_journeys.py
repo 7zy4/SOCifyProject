@@ -6,9 +6,9 @@ import pytest
 from playwright.sync_api import expect
 
 from socify.timeutils import parse_timestamp
+from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_assignment_handoff_journeys import handoff_form
 from tests.e2e.test_batch_boundary_journeys import restrict_batch, upload_logs
-from tests.e2e.test_browser import assert_accessible
 from tests.e2e.test_review_workflow import ARTIFACTS, review_session
 from tests.e2e.test_task_queue_journeys import assign, assignments
 

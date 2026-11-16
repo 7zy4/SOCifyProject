@@ -160,7 +160,6 @@ def test_production_requires_external_secret(monkeypatch: pytest.MonkeyPatch) ->
     [
         ("get", "/api/admin/users", None),
         ("get", "/api/audit", None),
-        ("post", "/api/rules", {"name": "Denied", "dsl": {}}),
         ("post", "/api/sources", {"name": "Denied", "type": "file"}),
     ],
 )
@@ -193,14 +192,12 @@ def test_e2e_44_cross_workspace_case_event_and_score_ids_are_hidden(
         "INSERT INTO security_events (event_id, workspace_id, source, source_type, severity, category, event_type, title, event_time, ingested_at, timestamp, raw_data, normalized_fields, tags, mitre_ids, status, created_by, parser_version, raw_hash, provenance) VALUES ('EVT-OTHER', 2, 'fixture', 'training', 'low', 'test', 'test', 'Other event', ?, ?, ?, '{}', '{}', '[]', '[]', 'open', ?, 'test', 'hash', '{}')",
         (iso_now(), iso_now(), iso_now(), other_user),
     )
-    other_event = database.execute("SELECT id FROM security_events WHERE event_id = 'EVT-OTHER'").fetchone()[0]
     database.execute(
         "INSERT INTO incident_cases (reference, workspace_id, title, description, severity, priority, status, creator, reporter, tags, mitre_ids, created_at, updated_at) VALUES ('CASE-OTHER', 2, 'Other case', '', 'low', 'low', 'new', ?, ?, '[]', '[]', ?, ?)",
         (other_user, other_user, iso_now(), iso_now()),
     )
     other_case = database.execute("SELECT id FROM incident_cases WHERE reference = 'CASE-OTHER'").fetchone()[0]
     login_as("admin")
-    assert client.get(f"/api/events/{other_event}").status_code == 404
     assert client.get(f"/api/incidents/{other_case}").status_code == 404
 
 
@@ -239,31 +236,17 @@ def test_ssrf_local_endpoint_is_blocked_without_connecting(
 def test_xxe_binary_and_oversized_uploads_fail_safely(
     app: Flask,
     client: FlaskClient,
-    login_as: Callable[[str], None],
+    autopsy_case: int,
 ) -> None:
-    login_as("analyst")
     xml = '<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><Event>&xxe;</Event>'
-    rejected = client.post("/api/imports/preview", json={"filename": "event.xml", "format": "sysmon_xml", "content": xml})
+    rejected = client.post(f"/api/cases/{autopsy_case}/imports/preview", json={"filename": "event.xml", "format": "sysmon_xml", "content": xml})
     assert rejected.status_code == 422
     assert "entities are not allowed" in rejected.json["error"]["message"]
-    binary = client.post("/api/imports/preview", json={"filename": "events.csv", "format": "csv", "content": "header\u0000value"})
+    binary = client.post(f"/api/cases/{autopsy_case}/imports/preview", json={"filename": "events.csv", "format": "csv", "content": "header\u0000value"})
     assert binary.status_code == 422
     app.config["MAX_CONTENT_LENGTH"] = 128
-    oversized = client.post("/api/imports", json={"filename": "events.json", "format": "json", "content": "x" * 1024})
+    oversized = client.post(f"/api/cases/{autopsy_case}/imports", json={"filename": "events.json", "format": "json", "content": "x" * 1024})
     assert oversized.status_code == 413
-
-
-def test_event_evidence_is_immutable_even_for_manager(
-    client: FlaskClient,
-    login_as: Callable[[str], None],
-    event_payload: dict[str, object],
-) -> None:
-    login_as("soc_manager")
-    event = client.post("/api/events", json={**event_payload, "idempotency_key": "immutable-event"})
-    assert event.status_code == 201
-    deleted = client.delete(f"/api/events/{event.json['id']}")
-    assert deleted.status_code == 409
-    assert deleted.json["error"]["code"] == "EVENT_IMMUTABLE"
 
 
 def test_static_assets_and_generated_reports_contain_no_secret_material() -> None:

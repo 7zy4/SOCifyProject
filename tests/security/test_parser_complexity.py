@@ -81,26 +81,3 @@ def test_valid_encoded_text_is_preserved(encoder):
     plain = b"Retained investigation evidence: 12345"
     result = decode_layer(encoder(plain).decode())
     assert result and result[1] == plain.decode()
-
-
-@pytest.mark.parametrize(
-    "key,value",
-    [
-        ("sort", "event_time DESC; DROP TABLE users;--"),
-        ("direction", "DESC LIMIT 1"),
-        ("sort", "(SELECT password_hash FROM users)"),
-        ("sort", "event_time\x00"),
-        ("direction", "desc/**/"),
-    ],
-)
-def test_event_ordering_rejects_sql_fragments(client, login_as, key, value):
-    login_as("analyst")
-    response = client.get("/api/events", query_string={key: value})
-    assert response.status_code == 422 and response.json["error"]["code"] == "INVALID_SORT"
-
-
-@pytest.mark.parametrize("sort", ["event_time", "ingested_at", "severity", "source", "event_type", "id"])
-@pytest.mark.parametrize("direction", ["asc", "desc", "ASC", "DESC"])
-def test_event_ordering_keeps_supported_choices(client, login_as, sort, direction):
-    login_as("analyst")
-    assert client.get("/api/events", query_string={"sort": sort, "direction": direction}).status_code == 200

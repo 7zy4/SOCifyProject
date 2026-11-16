@@ -11,7 +11,8 @@ from flask import Flask
 from flask.testing import FlaskClient
 
 from socify import create_app
-from socify.db import connect_path
+from socify.db import connect_path, get_db, transaction
+from socify.events import ingest_event
 from socify.schema import ensure_schema
 from socify.seeding import seed_demo_data
 from socify.timeutils import utc_now
@@ -130,6 +131,17 @@ def login_as(app: Flask, client: FlaskClient, user_ids: dict[str, int]) -> Calla
             browser_session["session_id"] = issue_session(app, user_ids[role])
 
     return authenticate
+
+
+@pytest.fixture
+def store_event(app: Flask, user_ids: dict[str, int]) -> Callable[..., int]:
+    """Store one event through socify.events.ingest_event, the function every producer uses, and return its row id."""
+
+    def store(payload: dict[str, object], role: str = "analyst") -> int:
+        with app.app_context(), transaction():
+            return ingest_event(get_db(), dict(payload), user_ids[role], 1)[0]
+
+    return store
 
 
 @pytest.fixture

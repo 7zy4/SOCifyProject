@@ -5,9 +5,9 @@ import json
 import pytest
 from playwright.sync_api import expect
 
+from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_assignment_handoff_journeys import role_permission
 from tests.e2e.test_batch_boundary_journeys import restrict_batch
-from tests.e2e.test_browser import assert_accessible
 from tests.e2e.test_case_continuity_journeys import panel
 from tests.e2e.test_followup_handoff_journeys import evidence_images, manager_case
 from tests.e2e.test_report_recovery_journeys import report, report_path

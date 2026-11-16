@@ -13,7 +13,7 @@ from playwright.sync_api import expect
 
 from scripts.local_services import local_worker_services
 from socify.autopsy_static_analysis import validate_yara
-from tests.e2e.test_browser import assert_accessible
+from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_report_recovery_journeys import absent_service, screenshots
 from tests.e2e.test_review_workflow import review_session
 

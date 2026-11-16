@@ -1,4 +1,3 @@
-import base64
 import binascii
 import csv
 import hashlib
@@ -14,13 +13,13 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from defusedxml import ElementTree
-from flask import Blueprint, Response, current_app, jsonify, request
+from flask import current_app, jsonify, request
 
 from .audit import record_audit
 from .autopsy_pipeline import activate_import, job_visible
 from .db import get_db, inserted_id, transaction
 from .events import ingest_event
-from .file_names import attachment_disposition, evidence_filename
+from .file_names import evidence_filename
 from .operational import case_visible, operational_mode
 from .schema import public_id
 from .security import (
@@ -32,13 +31,11 @@ from .security import (
     error_response,
     has_permission,
     require_permission,
-    training_scope_sql,
     workspace_id,
 )
 from .timeutils import iso_now, utc_now
 from .validation import ValidationError, public_error_message
 
-ingestion_api = Blueprint("ingestion", __name__)
 IMPORT_CHUNK_SIZE = 100
 
 SYSLOG_5424 = re.compile(
@@ -1145,7 +1142,7 @@ def _import_source(source_id: int | None, case_id: int | None, workspace: int, *
     )
 
 
-@ingestion_api.post("/api/imports/preview")
+# Reached through the case import views in socify.autopsy_ingestion, which bind the case before delegating here.
 @require_permission("events.create")
 def preview_import():
     try:
@@ -1171,7 +1168,6 @@ def preview_import():
         return error_response("IMPORT_PREVIEW_FAILED", public_error_message(exc, "Unable to parse the import; check its format and encoding"), 422)
 
 
-@ingestion_api.post("/api/imports")
 @require_permission("events.create")
 def create_import():
     try:
@@ -1296,35 +1292,6 @@ def create_import():
     return jsonify(_job_view(_process_job(job_database_id))), 201, {"Location": f"/api/imports/{job_database_id}"}
 
 
-@ingestion_api.get("/api/imports")
-@require_permission("events.read")
-def list_imports():
-    scope, parameters = training_scope_sql("training_run_id")
-    rows = (
-        get_db()
-        .execute(f"SELECT * FROM ingestion_jobs WHERE workspace_id = ?{scope} ORDER BY created_at DESC LIMIT 100", (workspace_id(), *parameters))
-        .fetchall()
-    )
-    return jsonify({"items": [_job_view(row) for row in rows]})
-
-
-@ingestion_api.get("/api/imports/<int:job_id>")
-@require_permission("events.read")
-def import_detail(job_id: int):
-    row = _job_access(job_id)
-    if not row:
-        return error_response("IMPORT_NOT_FOUND", "مهمة الاستيراد غير موجودة", 404)
-    item = _job_view(row)
-    item["errors"] = [
-        dict(error)
-        for error in get_db()
-        .execute("SELECT row_number, error_code, message, sample, created_at FROM ingestion_errors WHERE job_id = ? ORDER BY id LIMIT 1000", (job_id,))
-        .fetchall()
-    ]
-    return jsonify(item)
-
-
-@ingestion_api.post("/api/imports/<int:job_id>/resume")
 @require_permission("events.create")
 def resume_import(job_id: int):
     row = _job_access(job_id, True)
@@ -1352,7 +1319,6 @@ def resume_import(job_id: int):
     return jsonify(_job_view(_process_job(job_id)))
 
 
-@ingestion_api.post("/api/imports/<int:job_id>/cancel")
 @require_permission("events.create")
 def cancel_import(job_id: int):
     row = _job_access(job_id, True)
@@ -1368,20 +1334,3 @@ def cancel_import(job_id: int):
     if updated is None:
         raise RuntimeError("import job disappeared after cancellation")
     return jsonify(_job_view(updated))
-
-
-@ingestion_api.get("/api/imports/<int:job_id>/evidence")
-@require_permission("events.read")
-def import_evidence(job_id: int):
-    row = _job_access(job_id)
-    if not row:
-        return error_response("IMPORT_NOT_FOUND", "مهمة الاستيراد غير موجودة", 404)
-    try:
-        content = _job_content(row)
-    except ValueError as exc:
-        return error_response("IMPORT_EVIDENCE_INVALID", public_error_message(exc, "Import evidence is unavailable or failed integrity validation"), 409)
-    record_audit(get_db(), "read", "import_evidence", job_id, details={"sha256": row["content_hash"]})
-    response = Response(content, mimetype="application/octet-stream")
-    response.headers["Content-Disposition"] = attachment_disposition(row["filename"])
-    response.headers["Digest"] = f"sha-256={base64.b64encode(bytes.fromhex(row['content_hash'])).decode()}"
-    return response

@@ -1,22 +1,13 @@
 import json
 import sqlite3
-from typing import Any
 
 from flask import Blueprint, current_app, jsonify, request
 
-from .audit import record_audit
 from .db import get_db
-from .security import ROLE_PERMISSIONS, actor_id, current_user, error_response, has_permission, login_required, require_permission, workspace_id
+from .security import ROLE_PERMISSIONS, current_user, error_response, login_required, require_permission, workspace_id
 from .timeutils import iso_now
 
 platform_api = Blueprint("platform", __name__)
-
-
-def _training_scope(column: str) -> tuple[str, list[object]]:
-    user = current_user()
-    if has_permission(user, "scores.read_team") or has_permission(user, "training.manage"):
-        return "", []
-    return f" AND ({column} IS NULL OR {column} IN (SELECT id FROM training_runs WHERE workspace_id = ? AND user_id = ?))", [workspace_id(), actor_id()]
 
 
 @platform_api.get("/health/live")
@@ -159,108 +150,6 @@ def health_api():
     )
 
 
-def _dashboard_payload() -> dict[str, Any]:
-    event_scope, event_parameters = _training_scope("training_run_id")
-    alert_scope, alert_parameters = _training_scope("training_run_id")
-    case_scope, case_parameters = _training_scope("training_run_id")
-    workspace = workspace_id()
-    events = int(
-        get_db()
-        .execute(f"SELECT COUNT(*) FROM security_events WHERE workspace_id = ? AND source != 'rules_engine'{event_scope}", (workspace, *event_parameters))
-        .fetchone()[0]
-    )
-    alerts = int(
-        get_db()
-        .execute(
-            f"SELECT COUNT(*) FROM alerts WHERE workspace_id = ? AND status NOT IN ('closed', 'false_positive', 'suppressed'){alert_scope}",
-            (workspace, *alert_parameters),
-        )
-        .fetchone()[0]
-    )
-    cases = int(
-        get_db()
-        .execute(
-            f"SELECT COUNT(*) FROM incident_cases WHERE workspace_id = ? AND status NOT IN ('closed', 'cancelled', 'false_positive') AND archived_at IS NULL{case_scope}",
-            (workspace, *case_parameters),
-        )
-        .fetchone()[0]
-    )
-    critical = int(
-        get_db()
-        .execute(
-            f"SELECT COUNT(*) FROM security_events WHERE workspace_id = ? AND severity = 'critical' AND source != 'rules_engine'{event_scope}",
-            (workspace, *event_parameters),
-        )
-        .fetchone()[0]
-    )
-    overdue = int(
-        get_db()
-        .execute(
-            f"SELECT COUNT(*) FROM incident_cases WHERE workspace_id = ? AND sla_due_at < ? AND status NOT IN ('closed', 'cancelled') AND archived_at IS NULL{case_scope}",
-            (workspace, iso_now(), *case_parameters),
-        )
-        .fetchone()[0]
-    )
-    sources = [
-        dict(row)
-        for row in get_db()
-        .execute(
-            f"SELECT source, COUNT(*) AS count FROM security_events WHERE workspace_id = ? AND source != 'rules_engine'{event_scope} GROUP BY source ORDER BY count DESC LIMIT 10",
-            (workspace, *event_parameters),
-        )
-        .fetchall()
-    ]
-    recent_alerts = [
-        dict(row)
-        for row in get_db()
-        .execute(
-            f"SELECT id, alert_id, severity, status, reason, detected_at FROM alerts WHERE workspace_id = ?{alert_scope} ORDER BY detected_at DESC LIMIT 10",
-            (workspace, *alert_parameters),
-        )
-        .fetchall()
-    ]
-    recent_cases = [
-        dict(row)
-        for row in get_db()
-        .execute(
-            f"SELECT id, reference, title, severity, priority, status, updated_at, sla_due_at FROM incident_cases WHERE workspace_id = ? AND archived_at IS NULL{case_scope} ORDER BY updated_at DESC LIMIT 10",
-            (workspace, *case_parameters),
-        )
-        .fetchall()
-    ]
-    rule_health = [
-        dict(row)
-        for row in get_db()
-        .execute(
-            "SELECT id, name, is_active, match_count, false_positive_count, last_triggered_at, average_evaluation_ms, failed_evaluations, suppressions FROM rules WHERE workspace_id = ? AND archived_at IS NULL ORDER BY failed_evaluations DESC, match_count DESC LIMIT 10",
-            (workspace,),
-        )
-        .fetchall()
-    ]
-    return {
-        "counts": {"events": events, "open_alerts": alerts, "active_cases": cases, "critical_events": critical, "overdue_cases": overdue},
-        "top_sources": sources,
-        "recent_alerts": recent_alerts,
-        "recent_cases": recent_cases,
-        "rule_health": rule_health,
-        "scope": "workspace" if has_permission(current_user(), "scores.read_team") else "own_training_runs_and_shared_events",
-        "generated_at": iso_now(),
-    }
-
-
-@platform_api.get("/api/dashboard")
-@login_required
-def dashboard_data():
-    return jsonify(_dashboard_payload())
-
-
-@platform_api.get("/api/stats")
-@login_required
-def stats_compatibility():
-    payload = _dashboard_payload()
-    return jsonify({**payload["counts"], "top_sources": payload["top_sources"], "generated_at": payload["generated_at"]})
-
-
 @platform_api.get("/api/audit")
 @require_permission("audit.read")
 def audit_logs():
@@ -330,56 +219,6 @@ def audit_logs():
             row[0] for row in get_db().execute(f"SELECT DISTINCT {column} FROM security_audit_logs WHERE workspace_id=? ORDER BY {column}", (workspace_id(),))
         ]
     return jsonify({"items": items, "total": total, "page": page, "page_size": page_size, "filters": facets})
-
-
-@platform_api.get("/api/profile")
-@login_required
-def profile():
-    user = current_user()
-    if user is None:
-        raise RuntimeError("authenticated profile has no user")
-    user["leaderboard_opt_in"] = bool(user["leaderboard_opt_in"])
-    sessions = int(
-        get_db()
-        .execute("SELECT COUNT(*) FROM auth_sessions WHERE user_id = ? AND revoked_at IS NULL AND expires_at > ?", (actor_id(), iso_now()))
-        .fetchone()[0]
-    )
-    mfa = get_db().execute("SELECT enabled, verified_at FROM mfa_enrollments WHERE user_id = ?", (actor_id(),)).fetchone()
-    return jsonify(
-        {"user": user, "active_sessions": sessions, "mfa": {"enabled": bool(mfa and mfa["enabled"]), "verified_at": mfa["verified_at"] if mfa else None}}
-    )
-
-
-@platform_api.put("/api/profile/leaderboard")
-@login_required
-def leaderboard_preference():
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict) or type(data.get("opt_in")) is not bool:
-        return error_response("INVALID_LEADERBOARD_PREFERENCE", "يلزم تحديد خيار مشاركة صالح", 422)
-    enabled = int(data["opt_in"])
-    get_db().execute("UPDATE users SET leaderboard_opt_in = ? WHERE id = ? AND workspace_id = ?", (enabled, actor_id(), workspace_id()))
-    record_audit(get_db(), "update", "leaderboard_preference", actor_id(), details={"opt_in": bool(enabled)})
-    return jsonify({"opt_in": bool(enabled)})
-
-
-@platform_api.get("/api/settings")
-@login_required
-def settings():
-    return jsonify(
-        {
-            "environment": current_app.config["ENV_NAME"],
-            "max_upload_bytes": current_app.config["MAX_CONTENT_LENGTH"],
-            "max_import_rows": current_app.config["MAX_IMPORT_ROWS"],
-            "registration_enabled": bool(current_app.config["ALLOW_REGISTRATION"]),
-            "features": {
-                "external_threat_intelligence": "not_configured",
-                "http_source_connector": "default_deny",
-                "attack_snapshot": "20.0",
-                "sse": "enabled",
-                "mfa": "enabled",
-            },
-        }
-    )
 
 
 @platform_api.get("/api/admin/role-matrix")

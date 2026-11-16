@@ -67,49 +67,6 @@ class PhaseOneTests(unittest.TestCase):
             s["user_id"] = uid
             s["session_id"] = issue_session(self.client.application, uid)
 
-    def event(self):
-        return self.client.post(
-            "/api/lab/event",
-            json={
-                "source": "lab",
-                "severity": "medium",
-                "category": "Brute Force",
-                "title": "Failed login",
-                "description": "Simulated failure",
-                "raw_data": '{"source_ip":"192.0.2.9","username":"training"}',
-            },
-        )
-
-    def test_rule_triggers_on_threshold_only(self):
-        self.auth(2)
-        one = self.event()
-        self.assertEqual(one.status_code, 200)
-        self.assertEqual(one.json["detections"], [])
-        two = self.event()
-        self.assertEqual(two.status_code, 200)
-        self.assertEqual(len(two.json["detections"]), 1)
-        with closing(sqlite3.connect(app.config["DATABASE"])) as db, db:
-            self.assertEqual(db.execute("SELECT COUNT(*) FROM detection_matches").fetchone()[0], 1)
-
-    def test_analyst_cannot_delete_security_events(self):
-        self.auth(2)
-        event = self.event()
-        response = self.client.delete("/api/events/" + str(event.json["id"]))
-        self.assertEqual(response.status_code, 403)
-
-    def test_case_workflow_and_notes(self):
-        self.auth(2)
-        event = self.event()
-        case = self.client.post("/api/incidents", json={"title": "Investigate failed login", "event_ids": [event.json["id"]]})
-        self.assertEqual(case.status_code, 201)
-        case_id = case.json["id"]
-        note = self.client.post(f"/api/incidents/{case_id}/notes", json={"note": "Checked IP and username"})
-        self.assertEqual(note.status_code, 201)
-        detail = self.client.get(f"/api/incidents/{case_id}").json
-        self.assertEqual(len(detail["events"]), 1)
-        self.assertEqual(detail["notes"][0]["note"], "Checked IP and username")
-        self.assertEqual(self.client.patch(f"/api/incidents/{case_id}", json={"status": "investigating"}).status_code, 200)
-
     def test_source_secret_redaction(self):
         self.auth(2)
         response = self.client.get("/api/sources")

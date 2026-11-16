@@ -5,7 +5,7 @@ from conftest import DEMO_LOGIN_VALUE
 from playwright.sync_api import expect
 
 from socify.security import totp_code
-from tests.e2e.test_browser import assert_accessible
+from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_review_workflow import review_session
 
 

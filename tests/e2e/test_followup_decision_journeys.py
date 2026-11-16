@@ -18,8 +18,8 @@ from playwright.sync_api import expect
 
 from socify import autopsy_intel
 from tests.e2e import test_review_workflow as review_module
+from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_blue_team_decision_journeys import conclude
-from tests.e2e.test_browser import assert_accessible
 from tests.e2e.test_case_membership_journeys import grant
 from tests.e2e.test_detection_workflow_journeys import finish, job, open_detection, queue, read_result, result_value
 from tests.e2e.test_detection_workflow_journeys import upload as upload_scan

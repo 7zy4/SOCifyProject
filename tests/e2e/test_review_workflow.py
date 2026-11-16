@@ -15,8 +15,8 @@ from playwright.sync_api import expect, sync_playwright
 from werkzeug.serving import make_server
 
 from scripts.local_services import local_worker_services
+from tests.e2e.browser_helpers import assert_accessible, launch_browser
 from tests.e2e.document_requests import DocumentRequests
-from tests.e2e.test_browser import assert_accessible, launch_browser
 
 ANSWERS = {
     "incident_classification": "benign_activity",

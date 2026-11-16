@@ -27,9 +27,8 @@ def test_metrics_are_well_formed_counts_without_sign_in(client):
         assert f"# TYPE {family} gauge" in text
 
 
-def test_stored_text_never_becomes_a_label(app, client, database, login_as):
-    login_as("analyst")
-    queued = client.post("/api/imports", json={"filename": "metrics.jsonl", "content": '{"title":"metrics probe"}\n'})
+def test_stored_text_never_becomes_a_label(autopsy_case, client, database):
+    queued = client.post(f"/api/cases/{autopsy_case}/imports", json={"filename": "metrics.jsonl", "content": '{"title":"metrics probe"}\n'})
     assert queued.status_code in {201, 202}
     database.execute("UPDATE ingestion_jobs SET status = ? WHERE id = ?", ('state"} 1\nsocify_injected 9 #', queued.json["id"]))
     text = _metrics(client)

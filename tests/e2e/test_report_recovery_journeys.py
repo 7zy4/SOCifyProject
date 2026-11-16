@@ -10,8 +10,8 @@ import pytest
 from playwright.sync_api import expect
 
 from scripts.local_services import local_worker_services
+from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_batch_boundary_journeys import upload_logs
-from tests.e2e.test_browser import assert_accessible
 from tests.e2e.test_review_workflow import ARTIFACTS, review_session
 
 RETRYING = "إعداد التقرير متوقف مؤقتًا. ستتم إعادة المحاولة تلقائيًا."

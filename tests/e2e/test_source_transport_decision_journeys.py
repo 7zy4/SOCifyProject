@@ -9,7 +9,7 @@ import pytest
 from playwright.sync_api import expect
 
 from socify import outbound
-from tests.e2e.test_browser import assert_accessible
+from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_investigation_link_journeys import note_dialog, records
 from tests.e2e.test_report_recovery_journeys import report, report_path
 from tests.e2e.test_review_workflow import review_session

@@ -27,7 +27,7 @@ from playwright.sync_api import expect
 from scripts.local_services import local_worker_services
 from socify.timeutils import utc_now
 from tests.e2e import test_review_workflow as review_module
-from tests.e2e.test_browser import assert_accessible
+from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_case_continuity_journeys import panel, record_dialog, workflow
 from tests.e2e.test_case_membership_journeys import grant
 from tests.e2e.test_investigation_link_journeys import choose

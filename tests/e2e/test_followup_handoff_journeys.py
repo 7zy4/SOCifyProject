@@ -3,9 +3,9 @@
 import pytest
 from playwright.sync_api import expect
 
+from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_assignment_handoff_journeys import choose as choose_person
 from tests.e2e.test_assignment_handoff_journeys import handoff_form, role_permission
-from tests.e2e.test_browser import assert_accessible
 from tests.e2e.test_investigation_link_journeys import choose, corrective_dialog, note_dialog, records, root_cause
 from tests.e2e.test_review_workflow import ARTIFACTS, review_session
 

@@ -27,9 +27,6 @@ from .cases import cases_api
 from .codespaces_proxy import CodespacesProxy
 from .config import build_config
 from .db import close_db, connect_path
-from .detection import detection_api
-from .events import events_api
-from .ingestion import ingestion_api
 from .operational import operational_mode
 from .platform import platform_api
 from .request_limits import BoundedRequest, NumericInputError, StructureLimitError
@@ -58,6 +55,12 @@ RETIRED_API_PREFIXES = frozenset(
         "attack",
         "visualizations",
         "stream",
+        "events",
+        "rules",
+        "imports",
+        "dashboard",
+        "stats",
+        "settings",
     }
 )
 OPERATIONAL_BLUEPRINTS = frozenset({"auth", "cases", "teams", "sources", "watchlist", "quick_reports"})
@@ -113,11 +116,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         autopsy_yara_api,
         autopsy_investigation_api,
         auth_api,
-        events_api,
-        detection_api,
         cases_api,
         sources_api,
-        ingestion_api,
         platform_api,
         teams_api,
     ):

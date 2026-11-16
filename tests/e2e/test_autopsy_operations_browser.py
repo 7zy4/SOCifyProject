@@ -8,7 +8,7 @@ from playwright.sync_api import expect, sync_playwright
 from werkzeug.serving import make_server
 
 from socify.security import totp_code
-from tests.e2e.test_browser import launch_browser
+from tests.e2e.browser_helpers import launch_browser
 
 
 @pytest.mark.e2e

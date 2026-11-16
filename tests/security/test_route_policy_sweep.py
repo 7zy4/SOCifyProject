@@ -1,4 +1,4 @@
-"""Every URL rule under the production request policy: CSRF, authentication and retired legacy routes.
+"""Every URL rule under the production request policy: CSRF, authentication and the removed training API.
 
 The sweep walks the whole URL map, so a new route is checked without being listed. The exceptions below are
 written out on purpose: changing any of them should be a visible decision in review.
@@ -35,44 +35,6 @@ PUBLIC = {
     ("GET", "/health/metrics"): (200, None),
     ("POST", "/api/sources/<int:source_id>/ingest"): (401, "INVALID_SOURCE_KEY"),
     ("GET", "/"): (302, "/login"),
-}
-
-# Legacy training-platform API retired in operational mode: answered 410 before any view runs.
-RETIRED = {
-    ("GET", "/api/alerts"),
-    ("GET", "/api/alerts/<int:alert_id>"),
-    ("POST", "/api/alerts/<int:alert_id>/triage"),
-    ("GET", "/api/dashboard"),
-    ("GET", "/api/events"),
-    ("POST", "/api/events"),
-    ("DELETE", "/api/events/<int:event_id>"),
-    ("GET", "/api/events/<int:event_id>"),
-    ("PUT", "/api/events/<int:event_id>"),
-    ("GET", "/api/events/<int:event_id>/raw"),
-    ("GET", "/api/events/export"),
-    ("GET", "/api/imports"),
-    ("POST", "/api/imports"),
-    ("GET", "/api/imports/<int:job_id>"),
-    ("POST", "/api/imports/<int:job_id>/cancel"),
-    ("GET", "/api/imports/<int:job_id>/evidence"),
-    ("POST", "/api/imports/<int:job_id>/resume"),
-    ("POST", "/api/imports/preview"),
-    ("POST", "/api/lab/event"),
-    ("GET", "/api/profile"),
-    ("PUT", "/api/profile/leaderboard"),
-    ("GET", "/api/rules"),
-    ("POST", "/api/rules"),
-    ("DELETE", "/api/rules/<int:rule_id>"),
-    ("GET", "/api/rules/<int:rule_id>"),
-    ("PUT", "/api/rules/<int:rule_id>"),
-    ("POST", "/api/rules/<int:rule_id>/backfill"),
-    ("POST", "/api/rules/<int:rule_id>/clone"),
-    ("POST", "/api/rules/<int:rule_id>/rollback"),
-    ("POST", "/api/rules/<int:rule_id>/test"),
-    ("POST", "/api/rules/<int:rule_id>/toggle"),
-    ("GET", "/api/rules/<int:rule_id>/versions"),
-    ("GET", "/api/settings"),
-    ("GET", "/api/stats"),
 }
 
 
@@ -121,8 +83,6 @@ def test_anonymous_requests_are_refused_outside_the_public_list(app):
         if (method, rule) in PUBLIC:
             expected = PUBLIC[(method, rule)]
             actual = (status, location if status == 302 else code)
-        elif (method, rule) in RETIRED:
-            expected, actual = (410, "CASE_CONTEXT_REQUIRED"), (status, code)
         elif path.startswith("/api/") or status == 401:  # pages guarded by a permission check refuse like the API
             expected, actual = (401, "AUTHENTICATION_REQUIRED"), (status, code)
         else:
@@ -132,7 +92,8 @@ def test_anonymous_requests_are_refused_outside_the_public_list(app):
     assert not mismatches, mismatches
 
 
-def test_retired_legacy_routes_are_exactly_the_documented_set(app, user_ids):
+def test_no_registered_route_is_refused_as_retired(app, user_ids):
+    # The training platform's routes were deleted; a registered route answering 410 would be a view nobody can reach.
     _operational(app, csrf=False)
     for endpoint in list(app.view_functions):
         if endpoint != "static":
@@ -147,7 +108,7 @@ def test_retired_legacy_routes_are_exactly_the_documented_set(app, user_ids):
             blocked.add((method, rule))
         elif status != 299:
             other.append((method, rule, status, code))
-    assert blocked == RETIRED, {"unexpectedly retired": sorted(blocked - RETIRED), "unexpectedly open": sorted(RETIRED - blocked)}
+    assert not blocked, sorted(blocked)
     assert not other, other
 
 

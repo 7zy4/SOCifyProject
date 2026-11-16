@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import expect
 
-from tests.e2e.test_browser import assert_accessible
+from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_email_goal_journeys import reviews
 from tests.e2e.test_email_goal_journeys import upload as upload_mail
 from tests.e2e.test_investigation_link_journeys import note_dialog, records

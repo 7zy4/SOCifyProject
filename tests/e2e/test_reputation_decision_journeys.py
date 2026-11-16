@@ -16,8 +16,8 @@ import pytest
 from playwright.sync_api import expect
 
 from tests.e2e import test_review_workflow as review_module
+from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_blue_team_decision_journeys import conclude
-from tests.e2e.test_browser import assert_accessible
 from tests.e2e.test_followup_decision_journeys import preview_note
 from tests.e2e.test_investigation_link_journeys import records
 from tests.e2e.test_report_recovery_journeys import report, report_path

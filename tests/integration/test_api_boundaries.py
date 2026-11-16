@@ -6,8 +6,6 @@ import pytest
     [
         ("get", "/api/incidents?page=no", None, 400, "INVALID_PAGINATION"),
         ("get", "/api/incidents?q=" + "x" * 201, None, 422, "QUERY_TOO_LONG"),
-        ("get", "/api/alerts?page=no", None, 400, "INVALID_PAGINATION"),
-        ("get", "/api/events?page=no", None, 400, "INVALID_PAGINATION"),
         ("post", "/api/incidents", [], 400, "INVALID_JSON"),
         ("post", "/api/incidents", {}, 422, "INVALID_CASE"),
         ("post", "/api/incidents", {"title": "Boundary case", "severity": "bad"}, 422, "INVALID_CASE_PRIORITY"),
@@ -15,16 +13,6 @@ import pytest
         ("post", "/api/incidents", {"title": "Boundary case", "tags": "bad"}, 422, "INVALID_CASE_METADATA"),
         ("post", "/api/incidents", {"title": "Boundary case", "event_ids": ["bad"]}, 422, "INVALID_EVENT_LINKS"),
         ("post", "/api/incidents", {"title": "Boundary case", "alert_ids": ["bad"]}, 422, "INVALID_ALERT_LINKS"),
-        ("post", "/api/rules", [], 400, "INVALID_JSON"),
-        ("post", "/api/rules/1/toggle", {}, 422, "INVALID_TOGGLE"),
-        ("post", "/api/rules/1/rollback", {}, 422, "VERSION_REQUIRED"),
-        ("post", "/api/rules/1/rollback", {"version": 99999}, 404, "RULE_VERSION_NOT_FOUND"),
-        ("post", "/api/rules/1/test", {}, 422, "EVENT_ID_REQUIRED"),
-        ("post", "/api/rules/1/test", {"event_id": 99999}, 404, "EVENT_NOT_FOUND"),
-        ("post", "/api/rules/1/backfill", {}, 422, "BACKFILL_REASON_REQUIRED"),
-        ("post", "/api/rules/1/backfill", {"reason": "Boundary regression", "limit": "bad"}, 422, "INVALID_BACKFILL_LIMIT"),
-        ("post", "/api/alerts/99999/triage", {}, 422, "INVALID_ALERT_STATUS"),
-        ("post", "/api/alerts/99999/triage", {"status": "triaged"}, 404, "ALERT_NOT_FOUND"),
         ("post", "/api/sources", [], 400, "INVALID_JSON"),
         ("post", "/api/sources", {}, 422, "INVALID_SOURCE_NAME"),
         ("post", "/api/sources", {"name": "Source", "type": "bad"}, 422, "INVALID_SOURCE_TYPE"),
@@ -51,15 +39,6 @@ def test_invalid_requests_have_stable_errors(client, login_as, method, path, pay
 @pytest.mark.parametrize(
     "method,path,payload",
     [
-        ("get", "/api/rules/99999", None),
-        ("put", "/api/rules/99999", {}),
-        ("delete", "/api/rules/99999", {}),
-        ("post", "/api/rules/99999/clone", {}),
-        ("post", "/api/rules/99999/backfill", {}),
-        ("post", "/api/rules/99999/toggle", {"active": True}),
-        ("post", "/api/rules/99999/test", {}),
-        ("get", "/api/rules/99999/versions", None),
-        ("get", "/api/alerts/99999", None),
         ("get", "/api/incidents/99999", None),
         ("patch", "/api/incidents/99999", {}),
         ("post", "/api/incidents/99999/transitions", {}),
@@ -70,10 +49,6 @@ def test_invalid_requests_have_stable_errors(client, login_as, method, path, pay
         ("post", "/api/incidents/99999/tasks", {}),
         ("patch", "/api/incidents/99999/tasks/1", {}),
         ("get", "/api/incidents/99999/report", None),
-        ("get", "/api/events/99999", None),
-        ("get", "/api/events/99999/raw", None),
-        ("put", "/api/events/99999", {}),
-        ("delete", "/api/events/99999", {}),
         ("patch", "/api/sources/99999", {}),
         ("post", "/api/sources/99999/test", {}),
     ],
@@ -153,34 +128,3 @@ def test_admin_role_changes_and_mfa_recovery(client, login_as, user_ids, databas
     assert response.json["is_active"] == 0
     assert database.execute("SELECT role FROM workspace_memberships WHERE user_id = ?", (identifier,)).fetchone()[0] == "auditor"
     assert client.delete(f"/api/admin/users/{identifier}/mfa", json={"reason": "Verified recovery request"}).status_code == 204
-
-
-def test_backfill_preserves_activation_and_is_idempotent(client, login_as, database):
-    login_as("admin")
-    rule = client.post(
-        "/api/rules",
-        json={"name": "Backfill regression", "dsl": {"condition": {"field": "source", "operator": "equals", "value": "backfill-fixture"}}, "active": False},
-    )
-    assert rule.status_code == 201
-    event = client.post("/api/events", json={"source": "backfill-fixture"})
-    assert event.status_code == 201
-    before = [tuple(row) for row in database.execute("SELECT id, is_active FROM rules ORDER BY id")]
-    url = f"/api/rules/{rule.json['id']}/backfill"
-    response = client.post(url, json={"reason": "Historical event regression"})
-    assert response.status_code == 200
-    assert len(response.json["created_alert_ids"]) == 1
-    assert client.post(url, json={"reason": "Historical event regression"}).json["created_alert_ids"] == []
-    assert [tuple(row) for row in database.execute("SELECT id, is_active FROM rules ORDER BY id")] == before
-    alert_id = response.json["created_alert_ids"][0]
-    triage_url = f"/api/alerts/{alert_id}/triage"
-    assert client.post(triage_url, json={"status": "false_positive"}).status_code == 422
-    assert client.post(triage_url, json={"status": "triaged", "assignee": 99999}).status_code == 422
-    assert client.post(triage_url, json={"status": "false_positive", "reason": "Confirmed synthetic false positive"}).status_code == 200
-    assert client.get("/api/alerts?status=false_positive&severity=medium").json["total"] == 1
-    case_id = client.post("/api/incidents", json={"title": "Attach alert and event"}).json["id"]
-    assert client.post(f"/api/incidents/{case_id}/alerts", json={"alert_id": alert_id}).status_code == 201
-    assert client.post(f"/api/incidents/{case_id}/events", json={"event_id": event.json["id"]}).status_code == 201
-    detail = client.get(f"/api/incidents/{case_id}").json
-    assert len(detail["events"]) == 1
-    assert len(detail["alerts"]) == 1
-    assert len(detail["evidence"]) == 2

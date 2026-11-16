@@ -11,7 +11,7 @@ from werkzeug.serving import make_server
 
 from scripts.prepare_demo import provision
 from socify import create_app
-from tests.e2e.test_browser import assert_accessible, launch_browser
+from tests.e2e.browser_helpers import assert_accessible, launch_browser
 
 
 @pytest.mark.e2e

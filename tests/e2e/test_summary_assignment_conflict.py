@@ -3,7 +3,7 @@
 import pytest
 from playwright.sync_api import expect
 
-from tests.e2e.test_browser import assert_accessible
+from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_case_membership_journeys import member_row
 from tests.e2e.test_case_summary_recovery_journeys import member_form
 from tests.e2e.test_followup_handoff_journeys import evidence_images, manager_case

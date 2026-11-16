@@ -3,7 +3,7 @@
 import pytest
 from playwright.sync_api import Error, sync_playwright
 
-from tests.e2e.test_browser import launch_browser
+from tests.e2e.browser_helpers import launch_browser
 from tests.e2e.test_review_workflow import ReviewJourney
 
 
