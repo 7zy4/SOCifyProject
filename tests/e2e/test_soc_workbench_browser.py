@@ -12,7 +12,7 @@ from tests.integration.test_soc_workbench import alert, message
 
 @pytest.mark.e2e
 def test_soc_triage_case_tools_email_and_immediate_report_permissions(app, database, user_ids):
-    app.config.update(LEGACY_TRAINING_TESTS=False, ALLOW_REGISTRATION=False, WTF_CSRF_ENABLED=True)
+    app.config.update(WTF_CSRF_ENABLED=True)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

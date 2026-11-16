@@ -36,7 +36,6 @@ def test_configurable_team_permissions_have_human_labels(app):
     script = (ROOT / "static" / "autopsy_team.js").read_text(encoding="utf-8")
     labels = json.JSONDecoder().raw_decode(script.split("const teamPermissionLabels = ", 1)[1])[0]
     catalog = json.JSONDecoder().raw_decode((ROOT / "static" / "localization.js").read_text(encoding="utf-8").split("const english = ", 1)[1])[0]
-    app.config["LEGACY_TRAINING_TESTS"] = False
     with app.app_context():
         available = set().union(*(effective_permissions({"role": role}) for role in allowed_roles() - {"soc_manager", "admin"}))
     assert available <= labels.keys(), available - labels.keys()

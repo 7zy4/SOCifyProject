@@ -41,7 +41,6 @@ def local_worker_services(configuration):
             "TESTING",
             "ENV_NAME",
             "DEMO_MODE",
-            "LEGACY_TRAINING_TESTS",
             "IMPORT_INLINE_EXECUTION",
             "MAX_PENDING_IMPORT_JOBS",
             "MAX_CONTENT_LENGTH",

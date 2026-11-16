@@ -14,7 +14,7 @@ from tests.unit.test_telemetry import zeek
 @pytest.mark.e2e
 @pytest.mark.parametrize("language,theme,width", [("ar", "dark", 1440), ("en", "light", 1440), ("ar", "light", 390), ("en", "dark", 390)])
 def test_telemetry_investigation_and_evidence_navigation(app, language, theme, width):
-    app.config.update(LEGACY_TRAINING_TESTS=False, WTF_CSRF_ENABLED=True)
+    app.config.update(WTF_CSRF_ENABLED=True)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

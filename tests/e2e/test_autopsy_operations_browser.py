@@ -13,7 +13,7 @@ from tests.e2e.browser_helpers import launch_browser
 
 @pytest.mark.e2e
 def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(app):
-    app.config.update(LEGACY_TRAINING_TESTS=False, ALLOW_REGISTRATION=False, WTF_CSRF_ENABLED=True)
+    app.config.update(WTF_CSRF_ENABLED=True)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

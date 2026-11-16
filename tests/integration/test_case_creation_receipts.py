@@ -15,7 +15,7 @@ KEY = {"Idempotency-Key": "case-intake-operation-001"}
 
 @pytest.fixture(autouse=True)
 def operational(app, login_as):
-    app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
+    app.config.update(REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
     login_as("analyst")
 
 

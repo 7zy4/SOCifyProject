@@ -4,6 +4,7 @@ import shutil
 import sqlite3
 import sys
 from collections.abc import Callable, Iterator
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -53,8 +54,6 @@ def issue_session(app: Flask, user_id: int, workspace_id: int = 1) -> str:
 
 @pytest.fixture
 def autopsy_case(app, client, login_as):
-    app.config["LEGACY_TRAINING_TESTS"] = False
-    app.config["ALLOW_REGISTRATION"] = False
     login_as("analyst")
     response = client.post(
         "/api/cases", json={"title": "Internal incident review", "reason": "alert_review", "objective": "Establish impact from retained evidence"}
@@ -83,7 +82,6 @@ def app(tmp_path: Path, template_database: Path) -> Iterator[Flask]:
         {
             "DATABASE": str(database),
             "TESTING": True,
-            "LEGACY_TRAINING_TESTS": True,
             # Independent tool suites exercise the existing tools independently of the new intake/selection policy.
             # tests/integration/test_workspace.py covers the production-default policy explicitly.
             "REQUIRE_CASE_APPROVAL": False,
@@ -91,7 +89,6 @@ def app(tmp_path: Path, template_database: Path) -> Iterator[Flask]:
             "WTF_CSRF_ENABLED": False,
             "SECRET_KEY": "test-session-key",
             "CREDENTIAL_KEY": "test-credential-key",
-            "ALLOW_REGISTRATION": True,
             "RATE_LIMIT_LOGIN_ATTEMPTS": 3,
             "MAX_CONTENT_LENGTH": 2 * 1024 * 1024,
             "MAX_IMPORT_ROWS": 10000,
@@ -131,6 +128,32 @@ def login_as(app: Flask, client: FlaskClient, user_ids: dict[str, int]) -> Calla
             browser_session["session_id"] = issue_session(app, user_ids[role])
 
     return authenticate
+
+
+@pytest.fixture
+def invite(app: Flask, user_ids: dict[str, int]) -> Callable[..., str]:
+    """Issue a team invitation as the manager's invitation view stores it and return the token the invitee receives."""
+
+    def issue(email: str, role: str = "analyst") -> str:
+        token = secrets.token_urlsafe(32)
+        connection = sqlite3.connect(str(app.config["DATABASE"]))
+        try:
+            connection.execute(
+                "INSERT INTO team_invitations (workspace_id, email, role, token_hash, created_by, expires_at) VALUES (1, ?, ?, ?, ?, ?)",
+                (
+                    email.strip().lower(),
+                    role,
+                    hashlib.sha256(token.encode()).hexdigest(),
+                    user_ids["soc_manager"],
+                    (utc_now() + timedelta(days=1)).isoformat().replace("+00:00", "Z"),
+                ),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        return token
+
+    return issue
 
 
 @pytest.fixture

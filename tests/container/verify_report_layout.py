@@ -5,7 +5,7 @@ from pathlib import Path
 
 from defusedxml import ElementTree as ET
 
-from scripts.benchmark_reference import git_revision
+from scripts.benchmark_support import git_revision
 from socify.autopsy_worker import compute_report
 
 

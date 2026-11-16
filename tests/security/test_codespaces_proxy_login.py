@@ -15,7 +15,7 @@ def forwarded_login(app, monkeypatch):
     monkeypatch.setenv("CODESPACE_NAME", "socify-login-fixture")
     monkeypatch.setenv("SOCIFY_PORT", "5000")
     configuration = {key: app.config[key] for key in ("DATABASE", "TESTING", "SECRET_KEY", "CREDENTIAL_KEY")}
-    configuration.update(WTF_CSRF_ENABLED=True, LEGACY_TRAINING_TESTS=False)
+    configuration.update(WTF_CSRF_ENABLED=True)
     application = create_app(configuration)
     password = secrets.token_urlsafe(24)
     create_manager(application, "manager@example.test", "Local manager", "Private team", password)

@@ -17,8 +17,6 @@ def test_v6_default_config_disables_approval_and_selection_gates(monkeypatch):
 
 def test_analyst_creates_case_with_tactical_defaults_and_works_immediately(app, client, login_as, user_ids):
     app.config.update(
-        LEGACY_TRAINING_TESTS=False,
-        ALLOW_REGISTRATION=False,
         REQUIRE_CASE_APPROVAL=False,
         REQUIRE_INVESTIGATION_SELECTION=False,
     )
@@ -46,8 +44,6 @@ def test_analyst_creates_case_with_tactical_defaults_and_works_immediately(app, 
 
 def test_unassigned_case_queue_and_claim_ownership_workflow(app, client, database, login_as, user_ids):
     app.config.update(
-        LEGACY_TRAINING_TESTS=False,
-        ALLOW_REGISTRATION=False,
         REQUIRE_CASE_APPROVAL=False,
         REQUIRE_INVESTIGATION_SELECTION=False,
     )

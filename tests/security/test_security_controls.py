@@ -33,18 +33,18 @@ def test_e2e_02_login_session_logout_and_expiry(client: FlaskClient, database: s
     assert client.get("/api/auth/me").status_code == 401
 
 
-def test_e2e_03_registration_cannot_elevate_role(client: FlaskClient, database: sqlite3.Connection) -> None:
-    registered = client.post(
-        "/api/auth/register",
-        json={
-            "email": "new.trainee@example.test",
-            "name": "New Trainee",
-            "password": "New-Training-Account-2026!",
-            "role": "admin",
-            "workspace_id": 999,
-            "is_active": False,
-        },
-    )
+def test_e2e_03_registration_cannot_elevate_role(client: FlaskClient, database: sqlite3.Connection, invite: Callable[..., str]) -> None:
+    account = {
+        "email": "new.trainee@example.test",
+        "name": "New Trainee",
+        "password": "New-Training-Account-2026!",
+        "invitation_token": invite("new.trainee@example.test"),
+    }
+    for field, value in (("role", "admin"), ("workspace_id", 999), ("is_active", False)):
+        refused = client.post("/api/auth/register", json={**account, field: value})
+        assert refused.status_code == 422 and refused.json["error"]["code"] == "INVALID_REGISTRATION"
+    assert database.execute("SELECT COUNT(*) FROM users WHERE email = 'new.trainee@example.test'").fetchone()[0] == 0
+    registered = client.post("/api/auth/register", json=account)
     assert registered.status_code == 201
     row = database.execute("SELECT role, workspace_id, is_active FROM users WHERE email = 'new.trainee@example.test'").fetchone()
     assert dict(row) == {"role": "analyst", "workspace_id": 1, "is_active": 1}
@@ -77,7 +77,7 @@ def test_e2e_05_mfa_enrollment_login_backup_code_and_revoke(
     login_as: Callable[[str], None],
 ) -> None:
     login_as("analyst")
-    enrollment = client.post("/api/auth/mfa/enroll", json={})
+    enrollment = client.post("/api/auth/mfa/enroll", json={"current_password": DEMO_LOGIN_VALUE})
     assert enrollment.status_code == 200
     code = totp_code(enrollment.json["secret"], int(time.time()))
     verified = client.post("/api/auth/mfa/verify", json={"code": code})
@@ -100,7 +100,7 @@ def test_e2e_05_mfa_enrollment_login_backup_code_and_revoke(
 
 def test_login_form_opens_mfa_after_password_challenge(client, login_as):
     login_as("analyst")
-    enrollment = client.post("/api/auth/mfa/enroll", json={})
+    enrollment = client.post("/api/auth/mfa/enroll", json={"current_password": DEMO_LOGIN_VALUE})
     code = totp_code(enrollment.json["secret"], int(time.time()))
     verified = client.post("/api/auth/mfa/verify", json={"code": code})
     recovery = verified.json["backup_codes"][0]

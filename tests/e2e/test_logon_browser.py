@@ -13,7 +13,7 @@ from tests.unit.test_windows_logon import logon_xml
 @pytest.mark.e2e
 @pytest.mark.parametrize("language,width", [("ar", 1440), ("en", 390)])
 def test_logon_investigation_and_report_layout(app, language, width):
-    app.config.update(LEGACY_TRAINING_TESTS=False, WTF_CSRF_ENABLED=True)
+    app.config.update(WTF_CSRF_ENABLED=True)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

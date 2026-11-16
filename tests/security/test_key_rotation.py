@@ -12,7 +12,7 @@ OLD, NEW = "previous-credential-key", "current-credential-key"  # pragma: allowl
 
 
 def _app(app, key, previous=None):
-    base = {name: app.config[name] for name in ("DATABASE", "TESTING", "LEGACY_TRAINING_TESTS", "WTF_CSRF_ENABLED", "SECRET_KEY")}
+    base = {name: app.config[name] for name in ("DATABASE", "TESTING", "WTF_CSRF_ENABLED", "SECRET_KEY")}
     return create_app({**base, "CREDENTIAL_KEY": key, "CREDENTIAL_KEY_PREVIOUS": previous})
 
 

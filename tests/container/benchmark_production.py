@@ -27,7 +27,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.x509.oid import NameOID
 
-from scripts.benchmark_reference import distribution, git_revision
+from scripts.benchmark_support import distribution, git_revision
 from socify.timeutils import parse_timestamp
 
 ROOT = Path(__file__).resolve().parents[2]

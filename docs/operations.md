@@ -73,7 +73,6 @@ curl -fsS http://127.0.0.1:5000/health/ready
 | `SOCIFY_TRUSTED_PROXIES` | عدد الوكلاء الموثوقين أمام التطبيق لقراءة عنوان العميل من `X-Forwarded-For`؛ الافتراضي 0، وCompose يضبطه 1 |
 | `SOCIFY_LOGIN_ATTEMPTS` و`SOCIFY_LOGIN_IP_ATTEMPTS` | حد المحاولات الفاشلة للحساب من عنوان واحد، ثم للعنوان عبر كل الحسابات؛ الافتراضي 5 و50 |
 | `SOCIFY_REGISTER_ATTEMPTS` و`SOCIFY_SOURCE_KEY_ATTEMPTS` | حد محاولات التسجيل المرفوضة ومفاتيح المصادر الخاطئة من عنوان واحد؛ الافتراضي 20 |
-| `SOCIFY_ALLOW_REGISTRATION` | التسجيل الجديد، بما فيه الدعوات |
 | `SOCIFY_ANALYSIS_SOCKET` | مسار مقبس خدمة التحليل |
 | `SOCIFY_SOURCE_ALLOWLIST` | أسماء مصادر HTTPS المصرح بها |
 | `SOCIFY_MAX_UPLOAD_BYTES` و`SOCIFY_MAX_IMPORT_ROWS` | حدود الرفع والصفوف؛ الافتراضي 10 MiB و100000 صف |

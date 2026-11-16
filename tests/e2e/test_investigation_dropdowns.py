@@ -10,7 +10,6 @@ from tests.e2e.browser_helpers import launch_browser
 
 @pytest.mark.e2e
 def test_branded_choices_and_documented_why_answers(app, tmp_path):
-    app.config.update(LEGACY_TRAINING_TESTS=False, ALLOW_REGISTRATION=False)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

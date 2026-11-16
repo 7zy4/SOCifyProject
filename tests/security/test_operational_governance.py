@@ -2,7 +2,7 @@ from socify.audit import record_audit
 
 
 def test_operational_governance_preserves_permissions_and_workspace_scope(app, client, database, login_as):
-    app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=True, REQUIRE_INVESTIGATION_SELECTION=True)
+    app.config.update(REQUIRE_CASE_APPROVAL=True, REQUIRE_INVESTIGATION_SELECTION=True)
     paths = ("/api/audit", "/api/admin/users", "/api/admin/role-matrix")
     for path in paths:
         assert client.get(path).status_code == 401

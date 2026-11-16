@@ -27,7 +27,6 @@ from .cases import cases_api
 from .codespaces_proxy import CodespacesProxy
 from .config import build_config
 from .db import close_db, connect_path
-from .operational import operational_mode
 from .platform import platform_api
 from .request_limits import BoundedRequest, NumericInputError, StructureLimitError
 from .schema import ensure_schema
@@ -39,7 +38,8 @@ from .ui import ui
 
 csrf = CSRFProtect()
 
-# Operational-mode routing policy; tests/security/test_route_policy_sweep.py checks every name against the URL map.
+# First path segment of the training platform's API, removed with the platform. Requests that match no route under these
+# segments answer 410 instead of 404, so an old client or bookmark learns the feature is gone rather than misaddressed.
 RETIRED_API_PREFIXES = frozenset(
     {
         "training",
@@ -57,15 +57,13 @@ RETIRED_API_PREFIXES = frozenset(
         "stream",
         "events",
         "rules",
+        "alerts",
         "imports",
         "dashboard",
         "stats",
         "settings",
     }
 )
-OPERATIONAL_BLUEPRINTS = frozenset({"auth", "cases", "teams", "sources", "watchlist", "quick_reports"})
-OPERATIONAL_LEGACY_ENDPOINTS = frozenset({"platform.audit_logs", "platform.role_matrix", "platform.health_api"})
-OPERATIONAL_BLUEPRINT_PREFIX = "autopsy"
 
 
 def create_app(test_config: dict[str, Any] | None = None) -> Flask:
@@ -86,7 +84,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
 
     @app.context_processor
     def product_context():
-        return {"product_name": app.config["PRODUCT_NAME"] if operational_mode() else "SOCify", "operational": operational_mode()}
+        return {"product_name": app.config["PRODUCT_NAME"], "operational": True}
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
@@ -135,20 +133,12 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         request.environ["socify.correlation_id"] = correlation_id()
         if any(type(value) is int and not 1 <= value <= 9223372036854775807 for value in (request.view_args or {}).values()):
             return error_response("INVALID_IDENTIFIER", "معرف المورد خارج النطاق المسموح", 404)
-        if (
-            operational_mode()
-            and request.path.startswith("/api/")
-            and (request.blueprint is not None or request.path.split("/", 3)[2] in RETIRED_API_PREFIXES)
-            and request.blueprint not in OPERATIONAL_BLUEPRINTS
-            and request.endpoint not in OPERATIONAL_LEGACY_ENDPOINTS
-            and not str(request.blueprint or "").startswith(OPERATIONAL_BLUEPRINT_PREFIX)
-        ):
-            return error_response("CASE_CONTEXT_REQUIRED", "استخدم الأداة من داخل قضية مصرح بها؛ مسارات التدريب العامة متقاعدة", 410)
-        if operational_mode():
-            from .autopsy_pipeline import guard_batch_scope
-            from .autopsy_workspace import guard_workspace
+        if request.url_rule is None and request.path.startswith("/api/") and request.path.split("/", 3)[2] in RETIRED_API_PREFIXES:
+            return error_response("CASE_CONTEXT_REQUIRED", "استخدم الأداة من داخل قضية مصرح بها؛ مسارات التدريب العامة أزيلت", 410)
+        from .autopsy_pipeline import guard_batch_scope
+        from .autopsy_workspace import guard_workspace
 
-            return guard_workspace() or guard_batch_scope()
+        return guard_workspace() or guard_batch_scope()
 
     @app.after_request
     def secure_response(response):

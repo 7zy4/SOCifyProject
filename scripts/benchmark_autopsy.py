@@ -9,7 +9,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from scripts.benchmark_reference import distribution, git_revision, memory_total_bytes
+from scripts.benchmark_support import distribution, git_revision, memory_total_bytes
 from socify import create_app
 from socify.autopsy_worker import run_autopsy_worker_once
 from socify.db import connect_path, get_db
@@ -61,7 +61,6 @@ def main():
             {
                 "DATABASE": str(path),
                 "TESTING": True,
-                "LEGACY_TRAINING_TESTS": False,
                 "SECRET_KEY": secrets.token_urlsafe(40),
                 "CREDENTIAL_KEY": secrets.token_urlsafe(40),
                 "WTF_CSRF_ENABLED": False,

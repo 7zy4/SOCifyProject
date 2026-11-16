@@ -16,8 +16,7 @@ class PhaseOneTests(unittest.TestCase):
         self.old_database = app.config["DATABASE"]
         self.old_testing = app.config.get("TESTING")
         self.old_csrf = app.config.get("WTF_CSRF_ENABLED")
-        self.old_legacy = app.config.get("LEGACY_TRAINING_TESTS")
-        app.config.update(DATABASE=os.path.join(self.temp.name, "test.db"), TESTING=True, WTF_CSRF_ENABLED=False, LEGACY_TRAINING_TESTS=True)
+        app.config.update(DATABASE=os.path.join(self.temp.name, "test.db"), TESTING=True, WTF_CSRF_ENABLED=False)
         with closing(sqlite3.connect(app.config["DATABASE"])) as db, db:
             db.executescript("""
             CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, name TEXT,
@@ -59,7 +58,7 @@ class PhaseOneTests(unittest.TestCase):
         self.client = app.test_client()
 
     def tearDown(self):
-        app.config.update(DATABASE=self.old_database, TESTING=self.old_testing, WTF_CSRF_ENABLED=self.old_csrf, LEGACY_TRAINING_TESTS=self.old_legacy)
+        app.config.update(DATABASE=self.old_database, TESTING=self.old_testing, WTF_CSRF_ENABLED=self.old_csrf)
         self.temp.cleanup()
 
     def auth(self, uid):

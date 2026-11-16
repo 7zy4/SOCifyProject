@@ -14,7 +14,7 @@ from tests.unit.test_snort import snort
 @pytest.mark.e2e
 @pytest.mark.parametrize("language,width", [("ar", 1440), ("en", 390)])
 def test_account_language_and_labelled_network_report(app, language, width):
-    app.config.update(LEGACY_TRAINING_TESTS=False, WTF_CSRF_ENABLED=True)
+    app.config.update(WTF_CSRF_ENABLED=True)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

@@ -13,7 +13,7 @@ from tests.e2e.browser_helpers import assert_accessible, launch_browser
 
 @pytest.mark.e2e
 def test_theme_system_persistence_languages_and_operational_surfaces(app):
-    app.config.update(LEGACY_TRAINING_TESTS=False, ALLOW_REGISTRATION=False, WTF_CSRF_ENABLED=True)
+    app.config.update(WTF_CSRF_ENABLED=True)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -104,7 +104,7 @@ def test_theme_system_persistence_languages_and_operational_surfaces(app):
 @pytest.mark.e2e
 @pytest.mark.parametrize("language", ["ar", "en"])
 def test_mobile_operational_navigation_opens_inside_viewport(app, language):
-    app.config.update(LEGACY_TRAINING_TESTS=False, WTF_CSRF_ENABLED=True)
+    app.config.update(WTF_CSRF_ENABLED=True)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -143,7 +143,6 @@ def test_mobile_operational_navigation_opens_inside_viewport(app, language):
 
 @pytest.mark.e2e
 def test_theme_control_works_when_browser_storage_is_unavailable(app):
-    app.config["LEGACY_TRAINING_TESTS"] = True
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -152,7 +151,13 @@ def test_theme_control_works_when_browser_storage_is_unavailable(app):
             browser = launch_browser(playwright)
             page = browser.new_page(locale="ar-SA", color_scheme="dark")
             page.add_init_script("Storage.prototype.getItem = Storage.prototype.setItem = () => { throw new Error('Storage unavailable'); };")
-            page.goto(f"http://127.0.0.1:{server.server_port}/")
+            page.goto(f"http://127.0.0.1:{server.server_port}/login")
+            assert page.locator("html").get_attribute("data-theme") == "dark"
+            page.get_by_label("البريد الإلكتروني", exact=True).fill("manager@socify.local")
+            page.get_by_label("كلمة المرور", exact=True).fill(DEMO_LOGIN_VALUE)
+            page.get_by_role("button", name="دخول إلى المنصة", exact=True).click()
+            page.wait_for_url("**/cases")
+            page.wait_for_function("() => document.querySelector('#workspace').getAttribute('aria-busy') === 'false'")
             assert page.locator("html").get_attribute("data-theme") == "dark"
             page.locator('[data-theme-option="light"]').click()
             assert page.locator("html").get_attribute("data-theme") == "light"
@@ -180,10 +185,7 @@ def test_public_pages_theme_typography_and_responsive_layout(app):
                 page.evaluate("language => localStorage.setItem('socify-interface-language', language)", language)
                 for theme in ("light", "dark"):
                     page.evaluate("theme => localStorage.setItem('socify-interface-theme', theme)", theme)
-                    for route, name in (("/", "landing"), ("/login", "login"), ("/register", "register")):
-                        # The operational root intentionally redirects to sign-in/cases.
-                        # Render the retained landing template in its supported legacy mode.
-                        app.config["LEGACY_TRAINING_TESTS"] = route == "/"
+                    for route, name in (("/login", "login"), ("/register", "register")):
                         page.set_viewport_size({"width": 1440, "height": 1000})
                         page.goto(base + route)
                         page.evaluate("document.fonts.ready")
@@ -201,7 +203,7 @@ def test_public_pages_theme_typography_and_responsive_layout(app):
 
 @pytest.mark.e2e
 def test_operational_governance_routes_render_their_authorized_content(app):
-    app.config.update(LEGACY_TRAINING_TESTS=False, WTF_CSRF_ENABLED=True)
+    app.config.update(WTF_CSRF_ENABLED=True)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

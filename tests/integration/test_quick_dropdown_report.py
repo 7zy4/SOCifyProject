@@ -3,7 +3,7 @@ import json
 
 
 def test_guided_dropdown_report_validation_printable_html_xss_safety_and_manager_escalation(app, client, login_as):
-    app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
+    app.config.update(REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
     login_as("analyst")
 
     # Create case with XSS attempt in title to verify strict HTML escaping in printable report

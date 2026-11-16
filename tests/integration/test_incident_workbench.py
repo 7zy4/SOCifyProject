@@ -12,12 +12,12 @@ import pytest
         {"technique_id": "T1110", "reason": "Unrelated evidence", "assessment": "verified", "event_id": 999999},
     ],
 )
-def test_invalid_annotation_does_not_mutate_case(client, login_as, payload):
+def test_invalid_annotation_does_not_mutate_case(client, login_as, database, payload):
     login_as("analyst")
     case_id = client.post("/api/incidents", json={"title": "Validation exercise"}).json["id"]
     response = client.post(f"/api/incidents/{case_id}/techniques", json=payload)
     assert response.status_code in {400, 422}
-    assert client.get(f"/api/incidents/{case_id}").json["technique_annotations"] == []
+    assert database.execute("SELECT COUNT(*) FROM case_technique_annotations WHERE case_id = ?", (case_id,)).fetchone()[0] == 0
 
 
 def test_case_enum_inputs_are_rejected_without_server_error(client, login_as):

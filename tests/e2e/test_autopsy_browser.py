@@ -13,7 +13,7 @@ from scripts.local_services import local_worker_services
 
 @pytest.mark.e2e
 def test_case_first_operational_browser_with_csrf_and_mobile_layout(app):
-    app.config.update(LEGACY_TRAINING_TESTS=False, ALLOW_REGISTRATION=False, WTF_CSRF_ENABLED=True)
+    app.config.update(WTF_CSRF_ENABLED=True)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -59,7 +59,7 @@ def test_case_first_operational_browser_with_csrf_and_mobile_layout(app):
 
 @pytest.mark.e2e
 def test_manager_procedure_library_and_report_worker_browser(app):
-    app.config.update(LEGACY_TRAINING_TESTS=False, ALLOW_REGISTRATION=False, WTF_CSRF_ENABLED=True)
+    app.config.update(WTF_CSRF_ENABLED=True)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -108,7 +108,7 @@ def test_manager_procedure_library_and_report_worker_browser(app):
 
 @pytest.mark.e2e
 def test_local_sample_manual_reputation_and_team_assignment_browser(app):
-    app.config.update(LEGACY_TRAINING_TESTS=False, ALLOW_REGISTRATION=False, WTF_CSRF_ENABLED=True)
+    app.config.update(WTF_CSRF_ENABLED=True)
     with app.app_context():
         from socify.db import get_db
 
@@ -242,7 +242,7 @@ def test_local_sample_manual_reputation_and_team_assignment_browser(app):
 
 @pytest.mark.e2e
 def test_case_import_preview_commit_and_export_browser(app):
-    app.config.update(LEGACY_TRAINING_TESTS=False, ALLOW_REGISTRATION=False, WTF_CSRF_ENABLED=True)
+    app.config.update(WTF_CSRF_ENABLED=True)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

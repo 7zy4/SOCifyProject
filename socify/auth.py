@@ -274,10 +274,6 @@ def login_api():
 
 @auth_api.get("/register")
 def register_page():
-    from .operational import operational_mode
-
-    if not current_app.config["ALLOW_REGISTRATION"] and not operational_mode():
-        return error_response("REGISTRATION_DISABLED", "إنشاء الحسابات العامة غير متاح", 403)
     return render_template("register.html", csrf_token=generate_csrf())
 
 
@@ -292,13 +288,10 @@ def _register(data: dict[str, Any]):
 
 
 def _register_account(data: dict[str, Any]):
-    from .operational import operational_mode
-
-    if operational_mode() or not current_app.config["ALLOW_REGISTRATION"]:
-        token = data.get("invitation_token")
-        if not isinstance(token, str) or not 32 <= len(token) <= 200 or not token.strip():
-            return error_response("REGISTRATION_DISABLED", "إنشاء الحسابات يتطلب دعوة صالحة من مدير الفريق", 403)
-    if operational_mode() and set(data) - {"email", "name", "password", "invitation_token", "csrf_token"}:
+    token = data.get("invitation_token")
+    if not isinstance(token, str) or not 32 <= len(token) <= 200 or not token.strip():
+        return error_response("REGISTRATION_DISABLED", "إنشاء الحسابات يتطلب دعوة صالحة من مدير الفريق", 403)
+    if set(data) - {"email", "name", "password", "invitation_token", "csrf_token"}:
         return error_response("INVALID_REGISTRATION", "أرسل حقول الدعوة والحساب المعروفة فقط", 422)
     email = data.get("email")
     name = data.get("name")
@@ -308,37 +301,23 @@ def _register_account(data: dict[str, Any]):
     problem = password_error(password)
     if problem:
         return error_response("WEAK_PASSWORD", problem, 422)
-    team_name = data.get("team_name")
-    invitation = data.get("invitation_token")
-    if team_name is not None and not isinstance(team_name, str) or team_name and not 2 <= len(team_name.strip()) <= 120:
-        return error_response("INVALID_TEAM", "اسم الفريق غير صالح", 422)
-    if invitation is not None and not isinstance(invitation, str) or invitation and (len(invitation) > 200 or team_name):
-        return error_response("INVALID_INVITATION", "بيانات الدعوة غير صالحة", 422)
     password_hash = bcrypt.hashpw(str(password).encode(), bcrypt.gensalt(rounds=12)).decode()
     try:
         with transaction():
             if get_db().execute("SELECT 1 FROM users WHERE lower(email)=?", (email.strip().lower(),)).fetchone():
                 return error_response("ACCOUNT_EXISTS", "تعذر إنشاء الحساب بهذه البيانات", 409)
-            target_workspace, target_role, target_team = 1, "analyst", str(data.get("team") or "المتدربون")[:120]
-            invite_row = None
-            if team_name:
-                created = get_db().execute(
-                    "INSERT INTO training_workspaces (public_id, name, created_at) VALUES (?, ?, ?)",
-                    ("team-" + secrets.token_hex(16), team_name.strip(), iso_now()),
+            # The invitation alone decides the team and the role; a new team is created with scripts/bootstrap_team.py.
+            invite_row = (
+                get_db()
+                .execute(
+                    "SELECT i.*, w.name AS team_name FROM team_invitations i JOIN training_workspaces w ON w.id = i.workspace_id WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ? AND w.is_active = 1",
+                    (hashlib.sha256(token.encode()).hexdigest(), iso_now()),
                 )
-                target_workspace, target_role, target_team = inserted_id(created), "soc_manager", team_name.strip()
-            elif invitation:
-                invite_row = (
-                    get_db()
-                    .execute(
-                        "SELECT i.*, w.name AS team_name FROM team_invitations i JOIN training_workspaces w ON w.id = i.workspace_id WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ? AND w.is_active = 1",
-                        (hashlib.sha256(invitation.encode()).hexdigest(), iso_now()),
-                    )
-                    .fetchone()
-                )
-                if not invite_row or invite_row["email"] != email.strip().lower():
-                    return error_response("INVALID_INVITATION", "الدعوة غير صالحة أو منتهية أو لبريد آخر", 422)
-                target_workspace, target_role, target_team = invite_row["workspace_id"], invite_row["role"], invite_row["team_name"]
+                .fetchone()
+            )
+            if not invite_row or invite_row["email"] != email.strip().lower():
+                return error_response("INVALID_INVITATION", "الدعوة غير صالحة أو منتهية أو لبريد آخر", 422)
+            target_workspace, target_role, target_team = invite_row["workspace_id"], invite_row["role"], invite_row["team_name"]
             cursor = get_db().execute(
                 """INSERT INTO users
                 (email, password_hash, name, role, team, workspace_id, created_at, password_changed_at, is_active)
@@ -350,8 +329,7 @@ def _register_account(data: dict[str, Any]):
                 "INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at) VALUES (?, ?, ?, ?)",
                 (target_workspace, user_id, target_role, iso_now()),
             )
-            if invite_row:
-                get_db().execute("UPDATE team_invitations SET consumed_at = ? WHERE id = ?", (iso_now(), invite_row["id"]))
+            get_db().execute("UPDATE team_invitations SET consumed_at = ? WHERE id = ?", (iso_now(), invite_row["id"]))
             record_audit(get_db(), "register", "user", user_id, actor=user_id, workspace=target_workspace)
     except Exception as exc:
         if "UNIQUE" in str(exc).upper():
@@ -428,10 +406,6 @@ def me():
     user = _active_user()
     permissions = effective_permissions(user)
     return jsonify({"user": user, "permissions": sorted(permissions), "csrf_token": generate_csrf()})
-
-
-def current_permissions(role: str) -> set[str]:
-    return ROLE_PERMISSIONS.get(role, set())
 
 
 @auth_api.get("/api/auth/sessions")
@@ -518,13 +492,10 @@ def change_password():
 @auth_api.post("/api/auth/mfa/enroll")
 @login_required
 def mfa_enroll():
-    from .operational import operational_mode
-
-    if operational_mode():
-        supplied = _payload().get("current_password")
-        user = get_db().execute("SELECT password_hash FROM users WHERE id = ?", (actor_id(),)).fetchone()
-        if not _password_matches(supplied, user["password_hash"] if user else None):
-            return error_response("REAUTHENTICATION_FAILED", "أدخل كلمة المرور الحالية لبدء إعداد المصادقة", 403)
+    supplied = _payload().get("current_password")
+    user = get_db().execute("SELECT password_hash FROM users WHERE id = ?", (actor_id(),)).fetchone()
+    if not _password_matches(supplied, user["password_hash"] if user else None):
+        return error_response("REAUTHENTICATION_FAILED", "أدخل كلمة المرور الحالية لبدء إعداد المصادقة", 403)
     enrollment = get_db().execute("SELECT enabled FROM mfa_enrollments WHERE user_id = ?", (actor_id(),)).fetchone()
     if enrollment and enrollment["enabled"]:
         return error_response("MFA_ALREADY_ENABLED", "ألغِ التفعيل الحالي بعد التحقق قبل إعادة التسجيل", 409)

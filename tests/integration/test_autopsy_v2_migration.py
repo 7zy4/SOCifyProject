@@ -69,7 +69,6 @@ def test_actual_v2_database_migration_preserves_evidence_reports_relations_and_b
         {
             "DATABASE": str(migrated),
             "TESTING": True,
-            "LEGACY_TRAINING_TESTS": False,
             "WTF_CSRF_ENABLED": False,
             "SECRET_KEY": "test-session-key",
             "CREDENTIAL_KEY": metadata["credential_key"],

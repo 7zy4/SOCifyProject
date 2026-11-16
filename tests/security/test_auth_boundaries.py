@@ -3,7 +3,6 @@ from tests.conftest import DEMO_LOGIN_VALUE
 
 
 def test_rejected_invitation_form_retains_only_bounded_fields_without_echoing_password(app, client, login_as, database):
-    app.config["LEGACY_TRAINING_TESTS"] = False
     login_as("soc_manager")
     token = client.post("/api/team/invitations", json={"email": "invitee@example.test", "role": "analyst"}).json["invitation_token"]
     with client.session_transaction() as session:
@@ -19,11 +18,14 @@ def test_rejected_invitation_form_retains_only_bounded_fields_without_echoing_pa
     assert accepted.status_code == 302 and accepted.headers["Location"].endswith("/login")
 
 
-def test_browser_forms_redirect_and_register_without_privilege_escalation(client, database):
+def test_browser_forms_redirect_and_register_without_privilege_escalation(client, database, invite):
     assert client.get("/register").status_code == 200
     invalid = client.post("/register", data={})
-    assert invalid.status_code == 422 and 'id="register-form"' in invalid.text
-    payload = {"email": "form-user@example.test", "name": "Form Trainee", "password": DEMO_LOGIN_VALUE, "role": "admin"}
+    assert invalid.status_code == 403 and 'id="register-form"' in invalid.text
+    payload = {"email": "form-user@example.test", "name": "Form Trainee", "password": DEMO_LOGIN_VALUE, "invitation_token": invite("form-user@example.test")}
+    # The invitation fixes the role; a form that names one is refused instead of being silently corrected.
+    assert client.post("/register", data={**payload, "role": "admin"}).status_code == 422
+    assert database.execute("SELECT COUNT(*) FROM users WHERE email = ?", (payload["email"],)).fetchone()[0] == 0
     created = client.post("/register", data=payload)
     assert created.status_code == 302
     assert created.headers["Location"].endswith("/login")
@@ -44,9 +46,10 @@ def test_registration_disable_and_password_policy(app, client):
     assert not re_email("invalid")
     assert not re_email("a" * 255 + "@example.test")
     assert not re_email("a @example.test")
-    assert client.post("/api/auth/register", json={"email": "policy@example.test", "name": "Trainee", "password": "short"}).status_code == 422
-    app.config["ALLOW_REGISTRATION"] = False
-    assert client.get("/register").status_code == 403
+    account = {"email": "policy@example.test", "name": "Trainee", "password": "short"}
+    assert client.post("/api/auth/register", json={**account, "invitation_token": "x" * 40}).status_code == 422
+    # Without an invitation nothing else about the request is examined.
+    assert client.post("/api/auth/register", json=account).status_code == 403
     assert client.post("/api/auth/register", json={}).status_code == 403
 
 
@@ -62,7 +65,7 @@ def test_invalid_mfa_and_unreadable_enrollment_fail_closed(client, login_as, dat
     assert client.post("/api/profile/password", json={}).status_code == 422
     assert client.post("/api/auth/mfa/verify", json={"code": "invalid"}).status_code == 404
     assert client.delete("/api/auth/mfa", json={}).status_code == 403
-    assert client.post("/api/auth/mfa/enroll", json={}).status_code == 200
+    assert client.post("/api/auth/mfa/enroll", json={"current_password": DEMO_LOGIN_VALUE}).status_code == 200
     assert client.post("/api/auth/mfa/verify", json={"code": "invalid"}).status_code == 422
     database.execute("UPDATE mfa_enrollments SET secret_ciphertext = 'invalid-ciphertext', enabled = 1 WHERE user_id = ?", (user_ids["analyst"],))
     assert client.post("/api/auth/mfa/verify", json={"code": "123456"}).status_code == 409

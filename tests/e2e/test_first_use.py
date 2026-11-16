@@ -12,7 +12,7 @@ from tests.e2e.browser_helpers import assert_accessible, launch_browser
 @pytest.mark.e2e
 @pytest.mark.parametrize("language,width", [("ar", 390), ("en", 1440)])
 def test_first_visit_can_reach_case_alerts_from_log_intake(app, language, width):
-    app.config.update(LEGACY_TRAINING_TESTS=False, WTF_CSRF_ENABLED=True)
+    app.config.update(WTF_CSRF_ENABLED=True)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

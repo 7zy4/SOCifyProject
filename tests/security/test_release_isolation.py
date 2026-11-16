@@ -8,10 +8,10 @@ from tests.conftest import DEMO_LOGIN_VALUE
 
 def test_active_mfa_cannot_be_disabled_by_reenrollment(client, login_as):
     login_as("analyst")
-    enrollment = client.post("/api/auth/mfa/enroll", json={}).json
+    enrollment = client.post("/api/auth/mfa/enroll", json={"current_password": DEMO_LOGIN_VALUE}).json
     code = totp_code(enrollment["secret"], int(time.time()))
     assert client.post("/api/auth/mfa/verify", json={"code": code}).status_code == 200
-    assert client.post("/api/auth/mfa/enroll", json={}).status_code == 409
+    assert client.post("/api/auth/mfa/enroll", json={"current_password": DEMO_LOGIN_VALUE}).status_code == 409
     client.post("/api/auth/logout", json={})
     assert client.post("/api/auth/login", json={"email": "analyst@socify.local", "password": DEMO_LOGIN_VALUE}).status_code == 428
 
@@ -37,7 +37,12 @@ def test_case_creation_with_missing_evidence_is_atomic_client_error(client, logi
 
 @pytest.mark.parametrize("password", ["aB9!" * 25, "أبجد12!" * 10])
 def test_oversized_bcrypt_input_never_crashes_authentication(client, password):
-    assert client.post("/api/auth/register", json={"email": "long@example.test", "name": "Long password", "password": password}).status_code == 422
+    assert (
+        client.post(
+            "/api/auth/register", json={"email": "long@example.test", "name": "Long password", "password": password, "invitation_token": "x" * 40}
+        ).status_code
+        == 422
+    )
     assert client.post("/api/auth/login", json={"email": "analyst@socify.local", "password": password}).status_code == 401
 
 
@@ -106,17 +111,19 @@ def test_case_compare_and_swap_preserves_interleaved_write(client, login_as, dat
         with transaction() as connection:
             yield connection
 
+    version = database.execute("SELECT version FROM incident_cases WHERE id = ?", (case,)).fetchone()[0]
     monkeypatch.setattr("socify.cases.transaction", interleave)
-    assert client.patch(f"/api/incidents/{case}", json={"version": 1, **payload}).status_code == 409
+    monkeypatch.setattr("socify.autopsy_reports.transaction", interleave)
+    assert client.patch(f"/api/incidents/{case}", json={"version": version, **payload}).status_code == 409
     row = database.execute("SELECT title, version, status FROM incident_cases WHERE id = ?", (case,)).fetchone()
-    assert tuple(row) == ("Concurrent winner", 2, "new")
+    assert tuple(row) == ("Concurrent winner", version + 1, "new")
 
 
 def test_mfa_enrollment_cannot_race_activation(client, login_as, database, user_ids, monkeypatch):
     from socify.security import generate_totp_secret
 
     login_as("analyst")
-    assert client.post("/api/auth/mfa/enroll", json={}).status_code == 200
+    assert client.post("/api/auth/mfa/enroll", json={"current_password": DEMO_LOGIN_VALUE}).status_code == 200
     original = database.execute("SELECT secret_ciphertext FROM mfa_enrollments WHERE user_id = ?", (user_ids["analyst"],)).fetchone()[0]
 
     def activate():
@@ -124,7 +131,7 @@ def test_mfa_enrollment_cannot_race_activation(client, login_as, database, user_
         return generate_totp_secret()
 
     monkeypatch.setattr("socify.auth.generate_totp_secret", activate)
-    assert client.post("/api/auth/mfa/enroll", json={}).status_code == 409
+    assert client.post("/api/auth/mfa/enroll", json={"current_password": DEMO_LOGIN_VALUE}).status_code == 409
     assert tuple(database.execute("SELECT enabled, secret_ciphertext FROM mfa_enrollments WHERE user_id = ?", (user_ids["analyst"],)).fetchone()) == (
         1,
         original,

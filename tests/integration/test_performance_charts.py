@@ -44,7 +44,6 @@ def policy(client, identifier, minutes, calendar=None):
 
 
 def test_completion_uses_created_cohort_without_mixing_old_closed_backlog(app, client, login_as, database, performance_clock):
-    app.config["LEGACY_TRAINING_TESTS"] = False
     login_as("analyst")
     case(client, database, "Older case closed recently", "2026-09-01T08:00:00Z", status="closed", closed="2026-11-03T09:00:00Z")
     case(client, database, "Recent completed case", status="closed", closed="2026-11-03T09:00:00Z")
@@ -63,7 +62,6 @@ def test_completion_uses_created_cohort_without_mixing_old_closed_backlog(app, c
 
 @pytest.mark.parametrize("closed", [None, "not-a-time", "2026-11-01T07:00:00Z", "2030-01-01T00:00:00Z"])
 def test_invalid_closure_never_claims_complete_or_zero_speed(app, client, login_as, database, performance_clock, closed):
-    app.config["LEGACY_TRAINING_TESTS"] = False
     login_as("analyst")
     case(client, database, "Incomplete chronology", status="closed", closed=closed)
     data = performance(client)
@@ -72,7 +70,6 @@ def test_invalid_closure_never_claims_complete_or_zero_speed(app, client, login_
 
 
 def test_completion_recalculates_when_closed_work_is_reopened_or_cancelled(app, client, login_as, database, performance_clock):
-    app.config["LEGACY_TRAINING_TESTS"] = False
     login_as("analyst")
     identifier = case(client, database, "Reconsidered investigation", status="closed", closed="2026-11-03T09:00:00Z")
     assert performance(client)["completion"]["percentage"] == 100
@@ -85,7 +82,6 @@ def test_completion_recalculates_when_closed_work_is_reopened_or_cancelled(app, 
 
 
 def test_speed_uses_configured_working_time_and_retained_pauses(app, client, login_as, database, performance_clock):
-    app.config["LEGACY_TRAINING_TESTS"] = False
     login_as("soc_manager")
     paused = case(client, database, "Paused evidence collection", "2026-11-03T08:00:00Z")
     policy(client, paused, 90)
@@ -121,7 +117,6 @@ def test_speed_uses_configured_working_time_and_retained_pauses(app, client, log
 
 
 def test_speed_uses_latest_policy_but_does_not_measure_invalid_chronology(app, client, login_as, database, performance_clock):
-    app.config["LEGACY_TRAINING_TESTS"] = False
     login_as("soc_manager")
     identifier = case(client, database, "Revised response target", "2026-11-03T08:00:00Z")
     policy(client, identifier, 30)
@@ -149,7 +144,6 @@ def test_chart_data_obeys_member_selection_and_no_data_state(autopsy_case, app, 
 
 
 def test_rounding_never_hides_the_last_pending_or_late_case(app, client, login_as, database, performance_clock):
-    app.config["LEGACY_TRAINING_TESTS"] = False
     login_as("soc_manager")
     identifier = case(client, database, "Response boundary", "2026-11-03T08:00:00Z")
     policy(client, identifier, 60)

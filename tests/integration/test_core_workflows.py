@@ -5,57 +5,7 @@ from collections.abc import Callable
 
 from flask.testing import FlaskClient
 
-from socify.db import get_db, transaction
-from socify.events import ingest_event
 from socify.schema import ensure_schema
-
-
-def failed_login(client: FlaskClient, number: int, source_ip: str = "198.51.100.20", prefix: str = "login") -> tuple[int, list[int], bool]:
-    """Store one failed login the way every producer does and return (event id, alert ids, duplicate)."""
-    with client.application.app_context(), transaction():
-        return ingest_event(
-            get_db(),
-            {
-                "idempotency_key": f"{prefix}-{source_ip}-{number}",
-                "source": "integration-auth",
-                "source_type": "training",
-                "severity": "medium",
-                "category": "authentication",
-                "event_type": "failed_login",
-                "title": "Synthetic failed login",
-                "description": "Isolated integration event",
-                "event_time": f"2026-10-19T10:0{number}:00Z",
-                "source_ip": source_ip,
-                "username": "amina",
-                "hostname": "idp-training-01",
-                "action": "login",
-                "outcome": "failed",
-                "raw_payload": {"synthetic": True, "sequence": number},
-            },
-            None,
-            1,
-        )
-
-
-def generated_alert(client: FlaskClient, prefix: str = "alert") -> int:
-    alert_ids = [failed_login(client, index, prefix=prefix) for index in range(1, 6)][-1][1]
-    assert len(alert_ids) == 1
-    return int(alert_ids[0])
-
-
-def complete_case_tasks(client: FlaskClient, case_id: int) -> None:
-    detail = client.get(f"/api/incidents/{case_id}").json
-    for task in detail["tasks"]:
-        response = client.patch(f"/api/incidents/{case_id}/tasks/{task['id']}", json={"status": "completed"})
-        assert response.status_code == 200
-
-
-def transition(client: FlaskClient, case_id: int, status: str, **extra: object):
-    detail = client.get(f"/api/incidents/{case_id}").json
-    return client.post(
-        f"/api/incidents/{case_id}/transitions",
-        json={"status": status, "reason": f"Acceptance transition to {status}", "version": detail["version"], **extra},
-    )
 
 
 def test_e2e_20_empty_cases_support_persistent_manual_creation(client: FlaskClient, login_as: Callable[[str], None]) -> None:
@@ -69,69 +19,6 @@ def test_e2e_20_empty_cases_support_persistent_manual_creation(client: FlaskClie
     case_id = created.json["id"]
     assert client.get("/api/incidents").json["total"] == 1
     assert client.get(f"/api/incidents/{case_id}").json["title"] == "Manual acceptance investigation"
-
-
-def test_e2e_21_to_25_full_case_lifecycle_and_reports(client: FlaskClient, login_as: Callable[[str], None]) -> None:
-    login_as("analyst")
-    alert_id = generated_alert(client, "case-flow")
-    created = client.post(f"/api/alerts/{alert_id}/case", json={})
-    assert created.status_code == 201
-    case_id = created.json["id"]
-    detail = client.get(f"/api/incidents/{case_id}").json
-    assert len(detail["alerts"]) == 1
-    assert len(detail["events"]) == 5
-    assert len(detail["evidence"]) == 6
-    note = client.post(f"/api/incidents/{case_id}/notes", json={"body": "Reviewed <img src=x onerror=alert(1)>", "visibility": "team"})
-    assert note.status_code == 201
-    ioc_content = "198.51.100.20"
-    evidence = client.post(
-        f"/api/incidents/{case_id}/evidence",
-        json={"type": "ioc", "reference_id": ioc_content, "title": "Synthetic source IP", "content": ioc_content},
-    )
-    assert evidence.status_code == 201
-    assert evidence.json["sha256"] == hashlib.sha256(ioc_content.encode()).hexdigest()
-    complete_case_tasks(client, case_id)
-    assert transition(client, case_id, "investigating").status_code == 200
-    assert transition(client, case_id, "contained").status_code == 200
-    assert transition(client, case_id, "recovered").status_code == 200
-    login_as("soc_manager")
-    closure = transition(
-        client,
-        case_id,
-        "closed",
-        disposition="true_positive",
-        root_cause="Simulated credential abuse",
-        impact="Training identity exposure",
-        response_summary="Contained the synthetic source",
-        evidence_summary="Linked alerts and raw events confirm the finding",
-        lessons_learned="Tune identity detections",
-        validation="Verified containment and reviewed the evidence hashes",
-    )
-    assert closure.status_code == 200
-    report_json = client.get(f"/api/incidents/{case_id}/report?format=json")
-    report_html = client.get(f"/api/incidents/{case_id}/report?format=html")
-    assert report_json.status_code == 200
-    assert report_html.status_code == 200
-    assert report_json.headers["X-Report-SHA256"]
-    assert b"<img src=x" not in report_html.data
-    reopened = transition(client, case_id, "reopened")
-    assert reopened.status_code == 200
-    after = client.get(f"/api/incidents/{case_id}").json
-    assert after["status"] == "reopened"
-    assert len(after["reports"]) == 2
-    assert len(after["history"]) >= 8
-
-
-def test_e2e_24_case_closure_requires_evidence_tasks_and_report(client: FlaskClient, login_as: Callable[[str], None]) -> None:
-    login_as("soc_manager")
-    case = client.post("/api/incidents", json={"title": "Incomplete closure case"})
-    case_id = case.json["id"]
-    assert transition(client, case_id, "investigating").status_code == 200
-    assert transition(client, case_id, "contained").status_code == 200
-    assert transition(client, case_id, "recovered").status_code == 200
-    rejected = transition(client, case_id, "closed", disposition="true_positive")
-    assert rejected.status_code == 409
-    assert rejected.json["error"]["code"] == "CASE_CLOSURE_INCOMPLETE"
 
 
 def test_e2e_26_optimistic_lock_detects_concurrent_case_update(client: FlaskClient, login_as: Callable[[str], None]) -> None:

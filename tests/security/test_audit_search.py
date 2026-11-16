@@ -7,7 +7,7 @@ from tests.integration.test_workspace import request_case
 
 
 def test_case_search_and_facets_do_not_disclose_other_workspaces_or_hidden_titles(app, client, login_as, database, user_ids):
-    app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
+    app.config.update(REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
     login_as("soc_manager")
     case = request_case(client, "Private identity investigation")
     reference = client.get(f"/api/cases/{case}").json["reference"]

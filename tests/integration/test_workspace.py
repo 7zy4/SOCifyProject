@@ -9,7 +9,7 @@ from tests.integration.test_soc_workbench import alert
 
 @pytest.fixture
 def v4(app):
-    app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=True, REQUIRE_INVESTIGATION_SELECTION=True)
+    app.config.update(REQUIRE_CASE_APPROVAL=True, REQUIRE_INVESTIGATION_SELECTION=True)
     return app
 
 

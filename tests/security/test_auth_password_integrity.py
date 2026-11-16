@@ -21,7 +21,6 @@ def test_damaged_digest_cannot_authorize_sensitive_account_changes(client, datab
     if route == "password":
         response = client.post("/api/profile/password", json={"current_password": DEMO_LOGIN_VALUE, "new_password": "Synthetic-New-Password-2026!"})
     elif route == "mfa_enroll":
-        client.application.config["LEGACY_TRAINING_TESTS"] = False
         response = client.post("/api/auth/mfa/enroll", json={"current_password": DEMO_LOGIN_VALUE})
     else:
         response = client.delete("/api/auth/mfa", json={"current_password": DEMO_LOGIN_VALUE, "code": "123456"})
@@ -58,9 +57,12 @@ def test_case_insensitive_account_lookup_uses_index_without_rewriting_users(data
     assert [tuple(row) for row in database.execute("SELECT * FROM users ORDER BY id")] == rows
 
 
-def test_registration_does_not_duplicate_an_existing_mixed_case_email(client, database):
+def test_registration_does_not_duplicate_an_existing_mixed_case_email(client, database, invite):
     database.execute("UPDATE users SET email='Analyst@SOCify.Local' WHERE email='analyst@socify.local'")
     before = database.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    response = client.post("/api/auth/register", json={"email": "analyst@socify.local", "password": DEMO_LOGIN_VALUE, "name": "Duplicate"})
+    token = invite("analyst@socify.local")
+    response = client.post(
+        "/api/auth/register", json={"email": "analyst@socify.local", "password": DEMO_LOGIN_VALUE, "name": "Duplicate", "invitation_token": token}
+    )
     assert response.status_code == 409
     assert database.execute("SELECT COUNT(*) FROM users").fetchone()[0] == before

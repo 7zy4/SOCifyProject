@@ -13,7 +13,7 @@ def _minimal_pe_bytes(extra_ascii: bytes = b"") -> bytes:
 
 
 def test_one_click_disguised_pe_and_extension_mismatch_triage(app, client, login_as):
-    app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
+    app.config.update(REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
     login_as("analyst")
     case_id = client.post("/api/cases", json={"title": "Suspicious attachment triage"}).json["id"]
 
@@ -41,7 +41,7 @@ def test_one_click_disguised_pe_and_extension_mismatch_triage(app, client, login
 
 
 def test_ooxml_vba_macro_pdf_active_content_and_html_smuggling_triage(app, client, login_as):
-    app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
+    app.config.update(REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
     login_as("analyst")
     case_id = client.post("/api/cases", json={"title": "Document & HTML static triage"}).json["id"]
 
@@ -91,7 +91,7 @@ def test_ooxml_vba_macro_pdf_active_content_and_html_smuggling_triage(app, clien
 
 
 def test_one_click_email_and_attachment_static_triage(app, client, login_as, database):
-    app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
+    app.config.update(REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
     login_as("analyst")
     case_id = client.post("/api/cases", json={"title": "Phishing EML 1-click triage"}).json["id"]
 

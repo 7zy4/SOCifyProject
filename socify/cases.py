@@ -1,6 +1,5 @@
 import hashlib
 import hmac
-import html
 import json
 import re
 import sqlite3
@@ -14,8 +13,7 @@ from .autopsy_pipeline import visibility_sql
 from .case_policy import case_policy
 from .db import get_db, inserted_id, transaction
 from .file_names import attachment_disposition
-from .operational import case_scope, case_visible, operational_mode
-from .report_brand import report_style
+from .operational import case_scope, case_visible
 from .security import (
     actor_id,
     can_access_training_run,
@@ -28,7 +26,6 @@ from .security import (
     training_scope_sql,
     workspace_id,
 )
-from .task_titles import task_view
 from .timeutils import iso_now, utc_now
 from .validation import ValidationError, public_error_message
 
@@ -102,8 +99,6 @@ def _reference(connection: sqlite3.Connection) -> str:
 
 
 def _source_visible(owner_case_id: int | None, created_by: int | None = None) -> bool:
-    if not operational_mode():
-        return True
     user = current_user() or {}
     if owner_case_id is None:
         return user.get("role") in {"admin", "soc_manager"} or created_by == actor_id()
@@ -118,10 +113,9 @@ def _attach_event(connection: sqlite3.Connection, case_id: int, event_id: int) -
     case = connection.execute("SELECT training_run_id FROM incident_cases WHERE id = ? AND workspace_id = ?", (case_id, workspace_id())).fetchone()
     if not event or not case or event["training_run_id"] != case["training_run_id"] or not can_access_training_run(event["training_run_id"]):
         return False
-    if operational_mode():
-        scope, params = visibility_sql("e", active_only=False)
-        if not connection.execute(f"SELECT 1 FROM security_events e WHERE e.id=? AND {scope}", (event_id, *params)).fetchone():
-            return False
+    scope, params = visibility_sql("e", active_only=False)
+    if not connection.execute(f"SELECT 1 FROM security_events e WHERE e.id=? AND {scope}", (event_id, *params)).fetchone():
+        return False
     already_linked = connection.execute("SELECT 1 FROM case_events WHERE case_id = ? AND event_id = ?", (case_id, event_id)).fetchone()
     if not already_linked and not _source_visible(event["owner_case_id"], event["created_by"]):
         return False
@@ -168,8 +162,7 @@ def _attach_alert(connection: sqlite3.Connection, case_id: int, alert_id: int) -
         event["workspace_id"] != workspace_id()
         or event["training_run_id"] != case["training_run_id"]
         or not _source_visible(event["owner_case_id"], event["created_by"])
-        or operational_mode()
-        and not connection.execute(
+        or not connection.execute(
             f"SELECT 1 FROM security_events e WHERE e.id=? AND {visibility_sql('e', active_only=False)[0]}",
             (event["id"], *visibility_sql("e", active_only=False)[1]),
         ).fetchone()
@@ -208,40 +201,39 @@ def _case_view(row: sqlite3.Row | None) -> dict[str, Any]:
     item["overdue"] = bool(item["sla_due_at"] and item["status"] not in {"closed", "cancelled"} and item["sla_due_at"] < iso_now())
     context = get_db().execute("SELECT * FROM autopsy_case_context WHERE case_id = ?", (row["id"],)).fetchone()
     item["context"] = dict(context) if context else None
-    if operational_mode():
-        from .autopsy_workspace import approval
+    from .autopsy_workspace import approval
 
-        item["approval"] = approval(row["id"])
-        scope, scope_args = case_scope(current_user() or {})
-        item["related_case_ids"] = [
-            related[0]
-            for related in get_db().execute(
-                f"SELECT c.id FROM case_relationships rel JOIN incident_cases c ON c.id=CASE WHEN rel.first_id=? THEN rel.second_id ELSE rel.first_id END WHERE (rel.first_id=? OR rel.second_id=?) AND c.workspace_id=? AND c.archived_at IS NULL{scope}",
-                (row["id"], row["id"], row["id"], workspace_id(), *scope_args),
-            )
-        ]
-        from .autopsy_pipeline import case_full_access
+    item["approval"] = approval(row["id"])
+    scope, scope_args = case_scope(current_user() or {})
+    item["related_case_ids"] = [
+        related[0]
+        for related in get_db().execute(
+            f"SELECT c.id FROM case_relationships rel JOIN incident_cases c ON c.id=CASE WHEN rel.first_id=? THEN rel.second_id ELSE rel.first_id END WHERE (rel.first_id=? OR rel.second_id=?) AND c.workspace_id=? AND c.archived_at IS NULL{scope}",
+            (row["id"], row["id"], row["id"], workspace_id(), *scope_args),
+        )
+    ]
+    from .autopsy_pipeline import case_full_access
 
-        item["full_case_access"] = case_full_access(row["id"])
-        if not item["full_case_access"]:
-            allowed = {
-                "id",
-                "reference",
-                "title",
-                "status",
-                "severity",
-                "priority",
-                "created_at",
-                "updated_at",
-                "version",
-                "context",
-                "full_case_access",
-                "approval",
-                "related_case_ids",
-            }
-            item = {key: value for key, value in item.items() if key in allowed}
-            if item["context"]:
-                item["context"] = {key: value for key, value in item["context"].items() if key in {"case_id", "reason", "objective", "confidentiality"}}
+    item["full_case_access"] = case_full_access(row["id"])
+    if not item["full_case_access"]:
+        allowed = {
+            "id",
+            "reference",
+            "title",
+            "status",
+            "severity",
+            "priority",
+            "created_at",
+            "updated_at",
+            "version",
+            "context",
+            "full_case_access",
+            "approval",
+            "related_case_ids",
+        }
+        item = {key: value for key, value in item.items() if key in allowed}
+        if item["context"]:
+            item["context"] = {key: value for key, value in item["context"].items() if key in {"case_id", "reason", "objective", "confidentiality"}}
     return item
 
 
@@ -281,12 +273,8 @@ def list_cases():
         if len(query) > 200:
             return error_response("QUERY_TOO_LONG", "نص البحث طويل جدًا", 422)
         like = f"%{query}%"
-        if operational_mode():
-            clauses.append("(c.reference LIKE ? OR c.title LIKE ?)")
-            parameters.extend([like, like])
-        else:
-            clauses.append("(c.reference LIKE ? OR c.title LIKE ? OR c.description LIKE ?)")
-            parameters.extend([like, like, like])
+        clauses.append("(c.reference LIKE ? OR c.title LIKE ?)")
+        parameters.extend([like, like])
     where = " AND ".join(clauses)
     total = int(get_db().execute(f"SELECT COUNT(*) FROM incident_cases c WHERE {where}", parameters).fetchone()[0])
     rows = (
@@ -351,36 +339,35 @@ def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
     reason = data["reason"] if "reason" in data and data["reason"] is not None else "tactical_triage"
     objective = data["objective"] if "objective" in data and data["objective"] is not None else "التحقيق الأولي السريع وتحديد المؤشرات والإجراء المناسب"
     classification = data.get("classification", "confidential")
-    if operational_mode():
-        from .autopsy_domain import text_value
+    from .autopsy_domain import text_value
 
-        allowed = {
-            "title",
-            "reason",
-            "objective",
-            "classification",
-            "description",
-            "severity",
-            "priority",
-            "assignee",
-            "event_ids",
-            "alert_ids",
-            "tags",
-            "mitre_ids",
-        }
-        if set(data) - allowed:
-            return error_response("UNKNOWN_CASE_FIELDS", "حقول غير مسموحة في نموذج القضية", 422)
-        if not isinstance(reason, str) or not 3 <= len(reason.strip()) <= 500 or not isinstance(objective, str) or not 3 <= len(objective.strip()) <= 2000:
-            return error_response("CASE_PURPOSE_REQUIRED", "حدد سبب فتح القضية وهدف التحقيق", 422)
-        if not isinstance(classification, str) or classification not in {"internal", "confidential", "restricted"}:
-            return error_response("INVALID_CLASSIFICATION", "تصنيف السرية غير صالح", 422)
-        try:
-            text_value(data.get("title"), 255, True)
-            text_value(reason, 500, True)
-            text_value(objective, 2000, True)
-        except ValueError as exc:
-            return error_response("INVALID_CASE", public_error_message(exc, "Check the case fields"), 422)
-        data.setdefault("assignee", actor_id())
+    allowed = {
+        "title",
+        "reason",
+        "objective",
+        "classification",
+        "description",
+        "severity",
+        "priority",
+        "assignee",
+        "event_ids",
+        "alert_ids",
+        "tags",
+        "mitre_ids",
+    }
+    if set(data) - allowed:
+        return error_response("UNKNOWN_CASE_FIELDS", "حقول غير مسموحة في نموذج القضية", 422)
+    if not isinstance(reason, str) or not 3 <= len(reason.strip()) <= 500 or not isinstance(objective, str) or not 3 <= len(objective.strip()) <= 2000:
+        return error_response("CASE_PURPOSE_REQUIRED", "حدد سبب فتح القضية وهدف التحقيق", 422)
+    if not isinstance(classification, str) or classification not in {"internal", "confidential", "restricted"}:
+        return error_response("INVALID_CLASSIFICATION", "تصنيف السرية غير صالح", 422)
+    try:
+        text_value(data.get("title"), 255, True)
+        text_value(reason, 500, True)
+        text_value(objective, 2000, True)
+    except ValueError as exc:
+        return error_response("INVALID_CASE", public_error_message(exc, "Check the case fields"), 422)
+    data.setdefault("assignee", actor_id())
     title = data.get("title")
     description = data.get("description", "")
     severity = str(data.get("severity", "medium")).lower()
@@ -474,23 +461,22 @@ def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
             ),
         )
         case_id = inserted_id(cursor)
-        if operational_mode():
+        get_db().execute(
+            "INSERT INTO autopsy_case_context(case_id, reason, objective, classification, created_at) VALUES (?, ?, ?, ?, ?)",
+            (case_id, str(reason).strip(), str(objective).strip(), classification, now),
+        )
+        if current_app.config.get("REQUIRE_CASE_APPROVAL"):
+            get_db().execute("INSERT INTO case_approvals(case_id,state,requested_by) VALUES (?,'pending',?)", (case_id, actor_id()))
+        else:
             get_db().execute(
-                "INSERT INTO autopsy_case_context(case_id, reason, objective, classification, created_at) VALUES (?, ?, ?, ?, ?)",
-                (case_id, str(reason).strip(), str(objective).strip(), classification, now),
+                "INSERT INTO case_approvals(case_id,state,requested_by,reviewed_by,reviewed_at,reason,source) VALUES (?,'approved',?,?,?,'Direct tactical investigation','direct_investigation')",
+                (case_id, actor_id(), actor_id(), now),
             )
-            if current_app.config.get("REQUIRE_CASE_APPROVAL"):
-                get_db().execute("INSERT INTO case_approvals(case_id,state,requested_by) VALUES (?,'pending',?)", (case_id, actor_id()))
-            else:
-                get_db().execute(
-                    "INSERT INTO case_approvals(case_id,state,requested_by,reviewed_by,reviewed_at,reason,source) VALUES (?,'approved',?,?,?,'Direct tactical investigation','direct_investigation')",
-                    (case_id, actor_id(), actor_id(), now),
-                )
-            for member in {actor_id(), assignee} - {None}:
-                get_db().execute(
-                    "INSERT INTO autopsy_case_members(case_id, user_id, responsibility, assigned_by, assigned_at) VALUES (?, ?, 'analyst', ?, ?)",
-                    (case_id, member, actor_id(), now),
-                )
+        for member in {actor_id(), assignee} - {None}:
+            get_db().execute(
+                "INSERT INTO autopsy_case_members(case_id, user_id, responsibility, assigned_by, assigned_at) VALUES (?, ?, 'analyst', ?, ?)",
+                (case_id, member, actor_id(), now),
+            )
         for event_id in event_ids:
             if not _attach_event(get_db(), case_id, event_id):
                 raise ValidationError(f"event {event_id} is unavailable")
@@ -543,8 +529,7 @@ def case_from_alert(alert_id: int):
     body.setdefault("priority", alert["severity"] if alert["severity"] in PRIORITIES else "medium")
     body["alert_ids"] = [alert_id]
     body["training_run_id"] = alert["training_run_id"]
-    if operational_mode():
-        body.pop("training_run_id", None)
+    body.pop("training_run_id", None)
     body.setdefault("mitre_ids", json.loads(alert["mitre_technique_ids"] or "[]"))
     return _create_case(body)
 
@@ -553,115 +538,9 @@ def case_from_alert(alert_id: int):
 @case_policy(before_approval={"GET"}, batch_member={"GET"})
 @require_permission("cases.read")
 def case_detail(case_id: int):
-    if operational_mode():
-        from .autopsy_api import case_summary
+    from .autopsy_api import case_summary
 
-        return case_summary(case_id)
-    row = _case_row(case_id)
-    if not row:
-        return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
-    item = _case_view(row)
-    item["events"] = [
-        dict(value)
-        for value in get_db()
-        .execute(
-            "SELECT e.id, e.event_id, e.event_time, e.source, e.severity, e.event_type, e.title, ce.attached_at FROM case_events ce JOIN security_events e ON e.id = ce.event_id WHERE ce.case_id = ? ORDER BY e.event_time",
-            (case_id,),
-        )
-        .fetchall()
-    ]
-    item["alerts"] = [
-        dict(value)
-        for value in get_db()
-        .execute(
-            "SELECT a.id, a.alert_id, a.severity, a.status, a.reason, ca.attached_at FROM case_alerts ca JOIN alerts a ON a.id = ca.alert_id WHERE ca.case_id = ? ORDER BY a.detected_at",
-            (case_id,),
-        )
-        .fetchall()
-    ]
-    note_scope = "" if has_permission(current_user(), "cases.override") else " AND (n.visibility = 'team' OR n.author_id = ?)"
-    note_parameters: tuple[object, ...] = (case_id,) if not note_scope else (case_id, actor_id())
-    item["notes"] = [
-        {**dict(value), "note": value["body"]}
-        for value in get_db()
-        .execute(
-            f"SELECT n.*, socify_user_name(u.name,u.name_ar,u.name_en) AS author_name FROM case_notes n JOIN users u ON u.id = n.author_id WHERE n.case_id = ?{note_scope} ORDER BY n.created_at",
-            note_parameters,
-        )
-        .fetchall()
-    ]
-    item["evidence"] = [
-        dict(value)
-        for value in get_db()
-        .execute(
-            "SELECT e.*, socify_user_name(u.name,u.name_ar,u.name_en) AS added_by_name FROM case_evidence e JOIN users u ON u.id = e.added_by WHERE e.case_id = ? ORDER BY e.added_at",
-            (case_id,),
-        )
-        .fetchall()
-    ]
-    item["tasks"] = [task_view(value) for value in get_db().execute("SELECT * FROM case_tasks WHERE case_id = ? ORDER BY id", (case_id,)).fetchall()]
-    item["history"] = [
-        dict(value)
-        for value in get_db()
-        .execute(
-            "SELECT h.*, socify_user_name(u.name,u.name_ar,u.name_en) AS actor_name FROM case_history h JOIN users u ON u.id = h.actor_id WHERE h.case_id = ? ORDER BY h.created_at",
-            (case_id,),
-        )
-        .fetchall()
-    ]
-    item["reports"] = [
-        dict(value)
-        for value in get_db()
-        .execute("SELECT id, revision, format, sha256, created_by, created_at FROM case_reports WHERE case_id = ? ORDER BY revision DESC", (case_id,))
-        .fetchall()
-    ]
-    item["technique_annotations"] = [
-        dict(value)
-        for value in get_db()
-        .execute(
-            "SELECT a.*, socify_user_name(u.name,u.name_ar,u.name_en) AS author_name FROM case_technique_annotations a JOIN users u ON u.id = a.created_by WHERE a.case_id = ? ORDER BY a.id",
-            (case_id,),
-        )
-        .fetchall()
-    ]
-    item["observables"] = [
-        {**dict(value), "tags": json.loads(value["tags"] or "[]")}
-        for value in get_db()
-        .execute(
-            """SELECT i.id, i.type, i.value, i.confidence, i.source, i.tags,
-            MIN(o.created_at) AS first_seen, MAX(o.created_at) AS last_seen, COUNT(DISTINCT o.event_id) AS observation_count
-            FROM case_events ce
-            JOIN ioc_observations o ON o.event_id = ce.event_id
-            JOIN ioc_indicators i ON i.id = o.ioc_id AND i.workspace_id = ?
-            WHERE ce.case_id = ?
-            GROUP BY i.id, i.type, i.value, i.confidence, i.source, i.tags
-            ORDER BY observation_count DESC, last_seen DESC""",
-            (workspace_id(), case_id),
-        )
-        .fetchall()
-    ]
-    candidates = (
-        get_db()
-        .execute(
-            """SELECT c.id, c.reference, c.title, c.status, c.severity, c.training_run_id,
-        COUNT(DISTINCT source_o.ioc_id) AS shared_observables
-        FROM case_events source_ce
-        JOIN ioc_observations source_o ON source_o.event_id = source_ce.event_id
-        JOIN ioc_observations candidate_o ON candidate_o.ioc_id = source_o.ioc_id
-        JOIN case_events candidate_ce ON candidate_ce.event_id = candidate_o.event_id
-        JOIN incident_cases c ON c.id = candidate_ce.case_id
-        WHERE source_ce.case_id = ? AND c.id != ? AND c.workspace_id = ? AND c.archived_at IS NULL
-        GROUP BY c.id, c.reference, c.title, c.status, c.severity, c.training_run_id
-        ORDER BY shared_observables DESC, c.updated_at DESC
-        LIMIT 20""",
-            (case_id, case_id, workspace_id()),
-        )
-        .fetchall()
-    )
-    item["similar_cases"] = [
-        dict(value) for value in candidates if can_access_training_run(value["training_run_id"]) and case_visible(value["id"], current_user() or {})
-    ]
-    return jsonify(item)
+    return case_summary(case_id)
 
 
 @cases_api.patch("/api/incidents/<int:case_id>")
@@ -673,10 +552,9 @@ def update_case(case_id: int):
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return error_response("INVALID_JSON", "يلزم إرسال كائن JSON صالح", 400)
-    if operational_mode():
-        allowed = {"version", "title", "description", "team", "severity", "priority", "assignee", "assigned_to", "tags", "mitre_ids", "status", "reason"}
-        if set(data) - allowed or type(data.get("version")) is not int:
-            return error_response("INVALID_CASE_UPDATE", "أرسل الإصدار والحقول المعروفة", 422)
+    allowed = {"version", "title", "description", "team", "severity", "priority", "assignee", "assigned_to", "tags", "mitre_ids", "status", "reason"}
+    if set(data) - allowed or type(data.get("version")) is not int:
+        return error_response("INVALID_CASE_UPDATE", "أرسل الإصدار والحقول المعروفة", 422)
     supplied_version = data.get("version")
     if supplied_version is not None and supplied_version != row["version"]:
         return error_response("CASE_VERSION_CONFLICT", "تم تعديل التحقيق في جلسة أخرى. حدّث البيانات ثم أعد المحاولة", 409, {"current_version": row["version"]})
@@ -722,86 +600,9 @@ def update_case(case_id: int):
 
 
 def _transition(case_id: int, row: sqlite3.Row, target: str, reason: str, data: dict[str, Any]):
-    from .operational import operational_mode
+    from .autopsy_reports import transition_operational
 
-    if operational_mode():
-        from .autopsy_reports import transition_operational
-
-        return transition_operational(case_id, row, target, reason, data)
-    if target not in TRANSITIONS.get(str(row["status"]), set()):
-        return error_response("ILLEGAL_CASE_TRANSITION", f"لا يمكن الانتقال من {row['status']} إلى {target}", 409)
-    if len(reason.strip()) < 3:
-        return error_response("TRANSITION_REASON_REQUIRED", "اذكر سبب تغيير الحالة", 422)
-    user = current_user()
-    if target == "closed" and not has_permission(user, "cases.close"):
-        return error_response("PERMISSION_DENIED", "إغلاق التحقيق يتطلب صلاحية مدير", 403)
-    closure_fields = {
-        "disposition": 500,
-        "root_cause": 2000,
-        "impact": 2000,
-        "response_summary": 2000,
-        "evidence_summary": 5000,
-        "lessons_learned": 5000,
-        "validation": 2000,
-    }
-    override = False
-    if target == "closed":
-        missing = [field for field in closure_fields if not isinstance(data.get(field), str) or len(str(data[field]).strip()) < 3]
-        oversized = [field for field, maximum in closure_fields.items() if isinstance(data.get(field), str) and len(str(data[field])) > maximum]
-        if oversized:
-            return error_response("CASE_CLOSURE_FIELD_INVALID", "حقول تقرير الإغلاق تتجاوز الحد المسموح", 422, {"fields": oversized})
-        evidence_count = int(get_db().execute("SELECT COUNT(*) FROM case_evidence WHERE case_id = ?", (case_id,)).fetchone()[0])
-        tasks = int(get_db().execute("SELECT COUNT(*) FROM case_tasks WHERE case_id = ? AND required = 1 AND status != 'completed'", (case_id,)).fetchone()[0])
-        override = (
-            bool(data.get("override"))
-            and has_permission(user, "cases.override")
-            and isinstance(data.get("override_reason"), str)
-            and len(str(data["override_reason"]).strip()) >= 10
-        )
-        if (missing or evidence_count == 0 or tasks > 0) and not override:
-            return error_response(
-                "CASE_CLOSURE_INCOMPLETE",
-                "لا يمكن إغلاق التحقيق قبل إكمال الأدلة والمهام والتقرير",
-                409,
-                {"missing_fields": missing, "evidence_count": evidence_count, "pending_required_tasks": tasks},
-            )
-    now = iso_now()
-    extra: dict[str, Any] = {}
-    for field in closure_fields:
-        if isinstance(data.get(field), str):
-            extra[field] = str(data[field]).strip()
-    if target == "closed":
-        extra["closed_at"] = now
-        extra["resolved_at"] = row["resolved_at"] or now
-    if target == "recovered":
-        extra["resolved_at"] = now
-    if target == "reopened":
-        extra["closed_at"] = None
-    assignments = ["status = ?", "updated_at = ?", "version = version + 1"] + [f"{field} = ?" for field in extra]
-    with transaction():
-        changed = get_db().execute(
-            f"UPDATE incident_cases SET {', '.join(assignments)} WHERE id = ? AND version = ?", (target, now, *extra.values(), case_id, row["version"])
-        )
-        if changed.rowcount != 1:
-            return error_response("CASE_VERSION_CONFLICT", "تم تعديل التحقيق في جلسة أخرى", 409)
-        _history(get_db(), case_id, "status_changed", row["status"], target, reason)
-        audit_details = {"from": row["status"], "to": target, "reason": reason}
-        if override:
-            audit_details["override_reason"] = str(data["override_reason"]).strip()
-        record_audit(get_db(), "transition", "case", case_id, details=audit_details)
-        record_training_action(
-            get_db(),
-            row["training_run_id"],
-            actor_id(),
-            "case_transition",
-            "case",
-            case_id,
-            {"from": row["status"], "to": target},
-            f"case-transition:{case_id}:{row['version']}:{target}",
-        )
-        if target == "closed":
-            _generate_reports(case_id)
-    return jsonify(_case_view(_case_row(case_id)))
+    return transition_operational(case_id, row, target, reason, data)
 
 
 @cases_api.post("/api/incidents/<int:case_id>/transitions")
@@ -825,9 +626,7 @@ def add_note(case_id: int):
     row = _case_row(case_id)
     if not row:
         return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
-    from .operational import operational_mode
-
-    if operational_mode() and row["status"] == "closed":
+    if row["status"] == "closed":
         return error_response("CASE_CLOSED", "القضية مغلقة؛ تابع الإجراءات التصحيحية أو أعد فتحها بسبب موثق", 409)
     data = request.get_json(silent=True)
     body = data.get("body", data.get("note")) if isinstance(data, dict) else None
@@ -970,7 +769,7 @@ def evidence_detail(case_id: int, evidence_id: int):
 @cases_api.get("/api/incidents/<int:case_id>/evidence/<int:evidence_id>/content")
 @require_permission("cases.read")
 def evidence_content(case_id: int, evidence_id: int):
-    if operational_mode() and not has_permission(current_user(), "evidence.download"):
+    if not has_permission(current_user(), "evidence.download"):
         return error_response("PERMISSION_DENIED", "تنزيل الأصل يتطلب صلاحية مستقلة", 403)
     if not _case_row(case_id):
         return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
@@ -1157,133 +956,13 @@ def update_task(case_id: int, task_id: int):
         return jsonify({"id": task_id, "status": status, "updated": True, "case_version_before": case["version"], "case_version": version})
 
 
-def _report_payload(case_id: int) -> dict[str, Any]:
-    case = _case_row(case_id)
-    evidence = [
-        dict(row)
-        for row in get_db()
-        .execute("SELECT evidence_type, reference_id, title, sha256, added_at FROM case_evidence WHERE case_id = ? ORDER BY added_at", (case_id,))
-        .fetchall()
-    ]
-    history = [
-        dict(row)
-        for row in get_db()
-        .execute("SELECT action, previous_value, new_value, reason, created_at FROM case_history WHERE case_id = ? ORDER BY created_at", (case_id,))
-        .fetchall()
-    ]
-    events = [
-        dict(row)
-        for row in get_db()
-        .execute(
-            "SELECT e.id, e.event_id, e.event_time, e.ingested_at, e.source, e.event_type, e.title, e.severity, e.raw_hash, e.mitre_ids FROM case_events ce JOIN security_events e ON e.id = ce.event_id WHERE ce.case_id = ? ORDER BY e.event_time, e.id",
-            (case_id,),
-        )
-        .fetchall()
-    ]
-    annotations = [dict(row) for row in get_db().execute("SELECT * FROM case_technique_annotations WHERE case_id = ? ORDER BY id", (case_id,)).fetchall()]
-    notes = [
-        dict(row)
-        for row in get_db()
-        .execute("SELECT author_id, body, created_at FROM case_notes WHERE case_id = ? AND visibility = 'team' ORDER BY id", (case_id,))
-        .fetchall()
-    ]
-    tasks = [
-        dict(row)
-        for row in get_db()
-        .execute("SELECT title, status, assignee, completed_by, completed_at FROM case_tasks WHERE case_id = ? ORDER BY id", (case_id,))
-        .fetchall()
-    ]
-    alerts = [
-        dict(row)
-        for row in get_db()
-        .execute(
-            "SELECT a.alert_id, a.rule_id, a.rule_version, a.reason, a.severity, a.confidence, a.status, a.detected_at FROM case_alerts ca JOIN alerts a ON a.id = ca.alert_id WHERE ca.case_id = ? ORDER BY a.detected_at, a.id",
-            (case_id,),
-        )
-        .fetchall()
-    ]
-    responses = [
-        dict(row)
-        for row in get_db()
-        .execute("SELECT run_id, state, requested_by, approved_by, started_at, completed_at FROM playbook_runs WHERE case_id = ? ORDER BY id", (case_id,))
-        .fetchall()
-    ]
-    return {
-        "case": _case_view(case),
-        "evidence": evidence,
-        "timeline": history,
-        "event_timeline": events,
-        "technique_annotations": annotations,
-        "notes": notes,
-        "tasks": tasks,
-        "alerts": alerts,
-        "responses": responses,
-        "generated_at": iso_now(),
-    }
-
-
-def _report_html(payload: dict[str, Any]) -> str:
-    case = payload["case"]
-    evidence_rows = "".join(
-        f'<tr><td>{html.escape(str(item["evidence_type"]))}</td><td>{html.escape(str(item["title"]))}</td><td dir="ltr">{html.escape(str(item["sha256"]))}</td></tr>'
-        for item in payload["evidence"]
-    )
-    fields = (
-        ("التصنيف النهائي", "disposition"),
-        ("السبب الجذري", "root_cause"),
-        ("الأثر", "impact"),
-        ("ملخص الاستجابة", "response_summary"),
-        ("ملخص الأدلة", "evidence_summary"),
-        ("الدروس المستفادة", "lessons_learned"),
-        ("التحقق", "validation"),
-    )
-    closure = "".join(f"<p><strong>{label}:</strong> {html.escape(str(case.get(field) or 'غير محدد'))}</p>" for label, field in fields)
-    for heading, key in (
-        ("الخط الزمني للسجلات", "event_timeline"),
-        ("تقييم تقنيات ATT&CK", "technique_annotations"),
-        ("ملاحظات التحقيق المشتركة", "notes"),
-        ("المهام", "tasks"),
-        ("التنبيهات", "alerts"),
-        ("الاستجابات", "responses"),
-        ("سجل النشاط", "timeline"),
-    ):
-        rows = payload[key]
-        closure += f"<h2>{heading}</h2>"
-        if rows:
-            closure += "".join(
-                '<article class="report-record"><dl>'
-                + "".join(
-                    f"<dt>{html.escape(str(column))}</dt><dd>{html.escape(str(value) if value is not None else '—')}</dd>" for column, value in row.items()
-                )
-                + "</dl></article>"
-                for row in rows
-            )
-        else:
-            closure += "<p>لا توجد عناصر مسجلة</p>"
-    return f'<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{html.escape(str(case["reference"]))}</title><style>{report_style()}</style></head><body><h1>{html.escape(str(case["reference"]))}: {html.escape(str(case["title"]))}</h1><p><strong>الحالة:</strong> {html.escape(str(case["status"]))}</p>{closure}<h2>الأدلة</h2><table><thead><tr><th>النوع</th><th>العنوان</th><th>SHA-256</th></tr></thead><tbody>{evidence_rows}</tbody></table><p>وقت التوليد: {html.escape(str(payload["generated_at"]))}</p></body></html>'
-
-
-def _generate_reports(case_id: int) -> None:
-    payload = _report_payload(case_id)
-    revision = int(get_db().execute("SELECT COALESCE(MAX(revision), 0) + 1 FROM case_reports WHERE case_id = ?", (case_id,)).fetchone()[0])
-    json_content = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    html_content = _report_html(payload)
-    now = iso_now()
-    for report_format, content in (("json", json_content), ("html", html_content)):
-        get_db().execute(
-            "INSERT INTO case_reports (case_id, revision, format, content, sha256, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (case_id, revision, report_format, content, hashlib.sha256(content.encode()).hexdigest(), actor_id(), now),
-        )
-    record_audit(get_db(), "generate", "case_report", case_id, details={"revision": revision})
-
-
 @cases_api.get("/api/incidents/<int:case_id>/report")
 @require_permission("cases.read")
 def get_report(case_id: int):
     case = _case_row(case_id)
     if not case:
         return error_response("CASE_NOT_FOUND", "التحقيق غير موجود", 404)
-    if operational_mode() and not has_permission(current_user(), "evidence.download"):
+    if not has_permission(current_user(), "evidence.download"):
         return error_response("PERMISSION_DENIED", "تنزيل التقرير المؤرشف يتطلب صلاحية تنزيل الأدلة", 403)
     report_format = request.args.get("format", "json")
     if report_format not in {"json", "html"}:
@@ -1304,20 +983,10 @@ def get_report(case_id: int):
         .fetchone()
     )
     if not row:
-        if operational_mode():
-            return error_response("REPORT_NOT_FOUND", "لا يوجد تقرير مؤرشف؛ أنشئ تقريرًا من مساحة القضية", 404)
-        if revision is not None:
-            return error_response("REPORT_NOT_FOUND", "إصدار التقرير غير موجود", 404)
-        if case["status"] != "closed":
-            return error_response("REPORT_NOT_READY", "يتوفر التقرير النهائي بعد إغلاق التحقيق", 409)
-        with transaction():
-            _generate_reports(case_id)
-        row = (
-            get_db().execute("SELECT * FROM case_reports WHERE case_id = ? AND format = ? ORDER BY revision DESC LIMIT 1", (case_id, report_format)).fetchone()
-        )
+        return error_response("REPORT_NOT_FOUND", "لا يوجد تقرير مؤرشف؛ أنشئ تقريرًا من مساحة القضية", 404)
     if row is None:
         raise RuntimeError("Report generation returned no result")
-    if operational_mode() and hashlib.sha256(row["content"].encode()).hexdigest() != row["sha256"]:
+    if hashlib.sha256(row["content"].encode()).hexdigest() != row["sha256"]:
         return error_response("REPORT_INTEGRITY_FAILED", "بصمة التقرير المؤرشف غير مطابقة", 409)
     mimetype = "application/json" if report_format == "json" else "text/html; charset=utf-8"
     return Response(

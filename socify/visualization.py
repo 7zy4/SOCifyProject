@@ -5,15 +5,12 @@ from typing import Any
 from flask import request
 
 from .db import get_db
-from .security import actor_id, can_access_training_run, current_user, has_permission, workspace_id
+from .security import actor_id, can_access_training_run, workspace_id
 from .timeutils import iso_timestamp
 from .validation import ValidationError
 
 
 def _scope() -> tuple[str, list[object]]:
-    user = current_user()
-    if has_permission(user, "scores.read_team") or has_permission(user, "training.manage"):
-        return "", []
     return " AND (e.training_run_id IS NULL OR e.training_run_id IN (SELECT id FROM training_runs WHERE workspace_id = ? AND user_id = ?))", [
         workspace_id(),
         actor_id(),
@@ -23,14 +20,11 @@ def _scope() -> tuple[str, list[object]]:
 def _filters(alias: str = "e", fixed_case_id: int | None = None) -> tuple[str, list[object]]:
     clauses = [f"{alias}.workspace_id = ?"]
     parameters: list[object] = [workspace_id()]
-    from .operational import operational_mode
+    from .autopsy_pipeline import active_event_sql, visibility_sql
 
-    if operational_mode():
-        from .autopsy_pipeline import active_event_sql, visibility_sql
-
-        scope, arguments = visibility_sql(alias)
-        clauses.extend([active_event_sql(alias), scope])
-        parameters.extend(arguments)
+    scope, arguments = visibility_sql(alias)
+    clauses.extend([active_event_sql(alias), scope])
+    parameters.extend(arguments)
     if request.args.get("include_derived") != "1":
         clauses.append(f"{alias}.source != 'rules_engine'")
     case_id = fixed_case_id if fixed_case_id is not None else request.args.get("case_id")

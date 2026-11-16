@@ -2,7 +2,7 @@ import json
 
 
 def test_watchlist_crud_normalization_and_rbac(app, client, login_as):
-    app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
+    app.config.update(REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
     login_as("analyst")
 
     # Add suspicious email, IPv4-mapped IPv6 IP, and CIDR range
@@ -52,7 +52,7 @@ def test_watchlist_crud_normalization_and_rbac(app, client, login_as):
 
 
 def test_watchlist_auto_alerts_on_log_import_and_retroactive_case_scan(app, client, login_as):
-    app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
+    app.config.update(REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
     login_as("analyst")
 
     # Watchlist CIDR and suspicious email before importing logs

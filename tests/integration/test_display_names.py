@@ -2,7 +2,6 @@ import pytest
 
 
 def test_own_display_names_follow_language_without_changing_identity(client, login_as, database, user_ids, app):
-    app.config["LEGACY_TRAINING_TESTS"] = False
     login_as("soc_manager")
     actor = user_ids["soc_manager"]
     original = dict(database.execute("SELECT id,name,email,role FROM users WHERE id=?", (actor,)).fetchone())

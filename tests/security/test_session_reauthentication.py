@@ -2,7 +2,7 @@ from tests.conftest import DEMO_LOGIN_VALUE
 
 
 def test_account_switch_cannot_reuse_the_previous_documents_write_token(app, client):
-    app.config.update(WTF_CSRF_ENABLED=True, LEGACY_TRAINING_TESTS=False)
+    app.config.update(WTF_CSRF_ENABLED=True)
     token = client.get("/api/auth/csrf").json["csrf_token"]
     first = client.post("/api/auth/login", json={"email": "analyst@socify.local", "password": DEMO_LOGIN_VALUE}, headers={"X-CSRFToken": token})
     assert first.status_code == 200

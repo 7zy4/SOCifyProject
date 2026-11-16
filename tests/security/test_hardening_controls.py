@@ -18,10 +18,7 @@ WRONG = {"email": "analyst@socify.local", "password": "Incorrect-Password-2026!"
 
 
 def _variant(app: Flask, **overrides: object) -> Flask:
-    base = {
-        key: app.config[key]
-        for key in ("DATABASE", "TESTING", "LEGACY_TRAINING_TESTS", "WTF_CSRF_ENABLED", "SECRET_KEY", "CREDENTIAL_KEY", "ALLOW_REGISTRATION")
-    }
+    base = {key: app.config[key] for key in ("DATABASE", "TESTING", "WTF_CSRF_ENABLED", "SECRET_KEY", "CREDENTIAL_KEY")}
     return create_app({**base, **overrides})
 
 
@@ -75,7 +72,7 @@ def test_production_requires_an_explicit_credential_key(monkeypatch):
 
 def test_totp_code_opens_only_one_session(app, client, login_as):
     login_as("analyst")
-    secret = client.post("/api/auth/mfa/enroll", json={}).json["secret"]
+    secret = client.post("/api/auth/mfa/enroll", json={"current_password": DEMO_LOGIN_VALUE}).json["secret"]
     assert client.post("/api/auth/mfa/verify", json={"code": totp_code(secret)}).status_code == 200
     code = totp_code(secret)
     assert app.test_client().post("/api/auth/login", json={**CREDENTIALS, "mfa_code": code}).status_code == 200
@@ -89,7 +86,9 @@ def test_rejected_invitations_are_limited_without_counting_validation_mistakes(a
     limited = _variant(app, RATE_LIMIT_REGISTER_ATTEMPTS=2).test_client()
     account = {"name": "Invited analyst", "email": "invited@example.test", "password": "Training-Safe-Password-2026!"}
     for _ in range(4):
-        assert limited.post("/api/auth/register", json={**account, "password": "short"}).status_code == 422  # pragma: allowlist secret
+        assert (
+            limited.post("/api/auth/register", json={**account, "invitation_token": "x" * 40, "password": "short"}).status_code == 422
+        )  # pragma: allowlist secret
     for _ in range(2):
         rejected = limited.post("/api/auth/register", json={**account, "invitation_token": "x" * 40})
         assert rejected.status_code == 422 and rejected.json["error"]["code"] == "INVALID_INVITATION"

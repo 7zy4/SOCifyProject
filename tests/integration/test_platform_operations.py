@@ -16,27 +16,16 @@ def test_platform_read_models_and_ui_routes(client: FlaskClient, login_as: Calla
     assert client.get("/test").status_code == 404  # the old redirect-only route was removed
     assert client.get("/dashboard").status_code == 302
     login_as("admin")
-    for path in (
-        "/dashboard",
-        "/events",
-        "/alerts",
-        "/rules",
-        "/sources",
-        "/imports",
-        "/incidents",
-        "/lab",
-        "/attack",
-        "/hunt",
-        "/graph",
-        "/playbooks",
-        "/scores",
-        "/audit",
-        "/admin",
-        "/profile",
-    ):
+    for path in ("/cases", "/my-tasks", "/team", "/playbooks", "/analysis-library", "/audit", "/admin", "/profile", "/monitoring", "/reports"):
         response = client.get(path)
-        assert response.status_code == 200
+        assert response.status_code == 200, path
         assert 'dir="rtl"' in response.text
+    # Addresses of the removed training pages: an old bookmark lands on the case list, and the two training-only pages say they are gone.
+    for path in ("/dashboard", "/events", "/alerts", "/rules", "/sources", "/imports", "/incidents", "/attack", "/hunt", "/graph"):
+        response = client.get(path)
+        assert response.status_code == 302 and response.headers["Location"].endswith("/cases"), path
+    for path in ("/lab", "/scores"):
+        assert client.get(path).status_code == 410, path
     for path in ("/api/health", "/api/admin/role-matrix"):
         assert client.get(path).status_code == 200
     assert client.get("/api/audit?page=invalid").status_code == 400
@@ -130,7 +119,7 @@ def test_auth_profile_session_and_admin_validation(client: FlaskClient, login_as
     assert client.get("/login").status_code == 200
     assert client.get("/register").status_code == 200
     assert client.post("/api/auth/login", json={}).status_code == 401
-    assert client.post("/api/auth/register", json={}).status_code == 422
+    assert client.post("/api/auth/register", json={}).status_code == 403
     login_as("admin")
     assert client.get("/api/auth/me").status_code == 200
     assert client.get("/api/auth/sessions").status_code == 200

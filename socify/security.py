@@ -31,12 +31,10 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "cases.update",
         "evidence.add",
         "notes.add",
-        "training.run",
         "hunt.execute",
         "hunt.save",
         "graph.read",
         "playbooks.request",
-        "scores.read_own",
         "sources.read",
         "rules.read",
     },
@@ -53,8 +51,6 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "cases.override",
         "evidence.add",
         "notes.add",
-        "training.run",
-        "training.manage",
         "hunt.execute",
         "hunt.save",
         "hunt.share",
@@ -62,8 +58,6 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "playbooks.request",
         "playbooks.approve",
         "playbooks.manage",
-        "scores.read_own",
-        "scores.read_team",
         "sources.read",
         "sources.manage",
         "rules.read",
@@ -80,20 +74,15 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "cases.update",
         "evidence.add",
         "notes.add",
-        "training.run",
-        "training.manage",
-        "ground_truth.read",
         "hunt.execute",
         "hunt.save",
         "hunt.share",
         "graph.read",
         "playbooks.request",
-        "scores.read_own",
-        "scores.read_team",
         "rules.read",
         "sources.read",
     },
-    "auditor": {"events.read", "alerts.read", "cases.read", "graph.read", "audit.read", "scores.read_team", "rules.read", "sources.read"},
+    "auditor": {"events.read", "alerts.read", "cases.read", "graph.read", "audit.read", "rules.read", "sources.read"},
 }
 
 ROLE_PERMISSIONS.update(
@@ -226,11 +215,7 @@ def has_permission(user: dict[str, Any] | None, permission: str) -> bool:
 
 
 def effective_permissions(user: dict[str, Any]) -> set[str]:
-    from .operational import operational_mode
-
     permissions = ROLE_PERMISSIONS.get(str(user.get("role")), set()).copy()
-    if operational_mode():
-        permissions = {item for item in permissions if not item.startswith(("training.", "scores.", "ground_truth."))}
     if "role_permissions" in user and user.get("role") not in {"soc_manager", "admin"}:
         permissions = permissions.intersection(user["role_permissions"])
     return permissions
@@ -275,8 +260,6 @@ def can_access_training_run(training_run_id: object) -> bool:
     user = current_user()
     if user is None:
         return False
-    if has_permission(user, "training.manage") or has_permission(user, "scores.read_team"):
-        return get_db().execute("SELECT 1 FROM training_runs WHERE id = ? AND workspace_id = ?", (training_run_id, workspace_id())).fetchone() is not None
     return (
         get_db()
         .execute("SELECT 1 FROM training_runs WHERE id = ? AND workspace_id = ? AND user_id = ?", (training_run_id, workspace_id(), actor_id()))
@@ -286,9 +269,6 @@ def can_access_training_run(training_run_id: object) -> bool:
 
 
 def training_scope_sql(column: str) -> tuple[str, list[object]]:
-    user = current_user()
-    if user is not None and (has_permission(user, "training.manage") or has_permission(user, "scores.read_team")):
-        return "", []
     return f" AND ({column} IS NULL OR {column} IN (SELECT id FROM training_runs WHERE workspace_id = ? AND user_id = ?))", [workspace_id(), actor_id()]
 
 

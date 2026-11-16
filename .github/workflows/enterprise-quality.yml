@@ -220,13 +220,8 @@ jobs:
           cache: pip
           cache-dependency-path: requirements*.txt
       - run: python -m pip install --require-hashes -r requirements.txt
-      - run: python -m scripts.benchmark_reference
       - uses: ./.github/actions/analysis-backend
       - run: python -m scripts.benchmark_autopsy --events 1000000 --concurrency 20 --requests 100 --output artifacts/performance-autopsy.json
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
-        with:
-          name: performance-reference
-          path: artifacts/performance-reference.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: performance-autopsy

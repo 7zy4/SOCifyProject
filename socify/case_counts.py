@@ -6,7 +6,6 @@ from flask import current_app, g
 
 from .autopsy_pipeline import case_full_access
 from .db import get_db
-from .operational import operational_mode
 
 
 @contextmanager
@@ -48,7 +47,7 @@ def count_for_revision(namespace, database, case_id, version, job_id, active_onl
 
 
 def cached_case_count(case_id, *, job_id=None, active_only=True):
-    if not operational_mode() or not getattr(g, "case_count_read_snapshot", False) or not case_full_access(case_id):
+    if not getattr(g, "case_count_read_snapshot", False) or not case_full_access(case_id):
         return None
     case = get_db().execute("SELECT c.version FROM incident_cases c JOIN autopsy_case_context x ON x.case_id=c.id WHERE c.id=?", (case_id,)).fetchone()
     if case is None:

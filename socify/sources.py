@@ -306,20 +306,17 @@ def _ingest_records_for_source(
 @require_permission("sources.read")
 def list_sources():
     rows = get_db().execute("SELECT * FROM event_sources WHERE workspace_id = ? ORDER BY name", (workspace_id(),)).fetchall()
-    from .operational import operational_mode
+    from .autopsy_pipeline import case_full_access
+    from .autopsy_workspace import case_approved, selected_ids
+    from .cases import _case_row
 
-    if operational_mode():
-        from .autopsy_pipeline import case_full_access
-        from .autopsy_workspace import case_approved, selected_ids
-        from .cases import _case_row
-
-        selected = set(selected_ids()) if current_app.config["REQUIRE_INVESTIGATION_SELECTION"] else None
-        allowed = {
-            case_id
-            for case_id in {row["default_case_id"] for row in rows if row["default_case_id"] is not None}
-            if _case_row(case_id) and case_approved(case_id) and (selected is None or case_id in selected) and case_full_access(case_id)
-        }
-        rows = [row for row in rows if row["default_case_id"] is None or row["default_case_id"] in allowed]
+    selected = set(selected_ids()) if current_app.config["REQUIRE_INVESTIGATION_SELECTION"] else None
+    allowed = {
+        case_id
+        for case_id in {row["default_case_id"] for row in rows if row["default_case_id"] is not None}
+        if _case_row(case_id) and case_approved(case_id) and (selected is None or case_id in selected) and case_full_access(case_id)
+    }
+    rows = [row for row in rows if row["default_case_id"] is None or row["default_case_id"] in allowed]
     return jsonify([_source_view(row) for row in rows])
 
 

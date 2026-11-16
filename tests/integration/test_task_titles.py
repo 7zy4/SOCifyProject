@@ -14,7 +14,7 @@ from socify.task_titles import TITLES, task_title
 
 @pytest.fixture
 def case(app, client, login_as):
-    app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
+    app.config.update(REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
     login_as("analyst")
     response = client.post("/api/cases", json={"title": "Language investigation"})
     assert response.status_code == 201

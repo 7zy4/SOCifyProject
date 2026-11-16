@@ -2,7 +2,6 @@ from flask import Blueprint, redirect, render_template, request
 from flask_wtf.csrf import generate_csrf
 
 from .case_policy import ANY_METHOD, case_policy
-from .operational import operational_mode
 from .security import current_user, login_required
 
 ui = Blueprint("ui", __name__)
@@ -10,9 +9,7 @@ ui = Blueprint("ui", __name__)
 
 @ui.get("/")
 def index():
-    if operational_mode():
-        return redirect("/cases" if current_user() else "/login")
-    return render_template("index.html", user=current_user())
+    return redirect("/cases" if current_user() else "/login")
 
 
 @ui.get("/dashboard")
@@ -47,11 +44,35 @@ def index():
 @case_policy(before_approval=ANY_METHOD, batch_member={"GET"})
 @login_required
 def dashboard(case_id: int | None = None):
-    if operational_mode():
-        from .cases import _case_row
-        from .security import has_permission
+    from .cases import _case_row
+    from .security import has_permission
 
-        if request.path in {
+    if request.path in {
+        "/monitoring",
+        "/performance",
+        "/log-management",
+        "/endpoint-security",
+        "/threat-intel",
+        "/email-security",
+        "/sandbox",
+        "/reports",
+    } and not has_permission(current_user(), "cases.read"):
+        return render_template("unavailable.html"), 403
+    if case_id is not None and not _case_row(case_id):
+        return render_template("unavailable.html"), 404
+    if request.path in {"/lab", "/scores"}:
+        return render_template("unavailable.html"), 410
+    if (
+        request.path
+        not in {
+            "/cases",
+            "/my-tasks",
+            "/team",
+            "/profile",
+            "/playbooks",
+            "/analysis-library",
+            "/audit",
+            "/admin",
             "/monitoring",
             "/performance",
             "/log-management",
@@ -60,42 +81,15 @@ def dashboard(case_id: int | None = None):
             "/email-security",
             "/sandbox",
             "/reports",
-        } and not has_permission(current_user(), "cases.read"):
-            return render_template("unavailable.html"), 403
-        if case_id is not None and not _case_row(case_id):
-            return render_template("unavailable.html"), 404
-        if request.path in {"/lab", "/scores"}:
-            return render_template("unavailable.html"), 410
-        if (
-            request.path
-            not in {
-                "/cases",
-                "/my-tasks",
-                "/team",
-                "/profile",
-                "/playbooks",
-                "/analysis-library",
-                "/audit",
-                "/admin",
-                "/monitoring",
-                "/performance",
-                "/log-management",
-                "/endpoint-security",
-                "/threat-intel",
-                "/email-security",
-                "/sandbox",
-                "/reports",
-            }
-            and case_id is None
-        ):
-            return redirect("/cases")
-        return render_template(
-            "app.html",
-            user=current_user(),
-            section="case" if case_id else request.path.strip("/"),
-            csrf_token=generate_csrf(),
-            operational=True,
-            case_id=case_id,
-        )
-    section = request.path.strip("/") or "dashboard"
-    return render_template("app.html", user=current_user(), section=section, csrf_token=generate_csrf(), operational=False)
+        }
+        and case_id is None
+    ):
+        return redirect("/cases")
+    return render_template(
+        "app.html",
+        user=current_user(),
+        section="case" if case_id else request.path.strip("/"),
+        csrf_token=generate_csrf(),
+        operational=True,
+        case_id=case_id,
+    )

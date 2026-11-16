@@ -69,14 +69,6 @@ def transaction(connection: sqlite3.Connection | None = None, *, immediate: bool
         raise
 
 
-def fetch_one(query: str, parameters: tuple[object, ...] = ()) -> sqlite3.Row | None:
-    return get_db().execute(query, parameters).fetchone()
-
-
-def fetch_all(query: str, parameters: tuple[object, ...] = ()) -> list[sqlite3.Row]:
-    return get_db().execute(query, parameters).fetchall()
-
-
 def inserted_id(cursor: sqlite3.Cursor) -> int:
     value = cursor.lastrowid
     if value is None:

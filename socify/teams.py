@@ -8,7 +8,7 @@ from flask import Blueprint, jsonify, request
 from .audit import record_audit
 from .case_policy import case_policy
 from .db import get_db, inserted_id, transaction
-from .operational import case_scope, case_visible, operational_mode
+from .operational import case_scope, case_visible
 from .security import actor_id, current_user, error_response, has_permission, login_required, require_permission, workspace_id
 from .timeutils import iso_now, utc_now
 from .validation import ValidationError, public_error_message
@@ -18,7 +18,7 @@ MEMBER_ROLES = {"analyst", "auditor", "instructor", "soc_manager", "l1_analyst",
 
 
 def allowed_roles():
-    return MEMBER_ROLES - {"instructor"} if operational_mode() else MEMBER_ROLES
+    return MEMBER_ROLES - {"instructor"}
 
 
 def manager():
@@ -28,7 +28,6 @@ def manager():
 @teams_api.get("/api/team")
 @login_required
 def team_detail():
-    from .operational import operational_mode
     from .security import effective_permissions
 
     members = [
@@ -41,7 +40,7 @@ def team_detail():
     ]
     roles = []
     for role in sorted(MEMBER_ROLES):
-        if operational_mode() and role == "instructor":
+        if role == "instructor":
             continue
         available = effective_permissions({"role": role})
         policy = get_db().execute("SELECT permissions FROM team_role_permissions WHERE workspace_id = ? AND role = ?", (workspace_id(), role)).fetchone()
@@ -50,15 +49,14 @@ def team_detail():
         )
     scope = "" if manager() else " AND a.assignee = ?"
     args: list[object] = [workspace_id()] if manager() else [workspace_id(), actor_id()]
-    if operational_mode():
-        membership, parameters = case_scope(current_user() or {})
-        scope += membership
-        args.extend(parameters)
-        from .autopsy_workspace import selection_scope_sql
+    membership, parameters = case_scope(current_user() or {})
+    scope += membership
+    args.extend(parameters)
+    from .autopsy_workspace import selection_scope_sql
 
-        selected_scope, selected_args = selection_scope_sql()
-        scope += selected_scope
-        args.extend(selected_args)
+    selected_scope, selected_args = selection_scope_sql()
+    scope += selected_scope
+    args.extend(selected_args)
     assignments = [
         dict(row)
         for row in get_db()
@@ -70,10 +68,9 @@ def team_detail():
     ]
     if not has_permission(current_user(), "cases.read"):
         assignments = []
-    if operational_mode():
-        from .autopsy_pipeline import job_visible
+    from .autopsy_pipeline import job_visible
 
-        assignments = [assignment for assignment in assignments if job_visible(assignment["job_id"])]
+    assignments = [assignment for assignment in assignments if job_visible(assignment["job_id"])]
     return jsonify({"members": members, "roles": roles, "assignments": assignments, "can_manage": manager()})
 
 
@@ -94,16 +91,15 @@ def list_assignments():
     if scope == "me" or not manager():
         where += " AND a.assignee = ?"
         args.append(actor_id())
-    if operational_mode():
-        from .autopsy_workspace import selection_scope_sql
+    from .autopsy_workspace import selection_scope_sql
 
-        membership, parameters = case_scope(current_user() or {})
-        selection, selected = selection_scope_sql()
-        where += membership + selection + " AND c.training_run_id IS NULL"
-        args.extend([*parameters, *selected])
-        if not manager():
-            where += " AND (NOT EXISTS (SELECT 1 FROM autopsy_batch_access b WHERE b.job_id=j.id AND b.restricted=1) OR j.created_by=? OR EXISTS (SELECT 1 FROM autopsy_batch_members m WHERE m.job_id=j.id AND m.user_id=?))"
-            args.extend([actor_id(), actor_id()])
+    membership, parameters = case_scope(current_user() or {})
+    selection, selected = selection_scope_sql()
+    where += membership + selection + " AND c.training_run_id IS NULL"
+    args.extend([*parameters, *selected])
+    if not manager():
+        where += " AND (NOT EXISTS (SELECT 1 FROM autopsy_batch_access b WHERE b.job_id=j.id AND b.restricted=1) OR j.created_by=? OR EXISTS (SELECT 1 FROM autopsy_batch_members m WHERE m.job_id=j.id AND m.user_id=?))"
+        args.extend([actor_id(), actor_id()])
     if status:
         where += " AND t.status = ?"
         args.append(status)
@@ -145,8 +141,7 @@ def invite_member():
         or not re_email(data["email"])
         or not isinstance(data.get("role"), str)
         or data["role"] not in allowed_roles()
-        or operational_mode()
-        and set(data) != {"email", "role"}
+        or set(data) != {"email", "role"}
     ):
         return error_response("INVALID_INVITATION", "حدد البريد والدور المسموح", 422)
     token = secrets.token_urlsafe(32)
@@ -166,13 +161,7 @@ def change_member(user_id):
     if not manager():
         return error_response("PERMISSION_DENIED", "تغيير الأدوار للمدير فقط", 403)
     data = request.get_json(silent=True)
-    if (
-        not isinstance(data, dict)
-        or not isinstance(data.get("role"), str)
-        or data["role"] not in allowed_roles()
-        or operational_mode()
-        and set(data) != {"role"}
-    ):
+    if not isinstance(data, dict) or not isinstance(data.get("role"), str) or data["role"] not in allowed_roles() or set(data) != {"role"}:
         return error_response("INVALID_ROLE", "الدور غير مسموح", 422)
     with transaction():
         member = get_db().execute("SELECT role FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (user_id, workspace_id())).fetchone()
@@ -249,7 +238,7 @@ def assign_logs():
         or job["training_run_id"] is not None
     ):
         return error_response("ASSIGNMENT_SCOPE_INVALID", "اختر قضية واستيرادًا مشتركين وعضوًا من الفريق", 422)
-    if operational_mode() and job["case_id"] != case["id"]:
+    if job["case_id"] != case["id"]:
         return error_response("ASSIGNMENT_SCOPE_INVALID", "دفعة السجلات تابعة لقضية أخرى", 422)
     if job["status"] not in {"completed", "completed_with_errors"} or case["status"] == "closed":
         return error_response("ASSIGNMENT_NOT_READY", "يلزم استيراد مكتمل وقضية مفتوحة", 409)
@@ -272,11 +261,10 @@ def assign_logs():
     with transaction():
         if get_db().execute("SELECT status FROM incident_cases WHERE id = ?", (case["id"],)).fetchone()[0] == "closed":
             return error_response("ASSIGNMENT_NOT_READY", "القضية مغلقة", 409)
-        if operational_mode():
-            from .autopsy_pipeline import job_visible
+        from .autopsy_pipeline import job_visible
 
-            if not job_visible(job["id"], principal):
-                return error_response("ASSIGNEE_BATCH_ACCESS_REQUIRED", "العضو لا يستطيع فتح الدفعة. أضفه من إدارة الدفعة ثم أعد الإسناد", 422)
+        if not job_visible(job["id"], principal):
+            return error_response("ASSIGNEE_BATCH_ACCESS_REQUIRED", "العضو لا يستطيع فتح الدفعة. أضفه من إدارة الدفعة ثم أعد الإسناد", 422)
         duplicate = (
             get_db()
             .execute(
@@ -287,11 +275,10 @@ def assign_logs():
         )
         if duplicate:
             return jsonify({"id": duplicate["id"], "duplicate": True})
-        if operational_mode():
-            get_db().execute(
-                "INSERT INTO autopsy_case_members(case_id, user_id, responsibility, assigned_by, assigned_at) VALUES (?, ?, 'investigator', ?, ?) ON CONFLICT(case_id, user_id) DO NOTHING",
-                (case["id"], data["assignee"], actor_id(), iso_now()),
-            )
+        get_db().execute(
+            "INSERT INTO autopsy_case_members(case_id, user_id, responsibility, assigned_by, assigned_at) VALUES (?, ?, 'investigator', ?, ?) ON CONFLICT(case_id, user_id) DO NOTHING",
+            (case["id"], data["assignee"], actor_id(), iso_now()),
+        )
         task = get_db().execute(
             "INSERT INTO case_tasks (case_id, title, required, status, assignee, created_at) VALUES (?, ?, 1, 'pending', ?, ?)",
             (case["id"], data["instructions"].strip()[:255], data["assignee"], iso_now()),
@@ -333,13 +320,12 @@ def update_assignment_status(assignment_id, status, expected_status=None):
         )
         if not row or not manager() and row["assignee"] != actor_id():
             return error_response("ASSIGNMENT_NOT_FOUND", "المهمة غير موجودة", 404)
-        if operational_mode() and not case_visible(row["case_id"], current_user() or {}):
+        if not case_visible(row["case_id"], current_user() or {}):
             return error_response("ASSIGNMENT_NOT_FOUND", "المهمة غير متاحة بعد سحب عضوية القضية", 404)
-        if operational_mode():
-            from .autopsy_pipeline import job_visible
+        from .autopsy_pipeline import job_visible
 
-            if not job_visible(row["job_id"]):
-                return error_response("ASSIGNMENT_NOT_FOUND", "دفعة المهمة غير متاحة", 404)
+        if not job_visible(row["job_id"]):
+            return error_response("ASSIGNMENT_NOT_FOUND", "دفعة المهمة غير متاحة", 404)
         if row["case_status"] == "closed":
             return error_response("CASE_CLOSED", "المهمة مقفلة مع القضية", 409)
         if status == row["task_status"]:
@@ -467,7 +453,7 @@ def shift_handoff(case_id: int):
     from .autopsy_domain import custody, member_has_open_work, text_value, touch_case
     from .cases import _case_row
 
-    if not operational_mode() or not manager() or not all(has_permission(current_user(), permission) for permission in ("cases.update", "cases.assign")):
+    if not manager() or not all(has_permission(current_user(), permission) for permission in ("cases.update", "cases.assign")):
         return error_response("PERMISSION_DENIED", "تسليم المناوبة للمدير المخول فقط", 403)
     data = request.get_json(silent=True)
     try:

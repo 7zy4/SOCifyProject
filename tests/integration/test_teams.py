@@ -18,6 +18,20 @@ def account(client, database, email, **options):
     return dict(row)
 
 
+def new_team(client, database, email, name):
+    """A separate team and its manager, as scripts/bootstrap_team.py creates them, signed in on the client."""
+    now = "2026-01-01T00:00:00Z"
+    workspace = database.execute("INSERT INTO training_workspaces (public_id, name, created_at) VALUES (?, ?, ?)", (f"team-{email}", name, now)).lastrowid
+    user = database.execute(
+        "INSERT INTO users (email, password_hash, name, role, team, workspace_id, created_at, password_changed_at, is_active) VALUES (?, '', 'Team manager', 'soc_manager', ?, ?, ?, ?, 1)",
+        (email, name, workspace, now, now),
+    ).lastrowid
+    database.execute("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at) VALUES (?, ?, 'soc_manager', ?)", (workspace, user, now))
+    row = dict(database.execute("SELECT * FROM users WHERE id = ?", (user,)).fetchone())
+    switch(client, row)
+    return row
+
+
 def switch(client, user):
     with client.session_transaction() as session:
         session.clear()
@@ -27,7 +41,7 @@ def switch(client, user):
 
 
 def test_team_registration_invitation_and_live_permission_policy(client, database):
-    owner = account(client, database, "owner@team.test", team_name="Incident Team", role="admin")
+    owner = new_team(client, database, "owner@team.test", "Incident Team")
     assert owner["role"] == "soc_manager"
     assert owner["workspace_id"] != 1
     invite = client.post("/api/team/invitations", json={"email": "analyst@team.test", "role": "analyst"})
@@ -38,7 +52,9 @@ def test_team_registration_invitation_and_live_permission_policy(client, databas
     assert token not in client.get("/api/team").text
     wrong = client.post("/api/auth/register", json={"email": "wrong@team.test", "name": "Wrong member", "password": LOGIN_VALUE, "invitation_token": token})
     assert wrong.status_code == 422
-    member = account(client, database, "analyst@team.test", invitation_token=token, role="admin")
+    escalation = {"email": "analyst@team.test", "name": "Team member", "password": LOGIN_VALUE, "invitation_token": token, "role": "admin"}
+    assert client.post("/api/auth/register", json=escalation).status_code == 422
+    member = account(client, database, "analyst@team.test", invitation_token=token)
     assert member["role"] == "analyst"
     assert member["workspace_id"] == owner["workspace_id"]
     replay = client.post("/api/auth/register", json={"email": "other@team.test", "name": "Other member", "password": LOGIN_VALUE, "invitation_token": token})
@@ -57,9 +73,9 @@ def test_team_registration_invitation_and_live_permission_policy(client, databas
 
 
 def test_new_teams_cannot_see_or_manage_other_team(client, database):
-    first = account(client, database, "first@team.test", team_name="First Team")
+    first = new_team(client, database, "first@team.test", "First Team")
     case_id = client.post("/api/incidents", json={"title": "First team case"}).json["id"]
-    second = account(client, database, "second@team.test", team_name="Second Team")
+    second = new_team(client, database, "second@team.test", "Second Team")
     assert first["workspace_id"] != second["workspace_id"]
     assert client.get(f"/api/incidents/{case_id}").status_code == 404
     assert client.get("/api/incidents").json["total"] == 0

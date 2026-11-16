@@ -18,7 +18,7 @@ def test_builtin_brand_refresh_preserves_rule_identity_and_history(database):
 
 
 def test_builtin_rules_auto_seeded_into_every_workspace(app, client, database, login_as):
-    app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
+    app.config.update(REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
     new_ws = database.execute(
         "INSERT INTO training_workspaces(public_id, name, created_at) VALUES ('fresh-soc-ws', 'Fresh SOC Workspace', '2026-11-01T00:00:00Z')"
     ).lastrowid
@@ -38,7 +38,7 @@ def test_builtin_rules_auto_seeded_into_every_workspace(app, client, database, l
 
 
 def test_windows_xml_cef_and_json_logs_trigger_builtin_alerts_on_import(app, client, login_as):
-    app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
+    app.config.update(REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
     login_as("analyst")
     case_id = client.post("/api/cases", json={"title": "Multi-format SIEM triage"}).json["id"]
 
@@ -96,7 +96,6 @@ def test_windows_xml_cef_and_json_logs_trigger_builtin_alerts_on_import(app, cli
 
 def test_direct_siem_webhook_push_and_allowlisted_pull(app, client, login_as, monkeypatch):
     app.config.update(
-        LEGACY_TRAINING_TESTS=False,
         REQUIRE_CASE_APPROVAL=False,
         REQUIRE_INVESTIGATION_SELECTION=False,
     )

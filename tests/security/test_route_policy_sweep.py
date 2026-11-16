@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 
 from werkzeug.routing import IntegerConverter
 
-from socify import OPERATIONAL_BLUEPRINT_PREFIX, OPERATIONAL_BLUEPRINTS, OPERATIONAL_LEGACY_ENDPOINTS, RETIRED_API_PREFIXES
+from socify import RETIRED_API_PREFIXES
 from socify.case_policy import ANY_METHOD, CasePolicy
 from tests.conftest import issue_session
 
@@ -59,12 +59,8 @@ def _outcome(client, method, path):
     return response.status_code, code, urlsplit(response.headers.get("Location", "")).path
 
 
-def _operational(app, *, csrf):
-    app.config.update(LEGACY_TRAINING_TESTS=False, WTF_CSRF_ENABLED=csrf)
-
-
 def test_every_state_changing_request_requires_a_csrf_token(app):
-    _operational(app, csrf=True)
+    app.config.update(WTF_CSRF_ENABLED=True)
     accepted = {}
     for method, rule, path in _requests(app):
         if method in SAFE_METHODS:
@@ -76,7 +72,7 @@ def test_every_state_changing_request_requires_a_csrf_token(app):
 
 
 def test_anonymous_requests_are_refused_outside_the_public_list(app):
-    _operational(app, csrf=False)  # CSRF is covered above; this isolates authentication
+    # CSRF is covered above and is off in the test configuration; this isolates authentication.
     mismatches = []
     for method, rule, path in _requests(app):
         status, code, location = _outcome(app.test_client(), method, path)
@@ -94,7 +90,6 @@ def test_anonymous_requests_are_refused_outside_the_public_list(app):
 
 def test_no_registered_route_is_refused_as_retired(app, user_ids):
     # The training platform's routes were deleted; a registered route answering 410 would be a view nobody can reach.
-    _operational(app, csrf=False)
     for endpoint in list(app.view_functions):
         if endpoint != "static":
             app.view_functions[endpoint] = lambda **_: ("", 299)  # reached the view: not blocked by request policy
@@ -112,28 +107,8 @@ def test_no_registered_route_is_refused_as_retired(app, user_ids):
     assert not other, other
 
 
-def test_operational_routing_names_exist(app):
-    endpoints = set(app.view_functions)
-    assert set(OPERATIONAL_LEGACY_ENDPOINTS) <= endpoints, sorted(set(OPERATIONAL_LEGACY_ENDPOINTS) - endpoints)
-    assert set(OPERATIONAL_BLUEPRINTS) <= set(app.blueprints), sorted(set(OPERATIONAL_BLUEPRINTS) - set(app.blueprints))
-    assert any(name.startswith(OPERATIONAL_BLUEPRINT_PREFIX) for name in app.blueprints)
-    # A retired prefix answers 410 for every path under it, so no view that still serves requests may live there.
-    served = {
-        rule.rule.split("/")[2]
-        for rule in app.url_map.iter_rules()
-        if rule.rule.startswith("/api/")
-        and (
-            rule.endpoint.split(".")[0] in OPERATIONAL_BLUEPRINTS
-            or rule.endpoint.startswith(OPERATIONAL_BLUEPRINT_PREFIX)
-            or rule.endpoint in OPERATIONAL_LEGACY_ENDPOINTS
-        )
-    }
-    assert not served & set(RETIRED_API_PREFIXES), sorted(served & set(RETIRED_API_PREFIXES))
-
-
 def test_removed_legacy_paths_still_answer_gone(app, user_ids):
     # The training platform's API was deleted, not hidden: old clients get a stable 410 instead of a bare 404.
-    _operational(app, csrf=False)
     client = app.test_client()
     for anonymous in (True, False):
         if not anonymous:
@@ -206,7 +181,6 @@ def test_a_view_declared_under_another_decorator_is_not_silently_strict(app):
 
 
 def test_anonymous_assignment_update_is_refused_without_a_server_error(app):
-    _operational(app, csrf=False)
     app.config["TESTING"] = False  # production error handling: an exception here would become a 500
     response = app.test_client().patch("/api/team/assignments/1", json={"status": "completed"})
     assert response.status_code == 401 and response.json["error"]["code"] == "AUTHENTICATION_REQUIRED"

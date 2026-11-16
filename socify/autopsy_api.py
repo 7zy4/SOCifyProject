@@ -638,9 +638,7 @@ def case_member(case_id: int):
 @autopsy_api.delete("/api/cases/<int:case_id>/members/<int:user_id>")
 @require_permission("cases.assign")
 def remove_case_member(case_id: int, user_id: int):
-    from .operational import operational_mode
-
-    if not operational_mode() or not manager():
+    if not manager():
         return error_response("PERMISSION_DENIED", "سحب وصول القضية للمدير المخول فقط", 403)
     data = request.get_json(silent=True)
     try:

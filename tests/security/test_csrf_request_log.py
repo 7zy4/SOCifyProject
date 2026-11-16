@@ -5,7 +5,7 @@ import re
 
 
 def test_csrf_rejection_writes_the_request_line_and_the_reason(app, client, caplog):
-    app.config.update(WTF_CSRF_ENABLED=True, LEGACY_TRAINING_TESTS=False)
+    app.config.update(WTF_CSRF_ENABLED=True)
     with caplog.at_level(logging.INFO):
         response = client.post("/api/cases?q=private-search-term", json={"title": "No token"})
     assert response.status_code == 400 and response.json["error"]["code"] == "CSRF_VALIDATION_FAILED"

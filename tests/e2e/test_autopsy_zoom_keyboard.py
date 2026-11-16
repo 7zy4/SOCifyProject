@@ -15,7 +15,7 @@ from tests.e2e.browser_helpers import launch_browser
 @pytest.mark.parametrize("zoom_mode", ["css", "native"])
 @pytest.mark.parametrize("analysis_view", ["files", "observables"])
 def test_200_percent_zoom_keyboard_modal_and_searchable_choices(app, tmp_path, zoom_mode, analysis_view):
-    app.config.update(LEGACY_TRAINING_TESTS=False, ALLOW_REGISTRATION=False, WTF_CSRF_ENABLED=True)
+    app.config.update(WTF_CSRF_ENABLED=True)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

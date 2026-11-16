@@ -3,7 +3,7 @@ import pytest
 
 @pytest.mark.parametrize("case_scoped", [True, False])
 def test_machine_source_key_cannot_choose_another_case(app, client, login_as, case_scoped):
-    app.config.update(LEGACY_TRAINING_TESTS=False, REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
+    app.config.update(REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
     login_as("admin")
     own = client.post("/api/cases", json={"title": "Authorized source case"}).json["id"]
     other = client.post("/api/cases", json={"title": "Separate source case"}).json["id"]

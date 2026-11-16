@@ -173,7 +173,6 @@ def test_normal_startup_never_populates_operational_evidence(tmp_path):
     config = {
         "DATABASE": str(tmp_path / "blank.db"),
         "TESTING": True,
-        "LEGACY_TRAINING_TESTS": False,
         "SECRET_KEY": secrets.token_urlsafe(32),
         "CREDENTIAL_KEY": secrets.token_urlsafe(32),
         "WTF_CSRF_ENABLED": False,

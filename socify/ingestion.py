@@ -20,7 +20,7 @@ from .autopsy_pipeline import activate_import, job_visible
 from .db import get_db, inserted_id, transaction
 from .events import ingest_event
 from .file_names import evidence_filename
-from .operational import case_visible, operational_mode
+from .operational import case_visible
 from .schema import public_id
 from .security import (
     actor_id,
@@ -739,9 +739,9 @@ def _job_access(job_id: int, write: bool = False) -> sqlite3.Row | None:
     row = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ? AND workspace_id = ?", (job_id, workspace_id())).fetchone()
     if not row or not can_access_training_run(row["training_run_id"]):
         return None
-    if operational_mode() and row["case_id"] is not None and not case_visible(row["case_id"], current_user() or {}):
+    if row["case_id"] is not None and not case_visible(row["case_id"], current_user() or {}):
         return None
-    if operational_mode() and row["case_id"] is not None and not job_visible(job_id):
+    if row["case_id"] is not None and not job_visible(job_id):
         return None
     if write and row["created_by"] != actor_id() and not has_permission(current_user(), "sources.manage"):
         return None
@@ -1045,8 +1045,6 @@ def _upload_payload() -> tuple[str, bytes, str | None, int | None, int | None]:
 
 
 def _upload_options() -> tuple[int | None, dict[str, Any]]:
-    if not operational_mode():
-        return None, {}
     from .autopsy_domain import text_value
     from .cases import _case_row
 
@@ -1213,13 +1211,12 @@ def create_import():
         return error_response("IMPORT_FORMAT_ERROR", public_error_message(exc, "File does not match the selected format"), 422)
     now = iso_now()
     original_filename = request.files["file"].filename if request.files else (request.get_json(silent=True) or {}).get("filename", filename)
-    if operational_mode():
-        from .autopsy_domain import text_value
+    from .autopsy_domain import text_value
 
-        try:
-            original_filename = text_value(original_filename, 255, True)
-        except ValueError as exc:
-            return error_response("INVALID_FILENAME", public_error_message(exc, "Specify a valid filename without a path"), 422)
+    try:
+        original_filename = text_value(original_filename, 255, True)
+    except ValueError as exc:
+        return error_response("INVALID_FILENAME", public_error_message(exc, "Specify a valid filename without a path"), 422)
     ciphertext = encrypt_bytes(content)
     with transaction():
         duplicate = matching_import()
@@ -1299,7 +1296,7 @@ def resume_import(job_id: int):
         return error_response("IMPORT_NOT_FOUND", "مهمة الاستيراد غير موجودة", 404)
     if row["status"] not in {"queued", "interrupted", "failed"}:
         return error_response("IMPORT_NOT_RESUMABLE", "مهمة الاستيراد ليست في حالة قابلة للاستئناف", 409)
-    if operational_mode() and row["case_id"] is not None:
+    if row["case_id"] is not None:
         with transaction():
             get_db().execute("UPDATE ingestion_jobs SET executor_id = ? WHERE id = ?", (actor_id(), job_id))
             from .autopsy_domain import custody

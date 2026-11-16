@@ -134,7 +134,7 @@ class ReviewJourney:
 
 @contextmanager
 def review_session(app, language, name, *, create_case=True):
-    app.config.update(LEGACY_TRAINING_TESTS=False, ALLOW_REGISTRATION=False, WTF_CSRF_ENABLED=True)
+    app.config.update(WTF_CSRF_ENABLED=True)
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -255,7 +255,6 @@ def test_removed_assessment_note_stays_removed_after_escalation(app, language):
     "required_procedure", [False, pytest.param(True, marks=pytest.mark.skipif(sys.platform == "win32", reason="Requires the isolated native report service"))]
 )
 def test_complete_review_closes_alert_and_reopening_preserves_report(app, language, required_procedure):
-    app.config.update(LEGACY_TRAINING_TESTS=False)
     download_pdf = "تنزيل PDF" if language == "ar" else "Download PDF"
     scenario = "closure-native-required-procedure" if required_procedure else "complete-case-closure"
     with local_worker_services(app.config), review_session(app, language, scenario) as (analyst, manager, result):

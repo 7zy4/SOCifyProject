@@ -61,7 +61,7 @@ def test_missing_resources_never_mutate_state(client, login_as, database, method
     assert database.execute("SELECT COUNT(*) FROM security_events").fetchone()[0] == before
 
 
-def test_case_validation_and_task_lifecycle(client, login_as, user_ids):
+def test_case_validation_and_task_lifecycle(client, login_as, user_ids, database):
     login_as("admin")
     case = client.post("/api/incidents", json={"title": "Boundary case"}).json
     url = f"/api/incidents/{case['id']}"
@@ -90,10 +90,11 @@ def test_case_validation_and_task_lifecycle(client, login_as, user_ids):
     ]:
         assert client.post(f"{url}/{suffix}", json=payload).status_code == status
     assert client.get(url + "/report?format=pdf").status_code == 422
-    assert client.get(url + "/report").status_code == 409
+    assert client.get(url + "/report").status_code == 404  # no archived report yet
     updated = client.patch(
         url,
         json={
+            "version": database.execute("SELECT version FROM incident_cases WHERE id = ?", (case["id"],)).fetchone()[0],
             "title": "Updated boundary case",
             "description": "Detailed description",
             "team": "SOC",
@@ -104,7 +105,7 @@ def test_case_validation_and_task_lifecycle(client, login_as, user_ids):
             "mitre_ids": ["T1110"],
         },
     )
-    assert updated.status_code == 200
+    assert updated.status_code == 200, updated.json
     assert updated.json["tags"] == ["triage"]
     task = client.post(url + "/tasks", json={"title": "Verify evidence", "required": True, "assignee": user_ids["analyst"]})
     assert task.status_code == 201
