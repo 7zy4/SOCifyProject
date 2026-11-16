@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 import pytest
 
 from socify.detection import RuleValidationError, _condition_matches, _leaf_matches, validate_dsl
-from socify.hunting import QueryError, _ioc_type, compile_query
 from socify.ingestion import _decode, _depth, _detect_format, _priority_severity, parse_records
 from socify.security import password_error, redact, safe_external_endpoint, totp_code, verify_totp
 from socify.timeutils import iso_timestamp, parse_timestamp
@@ -77,43 +76,6 @@ def test_rule_validation_normalizes_dsl() -> None:
 def test_rule_validation_rejects_unsafe_or_invalid_dsl(dsl: dict[str, object]) -> None:
     with pytest.raises(RuleValidationError):
         validate_dsl(dsl)
-
-
-def test_hunt_query_compiler_is_parameterized() -> None:
-    compiled = compile_query('source_ip=198.51.100.20 AND event_type="failed_login"')
-    assert compiled.sql.count("?") == 2
-    assert compiled.parameters == ["198.51.100.20", "failed_login"]
-    assert "198.51.100.20" not in compiled.sql
-
-
-@pytest.mark.parametrize(
-    "query",
-    [
-        "unknown=value",
-        "source_ip=198.51.100.20;DELETE",
-        "source_ip = ' OR 1=1",
-        "http_status=not-a-number",
-        "(" * 7 + "source=x" + ")" * 7,
-    ],
-)
-def test_hunt_query_rejects_invalid_tokens(query: str) -> None:
-    with pytest.raises(QueryError):
-        compile_query(query)
-
-
-@pytest.mark.parametrize(
-    ("candidate", "expected"),
-    [
-        ("198.51.100.20", ("ip", "198.51.100.20")),
-        ("2001:db8::1", ("ip", "2001:db8::1")),
-        ("HTTPS://PHISH-TRAINING.TEST/path", ("url", "https://phish-training.test/path")),
-        ("phish-training.test", ("domain", "phish-training.test")),
-        ("a" * 64, ("sha256", "a" * 64)),
-        ("not an indicator", None),
-    ],
-)
-def test_ioc_normalization(candidate: str, expected: tuple[str, str] | None) -> None:
-    assert _ioc_type(candidate) == expected
 
 
 def test_timestamp_normalization_requires_timezone() -> None:

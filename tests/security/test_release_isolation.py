@@ -6,19 +6,6 @@ from socify.security import totp_code
 from tests.conftest import DEMO_LOGIN_VALUE
 
 
-@pytest.mark.parametrize("action", ["retry", "cancel"])
-def test_response_mutations_require_object_access(client, login_as, database, action):
-    login_as("admin")
-    playbook = client.post("/api/playbooks", json={"name": "Private response", "publish": True, "steps": [{"action": "isolate_virtual_host"}]}).json["id"]
-    login_as("instructor")
-    run = client.post("/api/playbook-runs", json={"playbook_id": playbook, "idempotency_key": "private-response-key"}).json
-    assert run["state"] == "failed"
-    login_as("analyst")
-    assert client.post(f"/api/playbook-runs/{run['id']}/{action}", json={}).status_code == 404
-    assert client.post("/api/playbook-runs", json={"playbook_id": playbook, "idempotency_key": "private-response-key"}).status_code == 404
-    assert database.execute("SELECT state FROM playbook_runs WHERE id = ?", (run["id"],)).fetchone()[0] == "failed"
-
-
 def test_active_mfa_cannot_be_disabled_by_reenrollment(client, login_as):
     login_as("analyst")
     enrollment = client.post("/api/auth/mfa/enroll", json={}).json
@@ -39,24 +26,6 @@ def test_closed_case_cannot_receive_new_event_or_alert_evidence(client, login_as
         assert response.status_code == 409
         assert response.json["error"]["code"] == "CASE_EVIDENCE_LOCKED"
     assert database.execute("SELECT COUNT(*) FROM case_evidence WHERE case_id = ?", (case,)).fetchone()[0] == 0
-
-
-def test_private_response_stream_is_not_visible_to_other_trainee(client, login_as):
-    login_as("admin")
-    playbook = client.post(
-        "/api/playbooks",
-        json={
-            "name": "Private notification",
-            "publish": True,
-            "steps": [{"action": "notify_training_team", "parameters": {"message": "private-response-marker"}}],
-        },
-    ).json["id"]
-    login_as("instructor")
-    assert client.post("/api/playbook-runs", json={"playbook_id": playbook, "idempotency_key": "private-stream-key"}).status_code == 201
-    login_as("analyst")
-    stream = client.get("/api/stream/events?once=1").get_data(as_text=True)
-    assert "private-response-marker" not in stream
-    assert "playbook_run.updated" not in stream
 
 
 def test_case_creation_with_missing_evidence_is_atomic_client_error(client, login_as, database):
@@ -84,42 +53,16 @@ def test_rule_enums_reject_non_scalar_json(client, login_as, field, value):
     assert client.post("/api/rules", json={"name": "Invalid scalar", "dsl": {"condition": condition}}).status_code == 422
 
 
-@pytest.mark.parametrize("field,value", [("timeout_seconds", "bad"), ("retry_limit", []), ("action", []), ("approval_role", []), ("position", True)])
-def test_playbook_steps_validate_types_before_writing(client, login_as, field, value):
-    login_as("admin")
-    step = {"action": "notify_training_team", field: value}
-    assert client.post("/api/playbooks", json={"name": "Invalid step", "steps": [step]}).status_code == 422
-
-
-@pytest.mark.parametrize("action", ["collect_evidence", "escalate_to_manager"])
-def test_response_cannot_mutate_closed_case(client, login_as, database, action):
-    login_as("admin")
-    case = client.post("/api/incidents", json={"title": "Closed response target"}).json["id"]
-    database.execute("UPDATE incident_cases SET status = 'closed' WHERE id = ?", (case,))
-    playbook = client.post("/api/playbooks", json={"name": "Closed case response", "publish": True, "steps": [{"action": action}]}).json["id"]
-    result = client.post("/api/playbook-runs", json={"playbook_id": playbook, "case_id": case, "idempotency_key": f"closed-{action}"})
-    assert result.json["state"] == "failed"
-    assert database.execute("SELECT status FROM incident_cases WHERE id = ?", (case,)).fetchone()[0] == "closed"
-    assert database.execute("SELECT COUNT(*) FROM case_evidence WHERE case_id = ?", (case,)).fetchone()[0] == 0
-
-
-def test_stream_stops_after_account_revocation(app, client, login_as, database, user_ids, monkeypatch):
-    login_as("analyst")
-    monkeypatch.setattr("socify.visualization.time.sleep", lambda _: database.execute("UPDATE users SET is_active = 0 WHERE id = ?", (user_ids["analyst"],)))
-    monkeypatch.setattr("socify.visualization.time.monotonic", iter([0, 16, 16]).__next__)
-    result = client.get("/api/stream/events", buffered=False)
-    assert next(result.response).startswith(b"event: heartbeat")
-    assert list(result.response) == []
-
-
 def test_scope_migration_is_repeatable_and_preserves_events(client, login_as, database):
     from socify.schema import ensure_schema
 
     login_as("admin")
     event = client.post("/api/events", json={"source": "migration-fixture", "source_ip": "192.0.2.234", "idempotency_key": "legacy-key"}).json["id"]
-    indicator = client.post("/api/iocs/extract", json={"event_id": event}).json["items"][0]["id"]
-    database.execute("DELETE FROM ioc_observations WHERE ioc_id = ?", (indicator,))
-    database.execute("UPDATE ioc_indicators SET context = ? WHERE id = ?", (f'{{"event_id":{event}}}', indicator))
+    # An indicator written before observations had their own table: the event it was seen in lives only in its context.
+    indicator = database.execute(
+        "INSERT INTO ioc_indicators (workspace_id, type, value, first_seen, last_seen, confidence, source, context, tags) VALUES (1, 'ip', '192.0.2.234', ?, ?, 0.5, 'SOCify extraction', ?, '[]')",
+        ("2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", f'{{"event_id":{event}}}'),
+    ).lastrowid
     database.execute("DROP INDEX idx_events_scope_idempotency")
     database.execute("CREATE UNIQUE INDEX idx_events_idempotency ON security_events(workspace_id, idempotency_key) WHERE idempotency_key IS NOT NULL")
     ensure_schema(database)

@@ -47,12 +47,6 @@ def test_capsule_library_errors_do_not_expose_internal_details(autopsy_case, cli
     assert database.execute("SELECT COUNT(*) FROM incident_cases").fetchone()[0] == count
 
 
-def test_catalog_errors_do_not_expose_internal_details(client, login_as, monkeypatch):
-    login_as("admin")
-    monkeypatch.setattr("socify.attack.activate_attack_version", fail_with(ValueError(PRIVATE_DETAIL)))
-    assert_safe_failure(client.post("/api/attack/catalogs/unavailable/activate"), "ATTACK_VERSION_NOT_FOUND", 404)
-
-
 def test_case_context_error_does_not_expose_details_or_mutate_case(autopsy_case, client, database, monkeypatch):
     version = database.execute("SELECT version FROM incident_cases WHERE id=?", (autopsy_case,)).fetchone()[0]
     monkeypatch.setattr(import_module("socify.autopsy_api"), "text_value", fail_with(ValueError(PRIVATE_DETAIL)))

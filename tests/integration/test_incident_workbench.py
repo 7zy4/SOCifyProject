@@ -36,7 +36,6 @@ def test_import_to_case_annotation_timeline_and_report(client, login_as):
     payload = {"technique_id": "T1110", "assessment": "verified", "event_id": event_id, "reason": "Repeated authentication failures in the linked source"}
     assert client.post(url + "/techniques", json=payload).status_code == 201
     assert client.get(url).json["technique_annotations"][0]["event_id"] == event_id
-    assert len(client.get(f"/api/visualizations/timeline?case_id={case_id}&limit=500").json["items"]) == 205
     client.post(url + "/notes", json={"body": "PRIVATE-MARKER", "visibility": "private"})
     client.post(url + "/notes", json={"body": "Reviewed <script>attack()</script>", "visibility": "team"})
     for task in detail["tasks"]:

@@ -162,7 +162,6 @@ def test_production_requires_external_secret(monkeypatch: pytest.MonkeyPatch) ->
         ("get", "/api/audit", None),
         ("post", "/api/rules", {"name": "Denied", "dsl": {}}),
         ("post", "/api/sources", {"name": "Denied", "type": "file"}),
-        ("post", "/api/playbooks", {"name": "Denied", "steps": []}),
     ],
 )
 def test_e2e_43_analyst_cannot_call_administrative_operations(

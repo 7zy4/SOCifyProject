@@ -30,7 +30,7 @@
 ```bash
 curl -fsS http://127.0.0.1:5000/health/ready
 docker compose ps
-docker compose logs --tail 100 analysis autopsy-worker import-worker playbook-worker
+docker compose logs --tail 100 analysis autopsy-worker import-worker
 ```
 
 - في التشغيل المحلي تظهر رسائل التطبيق في طرفية `python run.py`.

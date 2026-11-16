@@ -12,7 +12,7 @@ from flask import Blueprint, jsonify, request
 
 from .audit import record_audit, record_training_action
 from .db import get_db, inserted_id, transaction
-from .schema import insert_outbox, public_id
+from .schema import public_id
 from .security import actor_id, can_access_training_run, error_response, parse_json_object, require_permission, training_scope_sql, workspace_id
 from .timeutils import iso_now, parse_timestamp
 
@@ -542,7 +542,6 @@ def evaluate_rules(connection: sqlite3.Connection, event_id: int, only_rule_id: 
                 (rule["id"], event_id, inserted_id(compatibility_cursor), alert_id, dedup_key, json.dumps(evaluation.trace, separators=(",", ":")), now),
             )
             connection.execute("UPDATE rules SET match_count = match_count + 1, last_triggered_at = ? WHERE id = ?", (now, rule["id"]))
-            insert_outbox(connection, int(event["workspace_id"]), "alert.created", {"id": alert_id, "alert_id": alert_public_id, "severity": severity})
             alert_ids.append(alert_id)
         except (RuleValidationError, ValueError, TypeError, json.JSONDecodeError):
             connection.execute("UPDATE rules SET failed_evaluations = failed_evaluations + 1 WHERE id = ?", (rule["id"],))

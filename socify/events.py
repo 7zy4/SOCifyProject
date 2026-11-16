@@ -11,7 +11,7 @@ from .audit import record_audit
 from .db import get_db, inserted_id, transaction
 from .detection import SEVERITIES, evaluate_rules
 from .file_names import attachment_disposition
-from .schema import insert_outbox, public_id
+from .schema import public_id
 from .security import actor_id, can_access_training_run, current_user, error_response, require_permission, training_scope_sql, workspace_id
 from .timeutils import iso_now, iso_timestamp
 from .validation import ValidationError, public_error_message
@@ -278,9 +278,6 @@ def ingest_event(
 
     alerts = evaluate_rules(connection, event_id)
     alerts.extend(evaluate_watchlist_for_event(connection, event_id))
-    insert_outbox(
-        connection, workspace, "event.created", {"id": event_id, "event_id": event_public_id, "severity": normalized["severity"], "alert_ids": alerts}
-    )
     return event_id, alerts, False
 
 

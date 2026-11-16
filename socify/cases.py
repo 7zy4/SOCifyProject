@@ -16,7 +16,6 @@ from .db import get_db, inserted_id, transaction
 from .file_names import attachment_disposition
 from .operational import case_scope, case_visible, operational_mode
 from .report_brand import report_style
-from .schema import insert_outbox
 from .security import (
     actor_id,
     can_access_training_run,
@@ -517,7 +516,6 @@ def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
             {"alert_ids": alert_ids},
             f"case-create:{case_id}",
         )
-        insert_outbox(get_db(), workspace_id(), "incident.created", {"id": case_id})
         if retry is not None:
             get_db().execute(
                 "INSERT INTO case_creation_receipts(workspace_id,actor_id,request_key,request_hash,case_id,created_at) VALUES (?,?,?,?,?,?)",
@@ -720,7 +718,6 @@ def update_case(case_id: int):
             return error_response("CASE_VERSION_CONFLICT", "تم تعديل التحقيق في جلسة أخرى", 409)
         _history(get_db(), case_id, "case_updated", {key: row[key] for key in updates}, updates, str(data.get("reason") or "")[:500] or None)
         record_audit(get_db(), "update", "case", case_id, details={"fields": list(updates)})
-        insert_outbox(get_db(), workspace_id(), "incident.updated", {"id": case_id, "version": int(row["version"]) + 1})
     return jsonify(_case_view(_case_row(case_id)))
 
 
@@ -802,7 +799,6 @@ def _transition(case_id: int, row: sqlite3.Row, target: str, reason: str, data: 
             {"from": row["status"], "to": target},
             f"case-transition:{case_id}:{row['version']}:{target}",
         )
-        insert_outbox(get_db(), workspace_id(), "incident.updated", {"id": case_id, "status": target})
         if target == "closed":
             _generate_reports(case_id)
     return jsonify(_case_view(_case_row(case_id)))

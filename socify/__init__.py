@@ -7,7 +7,6 @@ from flask import Flask, g, render_template, request
 from flask_wtf.csrf import CSRFError, CSRFProtect, generate_csrf
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from .attack import attack_api
 from .auth import auth_api
 from .autopsy_api import autopsy_api
 from .autopsy_capsules import autopsy_capsules_api
@@ -30,11 +29,9 @@ from .config import build_config
 from .db import close_db, connect_path
 from .detection import detection_api
 from .events import events_api
-from .hunting import hunting_api
 from .ingestion import ingestion_api
 from .operational import operational_mode
 from .platform import platform_api
-from .playbooks import playbooks_api
 from .request_limits import BoundedRequest, NumericInputError, StructureLimitError
 from .schema import ensure_schema
 from .security import correlation_id, error_response
@@ -42,12 +39,27 @@ from .soc_insights import soc_insights_api
 from .sources import sources_api
 from .teams import teams_api
 from .ui import ui
-from .visualization import visualization_api
 
 csrf = CSRFProtect()
 
 # Operational-mode routing policy; tests/security/test_route_policy_sweep.py checks every name against the URL map.
-RETIRED_API_PREFIXES = frozenset({"training", "scores", "scenarios", "assessments", "leaderboards", "lab"})
+RETIRED_API_PREFIXES = frozenset(
+    {
+        "training",
+        "scores",
+        "scenarios",
+        "assessments",
+        "leaderboards",
+        "lab",
+        "playbooks",
+        "playbook-runs",
+        "hunt",
+        "iocs",
+        "attack",
+        "visualizations",
+        "stream",
+    }
+)
 OPERATIONAL_BLUEPRINTS = frozenset({"auth", "cases", "teams", "sources", "watchlist", "quick_reports"})
 OPERATIONAL_LEGACY_ENDPOINTS = frozenset({"platform.audit_logs", "platform.role_matrix", "platform.health_api"})
 OPERATIONAL_BLUEPRINT_PREFIX = "autopsy"
@@ -106,10 +118,6 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         cases_api,
         sources_api,
         ingestion_api,
-        attack_api,
-        hunting_api,
-        visualization_api,
-        playbooks_api,
         platform_api,
         teams_api,
     ):

@@ -135,7 +135,7 @@ def test_retention_removes_expired_bookkeeping_and_keeps_current_rows(app, datab
 def test_operational_health_reports_queues_to_signed_in_users(autopsy_case, client):
     health = client.get("/api/health")
     assert health.status_code == 200
-    assert {"import_jobs", "playbook_jobs", "rule_evaluation_failures"} <= set(health.json)
+    assert {"import_jobs", "rule_evaluation_failures"} <= set(health.json)
     assert client.get("/api/dashboard").status_code == 410
 
 

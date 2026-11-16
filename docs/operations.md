@@ -51,7 +51,6 @@ curl -fsS http://127.0.0.1:5000/health/ready
 | socify | الواجهة وAPI عبر Gunicorn | شبكة داخلية وقاعدة ومقبس التحليل |
 | import-worker | معالجة الاستيرادات | بلا شبكة؛ قاعدة ومفاتيح فك أدلة الرفع |
 | autopsy-worker | التحليل والتقارير | بلا شبكة؛ قاعدة ومقبس التحليل |
-| playbook-worker | إجراءات القضية المعتمدة | بلا شبكة؛ قاعدة مشتركة |
 | analysis | الفحص الساكن وإخراج المستندات | بلا شبكة أو قاعدة أو مفاتيح التطبيق |
 
 - تخزن البيانات في حجم `socify-data`؛ يتبادل التطبيق والتحليل الطلبات عبر `analysis-ipc`.
@@ -79,7 +78,6 @@ curl -fsS http://127.0.0.1:5000/health/ready
 | `SOCIFY_SOURCE_ALLOWLIST` | أسماء مصادر HTTPS المصرح بها |
 | `SOCIFY_MAX_UPLOAD_BYTES` و`SOCIFY_MAX_IMPORT_ROWS` | حدود الرفع والصفوف؛ الافتراضي 10 MiB و100000 صف |
 | `SOCIFY_MAX_PENDING_IMPORT_JOBS` | حد طابور الاستيراد |
-| `SOCIFY_MAX_PENDING_PLAYBOOK_RUNS` | حد طابور إجراءات القضية |
 | `SOCIFY_REQUIRE_CASE_APPROVAL` | اعتماد القضية عند تفعيل سياسة المؤسسة |
 | `SOCIFY_REQUIRE_INVESTIGATION_SELECTION` | قصر مساحة العمل على اختيار تحقيق محدد |
 
@@ -87,12 +85,11 @@ curl -fsS http://127.0.0.1:5000/health/ready
 
 - Compose يشغّل العمال؛ الأوامر التالية لمسؤول ينشر الخدمات منفردة.
 - استخدم قاعدة البيانات ومفاتيح التشفير نفسها في التطبيق والعمال.
-- أبق `SOCIFY_IMPORT_INLINE_EXECUTION=0` و`SOCIFY_PLAYBOOK_INLINE_EXECUTION=0` في الإنتاج.
+- أبق `SOCIFY_IMPORT_INLINE_EXECUTION=0` في الإنتاج.
 
 ```bash
 python -m scripts.run_import_worker --lease-seconds 120
 python -m scripts.run_autopsy_worker
-python -m scripts.run_playbook_worker
 ```
 
 - لكل عامل طرفية أو مشرف خدمة مستقل؛ الأوامر مستمرة.
@@ -113,14 +110,14 @@ python -m scripts.run_playbook_worker
 - راقب زمن الاستجابة و5xx وحجم القاعدة وWAL والأعمال الفاشلة والحجوزات المنتهية وتأخر outbox.
 - يسجل التطبيق سطرًا لكل طلب API وصفحة: الطريقة والمسار والحالة والمدة ومعرّف الارتباط والمستخدم، دون نص الاستعلام أو جسم الطلب. مثال: `request method=GET path=/api/cases status=200 duration_ms=12.4 correlation_id=… user_id=3`.
 - سجل الوصول الخاص بـGunicorn معطّل (`accesslog = None` في `gunicorn.conf.py`): كان يكرر كل طلب مع نص الاستعلام كاملًا (عبارات البحث وعناوين IP وأي رمز يمر في الرابط) وبعنوان NGINX بدل عنوان العميل. أدوات المراقبة التي كانت تقرأ سطر Gunicorn (`"GET /path?query HTTP/1.1" 200 …`) يجب أن تقرأ سطر `request method=… path=… status=…` بدلًا منه. أخطاء Gunicorn نفسها ما زالت تُكتب إلى stderr، وطلبات `/health/*` والملفات الثابتة لا تُسجَّل، والطلب المرفوض لغياب رمز الحماية يظهر بسطر `csrf_rejected reason=… correlation_id=…` بدل سطر `request`.
-- يكتب كل عامل سطرًا واحدًا عند انتهاء كل مهمة في السجل `socify.workers`: `import_job_finished` أو `import_job_failed` (المعرف والقضية والحالة وعدد المقبول والمرفوض أو نوع الخطأ والمدة)، و`autopsy_job_finished` (النوع والحالة ورمز الخطأ والمحاولة والمدة)، و`playbook_run_finished` أو `playbook_run_failed`. لا تدخل السطر أسماء الملفات المرفوعة ولا محتوى الأدلة ولا نص الاستثناءات؛ التفاصيل القابلة للمراجعة تبقى في سجل المهمة داخل المنصة.
+- يكتب كل عامل سطرًا واحدًا عند انتهاء كل مهمة في السجل `socify.workers`: `import_job_finished` أو `import_job_failed` (المعرف والقضية والحالة وعدد المقبول والمرفوض أو نوع الخطأ والمدة)، و`autopsy_job_finished` (النوع والحالة ورمز الخطأ والمحاولة والمدة). لا تدخل السطر أسماء الملفات المرفوعة ولا محتوى الأدلة ولا نص الاستثناءات؛ التفاصيل القابلة للمراجعة تبقى في سجل المهمة داخل المنصة.
 - تُحذف تلقائيًا محاولات الدخول الأقدم من 7 أيام، والجلسات المنتهية أو الملغاة منذ 30 يومًا، وأحداث outbox الأقدم من 7 أيام. سجل التدقيق والأدلة لا تُحذف آليًا.
 - نجاح readiness لا يثبت اكتمال كل خدمة؛ تحقق من العمال وخدمة التحليل أيضًا.
 - استخدم `X-Correlation-ID` لربط الطلب بسجلاته دون نسخ محتوى الأدلة أو الأسرار.
 
 ```bash
 docker compose ps
-docker compose logs --tail 100 analysis autopsy-worker import-worker playbook-worker
+docker compose logs --tail 100 analysis autopsy-worker import-worker
 ```
 
 ## النسخ الاحتياطي
@@ -162,6 +159,7 @@ python -m scripts.migrate --database instance/socify-restored.db
 ## تحديث التطبيق والكتالوج
 
 - خذ نسخة احتياطية، وحدد commit أو صورة التشغيل الحالية، واختبر الترحيل قبل تبديل الخدمة.
+- الخدمة `playbook-worker` أزيلت من `docker-compose.yml` لأنها لم تكن تستقبل عملًا في التشغيل الفعلي؛ عند الترقية من إصدار كان يشغّلها نفّذ `docker compose up -d --remove-orphans` ليزول حاويها القديم.
 - للرجوع، استخدم التطبيق وقاعدة متوافقة؛ الترحيلات تراكمية وقد تحتاج استعادة النسخة السابقة.
 - ترحيلات المخطط مرقّمة في `socify/migrations.py`، ورقم آخر ترحيل طُبّق محفوظ في القاعدة نفسها (`PRAGMA user_version`)، ويظهر في `python -m scripts.migrate --dry-run` باسم `migration_version`. القواعد المنشأة قبل الترقيم رقمها 0 وتُرقّى تلقائيًا عند أول إقلاع.
 - كل إقلاع يطبق الترحيلات الناقصة داخل معاملة كتابة واحدة؛ إن فشل أحدها لا يتغير المخطط ولا الرقم ويتوقف الإقلاع. العمليات التي تقلع معًا تنتظر الأولى ولا تُرحّل مرتين.
@@ -173,7 +171,7 @@ python -m scripts.load_attack_snapshot enterprise-attack.json --version 20.1 --d
 python -m scripts.load_attack_snapshot --activate-version 20.0 --database instance/socify.db
 ```
 
-- هذه الأرقام تخص كتالوج MITRE. استخدم الرقم الصحيح للملف لديك، وافحص `GET /api/attack/catalogs`.
+- هذه الأرقام تخص كتالوج MITRE. استخدم الرقم الصحيح للملف لديك، وتحقق من الكتالوج المفعّل في الحقل `attack_version` من `GET /api/health`.
 - تُحفظ بصمة الحزمة، ولا يُعاد استخدام اسم كتالوج محفوظ لمحتوى مختلف.
 - حزم YARA وSigma واستخبارات التهديدات محلية؛ وثّق المصدر والترخيص ونتيجة الفحص قبل تفعيلها.
 

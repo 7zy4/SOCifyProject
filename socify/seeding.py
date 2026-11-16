@@ -136,39 +136,6 @@ def _seed_rules(connection: sqlite3.Connection, creator: int) -> None:
     )
 
 
-def _seed_playbook(connection: sqlite3.Connection, creator: int) -> None:
-    if connection.execute("SELECT 1 FROM playbooks WHERE playbook_id = 'PB-CONTAIN-EXFIL'").fetchone():
-        return
-    now = iso_now()
-    cursor = connection.execute(
-        "INSERT INTO playbooks (playbook_id, workspace_id, name, description, active_version, state, created_by, created_at, updated_at) VALUES ('PB-CONTAIN-EXFIL', 1, 'احتواء تسريب افتراضي', 'خطة استجابة تدريبية تغيّر حالة المختبر فقط ولا تتصل بأي جهاز أو شبكة خارجية.', 1, 'published', ?, ?, ?)",
-        (creator, now, now),
-    )
-    playbook_id = inserted_id(cursor)
-    version_cursor = connection.execute(
-        "INSERT INTO playbook_versions (playbook_id, version, trigger_type, preconditions, expected_outcome, created_by, created_at) VALUES (?, 1, 'manual', ?, ?, ?, ?)",
-        (
-            playbook_id,
-            json.dumps({"case_required": True, "training_run_required": True}),
-            json.dumps({"host": "isolated", "exfiltration": "contained", "evidence": "collected"}),
-            creator,
-            now,
-        ),
-    )
-    version_id = inserted_id(version_cursor)
-    steps = [
-        (1, "isolate_virtual_host", {"host": "file-training-01"}, "soc_manager", "restore_virtual_service"),
-        (2, "collect_evidence", {}, None, None),
-        (3, "contain_simulated_exfiltration", {"channel": "training-exfil-channel"}, None, "restore_virtual_service"),
-        (4, "notify_training_team", {"message": "تم احتواء التسريب المحاكى"}, None, None),
-    ]
-    for position, action, parameters, approval, compensation in steps:
-        connection.execute(
-            "INSERT INTO playbook_steps (playbook_version_id, position, action_type, parameters, approval_role, timeout_seconds, retry_limit, compensation_action) VALUES (?, ?, ?, ?, ?, 30, 2, ?)",
-            (version_id, position, action, json.dumps(parameters, ensure_ascii=False), approval, compensation),
-        )
-
-
 def _seed_iocs(connection: sqlite3.Connection) -> None:
     now = iso_now()
     rows = [
@@ -189,7 +156,6 @@ def seed_demo_data(connection: sqlite3.Connection, password: str) -> dict[str, s
         users = {email: _user(connection, email, name, role, team, password) for email, name, role, team in DEMO_USERS}
         creator = users["admin@socify.local"]
         _seed_rules(connection, creator)
-        _seed_playbook(connection, creator)
         _seed_iocs(connection)
         connection.commit()
     except Exception:

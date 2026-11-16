@@ -3,14 +3,10 @@
 import io
 import logging
 
-import pytest
-
-from socify import autopsy_worker, import_worker, playbook_worker
+from socify import autopsy_worker, import_worker
 from socify.autopsy_worker import run_autopsy_worker_once
 from socify.db import get_db
 from socify.import_worker import run_import_worker_once
-from socify.playbook_worker import run_worker_once
-from tests.integration.test_playbook_worker import _queued_run
 
 UPLOADED_NAME = "Quarterly-Payroll-Ahmed-Alharbi.jsonl"
 EVIDENCE = "EVIDENCE-CONTENT-7c1e9a"
@@ -94,23 +90,4 @@ def test_failed_analysis_job_logs_the_error_code_not_the_exception_text(autopsy_
     lines = _worker_lines(caplog)
     assert len(lines) == 1, lines
     assert lines[0].startswith(f"autopsy_job_finished job_id={job_id} kind=sample case_id={autopsy_case} state=failed error_code=LOCAL_RENDER_FAILED attempt=1")
-    _assert_private_values_absent(caplog)
-
-
-def test_playbook_runs_log_their_final_state_and_failures_by_type(app, client, login_as, caplog, monkeypatch):
-    login_as("admin")
-    finished = _queued_run(client, app, [{"action": "notify_training_team"}], "logged-run")
-    with caplog.at_level(logging.INFO), app.app_context():
-        assert run_worker_once(get_db(), "playbook-log-test") == finished
-    assert _worker_lines(caplog)[-1].startswith(f"playbook_run_finished run_id={finished} state=succeeded duration_ms=")
-
-    failing = _queued_run(client, app, [{"action": "notify_training_team"}], "failing-logged-run")
-
-    def fail(*_args, **_kwargs):
-        raise ValueError(EXCEPTION_TEXT)
-
-    monkeypatch.setattr(playbook_worker, "process_playbook_run", fail)
-    with caplog.at_level(logging.INFO), app.app_context(), pytest.raises(ValueError):
-        run_worker_once(get_db(), "playbook-log-test")
-    assert _worker_lines(caplog)[-1].startswith(f"playbook_run_failed run_id={failing} error_type=ValueError duration_ms=")
     _assert_private_values_absent(caplog)

@@ -99,7 +99,6 @@ def test_accepted_import_runs_detection_and_preserves_explorer_provenance(client
     event_id = explorer.json["items"][0]["id"]
     raw = client.get(f"/api/events/{event_id}/raw").json
     assert raw["provenance"]["file_sha256"] == imported.json["content_hash"]
-    assert client.post("/api/hunt/query", json={"query": 'source="pipeline-import"'}).json["total"] == 1
     assert "Pipeline event" in client.get("/api/events/export").get_data(as_text=True)
     assert database.execute("SELECT COUNT(*) FROM detection_matches WHERE event_id = ?", (event_id,)).fetchone()[0] == 1
 

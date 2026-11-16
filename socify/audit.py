@@ -5,7 +5,6 @@ from typing import Any
 from flask import has_request_context, request, session
 
 from .db import inserted_id
-from .schema import insert_outbox
 from .security import correlation_id, redact
 from .timeutils import iso_now
 
@@ -43,8 +42,6 @@ def record_audit(
             iso_now(),
         ),
     )
-    if isinstance(workspace_id, int):
-        insert_outbox(connection, workspace_id, f"{resource_type}.{action}", {"resource_id": resource_id, "result": result})
     return inserted_id(cursor)
 
 

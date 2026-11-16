@@ -100,30 +100,6 @@ def test_backup_restore_and_migration_drill(app, tmp_path: Path) -> None:
         migration_dry_run(str(tmp_path / "missing.db"))
 
 
-def test_attack_catalog_search_coverage_and_navigator(client: FlaskClient, login_as: Callable[[str], None]) -> None:
-    login_as("analyst")
-    search = client.get("/api/attack/techniques?q=Brute")
-    assert search.status_code == 200
-    assert any(item["technique_id"] == "T1110" for item in search.json["items"])
-    assert client.get("/api/attack/techniques?q=" + "x" * 101).status_code == 422
-    assert client.get("/api/attack/techniques/T0000").status_code == 404
-    assert client.get("/api/attack/coverage").status_code == 200
-    navigator = client.get("/api/attack/navigator-layer")
-    assert navigator.status_code == 200
-    assert navigator.json["domain"] == "enterprise-attack"
-    catalogs = client.get("/api/attack/catalogs")
-    assert catalogs.status_code == 200
-    assert catalogs.json["items"][0]["version"] == "20.0"
-    assert catalogs.json["items"][0]["active"] == 1
-    assert client.post("/api/attack/catalogs/20.0/activate").status_code == 403
-
-    login_as("admin")
-    activated = client.post("/api/attack/catalogs/20.0/activate")
-    assert activated.status_code == 200
-    assert activated.json["active"] is True
-    assert activated.json["changed"] is False
-
-
 def test_event_filters_mutations_and_validation(client: FlaskClient, login_as: Callable[[str], None], event_payload: dict[str, object]) -> None:
     login_as("admin")
     created = client.post("/api/events", json=event_payload, headers={"Idempotency-Key": "platform-operations-event"})

@@ -4,7 +4,6 @@ import pytest
 
 from socify.detection import RuleValidationError, _condition_matches, _event_dict, _event_value, _leaf_matches, legacy_dsl, validate_dsl
 from socify.events import normalize_event
-from socify.hunting import QueryError, _ioc_type, compile_query
 from socify.ingestion import _depth, _detect_format, _priority_severity, parse_records
 from socify.timeutils import parse_timestamp
 
@@ -81,35 +80,6 @@ def test_normalized_fields_fallback_is_safe():
     assert _condition_matches({"logic": "and", "conditions": None}, {})[0] is False
     row = _event_dict({"normalized_fields": "invalid", "tags": "invalid", "mitre_ids": "invalid"})
     assert row == {"normalized_fields": {}, "tags": [], "mitre_ids": []}
-
-
-@pytest.mark.parametrize(
-    "query",
-    [
-        "x" * 2001,
-        " OR ".join(["source=x"] * 30),
-        "source",
-        "source =",
-        "source = x source = y",
-        "NOT",
-        "(source=x source=y)",
-        "source AND x",
-        "source = AND",
-        'source="\\q"',
-        "mitre_id != T1110",
-    ],
-)
-def test_hunt_grammar_limits_fail_closed(query):
-    with pytest.raises(QueryError):
-        compile_query(query)
-
-
-def test_hunt_operators_preserve_parameterization():
-    query = compile_query('NOT (source~"a%_" OR http_status>=500) AND mitre_id=T1110')
-    assert query.parameters == ["%a\\%\\_%", 500, '%"T1110"%']
-    assert query.sql.count("?") == 3
-    assert _ioc_type("a" * 32) == ("md5", "a" * 32)
-    assert _ioc_type("b" * 40) == ("sha1", "b" * 40)
 
 
 @pytest.mark.parametrize(

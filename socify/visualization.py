@@ -1,49 +1,13 @@
 import json
-import sqlite3
-import time
 from collections import OrderedDict
-from collections.abc import Iterator
 from typing import Any
 
-from flask import Blueprint, Response, g, jsonify, request, stream_with_context
+from flask import request
 
 from .db import get_db
-from .file_names import attachment_disposition
-from .security import actor_id, can_access_training_run, current_user, error_response, has_permission, require_permission, workspace_id
+from .security import actor_id, can_access_training_run, current_user, has_permission, workspace_id
 from .timeutils import iso_timestamp
-from .validation import ValidationError, public_error_message
-
-visualization_api = Blueprint("visualization", __name__)
-
-
-def _outbox_visible(row: sqlite3.Row) -> bool:
-    event_type = str(row["event_type"])
-    try:
-        payload = json.loads(row["payload"])
-    except (TypeError, json.JSONDecodeError):
-        return False
-    identifier = payload.get("id", payload.get("resource_id")) if isinstance(payload, dict) else None
-    if event_type == "training.notification" and isinstance(payload, dict):
-        identifier = payload.get("playbook_run_id")
-    if event_type.startswith("playbook_run.") or event_type == "training.notification":
-        from .playbooks import _run_access
-
-        return type(identifier) is int and _run_access(identifier) is not None
-    if not isinstance(identifier, int):
-        return has_permission(current_user(), "audit.read")
-    table = None
-    if event_type.startswith("event."):
-        table = "security_events"
-    elif event_type.startswith("alert."):
-        table = "alerts"
-    elif event_type.startswith(("incident.", "case.")):
-        table = "incident_cases"
-    elif event_type.startswith("training_run."):
-        return can_access_training_run(identifier)
-    if table:
-        record = get_db().execute(f"SELECT training_run_id FROM {table} WHERE id = ? AND workspace_id = ?", (identifier, workspace_id())).fetchone()
-        return bool(record and can_access_training_run(record["training_run_id"]))
-    return has_permission(current_user(), "audit.read")
+from .validation import ValidationError
 
 
 def _scope() -> tuple[str, list[object]]:
@@ -249,94 +213,3 @@ def build_graph(limit: int, case_id: int | None = None) -> dict[str, Any]:
         "limit": limit,
         "accuracy_policy": "Observed relationships reference source events; mapped and derived relationships declare provenance and confidence.",
     }
-
-
-@visualization_api.get("/api/visualizations/graph")
-@require_permission("graph.read")
-def graph():
-    try:
-        limit = min(max(int(request.args.get("limit", 500)), 1), 1000)
-        result = build_graph(limit)
-    except ValueError as exc:
-        return error_response("INVALID_GRAPH_FILTER", public_error_message(exc, "حدد مرشحًا وفترة صالحين"), 422)
-    return jsonify(result)
-
-
-@visualization_api.get("/api/visualizations/timeline")
-@require_permission("graph.read")
-def timeline():
-    try:
-        limit = min(max(int(request.args.get("limit", 500)), 1), 1000)
-        where, parameters = _filters()
-    except ValueError as exc:
-        return error_response("INVALID_TIMELINE_FILTER", public_error_message(exc, "حدد مرشحًا وفترة وترقيمًا صالحًا"), 422)
-    scope, scope_parameters = _scope()
-    rows = (
-        get_db()
-        .execute(
-            f"SELECT e.id, e.event_id, e.event_time, e.source, e.severity, e.event_type, e.title, e.mitre_ids FROM security_events e WHERE {where}{scope} ORDER BY e.event_time, e.id LIMIT ?",
-            (*parameters, *scope_parameters, limit),
-        )
-        .fetchall()
-    )
-    items = [{**dict(row), "mitre_ids": json.loads(row["mitre_ids"] or "[]"), "reference": f"/api/events/{row['id']}"} for row in rows]
-    return jsonify({"items": items, "truncated": len(rows) >= limit, "limit": limit})
-
-
-@visualization_api.get("/api/visualizations/graph/export")
-@require_permission("graph.read")
-def export_graph():
-    try:
-        result = build_graph(min(max(int(request.args.get("limit", 500)), 1), 1000))
-    except ValueError as exc:
-        return error_response("INVALID_GRAPH_FILTER", public_error_message(exc, "حدد مرشحًا وفترة صالحين"), 422)
-    return Response(
-        json.dumps(result, ensure_ascii=False, separators=(",", ":")),
-        mimetype="application/json",
-        headers={"Content-Disposition": attachment_disposition("socify-attack-graph.json")},
-    )
-
-
-@visualization_api.get("/api/stream/events")
-@require_permission("events.read")
-def event_stream():
-    try:
-        cursor = max(int(request.headers.get("Last-Event-ID", request.args.get("cursor", 0))), 0)
-    except ValueError:
-        return error_response("INVALID_STREAM_CURSOR", "معرف الاستئناف غير صالح", 422)
-    once = request.args.get("once") == "1"
-    workspace = workspace_id()
-
-    def generate() -> Iterator[str]:
-        nonlocal cursor
-        last_heartbeat = time.monotonic()
-        while True:
-            g.pop("current_user", None)
-            user = current_user()
-            if not has_permission(user, "events.read") or not user or user["workspace_id"] != workspace:
-                break
-            rows = (
-                get_db()
-                .execute(
-                    "SELECT id, event_type, payload, created_at FROM outbox_events WHERE workspace_id = ? AND id > ? ORDER BY id LIMIT 100", (workspace, cursor)
-                )
-                .fetchall()
-            )
-            for row in rows:
-                cursor = int(row["id"])
-                if not _outbox_visible(row):
-                    continue
-                yield f"id: {cursor}\nevent: {row['event_type']}\ndata: {row['payload']}\n\n"
-            if once:
-                yield f'event: heartbeat\ndata: {{"cursor":{cursor}}}\n\n'
-                break
-            if time.monotonic() - last_heartbeat >= 15:
-                yield f'event: heartbeat\ndata: {{"cursor":{cursor}}}\n\n'
-                last_heartbeat = time.monotonic()
-            time.sleep(1)
-
-    return Response(
-        stream_with_context(generate()),
-        mimetype="text/event-stream",
-        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
-    )

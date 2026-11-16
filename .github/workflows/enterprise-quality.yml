@@ -205,7 +205,6 @@ jobs:
       - run: docker compose exec -T -e SOCIFY_CONTAINER_ACCEPTANCE=synthetic socify python - < tests/container/verify_autopsy.py
       - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp autopsy-worker
       - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp import-worker
-      - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp playbook-worker
       - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp analysis
       - if: always()
         run: docker compose logs

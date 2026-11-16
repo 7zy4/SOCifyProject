@@ -12,7 +12,6 @@ from hypothesis import strategies as st
 
 from socify.autopsy_domain import normalize_indicator
 from socify.content_inspection import decode_layer, inspect_content
-from socify.hunting import QueryError, _tokens
 from socify.ingestion import SYSLOG_5424, WEB_LOG, _cef_extension
 
 
@@ -82,12 +81,6 @@ def test_valid_encoded_text_is_preserved(encoder):
     plain = b"Retained investigation evidence: 12345"
     result = decode_layer(encoder(plain).decode())
     assert result and result[1] == plain.decode()
-
-
-def test_quoted_hunt_tokens_keep_escaped_quotes_and_reject_unterminated_strings():
-    assert _tokens(r'hostname = "host\"name" AND severity = high') == ["hostname", "=", '"host\\"name"', "AND", "severity", "=", "high"]
-    with pytest.raises(QueryError):
-        _tokens('"' + '\\"' * 500)
 
 
 @pytest.mark.parametrize(
