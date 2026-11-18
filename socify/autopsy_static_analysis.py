@@ -263,6 +263,57 @@ def inspect_static_bytes(
         add_flag("double_extension", "high", 45, f"امتداد مزدوج مضلل في اسم الملف ({''.join(suffixes[-2:])}).")
 
     # Magic vs declared extension mismatch
+    (extension_mismatch,) = _flag_type_mismatch(add_flag, declared_ext, magic_code, magic_desc)
+
+    # ZIP / OOXML bounded central-directory inspection (never extracted to disk)
+    archive_summary, magic_code, magic_desc = _inspect_archive(add_flag, content, magic_code, magic_desc)
+
+    # PDF active content inspection
+    _flag_active_content(add_flag, content, declared_ext, magic_code, overall_entropy, window_entropy)
+
+    # Printable strings & IOC extraction
+    extracted_emails, extracted_ips, extracted_urls, strings = _extract_string_indicators(content)
+
+    # A failed rule evaluation is not a negative result.
+    (yara_matches,) = _flag_yara_matches(add_flag, content, yara_source)
+
+    verdict = "high_risk" if risk_score >= 65 else "suspicious" if risk_score >= 30 else "low_signal_static_only"
+    return {
+        "engine": "SOCify Quick Static Triage/1",
+        "filename": clean_name,
+        "declared_extension": declared_ext or None,
+        "declared_mime": (declared_mime or "")[:100] or None,
+        "detected_magic": magic_code,
+        "file_type_observation": magic_desc,
+        "extension_mismatch": extension_mismatch,
+        "double_extension": double_extension,
+        "sha256": hashlib.sha256(content).hexdigest(),
+        "sha1": hashlib.sha1(content, usedforsecurity=False).hexdigest(),
+        "md5": hashlib.md5(content, usedforsecurity=False).hexdigest(),
+        "size": len(content),
+        "entropy_bits_per_byte": overall_entropy,
+        "max_window_entropy_256b": window_entropy,
+        "pe_header": pe_header,
+        "archive_summary": archive_summary,
+        "flags": flags,
+        "risk_score": risk_score,
+        "verdict": verdict,
+        "yara_matches": yara_matches,
+        "extracted_urls": extracted_urls,
+        "extracted_ips": extracted_ips,
+        "extracted_emails": extracted_emails,
+        "printable_strings_first_100": strings[:100],
+        "network": "no network queries",
+        "execution": "never executed",
+        "limitations": [
+            "فحص ساكن أولي آمن دون تشغيل الملف أو فك تشفيره على القرص.",
+            "غياب المؤشرات الساكنة لا يعني سلامة الملف نهائيًا؛ عند الاشتباه العميق انقل العينة لبيئة Sandbox معزولة.",
+        ],
+    }
+
+
+def _flag_type_mismatch(add_flag, declared_ext, magic_code, magic_desc):
+    """Flag executables and files whose real type contradicts the declared extension."""
     extension_mismatch = False
     is_exec_magic = magic_code in {"pe_executable", "dos_executable", "elf_executable", "mach_o_executable", "lnk_shortcut"}
     if is_exec_magic and declared_ext and declared_ext not in EXECUTABLE_EXTS:
@@ -282,8 +333,11 @@ def inspect_static_bytes(
 
     if is_exec_magic:
         add_flag("executable_binary", "high", 35, f"ملف تنفيذي ثنائي ({magic_desc}) — لم يُشغّل نهائيًا.")
+    return (extension_mismatch,)
 
-    # ZIP / OOXML bounded central-directory inspection (never extracted to disk)
+
+def _inspect_archive(add_flag, content, magic_code, magic_desc):
+    """Read a ZIP or OOXML central directory without extracting it, flagging macros, executables and unsafe paths."""
     archive_summary: dict | None = None
     if magic_code == "zip_container":
         try:
@@ -349,8 +403,11 @@ def inspect_static_bytes(
                     )
         except zipfile.BadZipFile:
             add_flag("corrupt_zip_container", "medium", 20, "ترويسة PK غير صالحة أو أرشيف ZIP تالف/مشفر.")
+    return archive_summary, magic_code, magic_desc
 
-    # PDF active content inspection
+
+def _flag_active_content(add_flag, content, declared_ext, magic_code, overall_entropy, window_entropy):
+    """Flag active content: PDF actions, RTF objects, HTML smuggling, scripting APIs and packed or embedded high-entropy data."""
     lower_window = content[:524288].lower()
     if magic_code == "pdf":
         pdf_hits = [
@@ -410,7 +467,9 @@ def inspect_static_bytes(
     elif window_entropy >= 6.8 and magic_code in {"html_document", "text_or_script"}:
         add_flag("high_window_entropy_embedded_blob", "medium", 25, f"كتلة عالية الإنتروبيا داخل نص/سكربت ({window_entropy} bits/byte).")
 
-    # Printable strings & IOC extraction
+
+def _extract_string_indicators(content):
+    """Printable strings and the URLs, IPv4 addresses and email addresses found in them, each list bounded."""
     strings: list[str] = []
     for match in re.finditer(rb"[\x20-\x7e]{6,256}", content[:1048576]):
         strings.append(match[0].decode("ascii", errors="ignore"))
@@ -420,8 +479,11 @@ def inspect_static_bytes(
     extracted_urls = list(dict.fromkeys(URL_EXTRACT_RE.findall(joined_strings)))[:50]
     extracted_ips = [ip for ip in dict.fromkeys(IPV4_EXTRACT_RE.findall(joined_strings)) if not ip.startswith(("0.", "127.", "255."))][:50]
     extracted_emails = list(dict.fromkeys(e.lower() for e in EMAIL_EXTRACT_RE.findall(joined_strings)))[:50]
+    return extracted_emails, extracted_ips, extracted_urls, strings
 
-    # A failed rule evaluation is not a negative result.
+
+def _flag_yara_matches(add_flag, content, yara_source):
+    """Match the case's YARA rules, or the built-in set, against the bytes; a failed evaluation is an error, not a clean result."""
     rules_text = yara_source if isinstance(yara_source, str) and yara_source.strip() else BUILTIN_RULES
     yara_matches: list[dict] = []
     if len(rules_text.encode("utf-8")) > 65536:
@@ -434,37 +496,4 @@ def inspect_static_bytes(
         raise ValidationError("تعذر إكمال فحص قواعد YARA") from exc
     if yara_matches:
         add_flag("yara_rule_match", "critical", 75, f"تطابق مع قواعد YARA المحلية: {', '.join(m['rule'] for m in yara_matches[:5])}")
-
-    verdict = "high_risk" if risk_score >= 65 else "suspicious" if risk_score >= 30 else "low_signal_static_only"
-    return {
-        "engine": "SOCify Quick Static Triage/1",
-        "filename": clean_name,
-        "declared_extension": declared_ext or None,
-        "declared_mime": (declared_mime or "")[:100] or None,
-        "detected_magic": magic_code,
-        "file_type_observation": magic_desc,
-        "extension_mismatch": extension_mismatch,
-        "double_extension": double_extension,
-        "sha256": hashlib.sha256(content).hexdigest(),
-        "sha1": hashlib.sha1(content, usedforsecurity=False).hexdigest(),
-        "md5": hashlib.md5(content, usedforsecurity=False).hexdigest(),
-        "size": len(content),
-        "entropy_bits_per_byte": overall_entropy,
-        "max_window_entropy_256b": window_entropy,
-        "pe_header": pe_header,
-        "archive_summary": archive_summary,
-        "flags": flags,
-        "risk_score": risk_score,
-        "verdict": verdict,
-        "yara_matches": yara_matches,
-        "extracted_urls": extracted_urls,
-        "extracted_ips": extracted_ips,
-        "extracted_emails": extracted_emails,
-        "printable_strings_first_100": strings[:100],
-        "network": "no network queries",
-        "execution": "never executed",
-        "limitations": [
-            "فحص ساكن أولي آمن دون تشغيل الملف أو فك تشفيره على القرص.",
-            "غياب المؤشرات الساكنة لا يعني سلامة الملف نهائيًا؛ عند الاشتباه العميق انقل العينة لبيئة Sandbox معزولة.",
-        ],
-    }
+    return (yara_matches,)
