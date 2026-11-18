@@ -667,9 +667,9 @@ def print_quick_report(case_id: int):
         return error_response("REPORT_CONTENT_LIMIT", public_error_message(exc, "يتجاوز محتوى التقرير الحد المسموح"), 422)
     # report_table escapes every key and value it writes (tests/security/test_report_table_escaping.py); its output is the
     # only HTML this page takes as markup, and Jinja escapes everything else.
-    inspected_tables = [Markup(report_table(item, localize=True)) for item in inspected or []]  # noqa: S704
+    inspected_tables = [Markup(report_table(item, localize=True)) for item in inspected or []]  # noqa: S704  # nosec B704
     telemetry_sections = [
-        (title, Markup(report_table(network_report_content(telemetry[key]) if key == "network_analysis" else telemetry[key], localize=True)))  # noqa: S704
+        (title, Markup(report_table(network_report_content(telemetry[key]) if key == "network_analysis" else telemetry[key], localize=True)))  # noqa: S704  # nosec B704
         for title, key in (
             ("تحليل الشبكة", "network_analysis"),
             ("نتائج الأجهزة", "endpoint_results"),
