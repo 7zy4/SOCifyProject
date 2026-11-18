@@ -1,5 +1,6 @@
 """Chart acceptance on explicitly prepared, isolated investigation histories."""
 
+import re
 from datetime import timedelta
 from pathlib import Path
 
@@ -87,13 +88,15 @@ def test_performance_charts_support_comparison_scope_and_keyboard(app, database,
             page.emulate_media(reduced_motion=motion)
             page.set_viewport_size({"width": width, "height": 1000 if width == 1440 else 844})
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), (language, theme, width)
+            # Hovering a bar also selects it; after a resize the bars move under a pointer left where it was, so park it first.
+            page.mouse.move(0, 0)
             bars = page.locator(".performance-trend-bucket")
             bars.first.focus()
             bars.first.press("End")
             expect(bars.last).to_be_focused()
             bars.last.press("Home")
             expect(bars.first).to_be_focused()
-            assert "selected" in bars.first.get_attribute("class")
+            expect(bars.first).to_have_class(re.compile(r"(^|\s)selected(\s|$)"))
             bars.first.press("ArrowRight")
             expect(bars.nth(1)).to_be_focused()
             expect(page.locator(".performance-trend-readout")).to_contain_text(manager.text("أنشئت"))
