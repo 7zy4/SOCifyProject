@@ -18,6 +18,7 @@ autopsy_api = Blueprint("autopsy", __name__)
 
 
 def manager() -> bool:
+    """True when the signed-in user is a SOC manager or administrator."""
     return (current_user() or {}).get("role") in {"admin", "soc_manager"}
 
 
@@ -47,6 +48,7 @@ def validate_escalation_routing(payload):
 
 
 def record_view(row) -> dict[str, Any]:
+    """A record row with its JSON payload decoded."""
     return {**dict(row), "payload": json.loads(row["payload"])}
 
 
@@ -75,6 +77,7 @@ def records_for_case(case_id: int, kind: str | None = None, limit: int = 100, be
 
 
 def insert_record(case_id: int, kind: str, payload: dict[str, Any], actor: int | None = None) -> int:
+    """Add an investigation record with its first revision, a custody entry and a new case version; returns the record id."""
     now = iso_now()
     serialized = canonical(payload)
     principal = actor if actor is not None else actor_id()

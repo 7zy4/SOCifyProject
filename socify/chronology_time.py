@@ -13,6 +13,7 @@ def record_clock(alias=""):
 
 
 def sql_utc_key(expression):
+    """SQL expression that turns a stored timestamp column into a sortable UTC key with microseconds; only known columns are accepted."""
     if expression not in {"ce.event_time", "event_time", "n.created_at", "created_at", record_clock(), record_clock("r")}:
         raise ValueError("Unknown chronology timestamp expression")
     return f"substr({expression},1,19)||'.'||substr((CASE WHEN substr({expression},20,1)='.' THEN replace(substr({expression},21),'Z','') ELSE '' END)||'000000',1,6)||'Z'"

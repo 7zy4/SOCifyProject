@@ -101,6 +101,7 @@ SENSITIVE_KEYS = {"password", "current_password", "new_password", "api_key", "se
 
 
 def correlation_id() -> str:
+    """The request's correlation id: a well-formed X-Correlation-ID from the client, else a random one, kept for the whole request."""
     value = getattr(g, "correlation_id", None)
     if isinstance(value, str):
         return value
@@ -112,6 +113,7 @@ def correlation_id() -> str:
 
 
 def error_response(code: str, message: str, status: int, details: dict[str, Any] | None = None):
+    """The JSON error body every API failure uses, with a stable code, a message and the correlation id."""
     payload: dict[str, Any] = {"error": {"code": code, "message": message}, "correlation_id": correlation_id()}
     if details:
         cast(dict[str, Any], payload["error"])["details"] = details
@@ -168,6 +170,7 @@ def _session_valid(user_id: int) -> bool:
 
 
 def current_user() -> dict[str, Any] | None:
+    """The signed-in user for this request with their team's role permissions, or None when there is no valid server-side session."""
     cached = getattr(g, "current_user", None)
     if isinstance(cached, dict):
         return cached
@@ -195,6 +198,8 @@ def current_user() -> dict[str, Any] | None:
 
 
 def login_required[F: Callable[..., Any]](function: F) -> F:
+    """Refuse anonymous requests: 401 for API calls, a redirect to the sign-in page for pages."""
+
     @functools.wraps(function)
     def wrapped(*args: object, **kwargs: object):
         if current_user() is None:
@@ -208,6 +213,7 @@ def login_required[F: Callable[..., Any]](function: F) -> F:
 
 
 def has_permission(user: dict[str, Any] | None, permission: str) -> bool:
+    """True when the user's effective permissions (role, narrowed by the team policy) include the permission."""
     if user is None:
         return False
     permissions = effective_permissions(user)
@@ -222,6 +228,8 @@ def effective_permissions(user: dict[str, Any]) -> set[str]:
 
 
 def require_permission[F: Callable[..., Any]](permission: str) -> Callable[[F], F]:
+    """Refuse the request with 401 when nobody is signed in and 403 when the user lacks the permission."""
+
     def decorator(function: F) -> F:
         @functools.wraps(function)
         def wrapped(*args: object, **kwargs: object):
@@ -239,6 +247,7 @@ def require_permission[F: Callable[..., Any]](permission: str) -> Callable[[F], 
 
 
 def workspace_id() -> int:
+    """The signed-in user's team (workspace) id; raises when nobody is signed in."""
     user = current_user()
     if user is None:
         raise PermissionError("authentication required")
@@ -246,6 +255,7 @@ def workspace_id() -> int:
 
 
 def actor_id() -> int:
+    """The signed-in user's id; raises when nobody is signed in."""
     user = current_user()
     if user is None:
         raise PermissionError("authentication required")
@@ -253,6 +263,7 @@ def actor_id() -> int:
 
 
 def can_access_training_run(training_run_id: object) -> bool:
+    """True for records without a training run; a record that names one is never visible, since training runs no longer exist."""
     if training_run_id is None:
         return True
     if type(training_run_id) is not int or training_run_id <= 0:
@@ -287,10 +298,12 @@ def cipher() -> MultiFernet:
 
 
 def encrypt_secret(value: str) -> str:
+    """Encrypt text with the current credential key."""
     return cipher().encrypt(value.encode()).decode()
 
 
 def decrypt_secret(value: str) -> str:
+    """Decrypt text with the current or previous credential key; a token neither key opens raises ValueError."""
     try:
         return cipher().decrypt(value.encode()).decode()
     except InvalidToken as exc:
@@ -302,6 +315,7 @@ BINARY_MARKER = "b1:"
 
 
 def encrypt_bytes(content: bytes) -> str:
+    """Encrypt bytes with the current credential key, marked so decrypt_bytes knows the plaintext is binary."""
     return BINARY_MARKER + cipher().encrypt(content).decode()
 
 

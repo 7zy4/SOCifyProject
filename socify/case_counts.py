@@ -25,6 +25,8 @@ def read_snapshot():
 
 
 def consistent_read(function):
+    """Run the view inside one read snapshot, so every count it shows comes from the same moment."""
+
     @wraps(function)
     def wrapped(*args, **kwargs):
         with read_snapshot():

@@ -426,6 +426,7 @@ def _alert_reason(rule_name: str, evaluation: Evaluation) -> str:
 
 
 def evaluate_rules(connection: sqlite3.Connection, event_id: int, only_rule_id: int | None = None) -> list[int]:
+    """Evaluate the team's active rules (seeding the built-in ones when absent) against one stored event and return the ids of alerts it raised."""
     row = connection.execute("SELECT * FROM security_events WHERE id = ?", (event_id,)).fetchone()
     if not row or row["source"] == "rules_engine" or not row["autopsy_active"]:
         return []

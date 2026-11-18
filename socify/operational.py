@@ -2,6 +2,7 @@ from .db import get_db
 
 
 def case_scope(user: dict, alias: str = "c") -> tuple[str, list[object]]:
+    """SQL condition and arguments limiting cases to those the user is a member of; managers and administrators see the whole team."""
     if user.get("role") in {"soc_manager", "admin"}:
         return "", []
     return (
@@ -11,6 +12,7 @@ def case_scope(user: dict, alias: str = "c") -> tuple[str, list[object]]:
 
 
 def case_visible(case_id: int, user: dict) -> bool:
+    """True when the case exists in the user's team, is not archived and the user is a member (or a manager)."""
     scope, args = case_scope(user)
     return (
         get_db()

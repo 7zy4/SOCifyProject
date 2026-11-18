@@ -50,6 +50,7 @@ TRANSITIONS: dict[str, set[str]] = {
 
 
 def _case_row(case_id: int) -> sqlite3.Row | None:
+    """The case row when it exists in the user's team, is not archived and is visible to them; otherwise None."""
     row = get_db().execute("SELECT * FROM incident_cases WHERE id = ? AND workspace_id = ? AND archived_at IS NULL", (case_id, workspace_id())).fetchone()
     user = current_user()
     return row if row and user and can_access_training_run(row["training_run_id"]) and case_visible(case_id, user) else None
@@ -72,6 +73,7 @@ def _json_list(value: object, field: str, maximum: int = 50) -> list[str]:
 
 
 def _history(connection: sqlite3.Connection, case_id: int, action: str, previous: object = None, new: object = None, reason: str | None = None) -> None:
+    """Append an entry to the case's history with the actor, before and after values, reason and correlation id."""
     from .security import correlation_id
 
     connection.execute(

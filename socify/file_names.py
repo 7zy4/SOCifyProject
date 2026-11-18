@@ -10,6 +10,7 @@ from werkzeug.utils import secure_filename
 
 
 def evidence_filename(value: str, content: bytes, prefix: str = "evidence") -> str:
+    """A safe file name for stored evidence: the original name without path or unsafe characters, or a hash-based name when nothing usable is left."""
     original = PurePosixPath(value.replace("\\", "/")).name
     suffix = PurePosixPath(original).suffix
     if not re.fullmatch(r"\.[A-Za-z0-9]{1,12}", suffix):

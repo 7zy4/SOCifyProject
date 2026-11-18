@@ -19,6 +19,7 @@ def record_audit(
     actor: int | None = None,
     workspace: int | None = None,
 ) -> int:
+    """Append a security audit entry with actor, team, client address and user agent; details are redacted before they are stored."""
     actor_id = actor if actor is not None else session.get("user_id") if has_request_context() else None
     workspace_id = workspace if workspace is not None else session.get("workspace_id") if has_request_context() else None
     ip_address = request.remote_addr if has_request_context() else None

@@ -38,6 +38,7 @@ def approval(case_id):
 
 
 def case_approved(case_id):
+    """True when case approval is off or the case has been approved."""
     return not current_app.config["REQUIRE_CASE_APPROVAL"] or approval(case_id)["state"] == "approved"
 
 
@@ -46,6 +47,7 @@ def can_review():
 
 
 def selected_ids():
+    """The one or two cases chosen in this session's investigation workspace, dropped when no longer visible, approved or related."""
     from .operational import case_visible
 
     identifiers = session.get("investigation_cases", [])
@@ -68,6 +70,7 @@ def related(first, second):
 
 
 def selection_scope_sql(alias="c"):
+    """SQL condition and arguments limiting cases to the session's selection when investigation selection is required."""
     if not current_app.config["REQUIRE_INVESTIGATION_SELECTION"]:
         return "", []
     identifiers = selected_ids()

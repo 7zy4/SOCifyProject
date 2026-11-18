@@ -1114,4 +1114,5 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
 
 
 def public_id(prefix: str) -> str:
+    """A random identifier shown to users, such as EVT-1A2B3C4D5E6F7A8B."""
     return f"{prefix}-{uuid.uuid4().hex[:16].upper()}"

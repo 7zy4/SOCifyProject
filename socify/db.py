@@ -35,6 +35,7 @@ def connect_readonly(path: str) -> sqlite3.Connection:
 
 
 def get_db() -> sqlite3.Connection:
+    """The request's database connection, opened on first use and closed when the application context ends."""
     if "db" not in g:
         g.db = connect_path(str(current_app.config["DATABASE"]), bool(current_app.config.get("TESTING")))
     return g.db
@@ -47,11 +48,13 @@ def close_db(_: object | None = None) -> None:
 
 
 def database_is_busy(error: sqlite3.Error) -> bool:
+    """True when the error means another connection holds the database (SQLITE_BUSY or SQLITE_LOCKED)."""
     return getattr(error, "sqlite_errorcode", 0) & 0xFF in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}
 
 
 @contextmanager
 def transaction(connection: sqlite3.Connection | None = None, *, immediate: bool = True, wait: bool = True) -> Iterator[sqlite3.Connection]:
+    """Run the block in one SQLite transaction (BEGIN IMMEDIATE unless immediate=False), committing on success and rolling back on any exception; wait=False fails at once instead of waiting for a busy database."""
     target = connection or get_db()
     timeout = target.execute("PRAGMA busy_timeout").fetchone()[0] if not wait else None
     try:
@@ -70,6 +73,7 @@ def transaction(connection: sqlite3.Connection | None = None, *, immediate: bool
 
 
 def inserted_id(cursor: sqlite3.Cursor) -> int:
+    """The row id an INSERT produced; raises if SQLite returned none."""
     value = cursor.lastrowid
     if value is None:
         raise RuntimeError("database insert did not return an identifier")

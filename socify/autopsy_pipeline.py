@@ -107,6 +107,7 @@ def _manager(user):
 
 
 def job_visible(job_id: int, user: dict | None = None) -> bool:
+    """True when the user may open the import batch: managers, its uploader, members of a restricted batch, anyone for an unrestricted one."""
     principal = user if user is not None else current_user()
     if not principal:
         return False
@@ -123,6 +124,7 @@ def job_visible(job_id: int, user: dict | None = None) -> bool:
 
 
 def visibility_sql(alias: str = "e", user: dict | None = None, *, active_only: bool = True) -> tuple[str, list[object]]:
+    """SQL condition and arguments limiting events to batches the user may see; managers see all, nobody signed in sees none."""
     if alias not in {"e", "security_events", "candidate", "event", "ce"}:
         raise ValueError("Unknown event SQL alias")
     principal = user if user is not None else current_user()
@@ -156,6 +158,7 @@ def event_visible(case_id: int, event_id: int, user: dict | None = None, active_
 
 
 def case_full_access(case_id: int, user: dict | None = None) -> bool:
+    """True when the user may see every import batch the case draws on; managers always may, members only without a restricted batch they are not part of."""
     principal = user if user is not None else current_user()
     if not principal:
         return False

@@ -107,6 +107,7 @@ def retain_occurrence(connection, event_id, job, provenance, *, repeated, row_ke
 
 
 def job_event_sql(alias="e"):
+    """SQL condition matching events that came from one import batch, through retained occurrences or the event's own batch; takes the batch id twice."""
     if alias not in {"e", "ce", "f", "security_events", "case_events"}:
         raise ValueError("Unknown event SQL alias")
     key = "event_id" if alias in {"ce", "case_events"} else "id"

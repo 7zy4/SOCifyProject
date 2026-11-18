@@ -157,6 +157,7 @@ KINDS: dict[str, dict[str, dict[str, Any]]] = {
 
 
 def text_value(value: object, maximum: int, required: bool = False) -> str:
+    """Stripped text within the length limit and free of control characters other than newline and tab; anything else raises ValidationError."""
     if not isinstance(value, str):
         raise ValidationError("يلزم نص صالح")
     result = value.strip()
@@ -172,10 +173,12 @@ def text_value(value: object, maximum: int, required: bool = False) -> str:
 
 
 def canonical(value: object) -> str:
+    """JSON with sorted keys and no spaces, so the same value always hashes the same."""
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 def custody(case_id: int, action: str, details: dict[str, Any], actor: int | None = None) -> None:
+    """Append a hash-chained custody entry for the case (each entry's SHA-256 covers the previous one) and mirror it to the audit log."""
     previous = get_db().execute("SELECT entry_hash FROM autopsy_custody WHERE case_id = ? ORDER BY id DESC LIMIT 1", (case_id,)).fetchone()
     previous_hash = previous[0] if previous else "0" * 64
     now = iso_now()
@@ -207,6 +210,7 @@ def member_has_open_work(case_id: int, user_id: int) -> bool:
 
 
 def touch_case(case_id: int) -> None:
+    """Mark the case as changed: new updated_at and the next version for optimistic locking."""
     get_db().execute("UPDATE incident_cases SET updated_at = ?, version = version + 1 WHERE id = ?", (iso_now(), case_id))
 
 
