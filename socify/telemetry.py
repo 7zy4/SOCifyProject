@@ -152,115 +152,11 @@ def profile(record: dict[str, Any]) -> dict[str, Any]:
     fields: dict[str, Any] = {}
     result: dict[str, Any] = {}
     if all(key in record for key in ("uid", "id.orig_h", "id.resp_h")):
-        if not isinstance(record["uid"], str) or not record["uid"]:
-            raise ValidationError("Zeek UID must be a nonempty string")
-        connection = any(key in record for key in ("conn_state", "orig_bytes", "orig_pkts"))
-        kind = "conn" if connection else "dns" if "query" in record else "http" if "method" in record else "tls" if "server_name" in record else "event"
-        fields = {
-            "telemetry_schema": "zeek",
-            "flow_id": str(record["uid"]),
-            "connection_summary": connection,
-            "source_port": number(record.get("id.orig_p"), 65535, True),
-            "destination_port": number(record.get("id.resp_p"), 65535, True),
-            "protocol": str(record.get("proto") or "").lower(),
-            "bytes_sent": number(record.get("orig_bytes"), integral=True),
-            "bytes_received": number(record.get("resp_bytes"), integral=True),
-            "duration_seconds": number(record.get("duration")),
-            "dns_question": record.get("query"),
-            "tls_sni": record.get("server_name"),
-            "http_host": record.get("host"),
-            "http_method": record.get("method"),
-            "http_path": record.get("uri"),
-            "connection_state": record.get("conn_state"),
-        }
-        result = {
-            "source_type": "zeek",
-            "event_type": f"zeek_{kind}",
-            "category": "network",
-            "severity": "low",
-            "source_ip": record["id.orig_h"],
-            "destination_ip": record["id.resp_h"],
-            "event_time": record.get("ts"),
-            "http_status": record.get("status_code"),
-            "title": f"Zeek {kind} · {record['id.orig_h']} → {record['id.resp_h']}",
-        }
+        fields, result = _zeek_profile(record)
     elif all(key in record for key in ("flow_id", "src_ip", "dest_ip", "event_type")):
-        if (
-            isinstance(record["flow_id"], bool)
-            or not isinstance(record["flow_id"], (str, int))
-            or not str(record["flow_id"]).isascii()
-            or not str(record["flow_id"]).isdecimal()
-        ):
-            raise ValidationError("Suricata flow_id must be an unsigned integer identifier")
-        kind = record["event_type"]
-        flow = section("flow")
-        alert = section("alert")
-        http = section("http")
-        dns = section("dns")
-        tls = section("tls")
-        duration = None
-        if kind == "flow" and flow.get("start") and flow.get("end"):
-            duration = number((parse_timestamp(flow["end"]) - parse_timestamp(flow["start"])).total_seconds())
-        fields = {
-            "telemetry_schema": "suricata",
-            "flow_id": str(record["flow_id"]),
-            "connection_summary": kind == "flow",
-            "source_port": number(record.get("src_port"), 65535, True),
-            "destination_port": number(record.get("dest_port"), 65535, True),
-            "protocol": str(record.get("proto") or "").lower(),
-            "bytes_sent": number(flow.get("bytes_toserver"), integral=True),
-            "bytes_received": number(flow.get("bytes_toclient"), integral=True),
-            "duration_seconds": duration,
-            "dns_question": dns.get("rrname"),
-            "tls_sni": tls.get("sni"),
-            "http_host": http.get("hostname"),
-            "http_method": http.get("http_method"),
-            "http_path": http.get("url"),
-            "signature_id": alert.get("signature_id"),
-            "ids_severity": number(alert.get("severity"), 255, True),
-            "ids_signature": alert.get("signature"),
-        }
-        result = {
-            "source_type": "suricata",
-            "event_type": f"suricata_{kind}",
-            "category": "network",
-            "source_ip": record["src_ip"],
-            "destination_ip": record["dest_ip"],
-            "event_time": flow.get("start", record.get("timestamp")) if kind == "flow" else record.get("timestamp"),
-            "severity": {1: "high", 2: "medium", 3: "low"}.get(fields["ids_severity"], "low"),
-            "title": alert.get("signature") or f"Suricata {kind} · {record['src_ip']} → {record['dest_ip']}",
-            "action": alert.get("action"),
-            "http_status": http.get("status"),
-        }
+        fields, result = _suricata_profile(record, section)
     elif all(key in record for key in ("hostIdentifier", "name", "columns")):
-        columns = record["columns"]
-        if not isinstance(columns, dict):
-            raise ValidationError("invalid osquery columns")
-        fields = {
-            "telemetry_schema": "osquery",
-            "query_name": str(record["name"]),
-            "query_action": record.get("action"),
-            "query_columns": columns,
-            "process_id": columns.get("pid"),
-            "parent_process_id": columns.get("parent"),
-            "command_line": columns.get("cmdline"),
-            "process_path": columns.get("path"),
-        }
-        result = {
-            "source_type": "osquery",
-            "event_type": "osquery_result",
-            "category": "endpoint",
-            "severity": "low",
-            "hostname": record["hostIdentifier"],
-            "event_time": record.get("unixTime"),
-            "action": record.get("action"),
-            "title": f"{record['name']} · {record.get('action', '')}",
-            "process_name": columns.get("name") if "pid" in columns else None,
-            "username": columns.get("username"),
-            "source_ip": columns.get("local_address"),
-            "destination_ip": columns.get("remote_address"),
-            "file_hash": columns.get("sha256"),
-        }
+        fields, result = _osquery_profile(record)
     if not result:
         return {}
     for key, limit in (("flow_id", 256), ("protocol", 32), ("dns_question", 512), ("tls_sni", 512), ("http_host", 512), ("query_name", 255)):
@@ -276,3 +172,125 @@ def profile(record: dict[str, Any]) -> dict[str, Any]:
     result["normalized_fields"] = {key: value for key, value in fields.items() if value is not None}
     result["parser_version"] = "socify-telemetry-1"
     return result
+
+
+def _zeek_profile(record):
+    """Fields and event values for a Zeek log record: connection, DNS, HTTP, TLS or another log."""
+    if not isinstance(record["uid"], str) or not record["uid"]:
+        raise ValidationError("Zeek UID must be a nonempty string")
+    connection = any(key in record for key in ("conn_state", "orig_bytes", "orig_pkts"))
+    kind = "conn" if connection else "dns" if "query" in record else "http" if "method" in record else "tls" if "server_name" in record else "event"
+    fields = {
+        "telemetry_schema": "zeek",
+        "flow_id": str(record["uid"]),
+        "connection_summary": connection,
+        "source_port": number(record.get("id.orig_p"), 65535, True),
+        "destination_port": number(record.get("id.resp_p"), 65535, True),
+        "protocol": str(record.get("proto") or "").lower(),
+        "bytes_sent": number(record.get("orig_bytes"), integral=True),
+        "bytes_received": number(record.get("resp_bytes"), integral=True),
+        "duration_seconds": number(record.get("duration")),
+        "dns_question": record.get("query"),
+        "tls_sni": record.get("server_name"),
+        "http_host": record.get("host"),
+        "http_method": record.get("method"),
+        "http_path": record.get("uri"),
+        "connection_state": record.get("conn_state"),
+    }
+    result = {
+        "source_type": "zeek",
+        "event_type": f"zeek_{kind}",
+        "category": "network",
+        "severity": "low",
+        "source_ip": record["id.orig_h"],
+        "destination_ip": record["id.resp_h"],
+        "event_time": record.get("ts"),
+        "http_status": record.get("status_code"),
+        "title": f"Zeek {kind} · {record['id.orig_h']} → {record['id.resp_h']}",
+    }
+    return fields, result
+
+
+def _suricata_profile(record, section):
+    """Fields and event values for a Suricata EVE record of any event type, read from its alert, flow, DNS, HTTP and TLS sections."""
+    if (
+        isinstance(record["flow_id"], bool)
+        or not isinstance(record["flow_id"], (str, int))
+        or not str(record["flow_id"]).isascii()
+        or not str(record["flow_id"]).isdecimal()
+    ):
+        raise ValidationError("Suricata flow_id must be an unsigned integer identifier")
+    kind = record["event_type"]
+    flow = section("flow")
+    alert = section("alert")
+    http = section("http")
+    dns = section("dns")
+    tls = section("tls")
+    duration = None
+    if kind == "flow" and flow.get("start") and flow.get("end"):
+        duration = number((parse_timestamp(flow["end"]) - parse_timestamp(flow["start"])).total_seconds())
+    fields = {
+        "telemetry_schema": "suricata",
+        "flow_id": str(record["flow_id"]),
+        "connection_summary": kind == "flow",
+        "source_port": number(record.get("src_port"), 65535, True),
+        "destination_port": number(record.get("dest_port"), 65535, True),
+        "protocol": str(record.get("proto") or "").lower(),
+        "bytes_sent": number(flow.get("bytes_toserver"), integral=True),
+        "bytes_received": number(flow.get("bytes_toclient"), integral=True),
+        "duration_seconds": duration,
+        "dns_question": dns.get("rrname"),
+        "tls_sni": tls.get("sni"),
+        "http_host": http.get("hostname"),
+        "http_method": http.get("http_method"),
+        "http_path": http.get("url"),
+        "signature_id": alert.get("signature_id"),
+        "ids_severity": number(alert.get("severity"), 255, True),
+        "ids_signature": alert.get("signature"),
+    }
+    result = {
+        "source_type": "suricata",
+        "event_type": f"suricata_{kind}",
+        "category": "network",
+        "source_ip": record["src_ip"],
+        "destination_ip": record["dest_ip"],
+        "event_time": flow.get("start", record.get("timestamp")) if kind == "flow" else record.get("timestamp"),
+        "severity": {1: "high", 2: "medium", 3: "low"}.get(fields["ids_severity"], "low"),
+        "title": alert.get("signature") or f"Suricata {kind} · {record['src_ip']} → {record['dest_ip']}",
+        "action": alert.get("action"),
+        "http_status": http.get("status"),
+    }
+    return fields, result
+
+
+def _osquery_profile(record):
+    """Fields and event values for an osquery result row."""
+    columns = record["columns"]
+    if not isinstance(columns, dict):
+        raise ValidationError("invalid osquery columns")
+    fields = {
+        "telemetry_schema": "osquery",
+        "query_name": str(record["name"]),
+        "query_action": record.get("action"),
+        "query_columns": columns,
+        "process_id": columns.get("pid"),
+        "parent_process_id": columns.get("parent"),
+        "command_line": columns.get("cmdline"),
+        "process_path": columns.get("path"),
+    }
+    result = {
+        "source_type": "osquery",
+        "event_type": "osquery_result",
+        "category": "endpoint",
+        "severity": "low",
+        "hostname": record["hostIdentifier"],
+        "event_time": record.get("unixTime"),
+        "action": record.get("action"),
+        "title": f"{record['name']} · {record.get('action', '')}",
+        "process_name": columns.get("name") if "pid" in columns else None,
+        "username": columns.get("username"),
+        "source_ip": columns.get("local_address"),
+        "destination_ip": columns.get("remote_address"),
+        "file_hash": columns.get("sha256"),
+    }
+    return fields, result

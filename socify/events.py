@@ -217,6 +217,23 @@ def ingest_event(
         normalized["normalized_fields"] = json.dumps(fields, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     event_public_id = public_id("EVT") if case_id is not None else _string(data.get("event_id"), 80) or public_id("EVT")
     now = iso_now()
+    (event_id,) = _insert_event(actor, connection, event_public_id, idempotency_key, normalized, now, training_run_id, workspace)
+    if case_id is not None:
+        connection.execute("UPDATE security_events SET owner_case_id = ? WHERE id = ?", (case_id, event_id))
+    if import_job_id is not None:
+        connection.execute("UPDATE security_events SET import_job_id = ?, autopsy_active = ? WHERE id = ?", (import_job_id, int(is_active), event_id))
+        retain_occurrence(connection, event_id, job, provenance, repeated=False, row_key=row_key)
+    if identity:
+        connection.execute("INSERT INTO autopsy_event_identities(identity_key,event_id) VALUES (?,?)", (identity, event_id))
+    from .watchlist import evaluate_watchlist_for_event
+
+    alerts = evaluate_rules(connection, event_id)
+    alerts.extend(evaluate_watchlist_for_event(connection, event_id))
+    return event_id, alerts, False
+
+
+def _insert_event(actor, connection, event_public_id, idempotency_key, normalized, now, training_run_id, workspace):
+    """Insert the normalised event as a new security_events row and return its id."""
     cursor = connection.execute(
         """INSERT INTO security_events
         (event_id, external_id, idempotency_key, workspace_id, training_run_id, source, source_type, severity, category,
@@ -261,18 +278,7 @@ def ingest_event(
         ),
     )
     event_id = inserted_id(cursor)
-    if case_id is not None:
-        connection.execute("UPDATE security_events SET owner_case_id = ? WHERE id = ?", (case_id, event_id))
-    if import_job_id is not None:
-        connection.execute("UPDATE security_events SET import_job_id = ?, autopsy_active = ? WHERE id = ?", (import_job_id, int(is_active), event_id))
-        retain_occurrence(connection, event_id, job, provenance, repeated=False, row_key=row_key)
-    if identity:
-        connection.execute("INSERT INTO autopsy_event_identities(identity_key,event_id) VALUES (?,?)", (identity, event_id))
-    from .watchlist import evaluate_watchlist_for_event
-
-    alerts = evaluate_rules(connection, event_id)
-    alerts.extend(evaluate_watchlist_for_event(connection, event_id))
-    return event_id, alerts, False
+    return (event_id,)
 
 
 def _event_view(row: sqlite3.Row, include_raw: bool = False) -> dict[str, Any]:
