@@ -31,8 +31,8 @@ PUBLIC = {
     ("GET", "/api/auth/csrf"): (200, None),
     ("GET", "/health/live"): (200, None),
     ("GET", "/health/ready"): (200, None),
-    # Aggregate counts for operators; deploy/nginx.conf refuses it, so only the internal network can scrape it.
-    ("GET", "/health/metrics"): (200, None),
+    # Aggregate counts for operators: absent until SOCIFY_METRICS_TOKEN is set, then bearer-token only (and refused by the ingress).
+    ("GET", "/health/metrics"): (404, None),
     ("POST", "/api/sources/<int:source_id>/ingest"): (401, "INVALID_SOURCE_KEY"),
     ("GET", "/"): (302, "/login"),
 }

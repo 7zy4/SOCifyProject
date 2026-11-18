@@ -1,7 +1,8 @@
+import hmac
 import json
 import sqlite3
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, abort, current_app, jsonify, request
 
 from .db import get_db
 from .security import ROLE_PERMISSIONS, current_user, error_response, login_required, require_permission, workspace_id
@@ -46,13 +47,32 @@ def _age_seconds(sql: str) -> float:
     return max((utc_now() - parse_timestamp(str(oldest))).total_seconds(), 0.0)
 
 
+def _metrics_refusal():
+    """None when the request carries the configured metrics token, otherwise the response to send instead.
+
+    Without SOCIFY_METRICS_TOKEN the path does not exist. deploy/nginx.conf also refuses it, so the token is what still
+    protects it when port 5000 is published or the ingress is replaced.
+    """
+    expected = current_app.config.get("METRICS_TOKEN")
+    if not expected:
+        abort(404)
+    scheme, _, supplied = request.headers.get("Authorization", "").partition(" ")
+    if scheme.lower() != "bearer" or not hmac.compare_digest(supplied.strip().encode(), str(expected).encode()):
+        response = error_response("METRICS_TOKEN_REQUIRED", "يلزم رمز المقاييس", 401)
+        response[0].headers["WWW-Authenticate"] = 'Bearer realm="socify-metrics"'
+        return response
+    return None
+
+
 @platform_api.get("/health/metrics")
 def health_metrics():
     """Prometheus text format, read from SQLite on each request.
 
-    Counts and ages only: no case, user, workspace or file values and no label taken from stored text. deploy/nginx.conf
-    refuses this path, so it is reachable only from the internal container network.
+    Counts and ages only: no case, user, workspace or file values and no label taken from stored text.
     """
+    refusal = _metrics_refusal()
+    if refusal is not None:
+        return refusal
     now = iso_now()
     families: list[tuple[str, str, list[tuple[str, float]]]] = [
         ("socify_schema_version", "Last applied schema migration.", [("", float(get_db().execute("PRAGMA user_version").fetchone()[0]))]),

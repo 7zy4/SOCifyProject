@@ -30,6 +30,9 @@ def build_config() -> dict[str, object]:
     if environment == "production" and not credential_key:
         raise RuntimeError("SOCIFY_CREDENTIAL_KEY is required in production; reuse the previous SOCIFY_SECRET_KEY value if data was encrypted without it")
     previous_credential_key = os.environ.get("SOCIFY_CREDENTIAL_KEY_PREVIOUS") or None
+    metrics_token = os.environ.get("SOCIFY_METRICS_TOKEN", "").strip() or None
+    if metrics_token is not None and len(metrics_token) < 32:
+        raise RuntimeError("SOCIFY_METRICS_TOKEN must be at least 32 characters; leave it unset to keep /health/metrics disabled")
     database = os.environ.get("SOCIFY_DATABASE", str(Path.cwd() / "socify.db"))
     trusted_hosts = [item.strip() for item in os.environ.get("SOCIFY_TRUSTED_HOSTS", "localhost,127.0.0.1").split(",") if item.strip()]
     codespace_name = os.environ.get("CODESPACE_NAME", "").strip()
@@ -60,6 +63,7 @@ def build_config() -> dict[str, object]:
         "PERMANENT_SESSION_LIFETIME": _integer("SOCIFY_SESSION_SECONDS", 28800),
         "CREDENTIAL_KEY": credential_key or effective_secret,
         "CREDENTIAL_KEY_PREVIOUS": previous_credential_key,
+        "METRICS_TOKEN": metrics_token,
         "TRUSTED_HOSTS": trusted_hosts,
         "TRUSTED_PROXY_HOPS": min(max(_integer("SOCIFY_TRUSTED_PROXIES", 0), 0), 5),
         "RATE_LIMIT_LOGIN_ATTEMPTS": _integer("SOCIFY_LOGIN_ATTEMPTS", 5),
@@ -67,6 +71,4 @@ def build_config() -> dict[str, object]:
         "RATE_LIMIT_REGISTER_ATTEMPTS": _integer("SOCIFY_REGISTER_ATTEMPTS", 20),
         "RATE_LIMIT_SOURCE_KEY_ATTEMPTS": _integer("SOCIFY_SOURCE_KEY_ATTEMPTS", 20),
         "RATE_LIMIT_LOGIN_WINDOW_SECONDS": _integer("SOCIFY_LOGIN_WINDOW_SECONDS", 900),
-        "SSE_POLL_SECONDS": 1.0,
-        "SSE_HEARTBEAT_SECONDS": 15.0,
     }

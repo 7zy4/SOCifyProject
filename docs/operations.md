@@ -69,6 +69,7 @@ curl -fsS http://127.0.0.1:5000/health/ready
 | `SOCIFY_SECRET_KEY` | توقيع الجلسات والحماية المرتبطة بها |
 | `SOCIFY_CREDENTIAL_KEY` | تشفير بيانات الاعتماد والأدلة |
 | `SOCIFY_CREDENTIAL_KEY_PREVIOUS` | المفتاح السابق أثناء تدوير مفتاح التشفير فقط؛ يُقرأ به ولا يُكتب |
+| `SOCIFY_METRICS_TOKEN` | رمز جمع `/health/metrics`، 32 محرفًا على الأقل (مثل `python -c "import secrets; print(secrets.token_urlsafe(32))"`)؛ بدونه يبقى المسار معطّلًا، ورمز أقصر يمنع الإقلاع |
 | `SOCIFY_HTTPS` و`SOCIFY_TRUSTED_HOSTS` | HTTPS والمضيفون المسموحون |
 | `SOCIFY_TRUSTED_PROXIES` | عدد الوكلاء الموثوقين أمام التطبيق لقراءة عنوان العميل من `X-Forwarded-For`؛ الافتراضي 0، وCompose يضبطه 1 |
 | `SOCIFY_LOGIN_ATTEMPTS` و`SOCIFY_LOGIN_IP_ATTEMPTS` | حد المحاولات الفاشلة للحساب من عنوان واحد، ثم للعنوان عبر كل الحسابات؛ الافتراضي 5 و50 |
@@ -104,9 +105,22 @@ python -m scripts.run_autopsy_worker
 | `/health/live` | حياة عملية التطبيق |
 | `/health/ready` | اتصال القاعدة ومخططها |
 | `/api/health` | بعد المصادقة: الطوابير وإخفاقات القواعد وحالة التشغيل |
-| `/health/metrics` | داخلي فقط بصيغة Prometheus: أعداد مهام الاستيراد والتحليل حسب الحالة، وعمر أقدم مهمة منتظرة، والحجوزات المنتهية، والجلسات النشطة، وحجم القاعدة، ورقم الترحيل. NGINX يرفضه بـ404؛ اجمعه من الشبكة الداخلية على `socify:5000/health/metrics`، وأضف اسم المضيف الذي يستخدمه الجامع (مثل `socify`) إلى `SOCIFY_TRUSTED_HOSTS` وإلا رُفض الطلب بـ400. لا يحوي قيمًا من القضايا أو المستخدمين أو الملفات. |
+| `/health/metrics` | مقاييس Prometheus: أعداد مهام الاستيراد والتحليل حسب الحالة، وعمر أقدم مهمة منتظرة، والحجوزات المنتهية، والجلسات النشطة، وحجم القاعدة، ورقم الترحيل. غير موجود (404) ما لم يُضبط `SOCIFY_METRICS_TOKEN`، وبعدها يطلب `Authorization: Bearer <الرمز>` ويرد 401 بدونه. NGINX يرفضه بـ404 أيضًا؛ اجمعه من الشبكة الداخلية على `socify:5000/health/metrics`، وأضف اسم المضيف الذي يستخدمه الجامع (مثل `socify`) إلى `SOCIFY_TRUSTED_HOSTS` وإلا رُفض الطلب بـ400. لا يحوي قيمًا من القضايا أو المستخدمين أو الملفات. |
 
-- راقب زمن الاستجابة و5xx وحجم القاعدة وWAL والأعمال الفاشلة والحجوزات المنتهية وتأخر outbox.
+مثال إعداد Prometheus على الشبكة الداخلية، مع حفظ الرمز في ملف يقرؤه الجامع وحده:
+
+```yaml
+scrape_configs:
+  - job_name: socify
+    metrics_path: /health/metrics
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/socify-metrics-token
+    static_configs:
+      - targets: ["socify:5000"]
+```
+
+- راقب زمن الاستجابة و5xx وحجم القاعدة وWAL والأعمال الفاشلة والحجوزات المنتهية.
 - يسجل التطبيق سطرًا لكل طلب API وصفحة: الطريقة والمسار والحالة والمدة ومعرّف الارتباط والمستخدم، دون نص الاستعلام أو جسم الطلب. مثال: `request method=GET path=/api/cases status=200 duration_ms=12.4 correlation_id=… user_id=3`.
 - سجل الوصول الخاص بـGunicorn معطّل (`accesslog = None` في `gunicorn.conf.py`): كان يكرر كل طلب مع نص الاستعلام كاملًا (عبارات البحث وعناوين IP وأي رمز يمر في الرابط) وبعنوان NGINX بدل عنوان العميل. أدوات المراقبة التي كانت تقرأ سطر Gunicorn (`"GET /path?query HTTP/1.1" 200 …`) يجب أن تقرأ سطر `request method=… path=… status=…` بدلًا منه. أخطاء Gunicorn نفسها ما زالت تُكتب إلى stderr، وطلبات `/health/*` والملفات الثابتة لا تُسجَّل، والطلب المرفوض لغياب رمز الحماية يظهر بسطر `csrf_rejected reason=… correlation_id=…` بدل سطر `request`.
 - يكتب كل عامل سطرًا واحدًا عند انتهاء كل مهمة في السجل `socify.workers`: `import_job_finished` أو `import_job_failed` (المعرف والقضية والحالة وعدد المقبول والمرفوض أو نوع الخطأ والمدة)، و`autopsy_job_finished` (النوع والحالة ورمز الخطأ والمحاولة والمدة). لا تدخل السطر أسماء الملفات المرفوعة ولا محتوى الأدلة ولا نص الاستثناءات؛ التفاصيل القابلة للمراجعة تبقى في سجل المهمة داخل المنصة.
