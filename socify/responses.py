@@ -20,6 +20,8 @@ def register_response_policy(app: Flask) -> None:
         )
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
         response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+        # Every resource the pages load is same-origin, so requiring CORP costs nothing and isolates the browsing context.
+        response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
         response.headers["X-Correlation-ID"] = correlation_id()
         if app.config.get("SESSION_COOKIE_SECURE"):
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"

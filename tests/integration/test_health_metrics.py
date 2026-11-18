@@ -51,8 +51,13 @@ def test_stored_text_never_becomes_a_label(autopsy_case, client, database, metri
 
 def test_metrics_are_refused_by_the_ingress():
     config = (Path(__file__).parents[2] / "deploy" / "nginx.conf").read_text(encoding="utf-8")
-    block = re.search(r"location \^~ /health/metrics \{\s*return 404;\s*\}", config)
+    block = re.search(r"location \^~ /health/metrics \{([^}]*)\}", config)
     assert block and block.start() < config.index("location / {")
+    body = block.group(1)
+    assert "return 404;" in body and "proxy_pass" not in body
+    # NGINX writes this response itself, so it must carry the headers the application would have set.
+    for header in ("X-Content-Type-Options nosniff", "Content-Security-Policy", "Permissions-Policy", "Cache-Control no-store"):
+        assert f"add_header {header}" in body and "always;" in body, header
 
 
 def test_metrics_do_not_exist_until_a_token_is_configured(app, client):

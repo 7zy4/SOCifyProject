@@ -141,6 +141,7 @@ def test_security_headers_and_standard_errors(client: FlaskClient) -> None:
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["X-Frame-Options"] == "DENY"
     assert response.headers["Cross-Origin-Opener-Policy"] == "same-origin"
+    assert response.headers["Cross-Origin-Embedder-Policy"] == "require-corp"
     assert "unsafe-inline" not in response.headers["Content-Security-Policy"]
     missing = client.get("/api/does-not-exist")
     assert missing.status_code == 404
