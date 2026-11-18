@@ -10,11 +10,21 @@ import hashlib
 from pathlib import Path
 
 from flask import Flask, Response, request
+from flask.sessions import SecureCookieSessionInterface
 
 ONE_YEAR = 31536000
 
 
+class _NoCookieOnStaticFiles(SecureCookieSessionInterface):
+    """Never refresh the session cookie on a static file: such a response may be cached publicly for a year, and a
+    shared cache that stored it with Set-Cookie would hand the signed-in user's session to everyone it serves."""
+
+    def should_set_cookie(self, app: Flask, session) -> bool:
+        return request.endpoint != "static" and super().should_set_cookie(app, session)
+
+
 def register_static_fingerprints(app: Flask) -> None:
+    app.session_interface = _NoCookieOnStaticFiles()
     root = Path(str(app.static_folder)).resolve()
     known: dict[Path, tuple[int, int, str]] = {}
 

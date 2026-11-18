@@ -71,3 +71,17 @@ def test_ingress_marks_compressed_static_files_as_varying_by_encoding():
     config = (ROOT / "deploy" / "nginx.conf").read_text(encoding="utf-8")
     block = config[config.index("location ^~ /static/") : config.index("location / {")]
     assert "gzip on;" in block and "gzip_vary on;" in block
+
+
+def test_a_signed_in_static_response_never_carries_the_session_cookie(app, client, login_as):
+    # A long-lived public response with Set-Cookie would let a shared cache hand this user's session to others.
+    login_as("analyst")
+    with app.test_request_context():
+        from flask import url_for
+
+        link = url_for("static", filename="app.js")
+    static = client.get(link)
+    assert static.headers["Cache-Control"] == IMMUTABLE
+    assert "Set-Cookie" not in static.headers
+    page = client.get("/cases")
+    assert page.status_code == 200 and "Set-Cookie" in page.headers  # pages still refresh the session as before
