@@ -41,7 +41,6 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
     "soc_manager": {
         "events.read",
         "events.create",
-        "events.delete",
         "alerts.read",
         "alerts.triage",
         "cases.read",
@@ -56,7 +55,6 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "hunt.share",
         "graph.read",
         "playbooks.request",
-        "playbooks.approve",
         "playbooks.manage",
         "sources.read",
         "sources.manage",
