@@ -7,6 +7,7 @@ import re
 import sqlite3
 import tempfile
 from collections.abc import Iterable, Iterator
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -773,7 +774,145 @@ def _mark_job_failed(job_id: int, message: str) -> None:
     )
 
 
+RECORD_ERRORS = (ValueError, json.JSONDecodeError, csv.Error, ElementTree.ParseError)
+
+
+@dataclass
+class _Counts:
+    accepted: int
+    rejected: int
+    skipped: int
+
+
+def _job_row(job_id: int, moment: str) -> sqlite3.Row:
+    row = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
+    if row is None:
+        raise RuntimeError(f"import job disappeared {moment}")
+    return row
+
+
+def _skip_to_checkpoint(iterator: Iterator[dict[str, Any]], checkpoint: int) -> bool:
+    """Advance past rows a previous attempt already committed; True when the records end before the checkpoint."""
+    for _ in range(checkpoint):
+        try:
+            next(iterator)
+        except StopIteration:
+            return True
+        except RECORD_ERRORS:
+            return True
+    return False
+
+
+def _next_batch(
+    iterator: Iterator[dict[str, Any]], checkpoint: int, maximum_rows: int
+) -> tuple[list[tuple[int, dict[str, Any] | None, Exception | None]], bool]:
+    """Up to IMPORT_CHUNK_SIZE numbered rows, each a record or the error that ended parsing; True when the records end."""
+    batch: list[tuple[int, dict[str, Any] | None, Exception | None]] = []
+    while len(batch) < IMPORT_CHUNK_SIZE and checkpoint + len(batch) < maximum_rows:
+        row_number = checkpoint + len(batch) + 1
+        try:
+            batch.append((row_number, next(iterator), None))
+        except StopIteration:
+            return batch, True
+        except RECORD_ERRORS as exc:
+            batch.append((row_number, None, exc))
+            return batch, True
+    return batch, False
+
+
+def _store_record(job: sqlite3.Row, registered_source: sqlite3.Row | None, row_number: int, record: dict[str, Any], counts: _Counts) -> None:
+    """Store one parsed row inside the batch transaction; a row that fails is rolled back alone and recorded as rejected."""
+    get_db().execute("SAVEPOINT import_row")
+    try:
+        if record.get("__parse_error"):
+            raise ValidationError("Record could not be parsed")
+        if registered_source and record.get("source_type") in (None, "import", "training"):
+            record["source_type"] = registered_source["type"]
+        if job["case_id"] is not None:
+            record["idempotency_key"] = f"pipeline:{hashlib.sha256(job['autopsy_options'].encode()).hexdigest()}:{record.get('idempotency_key', row_number)}"
+        event_id, alerts, was_duplicate = ingest_event(
+            get_db(),
+            record,
+            int(job["created_by"]),
+            int(job["workspace_id"]),
+            job["training_run_id"],
+            job["case_id"],
+            job["id"] if job["case_id"] is not None else None,
+            bool(job["active_version"]),
+            import_row=row_number,
+        )
+        if job["case_id"] is not None:
+            _attach_import_result(job, event_id, alerts)
+        get_db().execute("RELEASE SAVEPOINT import_row")
+        if was_duplicate:
+            counts.skipped += 1
+        else:
+            counts.accepted += 1
+    except (ValueError, OverflowError, sqlite3.Error) as exc:
+        get_db().execute("ROLLBACK TO SAVEPOINT import_row")
+        get_db().execute("RELEASE SAVEPOINT import_row")
+        counts.rejected += 1
+        get_db().execute(
+            "INSERT INTO ingestion_errors (job_id, row_number, error_code, message, sample, created_at) VALUES (?, ?, 'VALIDATION_ERROR', ?, ?, ?)",
+            (job["id"], row_number, public_error_message(exc, "Record validation failed"), json.dumps(record, ensure_ascii=True)[:1000], iso_now()),
+        )
+
+
+def _finish_job(job: sqlite3.Row, counts: _Counts, checkpoint: int) -> sqlite3.Row:
+    """Record the final counts, update the source and, for a case import, activate the batch and log custody."""
+    job_id = int(job["id"])
+    completed = iso_now()
+    status = "completed" if counts.rejected == 0 else "completed_with_errors"
+    get_db().execute(
+        """UPDATE ingestion_jobs SET status = ?, accepted = ?, rejected = ?, skipped = ?, total = ?, checkpoint = ?, progress = 1,
+        worker_id = NULL, lease_expires_at = NULL, last_error = NULL, updated_at = ?, completed_at = ? WHERE id = ?""",
+        (status, counts.accepted, counts.rejected, counts.skipped, checkpoint, checkpoint, completed, completed, job_id),
+    )
+    if job["source_id"]:
+        error_rate = counts.rejected / checkpoint if checkpoint else 0
+        get_db().execute(
+            "UPDATE event_sources SET rows_ingested = rows_ingested + ?, error_rate = ?, last_sync = ?, status = ?, updated_at = ? WHERE id = ?",
+            (counts.accepted, error_rate, completed, "connected" if counts.accepted or counts.skipped else "failed", completed, job["source_id"]),
+        )
+    record_audit(
+        get_db(),
+        "complete",
+        "import",
+        job_id,
+        details={"accepted": counts.accepted, "rejected": counts.rejected, "skipped": counts.skipped, "format": job["format"]},
+        actor=int(job["created_by"]),
+        workspace=int(job["workspace_id"]),
+    )
+    if job["case_id"] is not None:
+        from .autopsy_domain import custody
+
+        with transaction():
+            finished = _job_row(job_id, "after completion")
+            latest = (
+                get_db()
+                .execute(
+                    "SELECT MAX(id) FROM ingestion_jobs WHERE case_id = ? AND content_hash = ? AND source_id IS ? AND source_name=? AND status IN ('completed','completed_with_errors') AND (accepted > 0 OR EXISTS (SELECT 1 FROM autopsy_event_occurrences o WHERE o.job_id=ingestion_jobs.id))",
+                    (job["case_id"], job["content_hash"], job["source_id"], job["source_name"]),
+                )
+                .fetchone()[0]
+            )
+            if latest == job_id and (counts.accepted or counts.skipped):
+                activate_import(finished, actor=job["executor_id"] or job["created_by"])
+                from .windows_logon import reconcile_logons
+
+                for event_id, alerts in reconcile_logons(get_db(), finished):
+                    _attach_import_result(finished, event_id, alerts)
+            custody(
+                job["case_id"],
+                "import_completed",
+                {"job_id": job_id, "accepted": counts.accepted, "rejected": counts.rejected, "sha256": job["content_hash"]},
+                actor=job["created_by"],
+            )
+    return _job_row(job_id, "after completion")
+
+
 def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int = 60) -> sqlite3.Row:
+    """Parse a stored upload and store its rows in committed chunks, resuming after the last committed checkpoint."""
     job = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
     if job is None:
         raise RuntimeError("import job disappeared during processing")
@@ -785,52 +924,24 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
             raise ValidationError("import source is unavailable in this case")
         content = _job_content(job)
         _, records = parse_records(job["filename"], content, job["format"], job["source_name"], json.loads(job["autopsy_options"]))
-    except (ValueError, json.JSONDecodeError, csv.Error, ElementTree.ParseError) as exc:
+    except RECORD_ERRORS as exc:
         _mark_job_failed(job_id, public_error_message(exc, "Unable to parse the import; check its format and encoding"))
-        failed = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
-        if failed is None:
-            raise RuntimeError("import job disappeared after failure") from exc
-        return failed
-    accepted = int(job["accepted"])
-    rejected = int(job["rejected"])
-    skipped = int(job["skipped"])
+        return _job_row(job_id, "after failure")
+    counts = _Counts(int(job["accepted"]), int(job["rejected"]), int(job["skipped"]))
     checkpoint = int(job["checkpoint"])
     maximum_rows = int(current_app.config["MAX_IMPORT_ROWS"])
     iterator = iter(records)
-    exhausted = False
-    for _ in range(checkpoint):
-        try:
-            next(iterator)
-        except StopIteration:
-            exhausted = True
-            break
-        except (ValueError, json.JSONDecodeError, csv.Error, ElementTree.ParseError):
-            exhausted = True
-            break
+    exhausted = _skip_to_checkpoint(iterator, checkpoint)
     now = iso_now()
     get_db().execute("UPDATE ingestion_jobs SET status = 'processing', started_at = COALESCE(started_at, ?), updated_at = ? WHERE id = ?", (now, now, job_id))
     while checkpoint < maximum_rows and not exhausted:
-        batch: list[tuple[int, dict[str, Any] | None, Exception | None]] = []
-        while len(batch) < IMPORT_CHUNK_SIZE and checkpoint + len(batch) < maximum_rows:
-            row_number = checkpoint + len(batch) + 1
-            try:
-                batch.append((row_number, next(iterator), None))
-            except StopIteration:
-                exhausted = True
-                break
-            except (ValueError, json.JSONDecodeError, csv.Error, ElementTree.ParseError) as exc:
-                batch.append((row_number, None, exc))
-                exhausted = True
-                break
+        batch, exhausted = _next_batch(iterator, checkpoint, maximum_rows)
         if not batch:
             break
         with transaction():
             if job["case_id"] is not None and not _import_case_authorized(job):
                 _mark_job_failed(job_id, "case closed, archived or import creator no longer authorized")
-                failed = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
-                if failed is None:
-                    raise RuntimeError("import job disappeared after authorization failure")
-                return failed
+                return _job_row(job_id, "after authorization failure")
             if worker_id is not None:
                 lease = (utc_now() + timedelta(seconds=lease_seconds)).isoformat().replace("+00:00", "Z")
                 owned = get_db().execute(
@@ -841,7 +952,7 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
                     raise RuntimeError("import worker lease was lost")
             for row_number, record, parse_error in batch:
                 if parse_error is not None:
-                    rejected += 1
+                    counts.rejected += 1
                     get_db().execute(
                         "INSERT INTO ingestion_errors (job_id, row_number, error_code, message, sample, created_at) VALUES (?, ?, 'PARSE_ERROR', ?, NULL, ?)",
                         (job_id, row_number, public_error_message(parse_error, "Invalid record syntax"), iso_now()),
@@ -849,48 +960,13 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
                     continue
                 if record is None:
                     raise RuntimeError("import batch contains no record")
-                get_db().execute("SAVEPOINT import_row")
-                try:
-                    if record.get("__parse_error"):
-                        raise ValidationError("Record could not be parsed")
-                    if registered_source and record.get("source_type") in (None, "import", "training"):
-                        record["source_type"] = registered_source["type"]
-                    if job["case_id"] is not None:
-                        record["idempotency_key"] = (
-                            f"pipeline:{hashlib.sha256(job['autopsy_options'].encode()).hexdigest()}:{record.get('idempotency_key', row_number)}"
-                        )
-                    event_id, alerts, was_duplicate = ingest_event(
-                        get_db(),
-                        record,
-                        int(job["created_by"]),
-                        int(job["workspace_id"]),
-                        job["training_run_id"],
-                        job["case_id"],
-                        job_id if job["case_id"] is not None else None,
-                        bool(job["active_version"]),
-                        import_row=row_number,
-                    )
-                    if job["case_id"] is not None:
-                        _attach_import_result(job, event_id, alerts)
-                    get_db().execute("RELEASE SAVEPOINT import_row")
-                    if was_duplicate:
-                        skipped += 1
-                    else:
-                        accepted += 1
-                except (ValueError, OverflowError, sqlite3.Error) as exc:
-                    get_db().execute("ROLLBACK TO SAVEPOINT import_row")
-                    get_db().execute("RELEASE SAVEPOINT import_row")
-                    rejected += 1
-                    get_db().execute(
-                        "INSERT INTO ingestion_errors (job_id, row_number, error_code, message, sample, created_at) VALUES (?, ?, 'VALIDATION_ERROR', ?, ?, ?)",
-                        (job_id, row_number, public_error_message(exc, "Record validation failed"), json.dumps(record, ensure_ascii=True)[:1000], iso_now()),
-                    )
+                _store_record(job, registered_source, row_number, record, counts)
             checkpoint += len(batch)
             estimated = max(min(int(job["estimated_total"]), maximum_rows), 1)
             progress = min(checkpoint / estimated, 0.9999)
             get_db().execute(
                 "UPDATE ingestion_jobs SET accepted = ?, rejected = ?, skipped = ?, total = ?, checkpoint = ?, progress = ?, updated_at = ? WHERE id = ?",
-                (accepted, rejected, skipped, checkpoint, checkpoint, progress, iso_now(), job_id),
+                (counts.accepted, counts.rejected, counts.skipped, checkpoint, checkpoint, progress, iso_now(), job_id),
             )
             if job["case_id"] is not None:
                 from .autopsy_domain import touch_case
@@ -902,70 +978,17 @@ def _process_job(job_id: int, worker_id: str | None = None, lease_seconds: int =
                 "UPDATE ingestion_jobs SET status = 'cancelled', worker_id = NULL, lease_expires_at = NULL, updated_at = ?, completed_at = ? WHERE id = ?",
                 (iso_now(), iso_now(), job_id),
             )
-            cancelled = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
-            if cancelled is None:
-                raise RuntimeError("import job disappeared after cancellation")
-            return cancelled
+            return _job_row(job_id, "after cancellation")
     if checkpoint >= maximum_rows and not exhausted:
         sentinel = object()
         overflow = next(iterator, sentinel)
         if overflow is not sentinel:
-            rejected += 1
+            counts.rejected += 1
             get_db().execute(
                 "INSERT INTO ingestion_errors (job_id, row_number, error_code, message, sample, created_at) VALUES (?, ?, 'ROW_LIMIT', ?, NULL, ?)",
                 (job_id, checkpoint + 1, f"row limit {maximum_rows} exceeded", iso_now()),
             )
-    completed = iso_now()
-    status = "completed" if rejected == 0 else "completed_with_errors"
-    get_db().execute(
-        """UPDATE ingestion_jobs SET status = ?, accepted = ?, rejected = ?, skipped = ?, total = ?, checkpoint = ?, progress = 1,
-        worker_id = NULL, lease_expires_at = NULL, last_error = NULL, updated_at = ?, completed_at = ? WHERE id = ?""",
-        (status, accepted, rejected, skipped, checkpoint, checkpoint, completed, completed, job_id),
-    )
-    if job["source_id"]:
-        error_rate = rejected / checkpoint if checkpoint else 0
-        get_db().execute(
-            "UPDATE event_sources SET rows_ingested = rows_ingested + ?, error_rate = ?, last_sync = ?, status = ?, updated_at = ? WHERE id = ?",
-            (accepted, error_rate, completed, "connected" if accepted or skipped else "failed", completed, job["source_id"]),
-        )
-    record_audit(
-        get_db(),
-        "complete",
-        "import",
-        job_id,
-        details={"accepted": accepted, "rejected": rejected, "skipped": skipped, "format": job["format"]},
-        actor=int(job["created_by"]),
-        workspace=int(job["workspace_id"]),
-    )
-    if job["case_id"] is not None:
-        from .autopsy_domain import custody
-
-        with transaction():
-            finished = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
-            latest = (
-                get_db()
-                .execute(
-                    "SELECT MAX(id) FROM ingestion_jobs WHERE case_id = ? AND content_hash = ? AND source_id IS ? AND source_name=? AND status IN ('completed','completed_with_errors') AND (accepted > 0 OR EXISTS (SELECT 1 FROM autopsy_event_occurrences o WHERE o.job_id=ingestion_jobs.id))",
-                    (job["case_id"], job["content_hash"], job["source_id"], job["source_name"]),
-                )
-                .fetchone()[0]
-            )
-            if latest == job_id and (accepted or skipped):
-                activate_import(finished, actor=job["executor_id"] or job["created_by"])
-                from .windows_logon import reconcile_logons
-
-                for event_id, alerts in reconcile_logons(get_db(), finished):
-                    _attach_import_result(finished, event_id, alerts)
-            custody(
-                job["case_id"],
-                "import_completed",
-                {"job_id": job_id, "accepted": accepted, "rejected": rejected, "sha256": job["content_hash"]},
-                actor=job["created_by"],
-            )
-    result = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_id,)).fetchone()
-    if result is None:
-        raise RuntimeError("import job disappeared after completion")
-    return result
+    return _finish_job(job, counts, checkpoint)
 
 
 def _import_case_authorized(job: sqlite3.Row) -> bool:

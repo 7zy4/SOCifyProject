@@ -92,20 +92,8 @@ def _parse_stream_payload(raw_bytes: bytes, content_type: str, source_name: str)
     return fmt, list(iterator)
 
 
-def _ingest_records_for_source(
-    source_row: sqlite3.Row,
-    raw_bytes: bytes,
-    content_type: str,
-    target_case_id: int | None,
-    actor: int | None,
-) -> dict[str, Any]:
-    ws_id = int(source_row["workspace_id"])
-    source_id = int(source_row["id"])
-    source_name = str(source_row["name"])
-    fmt, records = _parse_stream_payload(raw_bytes, content_type, source_name)
-    if len(records) > MAX_INGEST_BATCH_RECORDS:
-        raise ValidationError(f"SIEM batch exceeds {MAX_INGEST_BATCH_RECORDS} records")
-
+def _source_actor(ws_id: int, target_case_id: int | None, actor: int | None) -> int | None:
+    """The account recorded for pushed events: the caller, else the case assignee or creator, else the first active member."""
     effective_actor = actor
     if effective_actor is None:
         owner_row = (
@@ -123,6 +111,168 @@ def _ingest_records_for_source(
         else:
             fallback_user = get_db().execute("SELECT id FROM users WHERE workspace_id = ? AND is_active = 1 ORDER BY id LIMIT 1", (ws_id,)).fetchone()
             effective_actor = int(fallback_user[0]) if fallback_user else None
+    return effective_actor
+
+
+def _retained_case_batch(
+    ws_id: int, source_id: int, target_case_id: int, content_hash: str, fmt: str, now: str, effective_actor: int | None
+) -> dict[str, Any] | None:
+    """The answer for a batch this case already holds unchanged, after recording the retry; None when the batch is new."""
+    retained = (
+        get_db()
+        .execute(
+            """SELECT id, total FROM ingestion_jobs WHERE workspace_id = ? AND source_id = ? AND case_id = ?
+           AND content_hash = ? AND status = 'completed' AND active_version = 1 AND (accepted > 0 OR skipped > 0) AND rejected = 0
+           ORDER BY id LIMIT 1""",
+            (ws_id, source_id, target_case_id, content_hash),
+        )
+        .fetchone()
+    )
+    if retained:
+        get_db().execute(
+            "UPDATE event_sources SET error_rate = 0, last_sync = ?, status = 'connected', updated_at = ? WHERE id = ?",
+            (now, now, source_id),
+        )
+        record_audit(
+            get_db(),
+            "ingest_retry",
+            "source",
+            source_id,
+            details={"accepted": 0, "skipped": retained["total"], "case_id": target_case_id, "retained_job_id": retained["id"]},
+            actor=effective_actor,
+            workspace=ws_id,
+        )
+        return {
+            "source_id": source_id,
+            "case_id": target_case_id,
+            "format": fmt,
+            "accepted": 0,
+            "rejected": 0,
+            "skipped": retained["total"],
+            "alerts_triggered": 0,
+            "alert_ids": [],
+        }
+    return None
+
+
+def _open_case_batch(
+    ws_id: int,
+    source_id: int,
+    source_name: str,
+    target_case_id: int,
+    fmt: str,
+    content_hash: str,
+    raw_bytes: bytes,
+    records: list[dict[str, Any]],
+    effective_actor: int | None,
+    now: str,
+) -> int:
+    """Retain the pushed bytes as an import of the case and record them as its evidence; returns the import row id."""
+    ciphertext = encrypt_bytes(raw_bytes)
+    cursor = get_db().execute(
+        """INSERT INTO ingestion_jobs
+           (job_id, workspace_id, source_id, training_run_id, case_id, filename, original_filename, format,
+            content_hash, evidence_ciphertext, raw_size, estimated_total, source_name, status,
+            parser_version, active_version, autopsy_options, created_by, executor_id, created_at, updated_at, available_at, completed_at, progress)
+           VALUES (?, ?, ?, NULL, ?, 'siem-stream.log', 'siem-stream.log', ?, ?, ?, ?, ?, ?, 'completed', 'socify-siem', 1, '{}', ?, ?, ?, ?, ?, ?, 1)""",
+        (
+            public_id("IMP"),
+            ws_id,
+            source_id,
+            target_case_id,
+            fmt,
+            content_hash,
+            ciphertext,
+            len(raw_bytes),
+            len(records),
+            source_name,
+            effective_actor,
+            effective_actor,
+            now,
+            now,
+            now,
+            now,
+        ),
+    )
+    job_db_id = inserted_id(cursor)
+    get_db().execute(
+        "INSERT INTO autopsy_case_imports(case_id, job_id, attached_by, attached_at) VALUES (?, ?, ?, ?)",
+        (target_case_id, job_db_id, effective_actor, now),
+    )
+    get_db().execute(
+        "INSERT INTO case_evidence(case_id, evidence_type, reference_id, title, sha256, provenance, added_by, added_at) VALUES (?, 'import', ?, ?, ?, ?, ?, ?)",
+        (
+            target_case_id,
+            str(job_db_id),
+            f"SIEM Stream ({source_name})",
+            content_hash,
+            json.dumps({"source_id": source_id, "source": source_name, "format": fmt}),
+            effective_actor,
+            now,
+        ),
+    )
+    return job_db_id
+
+
+def _store_source_record(
+    source_row: sqlite3.Row,
+    record: dict[str, Any],
+    idx: int,
+    content_hash: str,
+    effective_actor: int | None,
+    target_case_id: int | None,
+    job_db_id: int | None,
+    job_row: sqlite3.Row | None,
+) -> tuple[str, list[int]]:
+    """Store one pushed record in its own savepoint; returns whether it was accepted, skipped or rejected, and its alerts."""
+    ws_id = int(source_row["workspace_id"])
+    source_id = int(source_row["id"])
+    source_name = str(source_row["name"])
+    record = dict(record)
+    record["source"] = source_name
+    if record.get("source_type") in (None, "import", "training"):
+        record["source_type"] = "http" if source_row["type"] == "http" else str(source_row["type"])
+    record["idempotency_key"] = f"siem:{source_id}:{content_hash}:{idx}"
+    record["provenance"] = {**record.get("provenance", {}), "file_sha256": content_hash}
+    get_db().execute("SAVEPOINT source_row")
+    try:
+        ev_id, triggered, duplicate = ingest_event(
+            get_db(),
+            record,
+            effective_actor,
+            ws_id,
+            None,
+            target_case_id,
+            job_db_id,
+            True,
+            import_row=idx,
+        )
+        if target_case_id is not None and job_row is not None:
+            _attach_import_result(job_row, ev_id, triggered)
+        outcome = ("skipped", []) if duplicate else ("accepted", triggered)
+        get_db().execute("RELEASE SAVEPOINT source_row")
+    except (ValueError, OverflowError, sqlite3.Error):
+        get_db().execute("ROLLBACK TO SAVEPOINT source_row")
+        get_db().execute("RELEASE SAVEPOINT source_row")
+        return "rejected", []
+    return outcome
+
+
+def _ingest_records_for_source(
+    source_row: sqlite3.Row,
+    raw_bytes: bytes,
+    content_type: str,
+    target_case_id: int | None,
+    actor: int | None,
+) -> dict[str, Any]:
+    ws_id = int(source_row["workspace_id"])
+    source_id = int(source_row["id"])
+    source_name = str(source_row["name"])
+    fmt, records = _parse_stream_payload(raw_bytes, content_type, source_name)
+    if len(records) > MAX_INGEST_BATCH_RECORDS:
+        raise ValidationError(f"SIEM batch exceeds {MAX_INGEST_BATCH_RECORDS} records")
+
+    effective_actor = _source_actor(ws_id, target_case_id, actor)
 
     content_hash = hashlib.sha256(raw_bytes).hexdigest()
     now = iso_now()
@@ -144,119 +294,23 @@ def _ingest_records_for_source(
             )
             if not case_check or case_check["archived_at"] is not None or case_check["status"] == "closed":
                 raise ValidationError("linked target case is closed or unavailable")
-            retained = (
-                get_db()
-                .execute(
-                    """SELECT id, total FROM ingestion_jobs WHERE workspace_id = ? AND source_id = ? AND case_id = ?
-                   AND content_hash = ? AND status = 'completed' AND active_version = 1 AND (accepted > 0 OR skipped > 0) AND rejected = 0
-                   ORDER BY id LIMIT 1""",
-                    (ws_id, source_id, target_case_id, content_hash),
-                )
-                .fetchone()
-            )
-            if retained:
-                get_db().execute(
-                    "UPDATE event_sources SET error_rate = 0, last_sync = ?, status = 'connected', updated_at = ? WHERE id = ?",
-                    (now, now, source_id),
-                )
-                record_audit(
-                    get_db(),
-                    "ingest_retry",
-                    "source",
-                    source_id,
-                    details={"accepted": 0, "skipped": retained["total"], "case_id": target_case_id, "retained_job_id": retained["id"]},
-                    actor=effective_actor,
-                    workspace=ws_id,
-                )
-                return {
-                    "source_id": source_id,
-                    "case_id": target_case_id,
-                    "format": fmt,
-                    "accepted": 0,
-                    "rejected": 0,
-                    "skipped": retained["total"],
-                    "alerts_triggered": 0,
-                    "alert_ids": [],
-                }
-            ciphertext = encrypt_bytes(raw_bytes)
-            cursor = get_db().execute(
-                """INSERT INTO ingestion_jobs
-                   (job_id, workspace_id, source_id, training_run_id, case_id, filename, original_filename, format,
-                    content_hash, evidence_ciphertext, raw_size, estimated_total, source_name, status,
-                    parser_version, active_version, autopsy_options, created_by, executor_id, created_at, updated_at, available_at, completed_at, progress)
-                   VALUES (?, ?, ?, NULL, ?, 'siem-stream.log', 'siem-stream.log', ?, ?, ?, ?, ?, ?, 'completed', 'socify-siem', 1, '{}', ?, ?, ?, ?, ?, ?, 1)""",
-                (
-                    public_id("IMP"),
-                    ws_id,
-                    source_id,
-                    target_case_id,
-                    fmt,
-                    content_hash,
-                    ciphertext,
-                    len(raw_bytes),
-                    len(records),
-                    source_name,
-                    effective_actor,
-                    effective_actor,
-                    now,
-                    now,
-                    now,
-                    now,
-                ),
-            )
-            job_db_id = inserted_id(cursor)
-            get_db().execute(
-                "INSERT INTO autopsy_case_imports(case_id, job_id, attached_by, attached_at) VALUES (?, ?, ?, ?)",
-                (target_case_id, job_db_id, effective_actor, now),
-            )
-            get_db().execute(
-                "INSERT INTO case_evidence(case_id, evidence_type, reference_id, title, sha256, provenance, added_by, added_at) VALUES (?, 'import', ?, ?, ?, ?, ?, ?)",
-                (
-                    target_case_id,
-                    str(job_db_id),
-                    f"SIEM Stream ({source_name})",
-                    content_hash,
-                    json.dumps({"source_id": source_id, "source": source_name, "format": fmt}),
-                    effective_actor,
-                    now,
-                ),
-            )
+            retained = _retained_case_batch(ws_id, source_id, target_case_id, content_hash, fmt, now, effective_actor)
+            if retained is not None:
+                return retained
+            job_db_id = _open_case_batch(ws_id, source_id, source_name, target_case_id, fmt, content_hash, raw_bytes, records, effective_actor, now)
 
         job_row = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ?", (job_db_id,)).fetchone() if job_db_id else None
         for idx, record in enumerate(records, 1):
             if record.get("__parse_error"):
                 rejected += 1
                 continue
-            record = dict(record)
-            record["source"] = source_name
-            if record.get("source_type") in (None, "import", "training"):
-                record["source_type"] = "http" if source_row["type"] == "http" else str(source_row["type"])
-            record["idempotency_key"] = f"siem:{source_id}:{content_hash}:{idx}"
-            record["provenance"] = {**record.get("provenance", {}), "file_sha256": content_hash}
-            get_db().execute("SAVEPOINT source_row")
-            try:
-                ev_id, triggered, duplicate = ingest_event(
-                    get_db(),
-                    record,
-                    effective_actor,
-                    ws_id,
-                    None,
-                    target_case_id,
-                    job_db_id,
-                    True,
-                    import_row=idx,
-                )
-                if target_case_id is not None and job_row is not None:
-                    _attach_import_result(job_row, ev_id, triggered)
-                if duplicate:
-                    skipped += 1
-                else:
-                    accepted += 1
-                    alert_ids.extend(triggered)
-                get_db().execute("RELEASE SAVEPOINT source_row")
-            except (ValueError, OverflowError, sqlite3.Error):
-                get_db().execute("ROLLBACK TO SAVEPOINT source_row")
-                get_db().execute("RELEASE SAVEPOINT source_row")
+            outcome, triggered = _store_source_record(source_row, record, idx, content_hash, effective_actor, target_case_id, job_db_id, job_row)
+            if outcome == "accepted":
+                accepted += 1
+                alert_ids.extend(triggered)
+            elif outcome == "skipped":
+                skipped += 1
+            else:
                 rejected += 1
 
         if job_db_id is not None and target_case_id is not None:
