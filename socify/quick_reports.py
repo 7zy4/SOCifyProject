@@ -1,10 +1,10 @@
-import html
 import json
 import re
 import sqlite3
 from typing import Any
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, jsonify, render_template, request
+from markupsafe import Markup
 
 from .audit import record_audit
 from .autopsy_domain import custody, touch_case
@@ -611,19 +611,22 @@ def acknowledge_escalated_report(case_id: int):
     return jsonify({"report": _report_view(updated)}), 200
 
 
-def _esc(value: object) -> str:
-    return html.escape(str(value if value is not None else "—"), quote=True)
-
-
-def _fmt_bilingual(value: object) -> str:
+def _bilingual(value: object) -> str:
+    """The reader's half of a stored "Arabic (English)" label, or the whole value; None reads as an em dash."""
     raw = str(value if value is not None else "—")
     parts = re.fullmatch(r"(.*)\s+\(([^()]*)\)", raw)
     if parts:
         language = request.headers.get("X-SOCify-Language", request.cookies.get("socify-language")) or request.accept_languages.best_match(
             ("ar", "en"), default="ar"
         )
-        return _esc(parts[2] if language == "en" else parts[1])
-    return _esc(raw)
+        return parts[2] if language == "en" else parts[1]
+    return raw
+
+
+@quick_reports_api.app_template_filter("dash")
+def _dash(value: object) -> object:
+    """Missing values print as an em dash; the template escapes whatever this returns."""
+    return "—" if value is None else value
 
 
 def _badge_tone(raw: object) -> str:
@@ -662,177 +665,34 @@ def print_quick_report(case_id: int):
         telemetry = telemetry_report(get_db(), case_id, case["workspace_id"])
     except ValueError as exc:
         return error_response("REPORT_CONTENT_LIMIT", public_error_message(exc, "يتجاوز محتوى التقرير الحد المسموح"), 422)
-    inspection_html = ""
-    if inspected:
-        parts = ['<h2 class="section-title" data-ui-copy>فحص المحتوى والترميزات</h2>']
-        for item in inspected:
-            parts.append(f'<div class="content-inspection-report">{report_table(item, localize=True)}</div>')
-        inspection_html = "".join(parts)
-    for title, key in (
-        ("تحليل الشبكة", "network_analysis"),
-        ("نتائج الأجهزة", "endpoint_results"),
-        ("أمن الأنظمة والحاويات", "runtime_events"),
-        ("تنبيهات الشبكة", "network_alerts"),
-        ("تسجيل الدخول", "logon_events"),
-    ):
-        if telemetry[key]:
-            inspection_html += f'<h2 class="section-title" data-ui-copy>{title}</h2>'
-            readable = network_report_content(telemetry[key]) if key == "network_analysis" else telemetry[key]
-            inspection_html += report_table(readable, localize=True)
-    qa_rows_html = "".join(
-        f"<tr><th>{_fmt_bilingual(item['question'])}</th><td><strong>{_fmt_bilingual(item['answer_label'])}</strong></td></tr>"
-        for item in report["resolved_questions"]
-    )
-    status_label = {"draft": "مسودة", "escalated": "أُحيل للمراجعة", "acknowledged": "تمت المراجعة"}.get(report["status"], report["status"])
-    status_tone = _badge_tone(report["status"])
-    note_html = f'<div class="note-box"><strong data-ui-copy>خلاصة المحقق</strong>: {_esc(report["executive_note"])}</div>' if report["executive_note"] else ""
-    manager_label = {"approved": "معتمد", "needs_followup": "يتطلب متابعة", "closed": "تم الحل"}.get(report["manager_decision"], "")
-    manager_html = (
-        f'<div class="note-box manager-box"><strong data-ui-copy>قرار المدير</strong>: <span data-ui-copy>{manager_label}</span> · {_esc(report["manager_comment"])} · <span class="mono" dir="ltr">{_esc(report["acknowledged_at"])}</span></div>'
-        if report["manager_decision"]
-        else ""
-    )
-
-    if summary["alerts"]:
-        alerts_rows_html = "".join(
-            f'<tr><td><code dir="ltr">{_esc(a["alert_id"])}</code></td><td><span class="badge {_badge_tone(a["severity"])}" data-ui-copy>{_esc(ENUM_LABELS.get(a["severity"], a["severity"]))}</span></td><td>{_esc(a["reason"])}</td><td><span class="mono" dir="ltr">{_esc(a["detected_at"])}</span></td></tr>'
-            for a in summary["alerts"]
+    # report_table escapes every key and value it writes (tests/security/test_report_table_escaping.py); its output is the
+    # only HTML this page takes as markup, and Jinja escapes everything else.
+    inspected_tables = [Markup(report_table(item, localize=True)) for item in inspected or []]  # noqa: S704
+    telemetry_sections = [
+        (title, Markup(report_table(network_report_content(telemetry[key]) if key == "network_analysis" else telemetry[key], localize=True)))  # noqa: S704
+        for title, key in (
+            ("تحليل الشبكة", "network_analysis"),
+            ("نتائج الأجهزة", "endpoint_results"),
+            ("أمن الأنظمة والحاويات", "runtime_events"),
+            ("تنبيهات الشبكة", "network_alerts"),
+            ("تسجيل الدخول", "logon_events"),
         )
-    else:
-        alerts_rows_html = '<tr><td colspan="4" data-ui-copy>لا توجد تنبيهات مسجلة في القضية حتى لحظة التقرير.</td></tr>'
-
-    # Deliberately use a small, explicit projection; never dump review or log JSON.
-    evidence_context = [
-        '<h2 class="section-title">' + _fmt_bilingual("التقييم والملاحظات (Assessment and Notes)") + "</h2>",
+        if telemetry[key]
     ]
-    if len(summary["alerts"]) < summary["alerts_count"]:
-        shown, total = len(summary["alerts"]), summary["alerts_count"]
-        evidence_context.append("<p>" + _fmt_bilingual(f"المعروض {shown} من {total} (Showing {shown} of {total})") + "</p>")
-    for alert in summary["alerts"]:
-        review = alert["review"]
-        evidence_context.append(
-            '<section class="note-box report-narrative"><h3><code dir="ltr">'
-            + _esc(alert["alert_id"])
-            + "</code></h3><p>"
-            + _fmt_bilingual("حكم التنبيه (Alert verdict)")
-            + ": <span data-ui-copy>"
-            + _esc(ENUM_LABELS.get(review["verdict"], review["verdict"]))
-            + "</span> · "
-            + _fmt_bilingual("نتيجة الهجوم (Attack outcome)")
-            + ": <span data-ui-copy>"
-            + _esc(ENUM_LABELS.get(review["attack_outcome"], review["attack_outcome"]))
-            + '</span></p><p dir="auto">'
-            + _esc(review["reason"])
-            + "</p></section>"
-        )
-    evidence_context.append("<h3>" + _fmt_bilingual("ملاحظات الأدلة المشتركة (Shared Evidence Notes)") + "</h3>")
-    if len(summary["evidence_notes"]) < summary["evidence_notes_count"]:
-        shown, total = len(summary["evidence_notes"]), summary["evidence_notes_count"]
-        evidence_context.append("<p>" + _fmt_bilingual(f"المعروض {shown} من {total} (Showing {shown} of {total})") + "</p>")
-    for note in summary["evidence_notes"]:
-        evidence_context.append(
-            '<section class="note-box report-narrative"><h3 dir="auto">'
-            + _esc(note["title"])
-            + "</h3><p>"
-            + _fmt_bilingual("مرجع السجل (Log reference)")
-            + f': {_esc(note["event_id"])} · <bdi dir="auto">{_esc(note["event_title"])}</bdi><br>'
-            + _fmt_bilingual("وقت الحدث (Event time)")
-            + ' (UTC): <bdi class="mono" dir="ltr">'
-            + _esc(note["event_time"])
-            + "</bdi><br>"
-            + _fmt_bilingual("وقت التوثيق (Documentation time)")
-            + ' (UTC): <bdi class="mono" dir="ltr">'
-            + _esc(note["documented_at"])
-            + '</bdi></p><p dir="auto">'
-            + _esc(note["notes"])
-            + "</p><p><strong>"
-            + _fmt_bilingual("وصف الدليل (Evidence description)")
-            + ':</strong> <bdi dir="auto">'
-            + _esc(note["source_description"])
-            + "</bdi></p></section>"
-        )
-    evidence_context_html = "".join(evidence_context)
-
-    if summary["static_triage_items"]:
-        triage_rows_html = "".join(
-            f'<tr><td><span class="mono" dir="ltr">{_esc(t["name"])}</span></td><td><span class="badge {_badge_tone(t["verdict"])}" dir="ltr">{_esc(t["verdict"])} ({_esc(t["risk_score"])}/100)</span></td><td><code dir="ltr">{_esc(t["sha256"][:24])}...</code></td><td>{_esc(t["detail"])}</td></tr>'
-            for t in summary["static_triage_items"]
-        )
-    else:
-        triage_rows_html = '<tr><td colspan="4" data-ui-copy>لم تُفحص ملفات أو رسائل بريد ساكنة في هذه القضية.</td></tr>'
-
-    document = f"""<!doctype html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/svg+xml" href="/static/brand-mark.svg">
-  <title data-ui-copy>تقرير التحقيق | {_esc(cmeta["reference"])}</title>
-  <link rel="stylesheet" href="/static/fonts.css">
-  <link rel="stylesheet" href="/static/tokens.css">
-  <link rel="stylesheet" href="/static/quick-report-print.css">
-  <script src="/static/localization.js" defer></script>
-  <script src="/static/quick-report-print.js" defer></script>
-</head>
-<body>
-  <div class="print-toolbar">
-    <div class="toolbar-brand">
-      <img src="/static/brand-mark.svg" width="22" height="22" alt="">
-      <span><strong dir="ltr">SOCify</strong></span>
-    </div>
-    <div class="toolbar-actions">
-      <button type="button" id="trigger-print-btn" data-ui-copy>طباعة التقرير / حفظ PDF</button>
-      <a class="secondary" href="/cases/{case_id}?tab=reports" data-ui-copy>العودة للقضية</a>
-    </div>
-  </div>
-  <main class="report-sheet">
-    <header class="report-header">
-      <div class="header-main">
-        <div class="brand-kicker"><img src="/static/brand-mark.svg" width="20" height="20" alt=""><span dir="ltr">SOCify</span></div>
-        <h1 class="report-title"><span class="mono" dir="ltr">{_esc(cmeta["reference"])}</span> — {_esc(cmeta["title"])}</h1>
-      </div>
-      <div><span class="badge {status_tone}" data-ui-copy>{_esc(status_label)}</span></div>
-    </header>
-
-    <section class="meta-grid" aria-label="بيانات القضية الأساسية" data-ui-attributes>
-      <div class="meta-item"><strong data-ui-copy>مرجع القضية</strong><span class="mono" dir="ltr">{_esc(cmeta["reference"])}</span></div>
-      <div class="meta-item"><strong data-ui-copy>المسؤول عن التحقيق</strong>{_esc(cmeta["owner_name"])}</div>
-      <div class="meta-item"><strong data-ui-copy>الخطورة والحالة</strong><span><span data-ui-copy>{_esc(ENUM_LABELS.get(cmeta["severity"], cmeta["severity"]))}</span> · <span data-ui-copy>{_esc(ENUM_LABELS.get(cmeta["status"], cmeta["status"]))}</span></span></div>
-      <div class="meta-item"><strong data-ui-copy>إجمالي السجلات المفحوصة</strong>{_esc(summary["logs_count"])}</div>
-      <div class="meta-item"><strong data-ui-copy>التنبيهات وتطابقات المراقبة</strong><span>{_esc(summary["alerts_count"])} <span data-ui-copy>تنبيه</span> · {_esc(summary["watchlist_hits_count"])} <span data-ui-copy>تطابق مراقبة</span></span></div>
-      <div class="meta-item"><strong data-ui-copy>وقت التوليد (UTC)</strong><span class="mono" dir="ltr">{_esc(iso_now()[:19].replace("T", " "))}</span></div>
-    </section>
-
-    {note_html}
-    {manager_html}
-
-    <h2 class="section-title" data-ui-copy>قرارات التحقيق</h2>
-    <table class="qa-table">
-      <thead data-ui-copy><tr><th class="qa-col-topic">محور التقييم</th><th>النتيجة المعتمدة</th></tr></thead>
-      <tbody>{qa_rows_html}</tbody>
-    </table>
-
-    <h2 class="section-title" data-ui-copy>التنبيهات</h2>
-    <table class="evidence-table">
-      <thead data-ui-copy><tr><th>المعرف</th><th>الخطورة</th><th>القاعدة / سبب التنبيه</th><th>وقت الرصد</th></tr></thead>
-      <tbody>{alerts_rows_html}</tbody>
-    </table>
-
-    {evidence_context_html}
-
-    <h2 class="section-title" data-ui-copy>فحص الملفات والبريد</h2>
-    <table class="evidence-table">
-      <thead data-ui-copy><tr><th>الملف / الرسالة</th><th>الحكم الأولي</th><th>SHA-256</th><th>الملاحظات الفنية</th></tr></thead>
-      <tbody>{triage_rows_html}</tbody>
-    </table>
-
-    {inspection_html}
-
-    <footer class="report-footer">
-      <span dir="ltr">SOCify</span>
-      <span class="mono" dir="ltr">Case #{case_id} · {_esc(cmeta["reference"])}</span>
-    </footer>
-  </main>
-</body>
-</html>"""
+    document = render_template(
+        "quick_report_print.html",
+        case_id=case_id,
+        cmeta=cmeta,
+        summary=summary,
+        report=report,
+        status_label={"draft": "مسودة", "escalated": "أُحيل للمراجعة", "acknowledged": "تمت المراجعة"}.get(report["status"], report["status"]),
+        status_tone=_badge_tone(report["status"]),
+        manager_label={"approved": "معتمد", "needs_followup": "يتطلب متابعة", "closed": "تم الحل"}.get(report["manager_decision"], ""),
+        generated_at=iso_now()[:19].replace("T", " "),
+        inspected=inspected_tables,
+        telemetry_sections=telemetry_sections,
+        bilingual=_bilingual,
+        label=lambda value: ENUM_LABELS.get(value, value),
+        tone=_badge_tone,
+    )
     return Response(document, status=200, mimetype="text/html; charset=utf-8")

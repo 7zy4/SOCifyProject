@@ -1,4 +1,4 @@
-"""The printable quick report is assembled as HTML text, so every stored value must reach the page escaped."""
+"""Stored text must reach the printable quick report escaped; it is rendered by an auto-escaping template."""
 
 import re
 
