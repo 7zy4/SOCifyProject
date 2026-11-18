@@ -220,6 +220,13 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
     case = _case_row(case_id)
     if not case:
         raise ValidationError("القضية غير متاحة")
+    _validate_record_fields(case, case_id, payload, result, schema)
+    _check_record_rules(case, case_id, kind, result)
+    return result
+
+
+def _validate_record_fields(case, case_id, payload, result, schema):
+    """Validate each field of the payload against the kind's schema and store the cleaned value in result."""
     for key, spec in schema.items():
         value = payload.get(key)
         if value is None or value == "":
@@ -314,6 +321,10 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
             if spec.get("choices") and value not in spec["choices"]:
                 raise ValidationError(f"اختيار {key} غير صالح")
         result[key] = value
+
+
+def _check_record_rules(case, case_id, kind, result):
+    """Rules across fields of one record kind: indicator normalisation, period order, corrective actions tied to a cause and owned by a case member, and conclusions that need evidence."""
     if kind == "indicator":
         result["value"] = normalize_indicator(result["type"], result["value"])
         if result["classification"] == "ioc" and not result.get("evidence_id"):
@@ -357,7 +368,6 @@ def validate_record(case_id: int, kind: str, payload: object) -> dict[str, Any]:
         and (not result.get("performed_by") or not result.get("performed_at") or not result.get("evidence_id"))
     ):
         raise ValidationError("الإجراء الناجح يتطلب منفذًا ووقتًا ودليلًا")
-    return result
 
 
 def normalize_indicator(kind: str, value: str) -> str:

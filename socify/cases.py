@@ -461,37 +461,7 @@ def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
             ),
         )
         case_id = inserted_id(cursor)
-        get_db().execute(
-            "INSERT INTO autopsy_case_context(case_id, reason, objective, classification, created_at) VALUES (?, ?, ?, ?, ?)",
-            (case_id, str(reason).strip(), str(objective).strip(), classification, now),
-        )
-        if current_app.config.get("REQUIRE_CASE_APPROVAL"):
-            get_db().execute("INSERT INTO case_approvals(case_id,state,requested_by) VALUES (?,'pending',?)", (case_id, actor_id()))
-        else:
-            get_db().execute(
-                "INSERT INTO case_approvals(case_id,state,requested_by,reviewed_by,reviewed_at,reason,source) VALUES (?,'approved',?,?,?,'Direct tactical investigation','direct_investigation')",
-                (case_id, actor_id(), actor_id(), now),
-            )
-        for member in {actor_id(), assignee} - {None}:
-            get_db().execute(
-                "INSERT INTO autopsy_case_members(case_id, user_id, responsibility, assigned_by, assigned_at) VALUES (?, ?, 'analyst', ?, ?)",
-                (case_id, member, actor_id(), now),
-            )
-        for event_id in event_ids:
-            if not _attach_event(get_db(), case_id, event_id):
-                raise ValidationError(f"event {event_id} is unavailable")
-        for alert_id in alert_ids:
-            if not _attach_alert(get_db(), case_id, alert_id):
-                raise ValidationError(f"alert {alert_id} is unavailable")
-        get_db().executemany(
-            "INSERT INTO case_tasks (case_id, title, system_key, required, status, assignee, created_at) VALUES (?, ?, ?, 1, 'pending', ?, ?)",
-            [
-                (case_id, "Validate primary evidence", "validate_evidence", assignee, now),
-                (case_id, "Document response decision", "document_response", assignee, now),
-            ],
-        )
-        _history(get_db(), case_id, "case_created", None, {"status": "new"})
-        record_audit(get_db(), "create", "case", case_id, details={"events": event_ids, "alerts": alert_ids})
+        _record_case_setup(alert_ids, assignee, case_id, classification, event_ids, now, objective, reason)
         if retry is not None:
             get_db().execute(
                 "INSERT INTO case_creation_receipts(workspace_id,actor_id,request_key,request_hash,case_id,created_at) VALUES (?,?,?,?,?,?)",
@@ -499,6 +469,41 @@ def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
             )
     row = _case_row(case_id)
     return jsonify(_case_view(row)), 201, {"Location": f"/api/incidents/{case_id}"}
+
+
+def _record_case_setup(alert_ids, assignee, case_id, classification, event_ids, now, objective, reason):
+    """Write what every new case starts with: its context, approval state, members, linked events and alerts, default tasks, history entry and audit record."""
+    get_db().execute(
+        "INSERT INTO autopsy_case_context(case_id, reason, objective, classification, created_at) VALUES (?, ?, ?, ?, ?)",
+        (case_id, str(reason).strip(), str(objective).strip(), classification, now),
+    )
+    if current_app.config.get("REQUIRE_CASE_APPROVAL"):
+        get_db().execute("INSERT INTO case_approvals(case_id,state,requested_by) VALUES (?,'pending',?)", (case_id, actor_id()))
+    else:
+        get_db().execute(
+            "INSERT INTO case_approvals(case_id,state,requested_by,reviewed_by,reviewed_at,reason,source) VALUES (?,'approved',?,?,?,'Direct tactical investigation','direct_investigation')",
+            (case_id, actor_id(), actor_id(), now),
+        )
+    for member in {actor_id(), assignee} - {None}:
+        get_db().execute(
+            "INSERT INTO autopsy_case_members(case_id, user_id, responsibility, assigned_by, assigned_at) VALUES (?, ?, 'analyst', ?, ?)",
+            (case_id, member, actor_id(), now),
+        )
+    for event_id in event_ids:
+        if not _attach_event(get_db(), case_id, event_id):
+            raise ValidationError(f"event {event_id} is unavailable")
+    for alert_id in alert_ids:
+        if not _attach_alert(get_db(), case_id, alert_id):
+            raise ValidationError(f"alert {alert_id} is unavailable")
+    get_db().executemany(
+        "INSERT INTO case_tasks (case_id, title, system_key, required, status, assignee, created_at) VALUES (?, ?, ?, 1, 'pending', ?, ?)",
+        [
+            (case_id, "Validate primary evidence", "validate_evidence", assignee, now),
+            (case_id, "Document response decision", "document_response", assignee, now),
+        ],
+    )
+    _history(get_db(), case_id, "case_created", None, {"status": "new"})
+    record_audit(get_db(), "create", "case", case_id, details={"events": event_ids, "alerts": alert_ids})
 
 
 @cases_api.post("/api/alerts/<int:alert_id>/case")

@@ -153,6 +153,20 @@ def build_snapshot(case, revision: int, profile: str):
         "collections": payload["records"].get("collection_request", []),
         "postmortems": payload["records"].get("postmortem", []),
     }
+    _snapshot_case_material(case, case_id, payload)
+    previous, valid, count = "0" * 64, True, 0
+    for entry in get_db().execute("SELECT * FROM autopsy_custody WHERE case_id = ? ORDER BY id", (case_id,)):
+        material = [case_id, entry["actor_id"], entry["action"], entry["details"], entry["previous_hash"], entry["created_at"]]
+        valid = valid and entry["previous_hash"] == previous and hashlib.sha256(canonical(material).encode()).hexdigest() == entry["entry_hash"]
+        previous, count = entry["entry_hash"], count + 1
+    payload["custody"] = {"entries": count, "head_sha256": previous, "integrity_valid": valid}
+    if len(canonical(payload).encode()) > 4 * 1024 * 1024:
+        raise ValidationError("حجم التقرير يتجاوز 4 MiB؛ استخدم حزمة القضية للأرشيف الكامل")
+    return payload
+
+
+def _snapshot_case_material(case, case_id, payload):
+    """Add the case's bounded members, evidence, imports, alerts, quick report assessment, observables, tasks, techniques, timeline, content inspection, telemetry, shared notes, history and chronology to the snapshot."""
     payload["members"] = bounded_rows(
         "SELECT m.user_id, socify_user_name(u.name,u.name_ar,u.name_en) AS name, u.role, m.responsibility FROM autopsy_case_members m JOIN users u ON u.id = m.user_id WHERE m.case_id = ? ORDER BY m.user_id",
         (case_id,),
@@ -211,15 +225,6 @@ def build_snapshot(case, revision: int, profile: str):
     from .autopsy_chronology import report_chronology
 
     payload["chronology"] = report_chronology(payload)
-    previous, valid, count = "0" * 64, True, 0
-    for entry in get_db().execute("SELECT * FROM autopsy_custody WHERE case_id = ? ORDER BY id", (case_id,)):
-        material = [case_id, entry["actor_id"], entry["action"], entry["details"], entry["previous_hash"], entry["created_at"]]
-        valid = valid and entry["previous_hash"] == previous and hashlib.sha256(canonical(material).encode()).hexdigest() == entry["entry_hash"]
-        previous, count = entry["entry_hash"], count + 1
-    payload["custody"] = {"entries": count, "head_sha256": previous, "integrity_valid": valid}
-    if len(canonical(payload).encode()) > 4 * 1024 * 1024:
-        raise ValidationError("حجم التقرير يتجاوز 4 MiB؛ استخدم حزمة القضية للأرشيف الكامل")
-    return payload
 
 
 def report_queue_full(workspace):

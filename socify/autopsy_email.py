@@ -221,8 +221,6 @@ def _email_domain(addr: str) -> str:
 
 
 def inspect_email_with_attachment_triage(content: bytes) -> dict:
-    from .autopsy_static_analysis import inspect_static_bytes
-
     max_eml_bytes = 5 * 1024 * 1024
     if not content or len(content) > max_eml_bytes:
         raise ValidationError("حجم رسالة EML يجب ألا يتجاوز 5MiB")
@@ -249,6 +247,38 @@ def inspect_email_with_attachment_triage(content: bytes) -> dict:
             header_flags.append({"code": code, "severity": severity, "detail": detail})
             email_risk = min(100, email_risk + points)
 
+    _flag_email_headers(add_header_flag, headers, reply_to_email, return_path_email, sender_email)
+
+    leaves, part_count = _walk_mime_parts(message)
+
+    attachments, email_risk, html_text, links, plain = _triage_email_parts(email_risk, leaves)
+
+    urls = list(dict.fromkeys(value.rstrip(".,);]")[:2048] for value in links))[:100]
+    if any("xn--" in u.lower() or re.match(r"^https?://(?:\d{1,3}\.){3}\d{1,3}", u) for u in urls):
+        add_header_flag("suspicious_url_host", "high", 30, "تحتوي الرسالة على رابط IP مباشر أو نطاق Punycode.")
+
+    email_verdict = "high_risk" if email_risk >= 65 else "suspicious" if email_risk >= 30 else "low_signal_static_only"
+    body = "\n".join(plain or html_text)
+    return {
+        "headers": headers,
+        "sender_email": sender_email or None,
+        "reply_to_email": reply_to_email or None,
+        "return_path_email": return_path_email or None,
+        "header_flags": header_flags,
+        "email_risk_score": email_risk,
+        "email_verdict": email_verdict,
+        "body": body[:16384],
+        "body_truncated": len(body) > 16384,
+        "urls": urls,
+        "attachments": attachments,
+        "mime_parts": part_count,
+        "execution": "never executed",
+        "limitations": LIMITATION,
+    }
+
+
+def _flag_email_headers(add_header_flag, headers, reply_to_email, return_path_email, sender_email):
+    """Flag a sender domain that differs from Reply-To or Return-Path, failed SPF, DKIM or DMARC results and pressure wording in the subject."""
     sender_dom = _email_domain(sender_email)
     reply_dom = _email_domain(reply_to_email)
     return_dom = _email_domain(return_path_email)
@@ -265,6 +295,9 @@ def inspect_email_with_attachment_triage(content: bytes) -> dict:
     if any(tok in subj_lower for tok in ("urgent", "wire", "invoice", "password", "suspended", "عاجل", "حوالة", "تحديث كلمة المرور")):
         add_header_flag("urgent_lure_subject", "low", 10, "عنوان الرسالة يستخدم صياغة استعجال شائعة في التصيد.")
 
+
+def _walk_mime_parts(message):
+    """Walk the MIME tree depth-first within the depth, part, header and attachment limits, returning its leaf parts."""
     pending = [(message, 0)]
     leaves = []
     part_count, header_count, attachment_count = 0, 0, 0
@@ -294,6 +327,12 @@ def inspect_email_with_attachment_triage(content: bytes) -> dict:
             pending.extend((child, depth + 1) for child in reversed(children))
             continue
         leaves.append((part, is_attachment))
+    return leaves, part_count
+
+
+def _triage_email_parts(email_risk, leaves):
+    """Triage attachments statically without running them and collect the plain text, HTML text and links of the other parts; returns the raised risk score with them."""
+    from .autopsy_static_analysis import inspect_static_bytes
 
     attachments: list[dict] = []
     plain, html_text, links = [], [], []
@@ -342,29 +381,7 @@ def inspect_email_with_attachment_triage(content: bytes) -> dict:
         else:
             plain.append(text)
         links.extend(re.findall(r"https?://[^\s<>\"']+", text, re.I))
-
-    urls = list(dict.fromkeys(value.rstrip(".,);]")[:2048] for value in links))[:100]
-    if any("xn--" in u.lower() or re.match(r"^https?://(?:\d{1,3}\.){3}\d{1,3}", u) for u in urls):
-        add_header_flag("suspicious_url_host", "high", 30, "تحتوي الرسالة على رابط IP مباشر أو نطاق Punycode.")
-
-    email_verdict = "high_risk" if email_risk >= 65 else "suspicious" if email_risk >= 30 else "low_signal_static_only"
-    body = "\n".join(plain or html_text)
-    return {
-        "headers": headers,
-        "sender_email": sender_email or None,
-        "reply_to_email": reply_to_email or None,
-        "return_path_email": return_path_email or None,
-        "header_flags": header_flags,
-        "email_risk_score": email_risk,
-        "email_verdict": email_verdict,
-        "body": body[:16384],
-        "body_truncated": len(body) > 16384,
-        "urls": urls,
-        "attachments": attachments,
-        "mime_parts": part_count,
-        "execution": "never executed",
-        "limitations": LIMITATION,
-    }
+    return attachments, email_risk, html_text, links, plain
 
 
 @autopsy_email_api.post("/api/cases/<int:case_id>/email-triage")
