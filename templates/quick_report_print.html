@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/svg+xml" href="/static/brand-mark.svg">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand-mark.svg') }}">
   <title data-ui-copy>تقرير التحقيق | {{ cmeta["reference"] | dash }}</title>
-  <link rel="stylesheet" href="/static/fonts.css">
-  <link rel="stylesheet" href="/static/tokens.css">
-  <link rel="stylesheet" href="/static/quick-report-print.css">
-  <script src="/static/localization.js" defer></script>
-  <script src="/static/quick-report-print.js" defer></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='quick-report-print.css') }}">
+  <script src="{{ url_for('static', filename='localization.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='quick-report-print.js') }}" defer></script>
 </head>
 <body>
   <div class="print-toolbar">
     <div class="toolbar-brand">
-      <img src="/static/brand-mark.svg" width="22" height="22" alt="">
+      <img src="{{ url_for('static', filename='brand-mark.svg') }}" width="22" height="22" alt="">
       <span><strong dir="ltr">SOCify</strong></span>
     </div>
     <div class="toolbar-actions">
@@ -25,7 +25,7 @@
   <main class="report-sheet">
     <header class="report-header">
       <div class="header-main">
-        <div class="brand-kicker"><img src="/static/brand-mark.svg" width="20" height="20" alt=""><span dir="ltr">SOCify</span></div>
+        <div class="brand-kicker"><img src="{{ url_for('static', filename='brand-mark.svg') }}" width="20" height="20" alt=""><span dir="ltr">SOCify</span></div>
         <h1 class="report-title"><span class="mono" dir="ltr">{{ cmeta["reference"] | dash }}</span> — {{ cmeta["title"] | dash }}</h1>
       </div>
       <div><span class="badge {{ status_tone }}" data-ui-copy>{{ status_label | dash }}</span></div>

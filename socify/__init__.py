@@ -35,6 +35,7 @@ from .schema import ensure_schema
 from .security import correlation_id, error_response
 from .soc_insights import soc_insights_api
 from .sources import sources_api
+from .static_assets import register_static_fingerprints
 from .teams import teams_api
 from .ui import ui
 
@@ -143,6 +144,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         return guard_workspace() or guard_batch_scope()
 
     register_response_policy(app)
+    register_static_fingerprints(app)
     register_error_handlers(app)
 
     with app.app_context():
