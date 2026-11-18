@@ -7,13 +7,14 @@ from flask import Blueprint, abort, current_app, jsonify, request
 from .db import get_db
 from .security import ROLE_PERMISSIONS, current_user, error_response, login_required, require_permission, workspace_id
 from .timeutils import iso_now
+from .version import VERSION
 
 platform_api = Blueprint("platform", __name__)
 
 
 @platform_api.get("/health/live")
 def health_live():
-    return jsonify({"status": "live", "service": "socify", "time": iso_now()})
+    return jsonify({"status": "live", "service": "socify", "version": VERSION, "time": iso_now()})
 
 
 @platform_api.get("/health/ready")

@@ -4,7 +4,7 @@
 
 منصة للتحقيق والاستجابة الأمنية: ارفع سجلاتك، راجع التنبيهات، وثّق الأدلة والقرار، ثم أصدر تقرير القضية. واجهة عربية وإنجليزية، مع وضعين داكن وفاتح.
 
-[البدء](#البدء) · [المميزات](docs/features.md) · [دليل المحلل](docs/analyst-guide.md) · [التشغيل](docs/operations.md) · [الأمان](SECURITY.md)
+[البدء](#البدء) · [المميزات](docs/features.md) · [دليل المحلل](docs/analyst-guide.md) · [التشغيل](docs/operations.md) · [الأمان](SECURITY.md) · [سجل التغييرات](CHANGELOG.md)
 
 ![لوحة أداء الفريق باللغة الإنجليزية والوضع الفاتح](docs/images/performance-en-light.png)
 
