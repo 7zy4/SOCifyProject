@@ -34,6 +34,18 @@ function node(tag, attributes = {}, children = []) {
   });
   const values = Array.isArray(children) ? children : [children];
   values.filter((value) => value != null).forEach((value) => element.append(value instanceof Node ? value : document.createTextNode(displayText(value))));
+  // Text a person writes may be Arabic or English whatever the interface language: let its own first strong character set
+  // the direction, so English in the Arabic interface (and the reverse) keeps its punctuation and shows its beginning.
+  // Browsers give an empty dir=auto field a left-to-right direction that CSS cannot override, which would push an Arabic
+  // placeholder to the left; so a field follows its own text only while it holds some.
+  const freeText = tag === "textarea" || (tag === "input" && ["", "text", "search"].includes(String(attributes.type || "")));
+  if (!element.hasAttribute("dir") && freeText) {
+    const follow = () => (element.value ? element.setAttribute("dir", "auto") : element.removeAttribute("dir"));
+    follow();
+    element.addEventListener("input", follow);
+    element.addEventListener("change", follow);
+    queueMicrotask(() => element.form?.addEventListener("reset", () => setTimeout(follow)));
+  } else if (!element.hasAttribute("dir") && element.hasAttribute("data-user-content")) element.setAttribute("dir", "auto");
   return element;
 }
 
