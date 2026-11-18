@@ -7,8 +7,8 @@ h1,h2,h3,h4,.workspace-head h2,.autopsy-shell .workspace-head h2,.panel-head h3,
 html[lang="en"] :is(h1,h2,h3,h4,.workspace-head h2,.panel-head h3) { font-weight:400; letter-spacing:.025em; }
 h1 { font-size:30px; } h2 { font-size:24px; } h3,h4 { font-size:19px; }
 strong,b { font-weight:800; }
-small,.small,.muted,.cell-meta,.scope-note,.panel-caption,.card-meta,.case-card-facts,.detail-note,.field-hint { font-size:14px; line-height:1.7; color:var(--muted); font-weight:600; opacity:1; }
-code,pre,.code-box,.raw-log { font-family:var(--font-mono),var(--font-ar),monospace; font-size:14px; font-weight:500; line-height:1.7; font-variant-numeric:tabular-nums; }
+small,.small,.muted,.cell-meta,.scope-note,.panel-caption,.case-card-facts,.detail-note,.field-hint { font-size:14px; line-height:1.7; color:var(--muted); font-weight:600; opacity:1; }
+code,pre,.raw-log { font-family:var(--font-mono),var(--font-ar),monospace; font-size:14px; font-weight:500; line-height:1.7; font-variant-numeric:tabular-nums; }
 .mono,.email-body,.case-reference,.channel-count,time { font-family:var(--font-ui); font-size:inherit; font-weight:inherit; line-height:inherit; font-variant-numeric:tabular-nums; }
 label,.form-grid label,.monitoring-toolbar label { font:700 14px/1.6 var(--font-ui); color:var(--text); }
 input,select,textarea { min-height:44px; border:2px solid var(--line); border-radius:2px 5px 2px 3px; background:var(--panel); color:var(--text); font:600 15px/1.6 var(--font-ui); box-shadow:inset 2px 2px 0 var(--ink-wash-66); }
@@ -22,12 +22,10 @@ input[type="checkbox"],input[type="radio"] { min-height:20px; width:20px; height
 .button.primary { background:var(--primary-fill); color:var(--on-primary); border-color:var(--ink-black); }
 .button.primary:hover { background:var(--primary-hover); color:var(--on-primary); }
 .button.ghost { color:var(--text); background:var(--panel); }
-.button.danger { background:var(--red-bg); color:var(--red); }
 .button:disabled { opacity:.7; cursor:not-allowed; transform:none; }
-.button.large { min-height:48px; }
 .icon-button { display:inline-flex; justify-content:center; align-items:center; width:42px; padding:8px; flex:none; }
 .button svg,.icon-button svg,.nav-icon { stroke-width:2; }
-.brand,.auth-panel .brand,.landing-nav .brand { display:inline-flex; align-items:center; gap:12px; padding:0; background:none; color:var(--text); text-decoration:none; border:0; border-radius:0; }
+.brand,.auth-panel .brand { display:inline-flex; align-items:center; gap:12px; padding:0; background:none; color:var(--text); text-decoration:none; border:0; border-radius:0; }
 .brand-mark { width:36px; height:36px; flex:none; display:block; }
 .brand-mark-frame { fill:var(--primary-fill); stroke:var(--ink-black); stroke-width:2.2; }
 .brand-mark-cross { stroke:var(--ink-black); }
@@ -172,16 +170,7 @@ dialog::backdrop { background:rgb(10 13 15 / .78); }
 .auth-mfa input { width:100%; margin:0; }
 .auth-focused .notice { margin-bottom:20px; overflow-wrap:anywhere; }
 .auth-focused .field-hint { margin-inline-start:8px; color:var(--text); }
-/* Retained public pages share the same materials and typography. */
-.landing-nav { padding:20px 32px; border-bottom:3px solid var(--border-ink); background:var(--panel); }
-.landing .hero { border:3px solid var(--border-ink); border-radius:3px 9px 2px 6px; background:var(--panel); box-shadow:8px 8px 0 var(--ink-black); }
-.landing h1 { font-size:clamp(28px,3vw,42px); }
-.landing .hero p { color:var(--text); font-size:17px; }
-.landing .hero-console,.landing .console-body { background:var(--terminal-bg); color:var(--terminal-text); }
 .feature-card { border:2px solid var(--border-ink); border-radius:3px 7px 2px 4px; box-shadow:4px 4px 0 var(--ink-black); background:var(--panel); }
-.feature-icon { background:var(--primary-fill); color:var(--on-primary); border:2px solid var(--ink-black); border-radius:2px; }
-.feature-grid { gap:20px; }
-.landing footer { font-size:14px; color:var(--text); border-top:2px solid var(--line); }
 @media (min-width:1100px) { .autopsy-shell #menu-toggle { display:none; } }
 @media (max-width:1099px) {
  .autopsy-shell { display:block; }
@@ -223,9 +212,6 @@ dialog::backdrop { background:rgb(10 13 15 / .78); }
  .auth-logo .brand-wordmark { font-size:58px; }
  .auth-logo .brand-mark { width:56px; height:56px; }
  .auth-focused form { padding:24px; }
- .landing-nav { padding:16px; flex-wrap:wrap; }
- .landing .hero { margin:20px 16px; width:calc(100% - 32px); padding:24px; }
- .capabilities { padding:32px 16px; }
 }
 @media (max-width:430px) {
  .autopsy-shell .topbar { gap:8px; }
@@ -255,7 +241,6 @@ dialog::backdrop { background:rgb(10 13 15 / .78); }
 .panel-head,.channel-tab { position:relative; }
 .panel-head::after { content:""; position:absolute; bottom:3px; inset-inline-end:8px; width:24px; height:4px; border-bottom:1px solid var(--line); transform:rotate(-7deg); }
 .row-expand { display:grid; place-items:center; width:40px; height:40px; min-height:40px; padding:0; border:2px solid var(--line); background:var(--panel-2); color:var(--text); font:800 22px/1 var(--font-ui); cursor:pointer; border-radius:2px 5px 2px 3px; }
-.console-step-main small { color:var(--terminal-text); font-size:14px; }
 @media (max-width:760px) {
  .monitoring-table { width:100%; min-width:0; border:0; }
  .monitoring-table > thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
@@ -298,7 +283,7 @@ dialog::backdrop { background:rgb(10 13 15 / .78); }
  .monitoring-table > tbody > tr > td:last-child .button { padding-inline:10px; }
 }
 .row-expand[aria-expanded="true"] svg { transform:rotate(180deg); }
-.pagination p,.autopsy-shell dt,.context-summary p,.attack-chain b { font-size:14px; color:var(--text); }
+.pagination p,.autopsy-shell dt,.context-summary p { font-size:14px; color:var(--text); }
 .app-shell:not(.autopsy-shell) .topbar { position:sticky; inset:auto; top:0; }
 @media (max-width:380px) {
  .autopsy-shell .topbar .topbar-brand .brand-mark { display:block; }
