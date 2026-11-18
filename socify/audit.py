@@ -43,32 +43,3 @@ def record_audit(
         ),
     )
     return inserted_id(cursor)
-
-
-def record_training_action(
-    connection: sqlite3.Connection,
-    run_id: int | None,
-    user_id: int,
-    action_type: str,
-    target_type: str | None,
-    target_id: object | None,
-    payload: dict[str, Any],
-    idempotency_key: str,
-) -> None:
-    if run_id is None:
-        return
-    connection.execute(
-        """INSERT OR IGNORE INTO trainee_actions
-        (run_id, user_id, action_type, target_type, target_id, payload, occurred_at, idempotency_key)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        (
-            run_id,
-            user_id,
-            action_type,
-            target_type,
-            None if target_id is None else str(target_id),
-            json.dumps(redact(payload), ensure_ascii=False, separators=(",", ":")),
-            iso_now(),
-            idempotency_key,
-        ),
-    )

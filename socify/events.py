@@ -309,10 +309,3 @@ def _event_view(row: sqlite3.Row, include_raw: bool = False) -> dict[str, Any]:
     else:
         item.pop("raw_data", None)
     return item
-
-
-def _csv_cell(value: object) -> str:
-    text = "" if value is None else str(value)
-    if text.lstrip().startswith(("=", "+", "-", "@", "\t", "\r")):
-        return "'" + text
-    return text

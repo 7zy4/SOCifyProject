@@ -85,10 +85,9 @@ def test_totp_code_opens_only_one_session(app, client, login_as):
 def test_rejected_invitations_are_limited_without_counting_validation_mistakes(app):
     limited = _variant(app, RATE_LIMIT_REGISTER_ATTEMPTS=2).test_client()
     account = {"name": "Invited analyst", "email": "invited@example.test", "password": "Training-Safe-Password-2026!"}
+    weak = {**account, "invitation_token": "x" * 40, "password": "short"}  # pragma: allowlist secret
     for _ in range(4):
-        assert (
-            limited.post("/api/auth/register", json={**account, "invitation_token": "x" * 40, "password": "short"}).status_code == 422
-        )  # pragma: allowlist secret
+        assert limited.post("/api/auth/register", json=weak).status_code == 422
     for _ in range(2):
         rejected = limited.post("/api/auth/register", json={**account, "invitation_token": "x" * 40})
         assert rejected.status_code == 422 and rejected.json["error"]["code"] == "INVALID_INVITATION"

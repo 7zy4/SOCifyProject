@@ -17,50 +17,26 @@ def _scope() -> tuple[str, list[object]]:
     ]
 
 
-def _filters(alias: str = "e", fixed_case_id: int | None = None) -> tuple[str, list[object]]:
-    clauses = [f"{alias}.workspace_id = ?"]
-    parameters: list[object] = [workspace_id()]
+def _filters(case_id: int) -> tuple[str, list[object]]:
+    """Events of one case that the caller may see, narrowed by the graph's severity and time filters."""
     from .autopsy_pipeline import active_event_sql, visibility_sql
 
-    scope, arguments = visibility_sql(alias)
-    clauses.extend([active_event_sql(alias), scope])
-    parameters.extend(arguments)
-    if request.args.get("include_derived") != "1":
-        clauses.append(f"{alias}.source != 'rules_engine'")
-    case_id = fixed_case_id if fixed_case_id is not None else request.args.get("case_id")
-    if case_id:
-        from .cases import _case_row
-
-        try:
-            case_value = int(case_id)
-        except ValueError as exc:
-            raise ValidationError("case_id must be an integer") from exc
-        if _case_row(case_value) is None:
-            clauses.append("1 = 0")
-        else:
-            clauses.append(f"{alias}.id IN (SELECT event_id FROM case_events WHERE case_id = ?)")
-            parameters.append(case_value)
+    scope, arguments = visibility_sql("e")
+    clauses = ["e.workspace_id = ?", active_event_sql("e"), scope, "e.source != 'rules_engine'", "e.id IN (SELECT event_id FROM case_events WHERE case_id = ?)"]
+    parameters: list[object] = [workspace_id(), *arguments, case_id]
     severity = request.args.get("severity")
     if severity:
         if severity not in {"low", "medium", "high", "critical"}:
             raise ValidationError("invalid severity")
-        clauses.append(f"{alias}.severity = ?")
+        clauses.append("e.severity = ?")
         parameters.append(severity)
-    training_run_id = request.args.get("training_run_id")
-    if training_run_id:
-        try:
-            value = int(training_run_id)
-        except ValueError as exc:
-            raise ValidationError("training_run_id must be an integer") from exc
-        clauses.append(f"{alias}.training_run_id = ?")
-        parameters.append(value)
     start = request.args.get("start")
     end = request.args.get("end")
     if start:
-        clauses.append(f"{alias}.event_time >= ?")
+        clauses.append("e.event_time >= ?")
         parameters.append(iso_timestamp(start))
     if end:
-        clauses.append(f"{alias}.event_time <= ?")
+        clauses.append("e.event_time <= ?")
         parameters.append(iso_timestamp(end))
     return " AND ".join(clauses), parameters
 
@@ -95,8 +71,8 @@ def _edge(
     }
 
 
-def build_graph(limit: int, case_id: int | None = None) -> dict[str, Any]:
-    where, parameters = _filters(fixed_case_id=case_id)
+def build_graph(limit: int, case_id: int) -> dict[str, Any]:
+    where, parameters = _filters(case_id)
     scope, scope_parameters = _scope()
     rows = (
         get_db()
@@ -161,7 +137,7 @@ def build_graph(limit: int, case_id: int | None = None) -> dict[str, Any]:
             .fetchall()
         )
         for alert in alerts:
-            if case_id is not None and not get_db().execute("SELECT 1 FROM case_alerts WHERE case_id = ? AND alert_id = ?", (case_id, alert["id"])).fetchone():
+            if not get_db().execute("SELECT 1 FROM case_alerts WHERE case_id = ? AND alert_id = ?", (case_id, alert["id"])).fetchone():
                 continue
             if not can_access_training_run(alert["training_run_id"]):
                 continue
@@ -189,7 +165,7 @@ def build_graph(limit: int, case_id: int | None = None) -> dict[str, Any]:
             .fetchall()
         )
         for case in cases:
-            if case_id is not None and case["id"] != case_id:
+            if case["id"] != case_id:
                 continue
             if not can_access_training_run(case["training_run_id"]):
                 continue

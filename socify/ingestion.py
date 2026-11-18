@@ -1019,7 +1019,7 @@ def _safe_import_filename(value: str, content: bytes = b"") -> str:
     return evidence_filename(value, content, "import")
 
 
-def _upload_payload() -> tuple[str, bytes, str | None, int | None, int | None]:
+def _upload_payload() -> tuple[str, bytes, str | None, int | None]:
     if request.files:
         uploaded = request.files.get("file")
         if not uploaded or not uploaded.filename:
@@ -1028,8 +1028,7 @@ def _upload_payload() -> tuple[str, bytes, str | None, int | None, int | None]:
         filename = _safe_import_filename(uploaded.filename, content)
         selected_format = request.form.get("format", "auto")
         source_id = int(request.form["source_id"]) if request.form.get("source_id") else None
-        training_run_id = int(request.form["training_run_id"]) if request.form.get("training_run_id") else None
-        return filename, content, selected_format, source_id, training_run_id
+        return filename, content, selected_format, source_id
     data = request.get_json(silent=True)
     if not isinstance(data, dict) or not isinstance(data.get("content"), str):
         raise ValidationError("multipart file or textual content is required")
@@ -1040,7 +1039,6 @@ def _upload_payload() -> tuple[str, bytes, str | None, int | None, int | None]:
         content,
         str(data.get("format") or "auto"),
         data.get("source_id") if isinstance(data.get("source_id"), int) else None,
-        data.get("training_run_id") if isinstance(data.get("training_run_id"), int) else None,
     )
 
 
@@ -1145,9 +1143,7 @@ def _import_source(source_id: int | None, case_id: int | None, workspace: int, *
 def preview_import():
     try:
         case_id, options = _upload_options()
-        filename, content, selected_format, source_id, training_run_id = _upload_payload()
-        if not can_access_training_run(training_run_id):
-            return error_response("TRAINING_RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
+        filename, content, selected_format, source_id = _upload_payload()
         source = _import_source(source_id, case_id, workspace_id())
         if source_id is not None and source is None:
             return error_response("SOURCE_NOT_FOUND", "المصدر غير متاح في هذا النطاق", 404)
@@ -1170,13 +1166,11 @@ def preview_import():
 def create_import():
     try:
         case_id, options = _upload_options()
-        filename, content, selected_format, source_id, training_run_id = _upload_payload()
+        filename, content, selected_format, source_id = _upload_payload()
     except (ValueError, OverflowError) as exc:
         return error_response("INVALID_IMPORT", public_error_message(exc, "Check the import options"), 422)
     if len(content) > int(current_app.config["MAX_CONTENT_LENGTH"]):
         return error_response("UPLOAD_TOO_LARGE", "الملف يتجاوز الحجم المسموح", 413)
-    if not can_access_training_run(training_run_id):
-        return error_response("TRAINING_RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
     source = _import_source(source_id, case_id, workspace_id())
     if source_id is not None and source is None:
         return error_response("SOURCE_NOT_FOUND", "المصدر غير متاح في هذا النطاق", 404)
@@ -1186,8 +1180,8 @@ def create_import():
 
     def matching_import():
         rows = get_db().execute(
-            "SELECT * FROM ingestion_jobs WHERE workspace_id = ? AND content_hash = ? AND training_run_id IS ? AND case_id IS ? AND autopsy_options = ? AND source_id IS ? AND source_name=? ORDER BY id DESC",
-            (workspace_id(), content_hash, training_run_id, case_id, serialized_options, source_id, source_name),
+            "SELECT * FROM ingestion_jobs WHERE workspace_id = ? AND content_hash = ? AND training_run_id IS NULL AND case_id IS ? AND autopsy_options = ? AND source_id IS ? AND source_name=? ORDER BY id DESC",
+            (workspace_id(), content_hash, case_id, serialized_options, source_id, source_name),
         )
         return next((row for row in rows if case_id is None or job_visible(row["id"])), None)
 
@@ -1224,14 +1218,13 @@ def create_import():
             return jsonify({**_job_view(duplicate), "duplicate": True})
         cursor = get_db().execute(
             """INSERT INTO ingestion_jobs
-            (job_id, workspace_id, source_id, training_run_id, filename, format, content_hash, evidence_ciphertext,
+            (job_id, workspace_id, source_id, filename, format, content_hash, evidence_ciphertext,
             raw_size, estimated_total, source_name, status, parser_version, created_by, created_at, updated_at, available_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 'socify-import-2', ?, ?, ?, ?)""",
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 'socify-import-2', ?, ?, ?, ?)""",
             (
                 public_id("IMP"),
                 workspace_id(),
                 source_id,
-                training_run_id,
                 filename,
                 format_name,
                 content_hash,

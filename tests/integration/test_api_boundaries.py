@@ -65,16 +65,22 @@ def test_case_validation_and_task_lifecycle(client, login_as, user_ids, database
     login_as("admin")
     case = client.post("/api/incidents", json={"title": "Boundary case"}).json
     url = f"/api/incidents/{case['id']}"
+    version = database.execute("SELECT version FROM incident_cases WHERE id = ?", (case["id"],)).fetchone()[0]
     for payload, status in [
         (None, 400),
         ({"version": -1}, 409),
         ({"title": "x"}, 422),
-        ({"severity": "bad"}, 422),
-        ({"assignee": 99999}, 422),
-        ({"tags": [3]}, 422),
         ({}, 422),
+        # With the current version the request reaches field validation, and a refused field changes nothing.
+        ({"version": version, "title": "x"}, 422),
+        ({"version": version, "severity": "bad"}, 422),
+        ({"version": version, "assignee": 99999}, 422),
+        ({"version": version, "tags": [3]}, 422),
+        ({"version": version}, 422),
+        ({"version": version, "unknown_field": 1}, 422),
     ]:
-        assert client.patch(url, json=payload).status_code == status
+        assert client.patch(url, json=payload).status_code == status, payload
+    assert database.execute("SELECT version FROM incident_cases WHERE id = ?", (case["id"],)).fetchone()[0] == version
     for suffix, payload, status in [
         ("transitions", {}, 422),
         ("transitions", {"status": "open", "version": -1}, 409),

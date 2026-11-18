@@ -8,7 +8,7 @@ from typing import Any
 
 from flask import Blueprint, Response, current_app, jsonify, request
 
-from .audit import record_audit, record_training_action
+from .audit import record_audit
 from .autopsy_pipeline import visibility_sql
 from .case_policy import case_policy
 from .db import get_db, inserted_id, transaction
@@ -492,16 +492,6 @@ def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
         )
         _history(get_db(), case_id, "case_created", None, {"status": "new"})
         record_audit(get_db(), "create", "case", case_id, details={"events": event_ids, "alerts": alert_ids})
-        record_training_action(
-            get_db(),
-            training_run_id if isinstance(training_run_id, int) else None,
-            actor_id(),
-            "case_created",
-            "case",
-            case_id,
-            {"alert_ids": alert_ids},
-            f"case-create:{case_id}",
-        )
         if retry is not None:
             get_db().execute(
                 "INSERT INTO case_creation_receipts(workspace_id,actor_id,request_key,request_hash,case_id,created_at) VALUES (?,?,?,?,?,?)",
@@ -642,7 +632,6 @@ def add_note(case_id: int):
         note_id = inserted_id(cursor)
         _history(get_db(), case_id, "note_added", None, {"note_id": note_id})
         record_audit(get_db(), "create", "case_note", note_id, details={"case_id": case_id})
-        record_training_action(get_db(), row["training_run_id"], actor_id(), "note_added", "case", case_id, {}, f"note:{note_id}")
     note = (
         get_db()
         .execute(
@@ -671,9 +660,6 @@ def add_case_event(case_id: int):
             return error_response("EVENT_NOT_FOUND", "السجل غير موجود", 404)
         _history(get_db(), case_id, "evidence_added", None, {"event_id": event_id})
         record_audit(get_db(), "attach", "case_event", event_id, details={"case_id": case_id})
-        record_training_action(
-            get_db(), row["training_run_id"], actor_id(), "evidence_added", "event", event_id, {"case_id": case_id}, f"evidence:event:{case_id}:{event_id}"
-        )
     return jsonify({"case_id": case_id, "event_id": event_id}), 201
 
 
@@ -694,9 +680,6 @@ def add_case_alert(case_id: int):
             return error_response("ALERT_NOT_FOUND", "التنبيه غير موجود", 404)
         _history(get_db(), case_id, "alert_attached", None, {"alert_id": alert_id})
         record_audit(get_db(), "attach", "case_alert", alert_id, details={"case_id": case_id})
-        record_training_action(
-            get_db(), row["training_run_id"], actor_id(), "alert_attached", "alert", alert_id, {"case_id": case_id}, f"evidence:alert:{case_id}:{alert_id}"
-        )
     return jsonify({"case_id": case_id, "alert_id": alert_id}), 201
 
 
