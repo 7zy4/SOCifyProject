@@ -14,28 +14,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token }}">
   <meta name="section" content="{{ section }}">
-  <meta name="product-mode" content="{{ 'autopsy' if operational else 'training' }}">
   {% if case_id %}<meta name="case-id" content="{{ case_id }}">{% endif %}
   <title data-ui-copy>SOCify | مركز العمليات</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
-  {% if operational %}<link rel="stylesheet" href="{{ url_for('static', filename='autopsy.css') }}">{% endif %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='autopsy.css') }}">
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
-  {% if operational %}<script src="{{ url_for('static', filename='drafts.js') }}" defer></script>{% endif %}
-  {% if operational %}<script src="{{ url_for('static', filename='soc-workbench.js') }}" defer></script>{% endif %}
-  {% if operational %}<script src="{{ url_for('static', filename='soc-insights.js') }}" defer></script>{% endif %}
-  {% if operational %}<script src="{{ url_for('static', filename='autopsy.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_data.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_procedures.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_reports.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_analysis.js') }}" defer></script>{% endif %}
-  {% if operational %}<script src="{{ url_for('static', filename='telemetry.js') }}" defer></script>{% endif %}
+  <script src="{{ url_for('static', filename='drafts.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='soc-workbench.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='soc-insights.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='autopsy.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_data.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_procedures.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_reports.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_analysis.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='telemetry.js') }}" defer></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='design-system.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='comic-workspace.css') }}">
-  {% if operational %}<script src="{{ url_for('static', filename='investigation-workspace.js') }}" defer></script>{% endif %}
+  <script src="{{ url_for('static', filename='investigation-workspace.js') }}" defer></script>
 </head>
-<body class="app-shell{{ ' autopsy-shell' if operational else '' }}">
+<body class="app-shell autopsy-shell">
   <a class="skip-link" href="#workspace" data-ui-copy>انتقل إلى مساحة العمل</a>
-  {% if operational %}<script src="{{ url_for('static', filename='autopsy_team.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_investigation.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_profile.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_operations.js') }}" defer></script>{% endif %}
+  <script src="{{ url_for('static', filename='autopsy_team.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_investigation.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_profile.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_operations.js') }}" defer></script>
   <aside id="workspace-navigation" class="sidebar" aria-label="تنقل المنصة" data-ui-attributes>
     <span class="sidebar-label" data-ui-copy>العمليات الأمنية</span>
     <nav id="primary-nav">
-      {% if operational %}
+      
       <a data-section="monitoring" data-nav-permission="cases.read" href="/monitoring" data-ui-copy>{{ nav_icon("monitoring") }}المراقبة</a>
       <a data-section="performance" data-nav-permission="cases.read" href="/performance" data-ui-copy>{{ nav_icon("dashboard") }}الأداء</a>
       <a data-section="log-management" data-nav-permission="cases.read" href="/log-management" data-ui-copy>{{ nav_icon("log-management") }}إدارة السجلات</a>
@@ -52,22 +51,7 @@
       <a data-section="team" data-nav-permission="cases.read" href="/team" data-ui-copy>{{ nav_icon("team") }}الفريق</a>
       <a data-section="audit" data-nav-permission="audit.read" href="/audit" data-ui-copy>{{ nav_icon("audit") }}سجل التدقيق</a>
       <a data-section="admin" data-nav-permission="users.read" href="/admin" data-ui-copy>{{ nav_icon("admin") }}الإدارة</a>
-      {% else %}
-      <a data-section="dashboard" href="/dashboard" data-ui-copy>{{ nav_icon("dashboard") }}نظرة عامة</a>
-      <a data-section="events" href="/events" data-ui-copy>{{ nav_icon("events") }}مستكشف السجلات</a>
-      <a data-section="alerts" href="/alerts" data-ui-copy>{{ nav_icon("alerts") }}التنبيهات</a>
-      <a data-section="rules" href="/rules" data-ui-copy>{{ nav_icon("rules") }}قواعد الكشف</a>
-      <a data-section="sources" href="/sources" data-ui-copy>{{ nav_icon("sources") }}المصادر</a>
-      <a data-section="imports" href="/imports" data-ui-copy>{{ nav_icon("imports") }}مركز الاستيراد</a>
-      <a data-section="incidents" href="/incidents" data-ui-copy>{{ nav_icon("incidents") }}التحقيقات</a>
-      <a data-section="attack" href="/attack">{{ nav_icon("attack") }}MITRE ATT&amp;CK</a>
-      <a data-section="hunt" href="/hunt" data-ui-copy>{{ nav_icon("hunt") }}الصيد</a>
-      <a data-section="graph" href="/graph" data-ui-copy>{{ nav_icon("graph") }}الرسم الزمني</a>
-      <a data-section="playbooks" href="/playbooks">{{ nav_icon("playbooks") }}Playbooks</a>
-      <a data-section="audit" href="/audit" data-ui-copy>{{ nav_icon("audit") }}التدقيق</a>
-      <a data-section="admin" href="/admin" data-ui-copy>{{ nav_icon("admin") }}الإدارة</a>
-      <a data-section="team" href="/team" data-ui-copy>{{ nav_icon("team") }}الفريق والمهام</a>
-      {% endif %}
+      
     </nav>
   </aside>
   <div class="app-main">
@@ -87,7 +71,7 @@
       </details>
     </header>
     <div id="global-message" class="global-message" role="status" aria-live="polite" hidden></div>
-    {% if operational %}<div class="investigation-context" data-investigation-context hidden></div>{% endif %}
+    <div class="investigation-context" data-investigation-context hidden></div>
     <main id="workspace" tabindex="-1" aria-busy="true"><div class="loading"><span></span><p data-ui-copy>جارٍ التحميل…</p></div></main>
   </div>
 </body>

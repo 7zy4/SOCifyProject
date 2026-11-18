@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
   <meta name="description" content="SOCify منصة الفرز والتحقيق الأمني السريع وإصدار التقارير الفورية" data-ui-attributes>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title data-ui-copy>{{ 'انضمام بدعوة' if operational else 'حساب الفريق' }} | {{ product_name }}</title>
+  <title data-ui-copy>انضمام بدعوة | {{ product_name }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
   <script src="{{ url_for('static', filename='register.js') }}" defer></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='design-system.css') }}">
@@ -33,9 +33,9 @@
         {% if registration_error %}<div class="notice error" role="alert" data-registration-error="{{ registration_error.code }}">{{ registration_error.message }}</div>{% endif %}
         <label for="name" data-ui-copy>الاسم</label><input id="name" name="name" required minlength="2" maxlength="120" autocomplete="name" value="{{ values.get('name', '') }}">
         <label for="email" data-ui-copy>البريد الإلكتروني</label><input id="email" name="email" type="email" spellcheck="false" required maxlength="254" autocomplete="email" value="{{ values.get('email', '') }}">
-        {% if not operational %}<label for="team_name" data-ui-copy>إنشاء فريق مستقل (اختياري)</label><input id="team_name" name="team_name" maxlength="120" value="{{ values.get('team_name', '') }}">{% endif %}
-        <label for="invitation_token" data-ui-copy>{{ 'رمز دعوة الفريق' if operational else 'رمز دعوة الفريق (اختياري)' }}</label><input id="invitation_token" name="invitation_token" maxlength="200" autocomplete="off" value="{{ values.get('invitation_token', '') }}" {% if operational %}required minlength="32"{% endif %}>
-        {% if not operational %}<p data-ui-copy>إنشاء فريق جديد يجعلك مدير مساحته المستقلة. الانضمام بدعوة يمنحك الدور المحدد فيها. اختر إنشاء فريق أو رمز دعوة فقط.</p>{% endif %}
+        
+        <label for="invitation_token" data-ui-copy>رمز دعوة الفريق</label><input id="invitation_token" name="invitation_token" maxlength="200" autocomplete="off" value="{{ values.get('invitation_token', '') }}" required minlength="32">
+        
         <label for="password" data-ui-copy>كلمة المرور <span class="field-hint">12–128</span></label><input id="password" name="password" type="password" required minlength="12" maxlength="128" autocomplete="new-password">
         <button class="button primary full" type="submit" data-ui-copy>إنشاء الحساب</button>
       </form>

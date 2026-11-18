@@ -90,6 +90,5 @@ def dashboard(case_id: int | None = None):
         user=current_user(),
         section="case" if case_id else request.path.strip("/"),
         csrf_token=generate_csrf(),
-        operational=True,
         case_id=case_id,
     )

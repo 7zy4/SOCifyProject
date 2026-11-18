@@ -84,7 +84,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
 
     @app.context_processor
     def product_context():
-        return {"product_name": app.config["PRODUCT_NAME"], "operational": True}
+        return {"product_name": app.config["PRODUCT_NAME"]}
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
