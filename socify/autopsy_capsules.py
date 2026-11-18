@@ -239,6 +239,15 @@ def inspect_capsule(content):
     if not content or len(content) > MAX_ARCHIVE:
         raise ValidationError("حجم الحزمة خارج النطاق")
     preflight_directory(content)
+    files, manifest = _read_capsule_archive(content)
+    data = decode_json(files["data.json"])
+    _check_capsule_shape(data)
+    _check_capsule_references(data, files, manifest)
+    return manifest, data, files
+
+
+def _read_capsule_archive(content):
+    """Read the archive's files and manifest within the size and entry limits, verifying each file's digest."""
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as archive:
             entries = archive.infolist()
@@ -293,7 +302,11 @@ def inspect_capsule(content):
                 raise ValidationError("ملفات غير مفهرسة أو بيانات القضية مفقودة")
     except (zipfile.BadZipFile, zipfile.LargeZipFile, KeyError, TypeError, NotImplementedError, RuntimeError, OSError) as exc:
         raise ValidationError("حزمة ZIP غير صالحة أو تالفة") from exc
-    data = decode_json(files["data.json"])
+    return files, manifest
+
+
+def _check_capsule_shape(data):
+    """Check the capsule's sections, row counts, identifiers and encoded fields before anything is restored."""
     if (
         not isinstance(data, dict)
         or set(data)
@@ -348,6 +361,10 @@ def inspect_capsule(content):
         for key, expected in (("normalized_fields", dict), ("tags", list), ("mitre_ids", list)):
             if not isinstance(decode_json(row.get(key, "{}" if expected is dict else "[]")), expected):
                 raise ValidationError("حقول السجل المطبع غير صالحة")
+
+
+def _check_capsule_references(data, files, manifest):
+    """Check text bounds, the team profile's sharing policy, and that every link and import original refers to something the capsule carries."""
     text_value(manifest["source_reference"], 160, True)
     text_value(data["case"].get("title"), 255, True)
     for key in ("severity", "priority", "description"):
@@ -385,7 +402,6 @@ def inspect_capsule(content):
     for row in data["imports"]:
         if f"originals/{row['id']}.bin" not in files and row.get("raw_size", 0):
             raise ValidationError("أصل استيراد مفقود")
-    return manifest, data, files
 
 
 def preflight_directory(content):
@@ -459,6 +475,36 @@ def restore_capsule(content, manifest, data, files):
     )
     insert_values("autopsy_case_members", {"case_id": case_id, "user_id": principal, "responsibility": "owner", "assigned_by": principal, "assigned_at": now})
     maps: dict[str, dict[str, int]] = {"events": {}, "imports": {}, "evidence": {}, "samples": {}}
+    _restore_imports(case_id, content, data, files, maps, now, principal)
+    _restore_events(case_id, content, data, maps, now, principal)
+    _restore_occurrences(case_id, data, maps)
+    from .event_identity import restore_declared_identities
+
+    restore_declared_identities(get_db(), case_id)
+    _restore_evidence(case_id, content, data, files, maps, now, principal)
+    _restore_samples(case_id, data, files, maps, now, principal)
+    identifier = inserted_id(
+        get_db().execute(
+            "INSERT INTO autopsy_capsule_archives(case_id, profile, source_reference, sha256, ciphertext, id_map, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (case_id, manifest["profile"], manifest["source_reference"], digest(content), cipher().encrypt(content), canonical(maps), principal, now),
+        )
+    )
+    custody(
+        case_id,
+        "capsule_imported",
+        {
+            "capsule_id": identifier,
+            "sha256": digest(content),
+            "source_reference": manifest["source_reference"],
+            "profile": manifest["profile"],
+            "foreign_workflow": "immutable unverified archive; not approved or executed",
+        },
+    )
+    return {"case_id": case_id, "capsule_id": identifier, "sha256": digest(content), "id_map": maps, "state": "open", "foreign_approvals_trusted": False}
+
+
+def _restore_imports(case_id, content, data, files, maps, now, principal):
+    """Restore the import batches whose originals the capsule carries, checking each digest and encrypting it under the current key."""
     for source in data["imports"]:
         identifier = int(source["id"])
         path = f"originals/{identifier}.bin"
@@ -497,6 +543,10 @@ def restore_capsule(content, manifest, data, files):
         new_id = insert_values("ingestion_jobs", values)
         maps["imports"][str(identifier)] = new_id
         insert_values("autopsy_case_imports", {"case_id": case_id, "job_id": new_id, "attached_by": principal, "attached_at": now})
+
+
+def _restore_events(case_id, content, data, maps, now, principal):
+    """Restore the case's events under new identifiers, keeping their provenance and import links."""
     for source in data["events"]:
         identifier = int(source["id"])
         values = {key: value for key, value in source.items() if key not in {"id", "training_run_id", "assigned_to"}}
@@ -517,6 +567,10 @@ def restore_capsule(content, manifest, data, files):
         new_id = insert_values("security_events", values)
         maps["events"][str(identifier)] = new_id
         insert_values("case_events", {"case_id": case_id, "event_id": new_id, "attached_by": principal, "attached_at": now})
+
+
+def _restore_occurrences(case_id, data, maps):
+    """Restore each event's import occurrences against the restored events and imports."""
     for source in data["tables"].get("autopsy_event_occurrences", []):
         job_id = maps["imports"].get(str(source["job_id"]))
         event_id = maps["events"].get(str(source["event_id"]))
@@ -533,9 +587,10 @@ def restore_capsule(content, manifest, data, files):
                 "disposition": source["disposition"],
             },
         )
-    from .event_identity import restore_declared_identities
 
-    restore_declared_identities(get_db(), case_id)
+
+def _restore_evidence(case_id, content, data, files, maps, now, principal):
+    """Restore case evidence records and their retained content, pointing references at the restored rows."""
     for source in data["tables"]["case_evidence"]:
         identifier = int(source["id"])
         reference = str(source["reference_id"])
@@ -564,6 +619,10 @@ def restore_capsule(content, manifest, data, files):
             if digest(files[path]) != source["sha256"]:
                 raise ValidationError("بصمة محتوى الدليل غير مطابقة")
             get_db().execute("INSERT INTO case_evidence_content(evidence_id, ciphertext) VALUES (?, ?)", (new_id, encrypt_secret(files[path].decode())))
+
+
+def _restore_samples(case_id, data, files, maps, now, principal):
+    """Restore the samples the capsule carries, checking each digest and linked evidence and encrypting it under the current key."""
     for source in data["samples"]:
         identifier = int(source["id"])
         path = f"samples/{identifier}.bin"
@@ -586,24 +645,6 @@ def restore_capsule(content, manifest, data, files):
             },
         )
         maps["samples"][str(identifier)] = new_id
-    identifier = inserted_id(
-        get_db().execute(
-            "INSERT INTO autopsy_capsule_archives(case_id, profile, source_reference, sha256, ciphertext, id_map, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (case_id, manifest["profile"], manifest["source_reference"], digest(content), cipher().encrypt(content), canonical(maps), principal, now),
-        )
-    )
-    custody(
-        case_id,
-        "capsule_imported",
-        {
-            "capsule_id": identifier,
-            "sha256": digest(content),
-            "source_reference": manifest["source_reference"],
-            "profile": manifest["profile"],
-            "foreign_workflow": "immutable unverified archive; not approved or executed",
-        },
-    )
-    return {"case_id": case_id, "capsule_id": identifier, "sha256": digest(content), "id_map": maps, "state": "open", "foreign_approvals_trusted": False}
 
 
 @autopsy_capsules_api.get("/api/cases/<int:case_id>/capsule")
