@@ -29,6 +29,38 @@ def test_all_authored_operational_labels_have_english_translations():
     assert not missing, "Missing English labels:\n" + "\n".join(missing)
 
 
+def _template_key(body: str) -> str:
+    """The catalog key SOCifyLocale.template builds from a template literal: each ${...} becomes {0}, {1}, ..."""
+    out, index, count = [], 0, 0
+    while index < len(body):
+        if body.startswith("${", index):
+            depth, index = 1, index + 2
+            while depth and index < len(body):
+                depth += body[index] == "{"
+                depth -= body[index] == "}"
+                index += 1
+            out.append(f"{{{count}}}")
+            count += 1
+        else:
+            out.append(body[index])
+            index += 1
+    return "".join(out)
+
+
+def test_every_arabic_interface_string_in_every_script_has_an_english_entry():
+    script = (ROOT / "static" / "localization.js").read_text(encoding="utf-8")
+    catalog = json.JSONDecoder().raw_decode(script.split("const english = ", 1)[1])[0]
+    missing = []
+    for path in sorted((ROOT / "static").glob("*.js")):
+        if path.name == "localization.js":
+            continue
+        source = path.read_text(encoding="utf-8")
+        strings = [json.loads(match.group(1)) for match in re.finditer(r'SOCifyLocale\.text\(("(?:\\.|[^"\\])*")\)', source)]
+        strings += [_template_key(match.group(1)) for match in re.finditer(r"template`((?:[^`\\]|\\.)*)`", source)]
+        missing += [f"{path.name}: {value}" for value in strings if re.search(r"[\u0600-\u06ff]", value) and value not in catalog]
+    assert not missing, "Missing English labels:\n" + "\n".join(sorted(set(missing)))
+
+
 def test_configurable_team_permissions_have_human_labels(app):
     from socify.security import effective_permissions
     from socify.teams import allowed_roles
