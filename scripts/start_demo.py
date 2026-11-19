@@ -154,7 +154,7 @@ def verify_accounts(directory):
         if not token:
             raise RuntimeError("Login page did not provide a CSRF token")
         response = client.post("/login", data={"email": account["email"], "password": account["password"], "csrf_token": token[1]})
-        if response.status_code != 302 or response.location != "/dashboard" or client.get("/api/auth/me").status_code != 200:
+        if response.status_code != 302 or response.location != "/cases" or client.get("/api/auth/me").status_code != 200:
             raise RuntimeError(f"Saved credentials did not pass real login: {account['email']}. Use scripts.recover_demo for this directory.")
         token = client.get("/api/auth/csrf").get_json()["csrf_token"]
         client.post("/api/auth/logout", headers={"X-CSRFToken": token})
