@@ -2,38 +2,14 @@
 
 ## المسارات
 
-- [تشغيل محلي](#تشغيل-محلي) للعمل على جهازك.
-- [Docker Compose](#docker-compose) للخدمات المنفصلة.
-- [Codespaces](codespaces.md) لبيئة خاصة عبر GitHub.
+- [Docker Compose](#docker-compose): التشغيل الموصى به على خادم أو جهاز واحد.
+- [Codespaces](codespaces.md): بيئة تجربة خاصة عبر GitHub، ومعها عرض ببيانات جاهزة.
 - [النسخ الاحتياطي](#النسخ-الاحتياطي) و[الاستعادة](#الاستعادة) لحماية البيانات.
 - [دليل الأمان](security-guide.md) لإعداد المفاتيح وTLS والشبكة.
 
-## تشغيل محلي
-
-- المتطلبات الكاملة: Python 3.12 وDocker على Linux أو WSL.
-- اتبع أوامر [البدء](../README.md#البدء) لتثبيت المتطلبات وإنشاء المدير وخدمة التحليل.
-- `python run.py` يشغّل التطبيق وعمال الاستيراد والتقارير وإجراءات القضية.
-- التحليل يحتاج خدمة Linux المعزولة؛ لا يكفي تشغيل واجهة Python على Windows وحدها.
-- المفاتيح المحلية محفوظة في `instance/codespaces.env`.
-- يستخدم المشغّل قاعدة `socify.db` الجذرية إذا كانت موجودة، وإلا `instance/socify.db`؛ يسبقها المسار الصريح `SOCIFY_DATABASE`.
-- للتحقق من القاعدة والحساب دون تعديل:
-
-```bash
-python -m scripts.bootstrap_team --email owner@example.com --status
-```
-
-- لتعيين قاعدة محددة، اضبط المسار نفسه قبل إنشاء الحساب والتشغيل:
-
-```bash
-export SOCIFY_DATABASE=/absolute/path/socify.db
-python run.py
-```
-
-- بيئة Python على Windows تُفعّل عبر `.\.venv\Scripts\Activate.ps1`؛ استخدم WSL أو Codespaces لمسار التحليل الكامل.
-
 ## Docker Compose
 
-1. جهّز قيمتين مستقلتين وقويتين لـ`SOCIFY_SECRET_KEY` و`SOCIFY_CREDENTIAL_KEY` في مدير الأسرار، ثم مررهما إلى بيئة Compose.
+1. جهّز قيمتين مستقلتين وقويتين لـ`SOCIFY_SECRET_KEY` و`SOCIFY_CREDENTIAL_KEY`: في ملف `.env` بجانب `docker-compose.yml` (أوامر إنشائه في [التشغيل](../README.md#التشغيل))، أو من مدير الأسرار في بيئة المؤسسة.
 2. تأكد من حفظ المفاتيح لاستعادة الأدلة؛ لا تعتمد على قيم مؤقتة تتغير مع إعادة التشغيل.
 3. ابنِ الخدمات وشغّلها، ثم أنشئ حساب المدير داخل خدمة التطبيق:
 
@@ -44,6 +20,11 @@ curl -fsS http://127.0.0.1:5000/health/ready
 ```
 
 4. افتح <http://127.0.0.1:5000>. للنشر الخارجي، اضبط TLS والمضيف الفعلي كما هو موضح أدناه.
+5. لعرض القاعدة المستخدمة وحالة الحساب دون تعديل أي شيء:
+
+```bash
+docker compose exec socify python -m scripts.bootstrap_team --email owner@example.com --status
+```
 
 | الخدمة | وظيفتها | الوصول |
 |---|---|---|
