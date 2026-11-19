@@ -6,9 +6,19 @@ on:
   push:
     branches:
       - final
+    tags:
+      - 'v*'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
 
 permissions:
   contents: read
+
+# A newer push to the same branch or tag replaces the run still in progress.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   quality:
@@ -93,6 +103,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294  # v5.0.0
   browser:
+    # Release gate: runs for version tags and when started by hand (Actions > Run workflow), not on every push.
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     # Playwright 1.55 supports this image; ubuntu-latest has moved to 26.04.
     runs-on: ubuntu-24.04
     steps:
@@ -151,6 +163,8 @@ jobs:
         run: docker rm --force socify-ci-analysis
   native-decisions:
     name: Native evidence decisions (${{ matrix.suite }})
+    # Release gate: runs for version tags and when started by hand (Actions > Run workflow), not on every push.
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -185,6 +199,8 @@ jobs:
       - if: always()
         run: docker rm --force socify-ci-analysis
   container:
+    # Release gate: runs for version tags and when started by hand (Actions > Run workflow), not on every push.
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -211,6 +227,8 @@ jobs:
       - if: always()
         run: docker compose down --volumes
   performance:
+    # Release gate: runs for version tags and when started by hand (Actions > Run workflow), not on every push.
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
