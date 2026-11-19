@@ -62,7 +62,7 @@ function autopsyCaseListURL() {
 
 function autopsyChoice(name, values, current = "", required = false) {
   const id = `choice-${name}-${crypto.randomUUID()}`;
-  const input = node("input", { name, list: id, required, autocomplete: "off", class: "search-choice" });
+  const input = node("input", { name, list: id, required, autocomplete: "off", class: "search-choice", placeholder: SOCifyLocale.text("اختر من القائمة أو اكتب للبحث") });
   const choices = values.map((entry) => typeof entry === "object" ? { ...entry, label: displayText(entry.label) } : { value: entry, label: displayText(autopsyLabel(entry)) });
   const labelCounts = new Map();
   for (const entry of choices) labelCounts.set(entry.label, (labelCounts.get(entry.label) || 0) + 1);

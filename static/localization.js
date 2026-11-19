@@ -925,6 +925,7 @@
   "الحيازة والنشاط": "Custody and activity",
   "التحليل المحلي": "Local analysis",
   "حالة القضية": "Case status",
+  "اختر من القائمة أو اكتب للبحث": "Choose from the list or type to search",
   "تحديد مسؤولية عضو": "Assign a member responsibility",
   "سحب الوصول": "Revoke access",
   "سحب الوصول إلى القضية": "Revoke case access",
