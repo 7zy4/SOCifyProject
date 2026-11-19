@@ -19,10 +19,21 @@ instance
 venv
 node_modules
 artifacts
-docs/research
 *.log
 htmlcov
 dist
-docs/qa/evidence
 tests
 work
+
+# Only what the services run goes into the image: no docs, samples, maintainer tools or development files.
+docs
+fixtures
+tools
+.devcontainer
+.secrets.baseline
+.gitignore
+requirements-dev.*
+requirements-audit.*
+README.md
+CHANGELOG.md
+SECURITY.md
