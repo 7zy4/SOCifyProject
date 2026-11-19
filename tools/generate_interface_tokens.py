@@ -35,7 +35,7 @@ def main() -> None:
     result = generate()
     if args.check:
         if target.read_text(encoding="utf-8") != result:
-            raise SystemExit("tokens.css differs from design-tokens.json; run python -m scripts.generate_interface_tokens")
+            raise SystemExit("tokens.css differs from design-tokens.json; run python -m tools.generate_interface_tokens")
     else:
         target.write_text(result, encoding="utf-8")
 

@@ -9,12 +9,12 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from scripts.benchmark_support import distribution, git_revision, memory_total_bytes
 from socify import create_app
 from socify.autopsy_worker import run_autopsy_worker_once
 from socify.db import connect_path, get_db
 from socify.import_worker import run_import_worker_once
 from socify.seeding import seed_demo_data
+from tools.benchmark_support import distribution, git_revision, memory_total_bytes
 
 
 def ensure(condition, stage):

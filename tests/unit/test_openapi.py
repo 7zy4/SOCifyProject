@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from scripts.generate_openapi import generate
+from tools.generate_openapi import generate
 
 
 def test_openapi_matches_registered_service_routes(app) -> None:

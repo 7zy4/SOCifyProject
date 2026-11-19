@@ -1,6 +1,6 @@
 import io
 
-from scripts.junit_summary import coverage_check, publish
+from tools.junit_summary import coverage_check, publish
 
 
 def _report(tmp_path, failing):

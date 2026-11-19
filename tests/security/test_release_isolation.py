@@ -85,7 +85,7 @@ def test_schema_failure_rolls_back_ddl_and_data(monkeypatch):
 
 
 def test_openapi_operation_ids_and_error_contract():
-    from scripts.generate_openapi import generate
+    from tools.generate_openapi import generate
 
     contract = generate()
     identifiers = [operation["operationId"] for path in contract["paths"].values() for operation in path.values()]

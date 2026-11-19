@@ -28,16 +28,16 @@ jobs:
           bash -n scripts/start_analysis.sh
           bash -n scripts/try_codespace.sh
           bash -n scripts/try_demo.sh
-      - run: python -m mypy socify scripts app.py run.py
-      - run: python -m scripts.generate_interface_tokens --check
-      - run: python -m scripts.audit_brand --tokens-only
-      - run: python -m scripts.generate_openapi
+      - run: python -m mypy socify scripts tools app.py run.py
+      - run: python -m tools.generate_interface_tokens --check
+      - run: python -m tools.audit_brand --tokens-only
+      - run: python -m tools.generate_openapi
       - run: git diff --exit-code docs/api/openapi.yaml
       - uses: ./.github/actions/analysis-backend
       - run: python -m pytest -q --cov=socify --cov-branch --cov-report=xml --cov-report=term-missing --cov-fail-under=90 --junitxml=artifacts/quality-junit.xml
       - name: Publish unit and integration failure details
         if: always()
-        run: python -m scripts.junit_summary artifacts/quality-junit.xml "Unit and integration tests" --coverage coverage.xml
+        run: python -m tools.junit_summary artifacts/quality-junit.xml "Unit and integration tests" --coverage coverage.xml
       - run: sudo apt-get update && sudo apt-get install --yes poppler-utils
       - name: Validate long bilingual report with the isolated native renderer
         run: |
@@ -70,7 +70,7 @@ jobs:
           cache: pip
           cache-dependency-path: requirements*.txt
       - run: python -m pip install --require-hashes -r requirements-dev.txt
-      - run: python -m bandit -c pyproject.toml -r socify scripts app.py run.py
+      - run: python -m bandit -c pyproject.toml -r socify scripts tools app.py run.py
       - run: python -m pip_audit -r requirements.txt
       - run: git ls-files -z | xargs -0 detect-secrets-hook -c 1 --baseline .secrets.baseline --exclude-files '^(data/enterprise-attack-v20.0.json|fixtures/windows/sysmon-sample.evtx.b64)$'
       - name: Generate the SBOM with a tool kept apart from the tested environment
@@ -109,10 +109,10 @@ jobs:
       - uses: ./.github/actions/analysis-backend
       - run: xvfb-run --auto-servernum --server-args="-screen 0 1600x1200x24" python -m pytest -m e2e tests/e2e --junitxml=artifacts/browser-junit.xml
       - name: Audit operational pages in both languages, editions and viewport sizes
-        run: python -m scripts.audit_brand
+        run: python -m tools.audit_brand
       - name: Publish browser failure details in the job summary
         if: always()
-        run: python -m scripts.junit_summary artifacts/browser-junit.xml "Browser acceptance"
+        run: python -m tools.junit_summary artifacts/browser-junit.xml "Browser acceptance"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: always()
         with:
@@ -221,7 +221,7 @@ jobs:
           cache-dependency-path: requirements*.txt
       - run: python -m pip install --require-hashes -r requirements.txt
       - uses: ./.github/actions/analysis-backend
-      - run: python -m scripts.benchmark_autopsy --events 1000000 --concurrency 20 --requests 100 --output artifacts/performance-autopsy.json
+      - run: python -m tools.benchmark_autopsy --events 1000000 --concurrency 20 --requests 100 --output artifacts/performance-autopsy.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: performance-autopsy

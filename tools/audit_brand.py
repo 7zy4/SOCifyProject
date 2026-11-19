@@ -9,9 +9,9 @@ import tempfile
 import threading
 from pathlib import Path
 
-from scripts.generate_brand_guide import generate
-from scripts.generate_interface_tokens import generate as generate_tokens
 from socify.report_brand import design_tokens
+from tools.generate_brand_guide import generate
+from tools.generate_interface_tokens import generate as generate_tokens
 
 ROOT = Path(__file__).resolve().parents[1]
 
