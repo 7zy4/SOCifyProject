@@ -29,13 +29,12 @@ def test_multipart_import_preserves_source_metrics_and_preview_limit(autopsy_cas
 
 
 @pytest.mark.parametrize("suffix", ["", "/preview"])
-def test_import_rejects_bad_upload_and_inaccessible_run(autopsy_case, client, suffix):
+def test_import_rejects_bad_upload_and_unknown_fields(autopsy_case, client, suffix):
     path = f"/api/cases/{autopsy_case}/imports{suffix}"
     assert client.post(path, json={}).status_code == 422
     assert client.post(path, data={"other": (io.BytesIO(b"{}"), "events.json")}).status_code == 422
     assert client.post(path, data={"file": (io.BytesIO(b"{}"), "events.json"), "source_id": "bad"}).status_code == 422
-    # A case import cannot be steered into a training run: the field is not part of the case contract.
-    assert client.post(path, json={"filename": "events.json", "content": "{}", "training_run_id": 99999}).status_code == 422
+    assert client.post(path, json={"filename": "events.json", "content": "{}", "unknown": 99999}).status_code == 422
 
 
 def test_import_records_validation_and_parse_errors(autopsy_case, client, login_as, database):

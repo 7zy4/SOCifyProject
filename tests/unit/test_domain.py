@@ -92,7 +92,7 @@ def test_totp_validation_and_password_policy() -> None:
     assert not verify_totp(totp_seed, "000000", 1700000000)
     assert password_error("short")
     assert password_error("password1234")
-    assert password_error("Long-Unique-Training-Password-2026") is None
+    assert password_error("Long-Unique-Sample-Password-2026") is None
 
 
 def test_redaction_recurses_without_mutating_shape() -> None:
@@ -149,7 +149,7 @@ def test_xml_entity_declaration_is_rejected(app) -> None:
         ("events.json", b'{"event_type":"json_object","source":"fixture"}', "json", "json", "json_object"),
         ("events.log", b"<34>1 2026-10-19T10:00:00Z host app 1 ID47 - message", "syslog", "syslog", "syslog"),
         ("legacy.log", b"<34>Oct 19 10:00:00 host sshd[1]: Accepted publickey for analyst from 198.51.100.2", "syslog", "syslog", "syslog"),
-        ("access.log", b'198.51.100.2 - analyst [19/Oct/2026:10:00:00 +0000] "GET /training HTTP/1.1" 200 12', "web", "web", "web_request"),
+        ("access.log", b'198.51.100.2 - analyst [19/Oct/2026:10:00:00 +0000] "GET /portal HTTP/1.1" 200 12', "web", "web", "web_request"),
         ("auth.log", b"Oct 19 10:00:00 host sshd[1]: Failed password for analyst from 198.51.100.2", "linux_auth", "linux_auth", "failed_login"),
         (
             "event.xml",

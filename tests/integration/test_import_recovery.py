@@ -99,7 +99,7 @@ def test_processing_import_observes_concurrent_cancel_request(autopsy_case, app,
 def test_evtx_adapter_normalizes_records_without_executing_uploaded_content(autopsy_case, app, client, login_as, monkeypatch):
     class FakeRecord:
         def xml(self):
-            return '<Event><System><EventID>1</EventID><Computer>training-host</Computer><TimeCreated SystemTime="2026-10-22T10:00:00Z"/></System><EventData><Data Name="Image">training.exe</Data></EventData></Event>'
+            return '<Event><System><EventID>1</EventID><Computer>lab-host</Computer><TimeCreated SystemTime="2026-10-22T10:00:00Z"/></System><EventData><Data Name="Image">sample.exe</Data></EventData></Event>'
 
     class FakeEvtx:
         def __init__(self, path):
@@ -118,18 +118,16 @@ def test_evtx_adapter_normalizes_records_without_executing_uploaded_content(auto
     module.Evtx = FakeEvtx
     monkeypatch.setitem(sys.modules, "Evtx.Evtx", module)
     with app.app_context():
-        format_name, records = ingestion.parse_records("training.evtx", b"synthetic-evtx-fixture", "evtx", "windows-training")
+        format_name, records = ingestion.parse_records("sample.evtx", b"synthetic-evtx-fixture", "evtx", "windows-sample")
         parsed = list(records)
     assert format_name == "evtx"
     assert parsed[0]["event_type"] == "sysmon_1"
-    assert parsed[0]["hostname"] == "training-host"
+    assert parsed[0]["hostname"] == "lab-host"
     assert parsed[0]["idempotency_key"].startswith("import:")
-    queued = client.post(
-        f"/api/cases/{autopsy_case}/imports?defer=1", json={"filename": "training.evtx", "format": "evtx", "content": "synthetic-evtx-fixture"}
-    )
+    queued = client.post(f"/api/cases/{autopsy_case}/imports?defer=1", json={"filename": "sample.evtx", "format": "evtx", "content": "synthetic-evtx-fixture"})
     assert queued.status_code == 202
     assert queued.json["estimated_total"] == 0
-    xml = "<Events><Event><System><EventID>1</EventID><Computer>training-host</Computer></System></Event></Events>"
-    sysmon = client.post(f"/api/cases/{autopsy_case}/imports?defer=1", json={"filename": "training.xml", "format": "sysmon_xml", "content": xml})
+    xml = "<Events><Event><System><EventID>1</EventID><Computer>lab-host</Computer></System></Event></Events>"
+    sysmon = client.post(f"/api/cases/{autopsy_case}/imports?defer=1", json={"filename": "sample.xml", "format": "sysmon_xml", "content": xml})
     assert sysmon.status_code == 202
     assert sysmon.json["estimated_total"] == 1

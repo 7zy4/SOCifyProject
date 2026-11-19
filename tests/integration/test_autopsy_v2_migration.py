@@ -15,7 +15,6 @@ FIXTURE = Path(__file__).parents[1] / "fixtures" / "v2" / "synthetic-v2.db.gz"
 PRESERVED = (
     "users",
     "workspace_memberships",
-    "training_scenarios",
     "security_events",
     "ingestion_jobs",
     "incident_cases",
@@ -45,8 +44,14 @@ def test_actual_v2_database_migration_preserves_evidence_reports_relations_and_b
     snapshots = {}
     for table in PRESERVED:
         if table in tables:
-            columns = [row["name"] for row in connection.execute(f"PRAGMA table_info({table})")]
-            snapshots[table] = (columns, [tuple(row) for row in connection.execute(f"SELECT * FROM {table} ORDER BY rowid")])
+            # The pre-release training-run column is removed on upgrade; every other column must survive unchanged.
+            columns = [row["name"] for row in connection.execute(f"PRAGMA table_info({table})") if row["name"] != "training_run_id"]
+            projection = ",".join(f'"{column}"' for column in columns)
+            snapshots[table] = (
+                columns,
+                [tuple(row) for row in connection.execute(f"SELECT {projection} FROM {table} ORDER BY rowid")],
+                [tuple(row) for row in connection.execute(f"SELECT * FROM {table} ORDER BY rowid")],
+            )
     assert len(snapshots["case_reports"][1]) == 2
     assert len(snapshots["case_events"][1]) == 2
     assert snapshots["case_evidence_content"][1]
@@ -58,10 +63,14 @@ def test_actual_v2_database_migration_preserves_evidence_reports_relations_and_b
     connection = connect_path(str(migrated), True)
     ensure_schema(connection)
     ensure_schema(connection)
-    for table, (columns, rows) in snapshots.items():
+    for table, (columns, rows, _full) in snapshots.items():
         projection = ",".join(f'"{column}"' for column in columns)
         assert [tuple(row) for row in connection.execute(f"SELECT {projection} FROM {table} ORDER BY rowid")] == rows, table
     assert connection.execute("SELECT value FROM schema_meta WHERE key='autopsy_schema_version'").fetchone()[0] == "3"
+    remaining = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert "workspaces" in remaining and not remaining & {"training_workspaces", "training_runs", "playbook_runs", "outbox_events"}
+    for table in ("security_events", "alerts", "incident_cases", "ingestion_jobs"):
+        assert "training_run_id" not in {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
     assert all(row[0] == 1 for row in connection.execute("SELECT active_event FROM case_events"))
     connection.close()
     assert verify_database(str(migrated))["foreign_key_violations"] == 0
@@ -91,10 +100,10 @@ def test_actual_v2_database_migration_preserves_evidence_reports_relations_and_b
     assert client.get(f"/api/cases/{metadata['case_id']}").json["approval"]["source"] == "v3_migration"
     assert client.post("/api/investigation-selection", json={"case_ids": [metadata["case_id"]]}).status_code == 200
     assert client.get(f"/api/cases/{metadata['case_id']}/logs").json["total"] == 2
-    assert client.get("/api/training/scenarios").status_code == 410
+    assert client.get("/api/training/scenarios").status_code == 404
     assert restore_database(str(backup), str(restored))["integrity"] == "ok"
     connection = connect_path(str(restored), True)
     assert not connection.execute("SELECT 1 FROM sqlite_master WHERE name='autopsy_case_context'").fetchone()
-    for table, (_columns, rows) in snapshots.items():
+    for table, (_columns, _projected, rows) in snapshots.items():
         assert [tuple(row) for row in connection.execute(f"SELECT * FROM {table} ORDER BY rowid")] == rows
     connection.close()

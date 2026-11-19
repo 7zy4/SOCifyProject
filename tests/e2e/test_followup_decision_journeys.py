@@ -187,7 +187,7 @@ def test_expired_invitation_is_renewed_before_first_case_action(app, database, m
     with decision_session(app, monkeypatch, language, "AFTER-37") as (j, manager, result, folder):
         manager_case(j, manager)
         email, name = "incoming.analyst@example.test", "Incoming Analyst"
-        workspaces_before = database.execute("SELECT COUNT(*) FROM training_workspaces").fetchone()[0]
+        workspaces_before = database.execute("SELECT COUNT(*) FROM workspaces").fetchone()[0]
         expired_url = invitation(manager, email)
         token = parse_qs(urlsplit(expired_url).fragment)["invitation_token"][0]
         token_hash = hashlib.sha256(token.encode()).hexdigest()
@@ -211,7 +211,7 @@ def test_expired_invitation_is_renewed_before_first_case_action(app, database, m
         identity = j.page.evaluate("api('/api/auth/me')")["user"]
         assert identity["role"] == "analyst", "PRODUCT: renewed invitation broadened the assigned role"
         assert database.execute("SELECT COUNT(*) FROM workspace_memberships WHERE user_id=?", (identity["id"],)).fetchone()[0] == 1
-        assert database.execute("SELECT COUNT(*) FROM training_workspaces").fetchone()[0] == workspaces_before
+        assert database.execute("SELECT COUNT(*) FROM workspaces").fetchone()[0] == workspaces_before
         assert database.execute("SELECT consumed_at FROM team_invitations WHERE token_hash=?", (token_hash,)).fetchone()[0] is None
         grant(manager, name)
         j.nav("إدارة القضايا")

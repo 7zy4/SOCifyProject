@@ -16,14 +16,12 @@ from .file_names import attachment_disposition
 from .operational import case_scope, case_visible
 from .security import (
     actor_id,
-    can_access_training_run,
     current_user,
     decrypt_secret,
     encrypt_secret,
     error_response,
     has_permission,
     require_permission,
-    training_scope_sql,
     workspace_id,
 )
 from .timeutils import iso_now, utc_now
@@ -53,7 +51,7 @@ def _case_row(case_id: int) -> sqlite3.Row | None:
     """The case row when it exists in the user's team, is not archived and is visible to them; otherwise None."""
     row = get_db().execute("SELECT * FROM incident_cases WHERE id = ? AND workspace_id = ? AND archived_at IS NULL", (case_id, workspace_id())).fetchone()
     user = current_user()
-    return row if row and user and can_access_training_run(row["training_run_id"]) and case_visible(case_id, user) else None
+    return row if row and user and case_visible(case_id, user) else None
 
 
 def _user_valid(user_id: object) -> bool:
@@ -109,11 +107,11 @@ def _source_visible(owner_case_id: int | None, created_by: int | None = None) ->
 
 def _attach_event(connection: sqlite3.Connection, case_id: int, event_id: int) -> bool:
     event = connection.execute(
-        "SELECT id, event_id, title, raw_hash, provenance, training_run_id, owner_case_id, created_by, import_job_id FROM security_events WHERE id = ? AND workspace_id = ?",
+        "SELECT id, event_id, title, raw_hash, provenance, owner_case_id, created_by, import_job_id FROM security_events WHERE id = ? AND workspace_id = ?",
         (event_id, workspace_id()),
     ).fetchone()
-    case = connection.execute("SELECT training_run_id FROM incident_cases WHERE id = ? AND workspace_id = ?", (case_id, workspace_id())).fetchone()
-    if not event or not case or event["training_run_id"] != case["training_run_id"] or not can_access_training_run(event["training_run_id"]):
+    case = connection.execute("SELECT id FROM incident_cases WHERE id = ? AND workspace_id = ?", (case_id, workspace_id())).fetchone()
+    if not event or not case:
         return False
     scope, params = visibility_sql("e", active_only=False)
     if not connection.execute(f"SELECT 1 FROM security_events e WHERE e.id=? AND {scope}", (event_id, *params)).fetchone():
@@ -148,21 +146,20 @@ def _attach_event(connection: sqlite3.Connection, case_id: int, event_id: int) -
 
 def _attach_alert(connection: sqlite3.Connection, case_id: int, alert_id: int) -> bool:
     alert = connection.execute(
-        "SELECT id, alert_id, reason, dedup_key, evidence, training_run_id, owner_case_id FROM alerts WHERE id = ? AND workspace_id = ?",
+        "SELECT id, alert_id, reason, dedup_key, evidence, owner_case_id FROM alerts WHERE id = ? AND workspace_id = ?",
         (alert_id, workspace_id()),
     ).fetchone()
-    case = connection.execute("SELECT training_run_id FROM incident_cases WHERE id = ? AND workspace_id = ?", (case_id, workspace_id())).fetchone()
-    if not alert or not case or alert["training_run_id"] != case["training_run_id"] or not can_access_training_run(alert["training_run_id"]):
+    case = connection.execute("SELECT id FROM incident_cases WHERE id = ? AND workspace_id = ?", (case_id, workspace_id())).fetchone()
+    if not alert or not case:
         return False
     if not _source_visible(alert["owner_case_id"]):
         return False
     events = connection.execute(
-        "SELECT e.id, e.workspace_id, e.training_run_id, e.owner_case_id, e.created_by, e.import_job_id FROM alert_events ae JOIN security_events e ON e.id=ae.event_id WHERE ae.alert_id=?",
+        "SELECT e.id, e.workspace_id, e.owner_case_id, e.created_by, e.import_job_id FROM alert_events ae JOIN security_events e ON e.id=ae.event_id WHERE ae.alert_id=?",
         (alert_id,),
     ).fetchall()
     if any(
         event["workspace_id"] != workspace_id()
-        or event["training_run_id"] != case["training_run_id"]
         or not _source_visible(event["owner_case_id"], event["created_by"])
         or not connection.execute(
             f"SELECT 1 FROM security_events e WHERE e.id=? AND {visibility_sql('e', active_only=False)[0]}",
@@ -255,16 +252,11 @@ def list_cases():
     if visibility:
         clauses.append(visibility.removeprefix(" AND "))
         parameters.extend(visibility_args)
-    scope, scope_parameters = training_scope_sql("c.training_run_id")
-    if scope:
-        clauses.append(scope.removeprefix(" AND "))
-        parameters.extend(scope_parameters)
     for parameter, column in (
         ("status", "c.status"),
         ("severity", "c.severity"),
         ("priority", "c.priority"),
         ("assignee", "c.assignee"),
-        ("training_run_id", "c.training_run_id"),
     ):
         value = request.args.get(parameter)
         if value:
@@ -392,17 +384,6 @@ def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
         return error_response("INVALID_EVENT_LINKS", "قائمة السجلات غير صالحة", 422)
     if not isinstance(alert_ids, list) or any(not isinstance(item, int) for item in alert_ids) or len(alert_ids) > 100:
         return error_response("INVALID_ALERT_LINKS", "قائمة التنبيهات غير صالحة", 422)
-    training_run_id = data.get("training_run_id")
-    if training_run_id is None and alert_ids:
-        source_alert = get_db().execute("SELECT training_run_id FROM alerts WHERE id = ? AND workspace_id = ?", (alert_ids[0], workspace_id())).fetchone()
-        training_run_id = source_alert["training_run_id"] if source_alert else None
-    if training_run_id is None and event_ids:
-        source_event = (
-            get_db().execute("SELECT training_run_id FROM security_events WHERE id = ? AND workspace_id = ?", (event_ids[0], workspace_id())).fetchone()
-        )
-        training_run_id = source_event["training_run_id"] if source_event else None
-    if not can_access_training_run(training_run_id):
-        return error_response("TRAINING_RUN_NOT_FOUND", "جلسة التدريب غير موجودة", 404)
     now = iso_now()
     sla_hours = {"urgent": 1, "high": 4, "medium": 24, "low": 72}[priority]
     sla_due = (utc_now() + timedelta(hours=sla_hours)).isoformat().replace("+00:00", "Z")
@@ -416,36 +397,23 @@ def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
         for event_id in event_ids:
             event = (
                 get_db()
-                .execute("SELECT training_run_id, owner_case_id, created_by FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, workspace_id()))
+                .execute("SELECT owner_case_id, created_by FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, workspace_id()))
                 .fetchone()
             )
-            if (
-                not event
-                or event["training_run_id"] != training_run_id
-                or not can_access_training_run(event["training_run_id"])
-                or not _source_visible(event["owner_case_id"], event["created_by"])
-            ):
+            if not event or not _source_visible(event["owner_case_id"], event["created_by"]):
                 return error_response("EVENT_NOT_FOUND", "السجل غير موجود", 404)
         for alert_id in alert_ids:
-            alert = (
-                get_db().execute("SELECT training_run_id, owner_case_id FROM alerts WHERE id = ? AND workspace_id = ?", (alert_id, workspace_id())).fetchone()
-            )
-            if (
-                not alert
-                or alert["training_run_id"] != training_run_id
-                or not can_access_training_run(alert["training_run_id"])
-                or not _source_visible(alert["owner_case_id"])
-            ):
+            alert = get_db().execute("SELECT owner_case_id FROM alerts WHERE id = ? AND workspace_id = ?", (alert_id, workspace_id())).fetchone()
+            if not alert or not _source_visible(alert["owner_case_id"]):
                 return error_response("ALERT_NOT_FOUND", "التنبيه غير موجود", 404)
         cursor = get_db().execute(
             """INSERT INTO incident_cases
-            (reference, workspace_id, training_run_id, title, description, case_type, severity, priority, status,
+            (reference, workspace_id, title, description, case_type, severity, priority, status,
             assignee, team, sla_due_at, creator, reporter, tags, mitre_ids, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 _reference(get_db()),
                 workspace_id(),
-                training_run_id,
                 title.strip(),
                 description.strip(),
                 str(data.get("case_type") or "investigation")[:80],
@@ -512,11 +480,9 @@ def _record_case_setup(alert_ids, assignee, case_id, classification, event_ids, 
 @require_permission("cases.create")
 def case_from_alert(alert_id: int):
     alert = (
-        get_db()
-        .execute("SELECT reason, severity, training_run_id, mitre_technique_ids FROM alerts WHERE id = ? AND workspace_id = ?", (alert_id, workspace_id()))
-        .fetchone()
+        get_db().execute("SELECT reason, severity, mitre_technique_ids FROM alerts WHERE id = ? AND workspace_id = ?", (alert_id, workspace_id())).fetchone()
     )
-    if not alert or not can_access_training_run(alert["training_run_id"]):
+    if not alert:
         return error_response("ALERT_NOT_FOUND", "التنبيه غير موجود", 404)
     data = request.get_json(silent=True)
     body = data if isinstance(data, dict) else {}
@@ -525,8 +491,6 @@ def case_from_alert(alert_id: int):
     body.setdefault("severity", alert["severity"])
     body.setdefault("priority", alert["severity"] if alert["severity"] in PRIORITIES else "medium")
     body["alert_ids"] = [alert_id]
-    body["training_run_id"] = alert["training_run_id"]
-    body.pop("training_run_id", None)
     body.setdefault("mitre_ids", json.loads(alert["mitre_technique_ids"] or "[]"))
     return _create_case(body)
 
@@ -707,7 +671,7 @@ def add_evidence(case_id: int):
     content = data.get("content")
     if (
         not isinstance(evidence_type, str)
-        or evidence_type not in {"ioc", "training_artifact", "raw_log"}
+        or evidence_type not in {"ioc", "artifact", "raw_log"}
         or not isinstance(reference, str)
         or not 1 <= len(reference) <= 255
         or not isinstance(title, str)
@@ -810,15 +774,15 @@ def attach_import(case_id: int):
     if not isinstance(data, dict) or type(data.get("job_id")) is not int or type(data.get("after_id", 0)) is not int or data.get("after_id", 0) < 0:
         return error_response("INVALID_IMPORT_LINK", "حدد رقم الاستيراد ومؤشر صفحة صحيحين", 422)
     job = _job_access(data["job_id"])
-    if not job or job["training_run_id"] != case["training_run_id"]:
+    if not job:
         return error_response("IMPORT_NOT_FOUND", "الاستيراد غير موجود ضمن نطاق القضية", 404)
     if job["status"] != "completed":
         return error_response("IMPORT_NOT_READY", "انتظر اكتمال الاستيراد قبل ربطه", 409)
     rows = (
         get_db()
         .execute(
-            "SELECT id FROM security_events WHERE workspace_id = ? AND training_run_id IS ? AND id > ? AND idempotency_key LIKE ? ORDER BY id LIMIT 201",
-            (workspace_id(), case["training_run_id"], data.get("after_id", 0), f"import:{job['content_hash']}:%"),
+            "SELECT id FROM security_events WHERE workspace_id = ? AND id > ? AND idempotency_key LIKE ? ORDER BY id LIMIT 201",
+            (workspace_id(), data.get("after_id", 0), f"import:{job['content_hash']}:%"),
         )
         .fetchall()
     )

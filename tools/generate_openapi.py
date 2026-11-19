@@ -45,7 +45,7 @@ def generate() -> dict[str, object]:
                 operation["description"] = (
                     "An optional retry key is scoped to the authenticated author and workspace and bound to the creation body. "
                     "Identical retries return the same case identifier and its current authorized view, preserving later claims and approvals. "
-                    "No additional case, tasks, approval, audit or outbox entries are created. Current cases.create permission and case visibility are required. "
+                    "No additional case, tasks, approval or audit entries are created. Current cases.create permission and case visibility are required. "
                     "Changed content with the same key returns 409; an unavailable retained case returns 404 without creating a replacement. "
                     "The receipt commits atomically with the case. A distinct intentional creation uses a fresh key."
                 )
@@ -268,7 +268,7 @@ def generate() -> dict[str, object]:
             elif path == "/api/soc/performance":
                 operation["summary"] = "Team and personal operational performance"
                 operation["description"] = (
-                    "Current authorized backlog and period completions. Team/member selection is manager-only; analysts can select themselves. The queue can show active cases, cases closed in the selected period, or cases awaiting review. Case rows use stable 50-row pagination; pages beyond the end resolve to the last page. Metrics retain the full selected member and period scope. Completion uses non-cancelled cases created in the selected period; reopened cases are pending and unknown closure chronology makes the percentage null. Speed measures configured case SLA compliance among cases closed in the selected period, using retained business calendars and pauses; cases without a measurable policy are excluded from the rate. Empty denominators and missing evidenced times remain null. Pending tasks include case_reference and case_title from this same authorized case scope. Excludes training, archived, unapproved and restricted-batch cases. Returns 422 above 2000 scoped cases; never silently samples."
+                    "Current authorized backlog and period completions. Team/member selection is manager-only; analysts can select themselves. The queue can show active cases, cases closed in the selected period, or cases awaiting review. Case rows use stable 50-row pagination; pages beyond the end resolve to the last page. Metrics retain the full selected member and period scope. Completion uses non-cancelled cases created in the selected period; reopened cases are pending and unknown closure chronology makes the percentage null. Speed measures configured case SLA compliance among cases closed in the selected period, using retained business calendars and pauses; cases without a measurable policy are excluded from the rate. Empty denominators and missing evidenced times remain null. Pending tasks include case_reference and case_title from this same authorized case scope. Excludes archived, unapproved and restricted-batch cases. Returns 422 above 2000 scoped cases; never silently samples."
                 )
                 operation["parameters"] = [
                     {"name": "days", "in": "query", "schema": {"type": "string", "enum": ["7", "30", "90", "all"], "default": "30"}},

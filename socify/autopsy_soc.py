@@ -4,7 +4,7 @@ from .autopsy_pipeline import full_case_scope_sql
 from .case_counts import consistent_read
 from .db import get_db
 from .operational import case_scope
-from .security import current_user, error_response, require_permission, training_scope_sql, workspace_id
+from .security import current_user, error_response, require_permission, workspace_id
 from .timeutils import iso_now
 
 autopsy_soc_api = Blueprint("autopsy_soc", __name__)
@@ -54,7 +54,7 @@ def monitoring():
         args.extend(ids)
     if current_app.config["REQUIRE_CASE_APPROVAL"]:
         where += " AND EXISTS(SELECT 1 FROM case_approvals ap WHERE ap.case_id=c.id AND ap.state='approved')"
-    for clause, parameters in (case_scope(user), full_case_scope_sql(user), training_scope_sql("c.training_run_id")):
+    for clause, parameters in (case_scope(user), full_case_scope_sql(user)):
         where += clause
         args.extend(parameters)
     if query:

@@ -18,7 +18,7 @@ def test_internal_bootstrap_preserves_existing_accounts_and_creates_private_team
     assert user["role"] == "soc_manager"
     assert user["workspace_id"] != 1
     assert bcrypt.checkpw(password.encode(), user["password_hash"].encode())
-    assert database.execute("SELECT name FROM training_workspaces WHERE id = ?", (user["workspace_id"],)).fetchone()[0] == "Internal Response"
+    assert database.execute("SELECT name FROM workspaces WHERE id = ?", (user["workspace_id"],)).fetchone()[0] == "Internal Response"
     assert [tuple(row) for row in database.execute("SELECT id, email, password_hash FROM users WHERE id != ? ORDER BY id", (user_id,))] == original
     with pytest.raises(ValueError, match="الحساب موجود"):
         create_manager(app, "manager@internal.example.test", "Replacement", "Replacement", password)
@@ -198,10 +198,10 @@ def test_recovery_rejects_unknown_email_before_prompting(app, monkeypatch, capsy
 @linux_only
 def test_generated_manager_creation_adds_one_user_and_preserves_all_existing_records(app, database):
     before = [tuple(row) for row in database.execute("SELECT * FROM users ORDER BY id")]
-    workspaces = database.execute("SELECT COUNT(*) FROM training_workspaces").fetchone()[0]
+    workspaces = database.execute("SELECT COUNT(*) FROM workspaces").fetchone()[0]
     user_id, destination = generate_manager_file(app, "owner@socify.local", "Owner", "Internal investigations")
     assert database.execute("SELECT COUNT(*) FROM users").fetchone()[0] == len(before) + 1
-    assert database.execute("SELECT COUNT(*) FROM training_workspaces").fetchone()[0] == workspaces + 1
+    assert database.execute("SELECT COUNT(*) FROM workspaces").fetchone()[0] == workspaces + 1
     assert [tuple(row) for row in database.execute("SELECT * FROM users WHERE id<>? ORDER BY id", (user_id,))] == before
     assert stat.S_IMODE(destination.stat().st_mode) == 0o600
     password = destination.read_text().strip()

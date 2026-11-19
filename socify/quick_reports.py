@@ -149,7 +149,7 @@ def migrate(connection: sqlite3.Connection) -> None:
     connection.execute(
         """CREATE TABLE IF NOT EXISTS case_quick_reports (
             case_id INTEGER PRIMARY KEY REFERENCES incident_cases(id),
-            workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+            workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
             answers_json TEXT NOT NULL CHECK(json_valid(answers_json)),
             executive_note TEXT NOT NULL DEFAULT '',
             status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'escalated', 'acknowledged')),

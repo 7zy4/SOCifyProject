@@ -82,7 +82,7 @@ def test_keys_are_scoped_to_workspace_and_author(client, login_as, database, use
     login_as("admin")
     second = client.post(PATH, json=BODY, headers=KEY)
     assert second.status_code == 201 and second.json["id"] != first.json["id"]
-    database.execute("INSERT INTO training_workspaces(id,name,public_id,created_at) VALUES (99,'Other team','receipt-other','2026-11-03T00:00:00Z')")
+    database.execute("INSERT INTO workspaces(id,name,public_id,created_at) VALUES (99,'Other team','receipt-other','2026-11-03T00:00:00Z')")
     database.execute("UPDATE users SET workspace_id=99 WHERE id=?", (user_ids["admin"],))
     with client.session_transaction() as session:
         session["workspace_id"] = 99

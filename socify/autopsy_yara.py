@@ -18,7 +18,7 @@ autopsy_yara_api = Blueprint("autopsy_yara", __name__)
 
 def migrate(connection):
     connection.execute(
-        "CREATE TABLE IF NOT EXISTS autopsy_yara_packs (id INTEGER PRIMARY KEY,workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),name TEXT NOT NULL,version INTEGER NOT NULL,source TEXT NOT NULL,license TEXT NOT NULL,origin TEXT NOT NULL,sha256 TEXT NOT NULL,validation TEXT NOT NULL CHECK(json_valid(validation)),created_by INTEGER NOT NULL REFERENCES users(id),created_at TEXT NOT NULL,UNIQUE(workspace_id,name,version))"
+        "CREATE TABLE IF NOT EXISTS autopsy_yara_packs (id INTEGER PRIMARY KEY,workspace_id INTEGER NOT NULL REFERENCES workspaces(id),name TEXT NOT NULL,version INTEGER NOT NULL,source TEXT NOT NULL,license TEXT NOT NULL,origin TEXT NOT NULL,sha256 TEXT NOT NULL,validation TEXT NOT NULL CHECK(json_valid(validation)),created_by INTEGER NOT NULL REFERENCES users(id),created_at TEXT NOT NULL,UNIQUE(workspace_id,name,version))"
     )
     for action in ("UPDATE", "DELETE"):
         connection.execute(

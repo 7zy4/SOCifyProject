@@ -21,7 +21,7 @@ def account(client, database, email, **options):
 def new_team(client, database, email, name):
     """A separate team and its manager, as scripts/bootstrap_team.py creates them, signed in on the client."""
     now = "2026-01-01T00:00:00Z"
-    workspace = database.execute("INSERT INTO training_workspaces (public_id, name, created_at) VALUES (?, ?, ?)", (f"team-{email}", name, now)).lastrowid
+    workspace = database.execute("INSERT INTO workspaces (public_id, name, created_at) VALUES (?, ?, ?)", (f"team-{email}", name, now)).lastrowid
     user = database.execute(
         "INSERT INTO users (email, password_hash, name, role, team, workspace_id, created_at, password_changed_at, is_active) VALUES (?, '', 'Team manager', 'soc_manager', ?, ?, ?, ?, 1)",
         (email, name, workspace, now, now),

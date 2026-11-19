@@ -144,5 +144,5 @@ def test_five_processes_starting_together_agree_on_one_schema(tmp_path, existing
     assert _objects(path) == _objects(reference)
     connection = sqlite3.connect(path)
     assert connection.execute("PRAGMA user_version").fetchone()[0] == NEWEST
-    assert connection.execute("SELECT COUNT(*) FROM training_workspaces").fetchone()[0] == 1
+    assert connection.execute("SELECT COUNT(*) FROM workspaces").fetchone()[0] == 1
     connection.close()

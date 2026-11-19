@@ -43,10 +43,8 @@ def test_codespaces_https_login_uses_configured_public_origin_from_loopback(forw
     application, password = forwarded_login
     client, response = submit(application, password, address=address)
     assert response.status_code == 302, response.text
-    assert response.headers["Location"] == "/dashboard"
-    dashboard = client.get("/dashboard", base_url=UPSTREAM)
-    assert dashboard.status_code == 302
-    assert dashboard.headers["Location"] == "/cases"
+    assert response.headers["Location"] == "/cases"
+    assert client.get("/cases", base_url=UPSTREAM).status_code == 200
     assert client.get("/api/auth/me", base_url=UPSTREAM).status_code == 200
 
 

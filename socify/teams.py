@@ -95,7 +95,7 @@ def list_assignments():
 
     membership, parameters = case_scope(current_user() or {})
     selection, selected = selection_scope_sql()
-    where += membership + selection + " AND c.training_run_id IS NULL"
+    where += membership + selection
     args.extend([*parameters, *selected])
     if not manager():
         where += " AND (NOT EXISTS (SELECT 1 FROM autopsy_batch_access b WHERE b.job_id=j.id AND b.restricted=1) OR j.created_by=? OR EXISTS (SELECT 1 FROM autopsy_batch_members m WHERE m.job_id=j.id AND m.user_id=?))"
@@ -229,14 +229,7 @@ def assign_logs():
         .execute("SELECT id, role, workspace_id FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (data["assignee"], workspace_id()))
         .fetchone()
     )
-    if (
-        not case
-        or not job
-        or not member
-        or member["role"] not in {"analyst", "l1_analyst", "l2_responder", "investigator", "soc_manager"}
-        or case["training_run_id"] is not None
-        or job["training_run_id"] is not None
-    ):
+    if not case or not job or not member or member["role"] not in {"analyst", "l1_analyst", "l2_responder", "investigator", "soc_manager"}:
         return error_response("ASSIGNMENT_SCOPE_INVALID", "اختر قضية واستيرادًا مشتركين وعضوًا من الفريق", 422)
     if job["case_id"] != case["id"]:
         return error_response("ASSIGNMENT_SCOPE_INVALID", "دفعة السجلات تابعة لقضية أخرى", 422)
@@ -251,7 +244,7 @@ def assign_logs():
     missing = (
         get_db()
         .execute(
-            "SELECT 1 FROM security_events e WHERE e.workspace_id = ? AND e.training_run_id IS NULL AND e.idempotency_key LIKE ? AND NOT EXISTS (SELECT 1 FROM case_events ce WHERE ce.case_id = ? AND ce.event_id = e.id) LIMIT 1",
+            "SELECT 1 FROM security_events e WHERE e.workspace_id = ? AND e.idempotency_key LIKE ? AND NOT EXISTS (SELECT 1 FROM case_events ce WHERE ce.case_id = ? AND ce.event_id = e.id) LIMIT 1",
             (workspace_id(), f"import:{job['content_hash']}:%", case["id"]),
         )
         .fetchone()

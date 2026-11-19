@@ -513,9 +513,7 @@ def _restore_imports(case_id, content, data, files, maps, now, principal):
         payload = files[path]
         if digest(payload) != source.get("content_hash"):
             raise ValidationError("بصمة أصل الاستيراد غير مطابقة")
-        values = {
-            key: value for key, value in source.items() if key not in {"id", "source_id", "training_run_id", "worker_id", "lease_expires_at", "available_at"}
-        }
+        values = {key: value for key, value in source.items() if key not in {"id", "source_id", "worker_id", "lease_expires_at", "available_at"}}
         previous_options = decode_json(source.get("autopsy_options") or "{}")
         if not isinstance(previous_options, dict):
             raise ValidationError("إعدادات أصل الاستيراد غير صالحة")
@@ -549,7 +547,7 @@ def _restore_events(case_id, content, data, maps, now, principal):
     """Restore the case's events under new identifiers, keeping their provenance and import links."""
     for source in data["events"]:
         identifier = int(source["id"])
-        values = {key: value for key, value in source.items() if key not in {"id", "training_run_id", "assigned_to"}}
+        values = {key: value for key, value in source.items() if key not in {"id", "assigned_to"}}
         values.update(
             event_id="CAP-EVT-" + uuid.uuid4().hex,
             external_id=str(source.get("event_id", identifier)),

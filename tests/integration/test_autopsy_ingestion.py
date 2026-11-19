@@ -86,7 +86,7 @@ def test_jsonl_quarantine_continues_after_invalid_row_and_marks_unknown_time(aut
         {"delimiter": "\n"},
         {"source_timezone": "../../etc/passwd"},
         {"source_timezone": "Unknown/Zone"},
-        {"training_run_id": 1},
+        {"unknown": 1},
         {"source_id": True},
         {"source_id": 2**100},
     ],

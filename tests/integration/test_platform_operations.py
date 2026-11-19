@@ -14,18 +14,11 @@ def test_platform_read_models_and_ui_routes(client: FlaskClient, login_as: Calla
     assert client.get("/health/live").json["status"] == "live"
     assert client.get("/health/ready").json["status"] == "ready"
     assert client.get("/test").status_code == 404  # the old redirect-only route was removed
-    assert client.get("/dashboard").status_code == 302
     login_as("admin")
     for path in ("/cases", "/my-tasks", "/team", "/playbooks", "/analysis-library", "/audit", "/admin", "/profile", "/monitoring", "/reports"):
         response = client.get(path)
         assert response.status_code == 200, path
         assert 'dir="rtl"' in response.text
-    # Addresses of the removed training pages: an old bookmark lands on the case list, and the two training-only pages say they are gone.
-    for path in ("/dashboard", "/events", "/alerts", "/rules", "/sources", "/imports", "/incidents", "/attack", "/hunt", "/graph"):
-        response = client.get(path)
-        assert response.status_code == 302 and response.headers["Location"].endswith("/cases"), path
-    for path in ("/lab", "/scores"):
-        assert client.get(path).status_code == 410, path
     for path in ("/api/health", "/api/admin/role-matrix"):
         assert client.get(path).status_code == 200
     assert client.get("/api/audit?page=invalid").status_code == 400
@@ -41,7 +34,7 @@ def test_attack_snapshot_loads_compact_and_stix_formats(tmp_path: Path, database
                 "technique_id": "T9999",
                 "name": "Synthetic Technique",
                 "tactics": ["discovery"],
-                "description": "Training fixture",
+                "description": "Sample fixture",
                 "source_url": "https://attack.mitre.org/",
                 "is_subtechnique": False,
             }
@@ -93,7 +86,7 @@ def test_source_crud_validation_and_explicit_connector_status(client: FlaskClien
     login_as("admin")
     assert client.post("/api/sources", json={}).status_code == 422
     assert client.post("/api/sources", json={"name": "x", "type": "unknown"}).status_code == 422
-    created = client.post("/api/sources", json={"name": "Training file", "type": "file", "credential": "temporary-secret"})
+    created = client.post("/api/sources", json={"name": "Sample file", "type": "file", "credential": "temporary-secret"})
     assert created.status_code == 201
     source_id = created.json["id"]
     listed = client.get("/api/sources")
@@ -101,7 +94,7 @@ def test_source_crud_validation_and_explicit_connector_status(client: FlaskClien
     assert source["credentials_stored"] is True
     assert "credential_ciphertext" not in source
     assert client.patch(f"/api/sources/{source_id}", json={}).status_code == 422
-    updated = client.patch(f"/api/sources/{source_id}", json={"name": "Training file updated", "credential": None})
+    updated = client.patch(f"/api/sources/{source_id}", json={"name": "Sample file updated", "credential": None})
     assert updated.status_code == 200
     assert updated.json["credentials_stored"] is False
     tested = client.post(f"/api/sources/{source_id}/test")

@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS autopsy_case_imports (
 );
 CREATE TABLE IF NOT EXISTS autopsy_templates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
     name TEXT NOT NULL,
     version INTEGER NOT NULL,
     state TEXT NOT NULL DEFAULT 'draft',
@@ -107,7 +107,7 @@ BEFORE DELETE ON autopsy_report_files
 BEGIN SELECT RAISE(ABORT, 'report files are immutable'); END;
 CREATE TABLE IF NOT EXISTS autopsy_intel_bundles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
     name TEXT NOT NULL,
     version TEXT NOT NULL,
     source TEXT NOT NULL,

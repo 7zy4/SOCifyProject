@@ -21,7 +21,7 @@ autopsy_detection_api = Blueprint("autopsy_detection", __name__)
 
 def migrate(connection):
     connection.execute(
-        "CREATE TABLE IF NOT EXISTS sigma_publication_receipts(workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id), actor_id INTEGER NOT NULL REFERENCES users(id), request_key TEXT NOT NULL, request_hash TEXT NOT NULL, response TEXT NOT NULL CHECK(json_valid(response)), created_at TEXT NOT NULL, PRIMARY KEY(workspace_id,actor_id,request_key))"
+        "CREATE TABLE IF NOT EXISTS sigma_publication_receipts(workspace_id INTEGER NOT NULL REFERENCES workspaces(id), actor_id INTEGER NOT NULL REFERENCES users(id), request_key TEXT NOT NULL, request_hash TEXT NOT NULL, response TEXT NOT NULL CHECK(json_valid(response)), created_at TEXT NOT NULL, PRIMARY KEY(workspace_id,actor_id,request_key))"
     )
     connection.execute(
         "CREATE TABLE IF NOT EXISTS autopsy_sigma_sources(rule_id INTEGER NOT NULL REFERENCES rules(id), version INTEGER NOT NULL, source TEXT NOT NULL, sha256 TEXT NOT NULL, compiler TEXT NOT NULL, fixtures TEXT NOT NULL, PRIMARY KEY(rule_id,version))"

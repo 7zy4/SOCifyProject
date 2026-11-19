@@ -5,26 +5,20 @@ import pytest
 from tests.conftest import issue_session
 
 
-def test_case_first_context_membership_and_retired_routes(autopsy_case, app, client, database, login_as):
+def test_case_first_context_membership_and_routes(autopsy_case, app, client, database, login_as):
     case = client.get(f"/api/cases/{autopsy_case}").json
     assert case["context"]["objective"] == "Establish impact from retained evidence"
     assert case["members"][0]["user_id"] == case["creator"]
     assert client.get("/api/cases").json["total"] >= 1
-    for path in ["/api/training/runs", "/api/scenarios", "/api/scores", "/api/events", "/api/dashboard"]:
-        assert client.get(path).status_code == 410
-    assert client.get("/lab").status_code == 410
-    assert client.get("/scores").status_code == 410
-    assert client.get("/dashboard").headers["Location"] == "/cases"
+    for path in ["/api/events", "/api/dashboard", "/dashboard", "/events"]:
+        assert client.get(path).status_code == 404
     assert client.get("/health/ready").status_code == 200
     assert "SOCify Tactical Workbench" in client.get("/cases").text
-    assert 'href="/lab"' not in client.get("/cases").text
     assert (
-        client.post("/api/auth/register", json={"name": "Public User", "email": "public@example.test", "password": "Training-Safe-Password-2026!"}).status_code
+        client.post("/api/auth/register", json={"name": "Public User", "email": "public@example.test", "password": "Demo-Safe-Password-2026!"}).status_code
         == 403
     )
-    assert not any(permission.startswith(("training.", "scores.")) for permission in client.get("/api/auth/me").json["permissions"])
     assert client.post("/api/auth/register", json={"invitation_token": "", "email": "empty@example.test"}).status_code == 403
-    assert database.execute("SELECT COUNT(*) FROM training_runs").fetchone()[0] >= 0
     login_as("auditor")
     assert client.get(f"/api/cases/{autopsy_case}").status_code == 404
     assert client.get(f"/cases/{autopsy_case}").status_code == 404
@@ -33,7 +27,7 @@ def test_case_first_context_membership_and_retired_routes(autopsy_case, app, cli
     assert client.get(f"/api/cases/{autopsy_case}").status_code == 200
 
 
-@pytest.mark.parametrize("change", [{"objective": ""}, {"reason": []}, {"classification": []}, {"title": "\ud800"}, {"training_run_id": 1}, {"is_admin": True}])
+@pytest.mark.parametrize("change", [{"objective": ""}, {"reason": []}, {"classification": []}, {"title": "\ud800"}, {"unknown": 1}, {"is_admin": True}])
 def test_case_creation_rejects_invalid_or_unknown_fields(autopsy_case, client, change):
     body = {"title": "Valid case title", "reason": "alert_review", "objective": "Verify incident impact", **change}
     assert client.post("/api/cases", json=body).status_code == 422

@@ -229,7 +229,7 @@ def test_relationship_and_selection_cannot_cross_tenants(v4, client, login_as, d
     approve(client, first)
     approve(client, other)
     tenant = database.execute(
-        "INSERT INTO training_workspaces(public_id,name,created_at) VALUES ('v4-private-tenant','Other workspace','2026-10-27T00:00:00Z')"
+        "INSERT INTO workspaces(public_id,name,created_at) VALUES ('v4-private-tenant','Other workspace','2026-10-27T00:00:00Z')"
     ).lastrowid
     database.execute("UPDATE incident_cases SET workspace_id=? WHERE id=?", (tenant, other))
     assert client.post(f"/api/cases/{first}/relationships", json={"related_case_id": other, "reason": "Cannot connect workspaces"}).status_code == 404

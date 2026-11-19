@@ -162,7 +162,7 @@ function finish(content) {
   document.dispatchEvent(new CustomEvent("socify:workspace-ready"));
 }
 
-// The second argument was a page description shown only by the training shell; callers still pass it, and it is not rendered.
+// Callers pass a page description as the second argument; the header shows only the title and actions.
 function pageHead(title, _description, actions = []) {
   return node("div", { class: "workspace-head" }, [node("div", {}, [node("h2", { text: title })]), node("div", { class: "action-row" }, actions)]);
 }

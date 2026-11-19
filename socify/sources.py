@@ -30,7 +30,7 @@ from .validation import ValidationError, public_error_message
 
 sources_api = Blueprint("sources", __name__)
 
-SOURCE_TYPES = {"training", "file", "syslog", "http", "windows", "linux", "web", "cef"}
+SOURCE_TYPES = {"synthetic", "file", "syslog", "http", "windows", "linux", "web", "cef"}
 MAX_REMOTE_PULL_BYTES = 5 * 1024 * 1024
 MAX_INGEST_BATCH_RECORDS = 5000
 
@@ -171,10 +171,10 @@ def _open_case_batch(
     ciphertext = encrypt_bytes(raw_bytes)
     cursor = get_db().execute(
         """INSERT INTO ingestion_jobs
-           (job_id, workspace_id, source_id, training_run_id, case_id, filename, original_filename, format,
+           (job_id, workspace_id, source_id, case_id, filename, original_filename, format,
             content_hash, evidence_ciphertext, raw_size, estimated_total, source_name, status,
             parser_version, active_version, autopsy_options, created_by, executor_id, created_at, updated_at, available_at, completed_at, progress)
-           VALUES (?, ?, ?, NULL, ?, 'siem-stream.log', 'siem-stream.log', ?, ?, ?, ?, ?, ?, 'completed', 'socify-siem', 1, '{}', ?, ?, ?, ?, ?, ?, 1)""",
+           VALUES (?, ?, ?, ?, 'siem-stream.log', 'siem-stream.log', ?, ?, ?, ?, ?, ?, 'completed', 'socify-siem', 1, '{}', ?, ?, ?, ?, ?, ?, 1)""",
         (
             public_id("IMP"),
             ws_id,
@@ -230,7 +230,7 @@ def _store_source_record(
     source_name = str(source_row["name"])
     record = dict(record)
     record["source"] = source_name
-    if record.get("source_type") in (None, "import", "training"):
+    if record.get("source_type") in (None, "import", "synthetic"):
         record["source_type"] = "http" if source_row["type"] == "http" else str(source_row["type"])
     record["idempotency_key"] = f"siem:{source_id}:{content_hash}:{idx}"
     record["provenance"] = {**record.get("provenance", {}), "file_sha256": content_hash}
@@ -241,7 +241,6 @@ def _store_source_record(
             record,
             effective_actor,
             ws_id,
-            None,
             target_case_id,
             job_db_id,
             True,
@@ -541,7 +540,7 @@ def test_source(source_id: int):
     source_type = row["type"]
     status = "unsupported"
     message = "التحقق الشبكي غير مفعّل لهذا النوع"
-    if source_type in {"training", "file"}:
+    if source_type in {"synthetic", "file"}:
         status = "connected"
         message = "المصدر المحلي جاهز للاستيراد"
     elif source_type == "http" and row["endpoint"]:

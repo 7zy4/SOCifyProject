@@ -39,7 +39,6 @@ def test_reordered_json_retains_originals_occurrences_rules_receipts_exports_and
     original = logs(client, autopsy_case)["items"]
     alert_before = [tuple(row) for row in database.execute("SELECT id,alert_id,dedup_key,evidence FROM alerts WHERE owner_case_id=?", (autopsy_case,))]
     assert alert_before
-    before_outbox = database.execute("SELECT COUNT(*) FROM outbox_events WHERE event_type='event.created'").fetchone()[0]
     third = observation("gateway-003", timestamp="2026-11-02T08:02:00Z")
     job, content = upload(client, autopsy_case, [second, first, third], pretty=True)
     assert (job["accepted"], job["skipped"], job["rejected"], job["total"]) == (1, 2, 0, 3)
@@ -47,8 +46,6 @@ def test_reordered_json_retains_originals_occurrences_rules_receipts_exports_and
     assert current["total"] == 3
     assert [row["id"] for row in current["items"][:2]] == [row["id"] for row in original]
     assert [tuple(row) for row in database.execute("SELECT id,alert_id,dedup_key,evidence FROM alerts WHERE owner_case_id=?", (autopsy_case,))] == alert_before
-    # Nothing writes the outbox: its only reader was the training platform's event stream.
-    assert database.execute("SELECT COUNT(*) FROM outbox_events WHERE event_type='event.created'").fetchone()[0] == before_outbox == 0
     occurrences = database.execute(
         "SELECT job_id,disposition,COUNT(*) FROM autopsy_event_occurrences WHERE case_id=? GROUP BY job_id,disposition", (autopsy_case,)
     ).fetchall()

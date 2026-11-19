@@ -90,11 +90,11 @@ def test_deactivation_transfers_case_tasks_and_revokes_existing_sessions_atomica
     assert client.get(f"/api/cases/{autopsy_case}").status_code == 401
 
 
-def test_operational_roles_no_training_role_or_training_permissions(autopsy_case, client, login_as, user_ids):
+def test_team_rejects_unknown_roles_and_permissions(autopsy_case, client, login_as, user_ids):
     login_as("soc_manager")
-    assert client.post("/api/team/invitations", json={"email": "training@internal.test", "role": "instructor"}).status_code == 422
+    assert client.post("/api/team/invitations", json={"email": "unknown@internal.test", "role": "instructor"}).status_code == 422
     assert client.patch(f"/api/team/members/{user_ids['analyst']}", json={"role": "instructor"}).status_code == 422
-    assert client.put("/api/team/roles/analyst", json={"permissions": ["training.run"]}).status_code == 422
+    assert client.put("/api/team/roles/analyst", json={"permissions": ["unknown.permission"]}).status_code == 422
     assert client.post("/api/team/invitations", json={"email": "valid@internal.test", "role": "l1_analyst", "is_admin": True}).status_code == 422
     invite = client.post("/api/team/invitations", json={"email": "valid@internal.test", "role": "l1_analyst"})
     assert invite.status_code == 201

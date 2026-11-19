@@ -56,7 +56,7 @@ def leaf(field, modifier, value, sysmon):
             raise ValidationError("EventID مدعوم فقط كرقم Sysmon دون modifier")
         return {"field": "event_type", "operator": "equals", "value": f"sysmon_{int(value)}"}
     field = ALIASES.get(field, field)
-    if field not in FIELDS - {"training_run_id", "anomaly_score"}:
+    if field not in FIELDS - {"anomaly_score"}:
         raise ValidationError("حقل Sigma لا يملك mapping معلنًا")
     if value is None and not modifier:
         return {"field": field, "operator": "exists", "value": False}

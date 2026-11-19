@@ -122,7 +122,7 @@ def test_removal_boundaries(autopsy_case, app, client, database, login_as, user_
         database.execute("UPDATE incident_cases SET version=version+1 WHERE id=?", (autopsy_case,))
     elif mode == "foreign_member":
         source = new_member(database, source, "analyst", "separate@internal.test")
-        database.execute("INSERT INTO training_workspaces(id,name,public_id,created_at) VALUES (99,'Separate','separate','2026-11-03T00:00:00Z')")
+        database.execute("INSERT INTO workspaces(id,name,public_id,created_at) VALUES (99,'Separate','separate','2026-11-03T00:00:00Z')")
         database.execute("UPDATE users SET workspace_id=99 WHERE id=?", (source,))
         expected = 404
     elif mode == "manager":

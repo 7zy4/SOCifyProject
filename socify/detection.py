@@ -34,7 +34,6 @@ FIELDS = {
     "title",
     "description",
     "command_line",
-    "training_run_id",
     "mitre_ids",
     "exposed_secret_count",
     "sensitive_data_count",
@@ -310,11 +309,10 @@ def _candidate_events(connection: sqlite3.Connection, event: dict[str, Any], sec
     start = end - timedelta(seconds=seconds)
     rows = connection.execute(
         """SELECT * FROM security_events
-        WHERE workspace_id = ? AND training_run_id IS ? AND owner_case_id IS ? AND autopsy_active = 1 AND source != 'rules_engine' AND event_time >= ? AND event_time <= ?
+        WHERE workspace_id = ? AND owner_case_id IS ? AND autopsy_active = 1 AND source != 'rules_engine' AND event_time >= ? AND event_time <= ?
         ORDER BY event_time, id LIMIT 20000""",
         (
             event["workspace_id"],
-            event.get("training_run_id"),
             event.get("owner_case_id"),
             start.isoformat().replace("+00:00", "Z"),
             end.isoformat().replace("+00:00", "Z"),
@@ -345,8 +343,8 @@ def evaluate_dsl(connection: sqlite3.Connection, dsl: dict[str, Any], event: dic
     group_fields = [str(item) for item in window.get("group_by", [])]
     target_group = _group_key(event, group_fields)
     max_time_row = connection.execute(
-        "SELECT MAX(event_time) FROM security_events WHERE workspace_id = ? AND training_run_id IS ? AND owner_case_id IS ? AND autopsy_active = 1 AND source != 'rules_engine'",
-        (event["workspace_id"], event.get("training_run_id"), event.get("owner_case_id")),
+        "SELECT MAX(event_time) FROM security_events WHERE workspace_id = ? AND owner_case_id IS ? AND autopsy_active = 1 AND source != 'rules_engine'",
+        (event["workspace_id"], event.get("owner_case_id")),
     ).fetchone()
     max_time = parse_timestamp(max_time_row[0]) if max_time_row and max_time_row[0] else parse_timestamp(event["event_time"])
     lateness = int((max_time - parse_timestamp(event["event_time"])).total_seconds())
@@ -460,7 +458,8 @@ def evaluate_rules(connection: sqlite3.Connection, event_id: int, only_rule_id: 
                 if evaluation.trace.get("suppressed"):
                     connection.execute("UPDATE rules SET suppressions = suppressions + 1 WHERE id = ?", (rule["id"],))
                 continue
-            material = f"{rule['id']}|{rule['version']}|{evaluation.group_key}|{','.join(str(item) for item in evaluation.event_ids)}|{event.get('training_run_id') or ''}"
+            # The trailing separator is part of the key format; dropping it would re-raise alerts that already exist.
+            material = f"{rule['id']}|{rule['version']}|{evaluation.group_key}|{','.join(str(item) for item in evaluation.event_ids)}|"
             dedup_key = hashlib.sha256(material.encode()).hexdigest()
             existing = connection.execute("SELECT id FROM alerts WHERE dedup_key = ?", (dedup_key,)).fetchone()
             if existing:
@@ -479,13 +478,12 @@ def evaluate_rules(connection: sqlite3.Connection, event_id: int, only_rule_id: 
             alert_public_id = public_id("ALT")
             alert_cursor = connection.execute(
                 """INSERT INTO alerts
-                (alert_id, workspace_id, training_run_id, rule_id, rule_version, reason, evidence, severity,
+                (alert_id, workspace_id, rule_id, rule_version, reason, evidence, severity,
                 confidence, detected_at, status, mitre_technique_ids, dedup_key, trace)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'untriaged', ?, ?, ?)""",
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'untriaged', ?, ?, ?)""",
                 (
                     alert_public_id,
                     event["workspace_id"],
-                    event.get("training_run_id"),
                     rule["id"],
                     rule["version"],
                     _alert_reason(str(rule["name"]), evaluation),
@@ -506,16 +504,15 @@ def evaluate_rules(connection: sqlite3.Connection, event_id: int, only_rule_id: 
             compatibility_event_id = public_id("DET")
             compatibility_cursor = connection.execute(
                 """INSERT INTO security_events
-                (event_id, external_id, idempotency_key, workspace_id, training_run_id, source, source_type, severity,
+                (event_id, external_id, idempotency_key, workspace_id, source, source_type, severity,
                 category, event_type, title, description, event_time, ingested_at, timestamp, raw_data, normalized_fields,
                 tags, mitre_ids, status, created_by, parser_version, raw_hash, provenance)
-                VALUES (?, ?, ?, ?, ?, 'rules_engine', 'internal', ?, 'detection', 'alert', ?, ?, ?, ?, ?, ?, '{}', '[]', ?, 'open', ?, 'socify-detection-2', ?, ?)""",
+                VALUES (?, ?, ?, ?, 'rules_engine', 'internal', ?, 'detection', 'alert', ?, ?, ?, ?, ?, ?, '{}', '[]', ?, 'open', ?, 'socify-detection-2', ?, ?)""",
                 (
                     compatibility_event_id,
                     alert_public_id,
                     f"alert:{dedup_key}",
                     event["workspace_id"],
-                    event.get("training_run_id"),
                     severity,
                     f"Detection: {str(rule['name'])[:220]}",
                     _alert_reason(str(rule["name"]), evaluation),

@@ -141,11 +141,11 @@ def _seed_iocs(connection: sqlite3.Connection) -> None:
     rows = [
         ("ip", "198.51.100.20", 0.92, "Synthetic credential attack source"),
         ("ip", "203.0.113.50", 0.88, "Synthetic exfiltration destination"),
-        ("domain", "phish-training.test", 1.0, "Reserved synthetic phishing domain"),
+        ("domain", "phish-lure.test", 1.0, "Reserved synthetic phishing domain"),
     ]
     for ioc_type, value, confidence, context in rows:
         connection.execute(
-            "INSERT OR IGNORE INTO ioc_indicators (workspace_id, type, value, first_seen, last_seen, confidence, source, context, tags) VALUES (1, ?, ?, ?, ?, ?, 'SOCify synthetic fixtures', ?, '[\"training\",\"synthetic\"]')",
+            "INSERT OR IGNORE INTO ioc_indicators (workspace_id, type, value, first_seen, last_seen, confidence, source, context, tags) VALUES (1, ?, ?, ?, ?, ?, 'SOCify synthetic fixtures', ?, '[\"synthetic\"]')",
             (ioc_type, value, now, now, confidence, json.dumps({"reason": context, "synthetic": True})),
         )
 

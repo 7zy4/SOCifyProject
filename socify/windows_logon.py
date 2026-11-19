@@ -95,13 +95,13 @@ def reconcile_logons(connection, job):
     end = (latest + timedelta(seconds=600)).isoformat().replace("+00:00", "Z")
     candidates = connection.execute(
         f"""SELECT e.id FROM security_events e
-        WHERE e.workspace_id=? AND e.owner_case_id=? AND e.training_run_id IS ? AND e.autopsy_active=1
+        WHERE e.workspace_id=? AND e.owner_case_id=? AND e.autopsy_active=1
         AND e.source_type='windows' AND e.outcome='success' AND e.event_time>=? AND e.event_time<=?
         AND EXISTS (SELECT 1 FROM security_events f WHERE {job_event_sql("f")} AND f.autopsy_active=1
             AND f.outcome='failed' AND f.event_time<=e.event_time AND julianday(f.event_time)>=julianday(e.event_time)-600.0/86400
             AND f.source_ip=e.source_ip AND json_extract(f.normalized_fields,'$.auth_target')=json_extract(e.normalized_fields,'$.auth_target'))
         ORDER BY e.event_time,e.id""",
-        (job["workspace_id"], job["case_id"], job["training_run_id"], bounds[0], end, job["id"], job["id"]),
+        (job["workspace_id"], job["case_id"], bounds[0], end, job["id"], job["id"]),
     )
     for row in candidates:
         alerts = evaluate_rules(connection, row["id"], only_rule_id=rule["id"])
@@ -136,7 +136,7 @@ def _reconcile_failed_logons(connection, job):
         end = (latest + timedelta(seconds=seconds)).isoformat().replace("+00:00", "Z")
         candidates = connection.execute(
             f"""SELECT e.* FROM security_events e
-            WHERE e.workspace_id=? AND e.owner_case_id=? AND e.training_run_id IS ? AND e.autopsy_active=1
+            WHERE e.workspace_id=? AND e.owner_case_id=? AND e.autopsy_active=1
             AND e.event_type='failed_login' AND e.event_time>=? AND e.event_time<=?
             AND json_extract(e.normalized_fields,'$.event_time_known')=1
             AND EXISTS (SELECT 1 FROM security_events f WHERE {job_event_sql("f")} AND f.autopsy_active=1
@@ -144,7 +144,7 @@ def _reconcile_failed_logons(connection, job):
                 AND json_extract(f.normalized_fields,'$.event_time_known')=1
                 AND f.event_time<=e.event_time AND julianday(f.event_time)>=julianday(e.event_time)-?/86400.0)
             ORDER BY e.event_time,e.id""",
-            (job["workspace_id"], job["case_id"], job["training_run_id"], bounds[0], end, job["id"], job["id"], seconds),
+            (job["workspace_id"], job["case_id"], bounds[0], end, job["id"], job["id"], seconds),
         )
         for row in candidates:
             evaluation = evaluate_dsl(connection, dsl, _event_dict(row))

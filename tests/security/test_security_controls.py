@@ -35,18 +35,18 @@ def test_e2e_02_login_session_logout_and_expiry(client: FlaskClient, database: s
 
 def test_e2e_03_registration_cannot_elevate_role(client: FlaskClient, database: sqlite3.Connection, invite: Callable[..., str]) -> None:
     account = {
-        "email": "new.trainee@example.test",
-        "name": "New Trainee",
-        "password": "New-Training-Account-2026!",
-        "invitation_token": invite("new.trainee@example.test"),
+        "email": "new.analyst@example.test",
+        "name": "New Analyst",
+        "password": "New-Analyst-Account-2026!",
+        "invitation_token": invite("new.analyst@example.test"),
     }
     for field, value in (("role", "admin"), ("workspace_id", 999), ("is_active", False)):
         refused = client.post("/api/auth/register", json={**account, field: value})
         assert refused.status_code == 422 and refused.json["error"]["code"] == "INVALID_REGISTRATION"
-    assert database.execute("SELECT COUNT(*) FROM users WHERE email = 'new.trainee@example.test'").fetchone()[0] == 0
+    assert database.execute("SELECT COUNT(*) FROM users WHERE email = 'new.analyst@example.test'").fetchone()[0] == 0
     registered = client.post("/api/auth/register", json=account)
     assert registered.status_code == 201
-    row = database.execute("SELECT role, workspace_id, is_active FROM users WHERE email = 'new.trainee@example.test'").fetchone()
+    row = database.execute("SELECT role, workspace_id, is_active FROM users WHERE email = 'new.analyst@example.test'").fetchone()
     assert dict(row) == {"role": "analyst", "workspace_id": 1, "is_active": 1}
 
 
@@ -58,18 +58,18 @@ def test_e2e_04_password_change_invalidates_old_value(
     assert (
         client.post(
             "/api/profile/password",
-            json={"current_password": "Wrong-Training-Value!", "new_password": "Updated-Training-Value-2026!"},
+            json={"current_password": "Wrong-Sample-Value!", "new_password": "Updated-Sample-Value-2026!"},
         ).status_code
         == 403
     )
     changed = client.post(
         "/api/profile/password",
-        json={"current_password": DEMO_LOGIN_VALUE, "new_password": "Updated-Training-Value-2026!"},
+        json={"current_password": DEMO_LOGIN_VALUE, "new_password": "Updated-Sample-Value-2026!"},
     )
     assert changed.status_code == 200
     client.post("/api/auth/logout", json={})
     assert client.post("/api/auth/login", json={"email": "analyst@socify.local", "password": DEMO_LOGIN_VALUE}).status_code == 401
-    assert client.post("/api/auth/login", json={"email": "analyst@socify.local", "password": "Updated-Training-Value-2026!"}).status_code == 200
+    assert client.post("/api/auth/login", json={"email": "analyst@socify.local", "password": "Updated-Sample-Value-2026!"}).status_code == 200
 
 
 def test_e2e_05_mfa_enrollment_login_backup_code_and_revoke(
@@ -115,7 +115,7 @@ def test_login_form_opens_mfa_after_password_challenge(client, login_as):
 
 def test_login_rate_limit_is_deterministic(client: FlaskClient) -> None:
     for _ in range(3):
-        assert client.post("/api/auth/login", json={"email": "analyst@socify.local", "password": "Invalid-Training-Value"}).status_code == 401
+        assert client.post("/api/auth/login", json={"email": "analyst@socify.local", "password": "Invalid-Sample-Value"}).status_code == 401
     limited = client.post("/api/auth/login", json={"email": "analyst@socify.local", "password": DEMO_LOGIN_VALUE})
     assert limited.status_code == 429
     assert limited.json["error"]["code"] == "LOGIN_RATE_LIMITED"
@@ -182,7 +182,7 @@ def test_e2e_44_cross_workspace_case_event_and_score_ids_are_hidden(
     login_as: Callable[[str], None],
     database: sqlite3.Connection,
 ) -> None:
-    database.execute("INSERT INTO training_workspaces (id, public_id, name, created_at) VALUES (2, 'workspace-two', 'Workspace Two', ?)", (iso_now(),))
+    database.execute("INSERT INTO workspaces (id, public_id, name, created_at) VALUES (2, 'workspace-two', 'Workspace Two', ?)", (iso_now(),))
     password_hash = bcrypt.hashpw(b"Isolated-Workspace-Password!", bcrypt.gensalt(rounds=4)).decode()
     database.execute(
         "INSERT INTO users (email, password_hash, name, role, workspace_id, created_at, is_active) VALUES ('other@example.test', ?, 'Other Analyst', 'analyst', 2, ?, 1)",
@@ -190,7 +190,7 @@ def test_e2e_44_cross_workspace_case_event_and_score_ids_are_hidden(
     )
     other_user = database.execute("SELECT id FROM users WHERE email = 'other@example.test'").fetchone()[0]
     database.execute(
-        "INSERT INTO security_events (event_id, workspace_id, source, source_type, severity, category, event_type, title, event_time, ingested_at, timestamp, raw_data, normalized_fields, tags, mitre_ids, status, created_by, parser_version, raw_hash, provenance) VALUES ('EVT-OTHER', 2, 'fixture', 'training', 'low', 'test', 'test', 'Other event', ?, ?, ?, '{}', '{}', '[]', '[]', 'open', ?, 'test', 'hash', '{}')",
+        "INSERT INTO security_events (event_id, workspace_id, source, source_type, severity, category, event_type, title, event_time, ingested_at, timestamp, raw_data, normalized_fields, tags, mitre_ids, status, created_by, parser_version, raw_hash, provenance) VALUES ('EVT-OTHER', 2, 'fixture', 'synthetic', 'low', 'test', 'test', 'Other event', ?, ?, ?, '{}', '{}', '[]', '[]', 'open', ?, 'test', 'hash', '{}')",
         (iso_now(), iso_now(), iso_now(), other_user),
     )
     database.execute(

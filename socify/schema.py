@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 import sqlite3
 import uuid
 from pathlib import Path
@@ -15,7 +16,7 @@ CREATE TABLE IF NOT EXISTS schema_meta (
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS training_workspaces (
+CREATE TABLE IF NOT EXISTS workspaces (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     public_id TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
@@ -39,7 +40,7 @@ CREATE TABLE IF NOT EXISTS users (
     is_active INTEGER NOT NULL DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS workspace_memberships (
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
     user_id INTEGER NOT NULL REFERENCES users(id),
     role TEXT NOT NULL,
     created_at TEXT NOT NULL,
@@ -47,7 +48,7 @@ CREATE TABLE IF NOT EXISTS workspace_memberships (
 );
 CREATE TABLE IF NOT EXISTS team_invitations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
     email TEXT NOT NULL,
     role TEXT NOT NULL,
     token_hash TEXT NOT NULL UNIQUE,
@@ -56,14 +57,14 @@ CREATE TABLE IF NOT EXISTS team_invitations (
     consumed_at TEXT
 );
 CREATE TABLE IF NOT EXISTS team_role_permissions (
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
     role TEXT NOT NULL,
     permissions TEXT NOT NULL,
     PRIMARY KEY(workspace_id, role)
 );
 CREATE TABLE IF NOT EXISTS team_log_assignments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
     job_id INTEGER NOT NULL REFERENCES ingestion_jobs(id),
     case_id INTEGER NOT NULL REFERENCES incident_cases(id),
     task_id INTEGER NOT NULL REFERENCES case_tasks(id),
@@ -79,7 +80,7 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_hash TEXT NOT NULL UNIQUE,
     user_id INTEGER NOT NULL REFERENCES users(id),
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
     created_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
     expires_at TEXT NOT NULL,
@@ -113,8 +114,7 @@ CREATE TABLE IF NOT EXISTS security_events (
     event_id TEXT NOT NULL UNIQUE,
     external_id TEXT,
     idempotency_key TEXT,
-    workspace_id INTEGER NOT NULL DEFAULT 1 REFERENCES training_workspaces(id),
-    training_run_id INTEGER,
+    workspace_id INTEGER NOT NULL DEFAULT 1 REFERENCES workspaces(id),
     source TEXT NOT NULL,
     source_type TEXT,
     severity TEXT NOT NULL,
@@ -146,13 +146,6 @@ CREATE TABLE IF NOT EXISTS security_events (
     raw_hash TEXT,
     provenance TEXT NOT NULL DEFAULT '{}'
 );
-CREATE TABLE IF NOT EXISTS event_comments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_id INTEGER NOT NULL REFERENCES security_events(id),
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    comment TEXT NOT NULL,
-    timestamp TEXT NOT NULL
-);
 CREATE TABLE IF NOT EXISTS rules (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -166,7 +159,7 @@ CREATE TABLE IF NOT EXISTS rules (
     archived_at TEXT,
     version INTEGER NOT NULL DEFAULT 1,
     deployment_state TEXT NOT NULL DEFAULT 'draft',
-    workspace_id INTEGER NOT NULL DEFAULT 1 REFERENCES training_workspaces(id),
+    workspace_id INTEGER NOT NULL DEFAULT 1 REFERENCES workspaces(id),
     created_by INTEGER NOT NULL REFERENCES users(id),
     deployed_by INTEGER REFERENCES users(id),
     created_at TEXT NOT NULL,
@@ -192,8 +185,7 @@ CREATE TABLE IF NOT EXISTS rule_versions (
 CREATE TABLE IF NOT EXISTS alerts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     alert_id TEXT NOT NULL UNIQUE,
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
-    training_run_id INTEGER,
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
     rule_id INTEGER NOT NULL REFERENCES rules(id),
     rule_version INTEGER NOT NULL,
     reason TEXT NOT NULL,
@@ -227,8 +219,7 @@ CREATE TABLE IF NOT EXISTS detection_matches (
 CREATE TABLE IF NOT EXISTS incident_cases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     reference TEXT NOT NULL UNIQUE,
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
-    training_run_id INTEGER,
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
     title TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     case_type TEXT NOT NULL DEFAULT 'investigation',
@@ -322,7 +313,7 @@ BEGIN
     SELECT RAISE(ABORT, 'immutable evidence content');
 END;
 CREATE TABLE IF NOT EXISTS case_creation_receipts (
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
     actor_id INTEGER NOT NULL REFERENCES users(id),
     request_key TEXT NOT NULL,
     request_hash TEXT NOT NULL,
@@ -378,7 +369,7 @@ CREATE TABLE IF NOT EXISTS case_technique_annotations (
 CREATE INDEX IF NOT EXISTS idx_case_technique_annotations ON case_technique_annotations(case_id, id);
 CREATE TABLE IF NOT EXISTS event_sources (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    workspace_id INTEGER NOT NULL DEFAULT 1 REFERENCES training_workspaces(id),
+    workspace_id INTEGER NOT NULL DEFAULT 1 REFERENCES workspaces(id),
     name TEXT NOT NULL,
     type TEXT NOT NULL,
     endpoint TEXT,
@@ -397,9 +388,8 @@ CREATE TABLE IF NOT EXISTS event_sources (
 CREATE TABLE IF NOT EXISTS ingestion_jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id TEXT NOT NULL UNIQUE,
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
     source_id INTEGER REFERENCES event_sources(id),
-    training_run_id INTEGER,
     filename TEXT NOT NULL,
     format TEXT NOT NULL,
     content_hash TEXT NOT NULL,
@@ -424,8 +414,7 @@ CREATE TABLE IF NOT EXISTS ingestion_jobs (
     worker_id TEXT,
     lease_expires_at TEXT,
     last_error TEXT,
-    started_at TEXT,
-    UNIQUE (workspace_id, content_hash, training_run_id)
+    started_at TEXT
 );
 CREATE TABLE IF NOT EXISTS ingestion_errors (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -435,92 +424,6 @@ CREATE TABLE IF NOT EXISTS ingestion_errors (
     message TEXT NOT NULL,
     sample TEXT,
     created_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS attack_scenarios (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    scenario_id TEXT NOT NULL UNIQUE,
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
-    name TEXT NOT NULL,
-    description TEXT NOT NULL,
-    active_version INTEGER NOT NULL DEFAULT 1,
-    state TEXT NOT NULL DEFAULT 'draft',
-    visibility TEXT NOT NULL DEFAULT 'workspace',
-    created_by INTEGER NOT NULL REFERENCES users(id),
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS scenario_versions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    scenario_id INTEGER NOT NULL REFERENCES attack_scenarios(id),
-    version INTEGER NOT NULL,
-    objectives TEXT NOT NULL,
-    roles TEXT NOT NULL,
-    difficulty TEXT NOT NULL,
-    duration_minutes INTEGER NOT NULL,
-    environment TEXT NOT NULL,
-    scoring_policy TEXT NOT NULL,
-    created_by INTEGER NOT NULL REFERENCES users(id),
-    created_at TEXT NOT NULL,
-    UNIQUE (scenario_id, version)
-);
-CREATE TABLE IF NOT EXISTS scenario_steps (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    scenario_version_id INTEGER NOT NULL REFERENCES scenario_versions(id),
-    step_id TEXT NOT NULL,
-    position INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    event_template TEXT NOT NULL,
-    artifact TEXT NOT NULL,
-    mitre_ids TEXT NOT NULL,
-    visible_hint TEXT,
-    UNIQUE (scenario_version_id, step_id)
-);
-CREATE TABLE IF NOT EXISTS scenario_ground_truth (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    scenario_version_id INTEGER NOT NULL REFERENCES scenario_versions(id),
-    step_id TEXT NOT NULL,
-    expected_detections TEXT NOT NULL,
-    relevant_evidence TEXT NOT NULL,
-    allowed_responses TEXT NOT NULL,
-    score_weight REAL NOT NULL,
-    UNIQUE (scenario_version_id, step_id)
-);
-CREATE TABLE IF NOT EXISTS training_runs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    run_id TEXT NOT NULL UNIQUE,
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
-    scenario_version_id INTEGER NOT NULL REFERENCES scenario_versions(id),
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    difficulty TEXT NOT NULL,
-    seed INTEGER NOT NULL,
-    state TEXT NOT NULL,
-    current_step INTEGER NOT NULL DEFAULT 0,
-    playback_rate REAL NOT NULL DEFAULT 1,
-    started_at TEXT NOT NULL,
-    paused_at TEXT,
-    completed_at TEXT,
-    submitted_at TEXT,
-    hints_used INTEGER NOT NULL DEFAULT 0,
-    snapshot TEXT NOT NULL DEFAULT '{}'
-);
-CREATE TABLE IF NOT EXISTS training_run_events (
-    run_id INTEGER NOT NULL REFERENCES training_runs(id),
-    step_id TEXT NOT NULL,
-    event_id INTEGER NOT NULL REFERENCES security_events(id),
-    sequence_number INTEGER NOT NULL,
-    PRIMARY KEY (run_id, step_id, event_id)
-);
-CREATE TABLE IF NOT EXISTS trainee_actions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    run_id INTEGER NOT NULL REFERENCES training_runs(id),
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    action_type TEXT NOT NULL,
-    target_type TEXT,
-    target_id TEXT,
-    payload TEXT NOT NULL DEFAULT '{}',
-    occurred_at TEXT NOT NULL,
-    idempotency_key TEXT NOT NULL,
-    UNIQUE (run_id, idempotency_key)
 );
 CREATE TABLE IF NOT EXISTS attack_techniques (
     technique_id TEXT PRIMARY KEY,
@@ -564,21 +467,9 @@ CREATE TABLE IF NOT EXISTS attack_catalog_transitions (
     revoked_count INTEGER NOT NULL,
     activated_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS saved_hunt_queries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
-    owner_id INTEGER NOT NULL REFERENCES users(id),
-    name TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    query TEXT NOT NULL,
-    visibility TEXT NOT NULL DEFAULT 'private',
-    tags TEXT NOT NULL DEFAULT '[]',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
 CREATE TABLE IF NOT EXISTS ioc_indicators (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
     type TEXT NOT NULL,
     value TEXT NOT NULL,
     first_seen TEXT NOT NULL,
@@ -589,28 +480,10 @@ CREATE TABLE IF NOT EXISTS ioc_indicators (
     tags TEXT NOT NULL DEFAULT '[]',
     UNIQUE (workspace_id, type, value)
 );
-CREATE TABLE IF NOT EXISTS ioc_observations (
-    ioc_id INTEGER NOT NULL REFERENCES ioc_indicators(id),
-    event_id INTEGER NOT NULL REFERENCES security_events(id),
-    context TEXT NOT NULL,
-    tags TEXT NOT NULL DEFAULT '[]',
-    created_at TEXT NOT NULL,
-    PRIMARY KEY (ioc_id, event_id)
-);
-CREATE TABLE IF NOT EXISTS ioc_enrichment_results (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ioc_id INTEGER NOT NULL REFERENCES ioc_indicators(id),
-    provider TEXT NOT NULL,
-    status TEXT NOT NULL,
-    result TEXT NOT NULL,
-    confidence REAL,
-    expires_at TEXT,
-    created_at TEXT NOT NULL
-);
 CREATE TABLE IF NOT EXISTS playbooks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     playbook_id TEXT NOT NULL UNIQUE,
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
     name TEXT NOT NULL,
     description TEXT NOT NULL,
     active_version INTEGER NOT NULL DEFAULT 1,
@@ -618,93 +491,6 @@ CREATE TABLE IF NOT EXISTS playbooks (
     created_by INTEGER NOT NULL REFERENCES users(id),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS playbook_versions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    playbook_id INTEGER NOT NULL REFERENCES playbooks(id),
-    version INTEGER NOT NULL,
-    trigger_type TEXT NOT NULL,
-    preconditions TEXT NOT NULL,
-    expected_outcome TEXT NOT NULL,
-    created_by INTEGER NOT NULL REFERENCES users(id),
-    created_at TEXT NOT NULL,
-    UNIQUE (playbook_id, version)
-);
-CREATE TABLE IF NOT EXISTS playbook_steps (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    playbook_version_id INTEGER NOT NULL REFERENCES playbook_versions(id),
-    position INTEGER NOT NULL,
-    action_type TEXT NOT NULL,
-    parameters TEXT NOT NULL,
-    approval_role TEXT,
-    timeout_seconds INTEGER NOT NULL DEFAULT 30,
-    retry_limit INTEGER NOT NULL DEFAULT 2,
-    compensation_action TEXT,
-    UNIQUE (playbook_version_id, position)
-);
-CREATE TABLE IF NOT EXISTS playbook_runs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    run_id TEXT NOT NULL UNIQUE,
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
-    playbook_version_id INTEGER NOT NULL REFERENCES playbook_versions(id),
-    case_id INTEGER REFERENCES incident_cases(id),
-    training_run_id INTEGER REFERENCES training_runs(id),
-    state TEXT NOT NULL,
-    requested_by INTEGER NOT NULL REFERENCES users(id),
-    approved_by INTEGER REFERENCES users(id),
-    idempotency_key TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    available_at TEXT,
-    worker_id TEXT,
-    lease_expires_at TEXT,
-    cancel_requested INTEGER NOT NULL DEFAULT 0,
-    last_error TEXT,
-    started_at TEXT,
-    completed_at TEXT,
-    UNIQUE (workspace_id, idempotency_key)
-);
-CREATE TABLE IF NOT EXISTS playbook_step_runs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    run_id INTEGER NOT NULL REFERENCES playbook_runs(id),
-    step_id INTEGER NOT NULL REFERENCES playbook_steps(id),
-    status TEXT NOT NULL,
-    attempt INTEGER NOT NULL DEFAULT 0,
-    input TEXT NOT NULL,
-    output TEXT,
-    impact TEXT,
-    started_at TEXT,
-    completed_at TEXT,
-    error TEXT,
-    next_attempt_at TEXT,
-    duration_ms INTEGER,
-    effect_key TEXT,
-    UNIQUE (run_id, step_id)
-);
-CREATE TABLE IF NOT EXISTS response_simulation_state (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
-    training_run_id INTEGER REFERENCES training_runs(id),
-    entity_type TEXT NOT NULL,
-    entity_id TEXT NOT NULL,
-    state TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    UNIQUE (workspace_id, training_run_id, entity_type, entity_id)
-);
-CREATE TABLE IF NOT EXISTS assessment_snapshots (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    assessment_id TEXT NOT NULL UNIQUE,
-    workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
-    run_id INTEGER NOT NULL REFERENCES training_runs(id),
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    policy_version TEXT NOT NULL,
-    weights TEXT NOT NULL,
-    inputs TEXT NOT NULL,
-    components TEXT NOT NULL,
-    total_score REAL NOT NULL,
-    created_at TEXT NOT NULL,
-    revision INTEGER NOT NULL DEFAULT 1,
-    UNIQUE (run_id, policy_version, revision)
 );
 CREATE TABLE IF NOT EXISTS security_audit_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -718,13 +504,6 @@ CREATE TABLE IF NOT EXISTS security_audit_logs (
     correlation_id TEXT NOT NULL,
     ip_address TEXT,
     user_agent TEXT,
-    created_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS outbox_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    workspace_id INTEGER NOT NULL,
-    event_type TEXT NOT NULL,
-    payload TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
 """
@@ -748,7 +527,6 @@ COLUMN_MIGRATIONS: dict[str, dict[str, str]] = {
         "external_id": "TEXT",
         "idempotency_key": "TEXT",
         "workspace_id": "INTEGER NOT NULL DEFAULT 1",
-        "training_run_id": "INTEGER",
         "source_type": "TEXT",
         "event_type": "TEXT",
         "event_time": "TEXT",
@@ -785,7 +563,6 @@ COLUMN_MIGRATIONS: dict[str, dict[str, str]] = {
         "failed_evaluations": "INTEGER NOT NULL DEFAULT 0",
         "suppressions": "INTEGER NOT NULL DEFAULT 0",
     },
-    "training_runs": {"submitted_at": "TEXT"},
     "incident_cases": {
         "evidence_summary": "TEXT",
         "validation": "TEXT",
@@ -821,20 +598,6 @@ COLUMN_MIGRATIONS: dict[str, dict[str, str]] = {
         "last_error": "TEXT",
         "started_at": "TEXT",
     },
-    "playbook_runs": {
-        "available_at": "TEXT",
-        "worker_id": "TEXT",
-        "lease_expires_at": "TEXT",
-        "cancel_requested": "INTEGER NOT NULL DEFAULT 0",
-        "last_error": "TEXT",
-        "started_at": "TEXT",
-        "completed_at": "TEXT",
-    },
-    "playbook_step_runs": {
-        "next_attempt_at": "TEXT",
-        "duration_ms": "INTEGER",
-        "effect_key": "TEXT",
-    },
 }
 
 
@@ -844,21 +607,15 @@ CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users(lower(email));
 CREATE INDEX IF NOT EXISTS idx_events_workspace_time ON security_events(workspace_id, event_time DESC);
 CREATE INDEX IF NOT EXISTS idx_events_source_time ON security_events(workspace_id, source, event_time DESC);
 CREATE INDEX IF NOT EXISTS idx_events_identity ON security_events(workspace_id, source_ip, username, event_time DESC);
-DROP INDEX IF EXISTS idx_events_idempotency;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_events_scope_idempotency ON security_events(workspace_id, COALESCE(training_run_id, 0), idempotency_key) WHERE idempotency_key IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_events_run_time ON security_events(workspace_id, training_run_id, event_time);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_events_workspace_idempotency ON security_events(workspace_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_rules_workspace_active ON rules(workspace_id, is_active, archived_at);
 CREATE INDEX IF NOT EXISTS idx_alerts_workspace_status ON alerts(workspace_id, status, detected_at DESC);
 CREATE INDEX IF NOT EXISTS idx_cases_workspace_status ON incident_cases(workspace_id, status, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_case_history_case ON case_history(case_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_ingestion_workspace ON ingestion_jobs(workspace_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ingestion_worker_queue ON ingestion_jobs(status, available_at, lease_expires_at);
-CREATE INDEX IF NOT EXISTS idx_runs_workspace ON training_runs(workspace_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_workspace ON security_audit_logs(workspace_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_outbox_workspace ON outbox_events(workspace_id, id);
 CREATE INDEX IF NOT EXISTS idx_login_attempts ON login_attempts(identifier_hash, ip_address, occurred_at);
-CREATE INDEX IF NOT EXISTS idx_playbook_worker_queue ON playbook_runs(state, available_at, lease_expires_at);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_playbook_step_effect ON playbook_step_runs(effect_key) WHERE effect_key IS NOT NULL;
 """
 
 
@@ -881,6 +638,92 @@ def _table_exists(connection: sqlite3.Connection, table: str) -> bool:
     return connection.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)).fetchone() is not None
 
 
+PRE_RELEASE_TABLES = (
+    "playbook_step_runs",
+    "playbook_steps",
+    "playbook_runs",
+    "playbook_versions",
+    "assessment_snapshots",
+    "response_simulation_state",
+    "trainee_actions",
+    "training_run_events",
+    "training_runs",
+    "scenario_steps",
+    "scenario_ground_truth",
+    "scenario_versions",
+    "attack_scenarios",
+    "saved_hunt_queries",
+    "ioc_observations",
+    "ioc_enrichment_results",
+    "event_comments",
+    "outbox_events",
+)
+PRE_RELEASE_INDEXES = ("idx_events_idempotency", "idx_events_scope_idempotency", "idx_events_run_time")
+PRE_RELEASE_SOURCE_CONDITION = '{"field":"source_type","operator":"not_equals","value":"training"}'
+
+
+def has_pre_release_schema(connection: sqlite3.Connection) -> bool:
+    return _table_exists(connection, "training_workspaces")
+
+
+def _rebuild_without_column(connection: sqlite3.Connection, table: str, column: str) -> None:
+    """Recreate ``table`` without ``column`` when a constraint on the column rules out ALTER TABLE DROP COLUMN."""
+    definition = connection.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)).fetchone()[0]
+    rebuilt = re.sub(rf",\s*UNIQUE\s*\([^)]*\b{column}\b[^)]*\)", "", definition)
+    rebuilt = re.sub(rf",\s*{column}\s+INTEGER(?:\s+REFERENCES\s+\w+\(id\))?", "", rebuilt)
+    if re.search(rf"\b{column}\b", rebuilt):
+        raise RuntimeError(f"cannot remove {table}.{column}: unexpected table definition")
+    attached = [
+        row[0] for row in connection.execute("SELECT sql FROM sqlite_master WHERE tbl_name = ? AND type IN ('index', 'trigger') AND sql IS NOT NULL", (table,))
+    ]
+    kept = ", ".join(name for name in (str(row[1]) for row in connection.execute(f"PRAGMA table_info({table})")) if name != column)
+    staging = f"{table}_rebuild"
+    connection.execute(re.sub(rf"^CREATE TABLE\s+(?:IF NOT EXISTS\s+)?\"?{table}\"?", f"CREATE TABLE {staging}", rebuilt, count=1))
+    connection.execute(f"INSERT INTO {staging} ({kept}) SELECT {kept} FROM {table}")
+    connection.execute(f"DROP TABLE {table}")
+    connection.execute(f"ALTER TABLE {staging} RENAME TO {table}")
+    for statement in attached:
+        connection.execute(statement)
+
+
+def _retire_pre_release_schema(connection: sqlite3.Connection) -> None:
+    """Bring a database created by a pre-release build to the 1.0.0 schema.
+
+    Runs before the baseline, which names the workspace table ``workspaces``, with foreign keys off as table
+    rebuilds require (``ensure_schema`` handles both). It refuses to drop records that belong to a training run
+    rather than make them visible to the team.
+    """
+    if not has_pre_release_schema(connection):
+        return
+    for table in ("security_events", "alerts", "incident_cases", "ingestion_jobs"):
+        if (
+            _table_exists(connection, table)
+            and "training_run_id" in _columns(connection, table)
+            and connection.execute(f"SELECT 1 FROM {table} WHERE training_run_id IS NOT NULL LIMIT 1").fetchone()
+        ):
+            raise RuntimeError(f"{table} holds records from a pre-release training run; export what you need and start from a new database")
+    connection.execute("ALTER TABLE training_workspaces RENAME TO workspaces")
+    for index in PRE_RELEASE_INDEXES:
+        connection.execute(f"DROP INDEX IF EXISTS {index}")
+    for table in PRE_RELEASE_TABLES:
+        connection.execute(f"DROP TABLE IF EXISTS {table}")
+    for table in ("security_events", "alerts", "incident_cases"):
+        if _table_exists(connection, table) and "training_run_id" in _columns(connection, table):
+            connection.execute(f"ALTER TABLE {table} DROP COLUMN training_run_id")
+    if _table_exists(connection, "ingestion_jobs") and "training_run_id" in _columns(connection, "ingestion_jobs"):
+        _rebuild_without_column(connection, "ingestion_jobs", "training_run_id")
+    for table in ("security_events", "event_sources"):
+        if _table_exists(connection, table):
+            column = "source_type" if table == "security_events" else "type"
+            if column in _columns(connection, table):
+                connection.execute(f"UPDATE {table} SET {column} = 'synthetic' WHERE {column} = 'training'")
+    if _table_exists(connection, "rules"):
+        connection.execute(
+            "UPDATE rules SET dsl_json = replace(dsl_json, ?, ?) WHERE instr(dsl_json, ?) > 0",
+            (PRE_RELEASE_SOURCE_CONDITION, PRE_RELEASE_SOURCE_CONDITION.replace('"training"', '"synthetic"'), PRE_RELEASE_SOURCE_CONDITION),
+        )
+
+
 def _ensure_columns(connection: sqlite3.Connection) -> None:
     for table, definitions in COLUMN_MIGRATIONS.items():
         if not _table_exists(connection, table):
@@ -893,19 +736,6 @@ def _ensure_columns(connection: sqlite3.Connection) -> None:
 
 def _normalize_existing_rows(connection: sqlite3.Connection) -> None:
     now = iso_now()
-    for indicator in connection.execute("SELECT id, workspace_id, context, last_seen FROM ioc_indicators WHERE source = 'SOCify extraction'").fetchall():
-        context = json.loads(indicator["context"])
-        event_id = context.get("event_id") if isinstance(context, dict) else None
-        event = (
-            connection.execute("SELECT id FROM security_events WHERE id = ? AND workspace_id = ?", (event_id, indicator["workspace_id"])).fetchone()
-            if type(event_id) is int
-            else None
-        )
-        if event:
-            connection.execute(
-                "INSERT OR IGNORE INTO ioc_observations (ioc_id, event_id, context, tags, created_at) VALUES (?, ?, ?, '[\"training\"]', ?)",
-                (indicator["id"], event_id, indicator["context"], indicator["last_seen"]),
-            )
     connection.execute("UPDATE users SET workspace_id = 1 WHERE workspace_id IS NULL")
     connection.execute("UPDATE users SET created_at = ? WHERE created_at IS NULL", (now,))
     if _table_exists(connection, "security_events"):
@@ -933,66 +763,11 @@ def _normalize_existing_rows(connection: sqlite3.Connection) -> None:
         )
         connection.execute("UPDATE ingestion_jobs SET updated_at = COALESCE(created_at, ?) WHERE updated_at IS NULL", (now,))
         connection.execute("UPDATE ingestion_jobs SET available_at = COALESCE(created_at, ?) WHERE available_at IS NULL", (now,))
-    if _table_exists(connection, "playbook_runs"):
-        connection.execute("UPDATE playbook_runs SET available_at = COALESCE(created_at, ?) WHERE available_at IS NULL", (now,))
-        connection.execute("UPDATE playbook_step_runs SET effect_key = 'playbook-step:' || run_id || ':' || step_id WHERE effect_key IS NULL")
-
-
-def _migrate_legacy_incidents(connection: sqlite3.Connection) -> None:
-    if not _table_exists(connection, "incidents"):
-        return
-    marker = connection.execute("SELECT value FROM schema_meta WHERE key = 'legacy_incidents_migrated'").fetchone()
-    if marker:
-        return
-    rows = connection.execute("SELECT * FROM incidents ORDER BY id").fetchall()
-    now = iso_now()
-    for row in rows:
-        data = dict(row)
-        status_map = {"open": "open", "investigating": "investigating", "resolved": "recovered", "false_positive": "false_positive"}
-        connection.execute(
-            """INSERT OR IGNORE INTO incident_cases
-            (id, reference, workspace_id, title, description, severity, priority, status, assignee, creator, reporter, created_at, updated_at, version)
-            VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)""",
-            (
-                data["id"],
-                f"LEGACY-{data['id']:06d}",
-                data["title"],
-                data.get("description") or "",
-                data.get("severity") or "medium",
-                data.get("severity") or "medium",
-                status_map.get(str(data.get("status") or ""), "open"),
-                data.get("assigned_to"),
-                data.get("created_by") or 1,
-                data.get("created_by") or 1,
-                data.get("created_at") or now,
-                data.get("updated_at") or now,
-            ),
-        )
-    if _table_exists(connection, "incident_events"):
-        for row in connection.execute("SELECT incident_id, event_id FROM incident_events").fetchall():
-            case = connection.execute("SELECT creator, created_at FROM incident_cases WHERE id = ?", (row["incident_id"],)).fetchone()
-            if case:
-                connection.execute(
-                    "INSERT OR IGNORE INTO case_events (case_id, event_id, attached_by, attached_at) VALUES (?, ?, ?, ?)",
-                    (row["incident_id"], row["event_id"], case["creator"], case["created_at"]),
-                )
-    if _table_exists(connection, "incident_notes"):
-        for row in connection.execute("SELECT incident_id, user_id, note, created_at FROM incident_notes").fetchall():
-            connection.execute(
-                "INSERT INTO case_notes (case_id, author_id, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-                (row["incident_id"], row["user_id"], row["note"], row["created_at"] or now, row["created_at"] or now),
-            )
-    connection.execute(
-        "INSERT INTO schema_meta (key, value, updated_at) VALUES ('legacy_incidents_migrated', '1', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
-        (now,),
-    )
 
 
 def seed_reference_data(connection: sqlite3.Connection) -> None:
     now = iso_now()
-    connection.execute(
-        "INSERT OR IGNORE INTO training_workspaces (id, public_id, name, created_at) VALUES (1, 'workspace-default', 'SOCify Workspace', ?)", (now,)
-    )
+    connection.execute("INSERT OR IGNORE INTO workspaces (id, public_id, name, created_at) VALUES (1, 'workspace-default', 'SOCify Workspace', ?)", (now,))
     existing_catalog = connection.execute("SELECT value FROM schema_meta WHERE key = 'attack_version'").fetchone()
     if existing_catalog:
         _record_existing_attack_catalog(connection, str(existing_catalog["value"]), now)
@@ -1078,14 +853,13 @@ def _execute_schema(connection: sqlite3.Connection, schema: str) -> None:
 
 
 def baseline_schema(connection: sqlite3.Connection) -> None:
-    """Migration 1 (socify.migrations): the start-up set-up exactly as it ran before migrations were numbered."""
+    """Migration 1 (socify.migrations): the idempotent start-up set-up and reconciliation."""
     from .autopsy_schema import migrate
 
     _execute_schema(connection, BASE_SCHEMA)
     _ensure_columns(connection)
     seed_reference_data(connection)
     _normalize_existing_rows(connection)
-    _migrate_legacy_incidents(connection)
     _execute_schema(connection, INDEX_SCHEMA)
     migrate(connection)
     from .autopsy_workspace import migrate as migrate_workspace
@@ -1103,14 +877,25 @@ def baseline_schema(connection: sqlite3.Connection) -> None:
 def ensure_schema(connection: sqlite3.Connection) -> None:
     from .migrations import apply_migrations
 
+    # Table rebuilds need foreign keys off, and SQLite only changes that setting outside a transaction.
+    retiring = has_pre_release_schema(connection)
+    if retiring:
+        connection.execute("PRAGMA foreign_keys = OFF")
     connection.execute("BEGIN IMMEDIATE")
     try:
+        if retiring:
+            _retire_pre_release_schema(connection)
         apply_migrations(connection)
+        if retiring and connection.execute("PRAGMA foreign_key_check").fetchone():
+            raise RuntimeError("foreign key check failed after upgrading a pre-release database")
         prune_if_due(connection)
         connection.commit()
     except Exception:
         connection.rollback()
         raise
+    finally:
+        if retiring:
+            connection.execute("PRAGMA foreign_keys = ON")
 
 
 def public_id(prefix: str) -> str:

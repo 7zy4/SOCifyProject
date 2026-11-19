@@ -28,7 +28,6 @@ def counts(database):
         "autopsy_case_members",
         "case_history",
         "security_audit_logs",
-        "outbox_events",
         "case_creation_receipts",
     )
     return [database.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in tables]
@@ -109,7 +108,7 @@ def test_receipt_respects_actor_and_workspace_boundaries(client, login_as, datab
     login_as("soc_manager")
     second = client.post(PATH, json=BODY, headers=KEY)
     assert first.json["id"] != second.json["id"]
-    database.execute("INSERT INTO training_workspaces(id,name,public_id,created_at) VALUES (99,'Other','intake-other','2026-11-03T00:00:00Z')")
+    database.execute("INSERT INTO workspaces(id,name,public_id,created_at) VALUES (99,'Other','intake-other','2026-11-03T00:00:00Z')")
     database.execute("UPDATE users SET workspace_id=99 WHERE id=?", (user_ids["soc_manager"],))
     with client.session_transaction() as session:
         session["workspace_id"] = 99

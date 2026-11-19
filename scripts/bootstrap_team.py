@@ -40,7 +40,7 @@ def create_manager(app, email: str, name: str, team: str, password: str) -> int:
             raise ValueError("الحساب موجود؛ لن تتم إعادة تعيينه أو تعديل بياناته")
         now = iso_now()
         workspace = inserted_id(
-            get_db().execute("INSERT INTO training_workspaces(public_id, name, created_at) VALUES (?, ?, ?)", (f"organization-{uuid.uuid4().hex}", team, now))
+            get_db().execute("INSERT INTO workspaces(public_id, name, created_at) VALUES (?, ?, ?)", (f"organization-{uuid.uuid4().hex}", team, now))
         )
         user = inserted_id(
             get_db().execute(

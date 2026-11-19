@@ -192,24 +192,24 @@ def test_operational_mfa_requires_password_status_does_not_leak_secret_and_recov
     assert client.get("/api/auth/mfa/status").json["enabled"] is False
     assert client.post("/api/auth/mfa/enroll", json={}).status_code == 403
     assert client.post("/api/auth/mfa/enroll", json={"current_password": secrets.token_urlsafe(20)}).status_code == 403
-    enrolled = client.post("/api/auth/mfa/enroll", json={"current_password": "Training-Safe-Password-2026!"})
+    enrolled = client.post("/api/auth/mfa/enroll", json={"current_password": "Demo-Safe-Password-2026!"})
     assert enrolled.status_code == 200
     status = client.get("/api/auth/mfa/status").json
     assert status["pending"] and "secret" not in status
     enabled = client.post("/api/auth/mfa/verify", json={"code": totp_code(enrolled.json["secret"])})
     assert enabled.status_code == 200
     assert client.get("/api/auth/mfa/status").json["recovery_codes_remaining"] == 10
-    assert client.post("/api/auth/mfa/enroll", json={"current_password": "Training-Safe-Password-2026!"}).status_code == 409
-    disabled = client.delete("/api/auth/mfa", json={"current_password": "Training-Safe-Password-2026!", "code": enabled.json["backup_codes"][0]})
+    assert client.post("/api/auth/mfa/enroll", json={"current_password": "Demo-Safe-Password-2026!"}).status_code == 409
+    disabled = client.delete("/api/auth/mfa", json={"current_password": "Demo-Safe-Password-2026!", "code": enabled.json["backup_codes"][0]})
     assert disabled.status_code == 204
     assert client.get("/api/auth/mfa/status").json["enabled"] is False
 
 
 def test_operational_mfa_login_requires_factor_and_recovery_code_is_single_use(autopsy_case, app, client, database):
-    enrolled = client.post("/api/auth/mfa/enroll", json={"current_password": "Training-Safe-Password-2026!"}).json
+    enrolled = client.post("/api/auth/mfa/enroll", json={"current_password": "Demo-Safe-Password-2026!"}).json
     enabled = client.post("/api/auth/mfa/verify", json={"code": totp_code(enrolled["secret"])}).json
     browser = app.test_client()
-    credentials = {"email": "analyst@socify.local", "password": "Training-Safe-Password-2026!"}
+    credentials = {"email": "analyst@socify.local", "password": "Demo-Safe-Password-2026!"}
     required = browser.post("/api/auth/login", json=credentials)
     assert required.status_code == 428 and required.json["error"]["code"] == "MFA_REQUIRED"
     assert browser.post("/api/auth/login", json={**credentials, "mfa_code": "invalid"}).status_code == 401

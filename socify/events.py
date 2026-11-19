@@ -121,7 +121,7 @@ def normalize_event(data: dict[str, Any]) -> dict[str, Any]:
         "external_id": external_id,
         "idempotency_key": idempotency_key,
         "source": source,
-        "source_type": _string(data.get("source_type"), 80) or "training",
+        "source_type": _string(data.get("source_type"), 80) or "synthetic",
         "severity": severity,
         "category": category,
         "event_type": event_type,
@@ -153,7 +153,6 @@ def ingest_event(
     data: dict[str, Any],
     actor: int | None,
     workspace: int,
-    training_run_id: int | None = None,
     case_id: int | None = None,
     import_job_id: int | None = None,
     is_active: bool = True,
@@ -199,8 +198,8 @@ def ingest_event(
     idempotency_key = normalized["idempotency_key"]
     if idempotency_key:
         existing = connection.execute(
-            "SELECT id FROM security_events WHERE workspace_id = ? AND COALESCE(training_run_id, 0) = COALESCE(?, 0) AND idempotency_key = ?",
-            (workspace, training_run_id, idempotency_key),
+            "SELECT id FROM security_events WHERE workspace_id = ? AND idempotency_key = ?",
+            (workspace, idempotency_key),
         ).fetchone()
         if existing:
             retain_occurrence(connection, int(existing["id"]), job, provenance, repeated=True, row_key=row_key)
@@ -217,7 +216,7 @@ def ingest_event(
         normalized["normalized_fields"] = json.dumps(fields, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     event_public_id = public_id("EVT") if case_id is not None else _string(data.get("event_id"), 80) or public_id("EVT")
     now = iso_now()
-    (event_id,) = _insert_event(actor, connection, event_public_id, idempotency_key, normalized, now, training_run_id, workspace)
+    (event_id,) = _insert_event(actor, connection, event_public_id, idempotency_key, normalized, now, workspace)
     if case_id is not None:
         connection.execute("UPDATE security_events SET owner_case_id = ? WHERE id = ?", (case_id, event_id))
     if import_job_id is not None:
@@ -232,21 +231,20 @@ def ingest_event(
     return event_id, alerts, False
 
 
-def _insert_event(actor, connection, event_public_id, idempotency_key, normalized, now, training_run_id, workspace):
+def _insert_event(actor, connection, event_public_id, idempotency_key, normalized, now, workspace):
     """Insert the normalised event as a new security_events row and return its id."""
     cursor = connection.execute(
         """INSERT INTO security_events
-        (event_id, external_id, idempotency_key, workspace_id, training_run_id, source, source_type, severity, category,
+        (event_id, external_id, idempotency_key, workspace_id, source, source_type, severity, category,
         event_type, title, description, event_time, ingested_at, timestamp, source_ip, destination_ip, username,
         hostname, process_name, parent_process, file_hash, http_status, action, outcome, raw_data, normalized_fields,
         tags, mitre_ids, status, assigned_to, created_by, parser_version, raw_hash, provenance)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', NULL, ?, ?, ?, ?)""",
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', NULL, ?, ?, ?, ?)""",
         (
             event_public_id,
             normalized["external_id"],
             idempotency_key,
             workspace,
-            training_run_id,
             normalized["source"],
             normalized["source_type"],
             normalized["severity"],

@@ -93,7 +93,7 @@ def test_receipt_is_scoped_to_workspace_and_author(client, login_as, database, u
     assert client.post(PATH, json=BODY, headers=KEY).status_code == 409
     second = client.post(PATH, json={**BODY, "version": "2"}, headers=KEY)
     assert second.status_code == 201 and second.json["id"] != first.json["id"]
-    database.execute("INSERT INTO training_workspaces(id,name,public_id,created_at) VALUES (99,'Other team','intel-other','2026-11-03T00:00:00Z')")
+    database.execute("INSERT INTO workspaces(id,name,public_id,created_at) VALUES (99,'Other team','intel-other','2026-11-03T00:00:00Z')")
     database.execute("UPDATE users SET workspace_id=99 WHERE id=?", (user_ids["admin"],))
     with client.session_transaction() as session:
         session["workspace_id"] = 99

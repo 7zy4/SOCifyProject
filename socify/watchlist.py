@@ -30,7 +30,7 @@ def migrate(connection: sqlite3.Connection) -> None:
     connection.execute(
         """CREATE TABLE IF NOT EXISTS watchlist_entries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id),
+            workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
             indicator_type TEXT NOT NULL CHECK(indicator_type IN ('email', 'ip', 'cidr', 'domain', 'url', 'sha256')),
             value TEXT NOT NULL,
             severity TEXT NOT NULL DEFAULT 'high',
@@ -191,7 +191,7 @@ def _event_matches_watchlist_entry(
 
 def evaluate_watchlist_for_event(connection: sqlite3.Connection, event_id: int) -> list[int]:
     row = connection.execute("SELECT * FROM security_events WHERE id = ?", (event_id,)).fetchone()
-    if not row or row["source"] == "rules_engine" or not row["autopsy_active"] or row["source_type"] == "training":
+    if not row or row["source"] == "rules_engine" or not row["autopsy_active"] or row["source_type"] == "synthetic":
         return []
     ws_id = int(row["workspace_id"])
     entries = connection.execute(
@@ -229,7 +229,8 @@ def evaluate_watchlist_for_event(connection: sqlite3.Connection, event_id: int) 
         matched, match_detail = _event_matches_watchlist_entry(row, entry, parsed_ips, blob_lower)
         if not matched:
             continue
-        dedup_material = f"watchlist|{entry['id']}|event|{event_id}|{row['training_run_id'] or ''}"
+        # The trailing separator is part of the key format; dropping it would re-raise alerts that already exist.
+        dedup_material = f"watchlist|{entry['id']}|event|{event_id}|"
         dedup_key = hashlib.sha256(dedup_material.encode()).hexdigest()
         if connection.execute("SELECT 1 FROM alerts WHERE dedup_key = ?", (dedup_key,)).fetchone():
             continue
@@ -253,13 +254,12 @@ def evaluate_watchlist_for_event(connection: sqlite3.Connection, event_id: int) 
         }
         cursor = connection.execute(
             """INSERT INTO alerts
-               (alert_id, workspace_id, training_run_id, rule_id, rule_version, reason, evidence, severity,
+               (alert_id, workspace_id, rule_id, rule_version, reason, evidence, severity,
                 confidence, detected_at, status, mitre_technique_ids, dedup_key, trace)
-               VALUES (?, ?, ?, ?, 1, ?, ?, ?, 0.95, ?, 'untriaged', '[]', ?, ?)""",
+               VALUES (?, ?, ?, 1, ?, ?, ?, 0.95, ?, 'untriaged', '[]', ?, ?)""",
             (
                 alert_pub_id,
                 ws_id,
-                row["training_run_id"],
                 rule_id,
                 reason[:500],
                 json.dumps({"event_ids": [event_id], "watchlist_id": entry["id"]}, separators=(",", ":")),

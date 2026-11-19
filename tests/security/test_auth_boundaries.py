@@ -22,7 +22,7 @@ def test_browser_forms_redirect_and_register_without_privilege_escalation(client
     assert client.get("/register").status_code == 200
     invalid = client.post("/register", data={})
     assert invalid.status_code == 403 and 'id="register-form"' in invalid.text
-    payload = {"email": "form-user@example.test", "name": "Form Trainee", "password": DEMO_LOGIN_VALUE, "invitation_token": invite("form-user@example.test")}
+    payload = {"email": "form-user@example.test", "name": "Form User", "password": DEMO_LOGIN_VALUE, "invitation_token": invite("form-user@example.test")}
     # The invitation fixes the role; a form that names one is refused instead of being silently corrected.
     assert client.post("/register", data={**payload, "role": "admin"}).status_code == 422
     assert database.execute("SELECT COUNT(*) FROM users WHERE email = ?", (payload["email"],)).fetchone()[0] == 0
@@ -34,8 +34,8 @@ def test_browser_forms_redirect_and_register_without_privilege_escalation(client
     assert client.post("/login", data={}).headers["Location"].endswith("/login")
     signed_in = client.post("/login", data=payload)
     assert signed_in.status_code == 302
-    assert signed_in.headers["Location"].endswith("/dashboard")
-    assert client.get("/login").headers["Location"].endswith("/dashboard")
+    assert signed_in.headers["Location"].endswith("/cases")
+    assert client.get("/login").headers["Location"].endswith("/cases")
     assert client.post("/logout").status_code == 302
     assert client.get("/api/auth/me").status_code == 401
     assert client.post("/login", json=payload).status_code == 200
@@ -46,7 +46,7 @@ def test_registration_disable_and_password_policy(app, client):
     assert not re_email("invalid")
     assert not re_email("a" * 255 + "@example.test")
     assert not re_email("a @example.test")
-    account = {"email": "policy@example.test", "name": "Trainee", "password": "short"}
+    account = {"email": "policy@example.test", "name": "Policy User", "password": "short"}
     assert client.post("/api/auth/register", json={**account, "invitation_token": "x" * 40}).status_code == 422
     # Without an invitation nothing else about the request is examined.
     assert client.post("/api/auth/register", json=account).status_code == 403

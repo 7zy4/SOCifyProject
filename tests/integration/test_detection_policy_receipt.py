@@ -175,7 +175,7 @@ def test_fingerprint_changes_when_rule_identity_or_decision_facts_change(field, 
 
 def test_inactive_archived_and_foreign_rules_do_not_change_selected_policy(autopsy_case, app, database, user_ids):
     before = fingerprint(app)
-    foreign = database.execute("INSERT INTO training_workspaces(public_id,name,created_at) VALUES ('receipt-other','Other','2026-11-04T00:00:00Z')").lastrowid
+    foreign = database.execute("INSERT INTO workspaces(public_id,name,created_at) VALUES ('receipt-other','Other','2026-11-04T00:00:00Z')").lastrowid
     identifiers = []
     for name, owner, active, archived in (
         ("Inactive private", 1, 0, None),

@@ -18,7 +18,7 @@ from socify.schema import ensure_schema
 from socify.seeding import seed_demo_data
 from socify.timeutils import utc_now
 
-DEMO_LOGIN_VALUE = "Training-Safe-Password-2026!"
+DEMO_LOGIN_VALUE = "Demo-Safe-Password-2026!"
 
 # The isolation, POSIX permission and native rendering contracts are verified on Linux, where the product runs.
 linux_only = pytest.mark.skipif(sys.platform != "linux", reason="requires Linux isolation, POSIX file permissions or native rendering libraries")
@@ -171,7 +171,7 @@ def store_event(app: Flask, user_ids: dict[str, int]) -> Callable[..., int]:
 def event_payload() -> dict[str, object]:
     return {
         "source": "acceptance-fixture",
-        "source_type": "training",
+        "source_type": "synthetic",
         "severity": "medium",
         "category": "authentication",
         "event_type": "failed_login",
@@ -179,7 +179,7 @@ def event_payload() -> dict[str, object]:
         "description": "Isolated acceptance event",
         "source_ip": "198.51.100.20",
         "username": "amina",
-        "hostname": "idp-training-01",
+        "hostname": "idp-lab-01",
         "action": "login",
         "outcome": "failed",
         "raw_payload": {"synthetic": True, "outcome": "failed", "action": "login"},

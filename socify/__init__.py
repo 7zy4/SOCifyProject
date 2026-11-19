@@ -41,33 +41,6 @@ from .ui import ui
 
 csrf = CSRFProtect()
 
-# First path segment of the training platform's API, removed with the platform. Requests that match no route under these
-# segments answer 410 instead of 404, so an old client or bookmark learns the feature is gone rather than misaddressed.
-RETIRED_API_PREFIXES = frozenset(
-    {
-        "training",
-        "scores",
-        "scenarios",
-        "assessments",
-        "leaderboards",
-        "lab",
-        "playbooks",
-        "playbook-runs",
-        "hunt",
-        "iocs",
-        "attack",
-        "visualizations",
-        "stream",
-        "events",
-        "rules",
-        "alerts",
-        "imports",
-        "dashboard",
-        "stats",
-        "settings",
-    }
-)
-
 
 def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     root = Path(__file__).parent.parent
@@ -136,8 +109,6 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         request.environ["socify.correlation_id"] = correlation_id()
         if any(type(value) is int and not 1 <= value <= 9223372036854775807 for value in (request.view_args or {}).values()):
             return error_response("INVALID_IDENTIFIER", "معرف المورد خارج النطاق المسموح", 404)
-        if request.url_rule is None and request.path.startswith("/api/") and request.path.split("/", 3)[2] in RETIRED_API_PREFIXES:
-            return error_response("CASE_CONTEXT_REQUIRED", "استخدم الأداة من داخل قضية مصرح بها؛ مسارات التدريب العامة أزيلت", 410)
         from .autopsy_pipeline import guard_batch_scope
         from .autopsy_workspace import guard_workspace
 

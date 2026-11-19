@@ -8,7 +8,6 @@ from .timeutils import utc_now
 
 LOGIN_ATTEMPT_DAYS = 7
 ENDED_SESSION_DAYS = 30
-OUTBOX_DAYS = 7
 PRUNE_INTERVAL = timedelta(hours=1)
 MARKER = "maintenance_pruned_at"
 
@@ -28,7 +27,6 @@ def prune(connection: sqlite3.Connection, now: datetime | None = None) -> dict[s
         "auth_sessions": connection.execute(
             "DELETE FROM auth_sessions WHERE expires_at < ? OR (revoked_at IS NOT NULL AND revoked_at < ?)", (ended, ended)
         ).rowcount,
-        "outbox_events": connection.execute("DELETE FROM outbox_events WHERE created_at < ?", (_stamp(moment - timedelta(days=OUTBOX_DAYS)),)).rowcount,
     }
     connection.execute(
         "INSERT INTO schema_meta (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",

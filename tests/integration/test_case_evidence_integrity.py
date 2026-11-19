@@ -15,7 +15,7 @@ def prepared_case(client, login_as):
     url = f"/api/incidents/{case_id}"
     evidence = client.post(
         url + "/evidence",
-        json={"type": "raw_log", "reference_id": "closure-log", "title": "Synthetic log", "content": "Training evidence"},
+        json={"type": "raw_log", "reference_id": "closure-log", "title": "Synthetic log", "content": "Sample evidence"},
     )
     assert evidence.status_code == 201
     return case_id, evidence.json["id"]
@@ -27,7 +27,7 @@ def test_evidence_access_is_audited_and_content_cannot_be_replaced(client, login
     response = client.get(url)
     assert response.status_code == 200
     assert response.json["accessed_at"]
-    assert response.json["sha256"] == hashlib.sha256(b"Training evidence").hexdigest()
+    assert response.json["sha256"] == hashlib.sha256(b"Sample evidence").hexdigest()
     audit = database.execute(
         "SELECT * FROM security_audit_logs WHERE action = 'read' AND resource_type = 'case_evidence' AND resource_id = ?", (str(evidence_id),)
     ).fetchone()
@@ -42,7 +42,7 @@ def test_evidence_content_is_encrypted_preserved_and_downloadable(client, login_
     case_id, evidence_id = prepared_case(client, login_as)
     url = f"/api/incidents/{case_id}"
     stored = database.execute("SELECT ciphertext FROM case_evidence_content WHERE evidence_id = ?", (evidence_id,)).fetchone()[0]
-    assert "Training evidence" not in stored
+    assert "Sample evidence" not in stored
     assert stored
     assert "ciphertext" not in client.get(url).text
     detail = client.get(f"{url}/evidence/{evidence_id}")
@@ -50,7 +50,7 @@ def test_evidence_content_is_encrypted_preserved_and_downloadable(client, login_
     assert "ciphertext" not in detail.text
     response = client.get(f"{url}/evidence/{evidence_id}/content")
     assert response.status_code == 200
-    assert response.data == b"Training evidence"
+    assert response.data == b"Sample evidence"
     assert response.headers["X-Evidence-SHA256"] == hashlib.sha256(response.data).hexdigest()
     assert response.mimetype == "application/octet-stream"
     assert response.headers["Content-Disposition"].startswith("attachment;")
@@ -101,4 +101,4 @@ def test_retained_evidence_survives_application_restart(app, client, login_as, u
             session["user_role"] = "soc_manager"
         response = restored_client.get(f"/api/incidents/{case_id}/evidence/{evidence_id}/content")
         assert response.status_code == 200
-        assert response.data == b"Training evidence"
+        assert response.data == b"Sample evidence"

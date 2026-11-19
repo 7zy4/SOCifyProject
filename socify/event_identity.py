@@ -74,7 +74,8 @@ def identity_key(event, job):
     policy = {"mapping": options.get("mapping", {}), "source_timezone": options.get("source_timezone", "UTC")}
     if "source_year" in options:
         policy["source_year"] = options["source_year"]
-    value = [1, job["workspace_id"], job["case_id"], job["training_run_id"], namespace, explicit, facts, policy]
+    # The empty fourth slot is part of the identity format; removing it would change every stored identity.
+    value = [1, job["workspace_id"], job["case_id"], None, namespace, explicit, facts, policy]
     return hashlib.sha256(canonical(value).encode()).hexdigest()
 
 

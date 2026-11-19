@@ -18,17 +18,17 @@ def test_html_login_failure_returns_protected_form_and_no_store(app, client):
     page = client.get("/login")
     assert page.headers["Cache-Control"] == "no-store"
     original = token(page)
-    missing = client.post("/login", data={"email": "analyst@socify.local", "password": "Training-Safe-Password-2026!"})
+    missing = client.post("/login", data={"email": "analyst@socify.local", "password": "Demo-Safe-Password-2026!"})
     assert missing.status_code == 400
     assert missing.mimetype == "text/html"
     assert "الرمز يُنشأ تلقائيًا" in missing.text
-    assert "Training-Safe-Password-2026!" not in missing.text
+    assert "Demo-Safe-Password-2026!" not in missing.text
     assert token(missing)
-    invalid = client.post("/login", data={"csrf_token": "invalid", "email": "analyst@socify.local", "password": "Training-Safe-Password-2026!"})
+    invalid = client.post("/login", data={"csrf_token": "invalid", "email": "analyst@socify.local", "password": "Demo-Safe-Password-2026!"})
     assert invalid.status_code == 400
-    accepted = client.post("/login", data={"csrf_token": original, "email": "analyst@socify.local", "password": "Training-Safe-Password-2026!"})
+    accepted = client.post("/login", data={"csrf_token": original, "email": "analyst@socify.local", "password": "Demo-Safe-Password-2026!"})
     assert accepted.status_code == 302
-    assert accepted.headers["Location"] == "/dashboard"
+    assert accepted.headers["Location"] == "/cases"
     assert client.get("/api/auth/me").status_code == 200
     api_missing = client.post("/api/incidents", json={"title": "Token remains required"})
     assert api_missing.status_code == 400
@@ -37,7 +37,7 @@ def test_html_login_failure_returns_protected_form_and_no_store(app, client):
 
 def test_registration_form_csrf_failure_stays_protected(app, client):
     app.config["WTF_CSRF_ENABLED"] = True
-    failed = client.post("/register", data={"name": "CSRF fixture", "email": "fixture@example.test", "password": "Training-Safe-Password-2026!"})
+    failed = client.post("/register", data={"name": "CSRF fixture", "email": "fixture@example.test", "password": "Demo-Safe-Password-2026!"})
     assert failed.status_code == 400
     assert failed.mimetype == "text/html"
     assert token(failed)
@@ -61,7 +61,7 @@ def test_persistent_codespace_keys_validate_csrf_across_app_instances(app, clien
     second = create_app({"DATABASE": app.config["DATABASE"], "TESTING": True})
     b = second.test_client()
     b.set_cookie("session", cookie.value)
-    response = b.post("/login", data={"csrf_token": csrf, "email": "analyst@socify.local", "password": "Training-Safe-Password-2026!"})
+    response = b.post("/login", data={"csrf_token": csrf, "email": "analyst@socify.local", "password": "Demo-Safe-Password-2026!"})
     assert response.status_code == 302
     assert b.get("/api/auth/me").status_code == 200
 
@@ -107,10 +107,10 @@ def test_csrf_https_same_origin_login_succeeds(app, client, caplog):
     response = client.post(
         "/login",
         base_url="https://localhost",
-        data={"csrf_token": csrf, "email": "analyst@socify.local", "password": "Training-Safe-Password-2026!"},
+        data={"csrf_token": csrf, "email": "analyst@socify.local", "password": "Demo-Safe-Password-2026!"},
         headers={"Referer": "https://localhost/login"},
     )
     assert response.status_code == 302
-    assert response.headers["Location"] == "/dashboard"
+    assert response.headers["Location"] == "/cases"
     assert client.get("/api/auth/me", base_url="https://localhost").status_code == 200
     assert "csrf_rejected" not in caplog.text

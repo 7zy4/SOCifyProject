@@ -22,7 +22,7 @@ def main():
             {"DATABASE": str(path), "TESTING": True, "WTF_CSRF_ENABLED": False, "SECRET_KEY": "test-session-key", "CREDENTIAL_KEY": "test-credential-key"}
         )
         connection = connect_path(str(path), True)
-        seed_demo_data(connection, "Training-Safe-Password-2026!")
+        seed_demo_data(connection, "Demo-Safe-Password-2026!")
         identifier = connection.execute("SELECT id FROM users WHERE role='analyst'").fetchone()[0]
         client = app.test_client()
         with client.session_transaction() as state:

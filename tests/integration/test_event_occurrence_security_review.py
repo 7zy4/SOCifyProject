@@ -211,7 +211,7 @@ def test_same_source_facts_are_independent_between_workspaces(autopsy_case, clie
         json={"name": "Original workspace source", "type": "http", "endpoint": "https://tenant-one.example/events"},
     ).json
     other_workspace = database.execute(
-        "INSERT INTO training_workspaces(public_id,name,created_at) VALUES ('occurrence-security-tenant','Independent workspace','2026-11-02T00:00:00Z')"
+        "INSERT INTO workspaces(public_id,name,created_at) VALUES ('occurrence-security-tenant','Independent workspace','2026-11-02T00:00:00Z')"
     ).lastrowid
     other_user = database.execute(
         "INSERT INTO users(email,password_hash,name,role,workspace_id,created_at) SELECT 'independent-review@example.test',password_hash,'Independent reviewer','analyst',?,'2026-11-02T00:00:00Z' FROM users WHERE id=?",

@@ -43,7 +43,7 @@ def test_200_percent_zoom_keyboard_modal_and_searchable_choices(app, tmp_path, z
             root = f"http://127.0.0.1:{server.server_port}"
             page.goto(root + "/login")
             page.locator("input[name=email]").fill("manager@socify.local")
-            page.locator("input[name=password]").fill("Training-Safe-Password-2026!")
+            page.locator("input[name=password]").fill("Demo-Safe-Password-2026!")
             page.locator("button[type=submit]").focus()
             page.keyboard.press("Enter")
             page.wait_for_url("**/cases")

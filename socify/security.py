@@ -260,27 +260,6 @@ def actor_id() -> int:
     return int(user["id"])
 
 
-def can_access_training_run(training_run_id: object) -> bool:
-    """True for records without a training run; a record that names one is never visible, since training runs no longer exist."""
-    if training_run_id is None:
-        return True
-    if type(training_run_id) is not int or training_run_id <= 0:
-        return False
-    user = current_user()
-    if user is None:
-        return False
-    return (
-        get_db()
-        .execute("SELECT 1 FROM training_runs WHERE id = ? AND workspace_id = ? AND user_id = ?", (training_run_id, workspace_id(), actor_id()))
-        .fetchone()
-        is not None
-    )
-
-
-def training_scope_sql(column: str) -> tuple[str, list[object]]:
-    return f" AND ({column} IS NULL OR {column} IN (SELECT id FROM training_runs WHERE workspace_id = ? AND user_id = ?))", [workspace_id(), actor_id()]
-
-
 def fernet_for(configured: str | bytes) -> Fernet:
     raw = configured if isinstance(configured, bytes) else str(configured).encode()
     return Fernet(base64.urlsafe_b64encode(hashlib.sha256(raw).digest()))

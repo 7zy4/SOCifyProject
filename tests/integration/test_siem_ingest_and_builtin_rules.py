@@ -20,7 +20,7 @@ def test_builtin_brand_refresh_preserves_rule_identity_and_history(database):
 def test_builtin_rules_auto_seeded_into_every_workspace(app, client, database, login_as):
     app.config.update(REQUIRE_CASE_APPROVAL=False, REQUIRE_INVESTIGATION_SELECTION=False)
     new_ws = database.execute(
-        "INSERT INTO training_workspaces(public_id, name, created_at) VALUES ('fresh-soc-ws', 'Fresh SOC Workspace', '2026-11-01T00:00:00Z')"
+        "INSERT INTO workspaces(public_id, name, created_at) VALUES ('fresh-soc-ws', 'Fresh SOC Workspace', '2026-11-01T00:00:00Z')"
     ).lastrowid
     ensure_schema(database)
 

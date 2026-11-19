@@ -2,8 +2,6 @@
 
 import json
 
-from socify.security import can_access_training_run
-
 
 def _failed_logins(client, case_id, count=5):
     rows = [
@@ -51,20 +49,7 @@ def test_graph_filters_narrow_events_and_reject_unknown_values(autopsy_case, cli
     assert client.get(base + "?start=2026-10-19T10:02:00Z").json["event_count"] == 3
     assert client.get(base + "?start=2026-10-19T10:01:00Z&end=2026-10-19T10:02:00Z").json["event_count"] == 2
     assert client.get(base + "?severity=urgent").status_code == 422
-    assert client.get(base + "?training_run_id=1").status_code == 422
-
-
-def test_training_run_scope_admits_only_unscoped_records(app, client, login_as):
-    # Records carry no training run any more; the guard stays so a row that names one is refused, never widened.
-    login_as("analyst")
-    with app.test_request_context():
-        assert can_access_training_run(None) is True
-    assert client.get("/api/auth/me").status_code == 200
-    with client:
-        client.get("/api/auth/me")
-        assert can_access_training_run(1) is False
-        assert can_access_training_run("1") is False
-        assert can_access_training_run(0) is False
+    assert client.get(base + "?unknown=1").status_code == 422
 
 
 def test_case_opened_from_an_alert_carries_the_alert_and_its_technique(autopsy_case, client, database):

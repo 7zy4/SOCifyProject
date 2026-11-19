@@ -5,16 +5,9 @@ from typing import Any
 from flask import request
 
 from .db import get_db
-from .security import actor_id, can_access_training_run, workspace_id
+from .security import workspace_id
 from .timeutils import iso_timestamp
 from .validation import ValidationError
-
-
-def _scope() -> tuple[str, list[object]]:
-    return " AND (e.training_run_id IS NULL OR e.training_run_id IN (SELECT id FROM training_runs WHERE workspace_id = ? AND user_id = ?))", [
-        workspace_id(),
-        actor_id(),
-    ]
 
 
 def _filters(case_id: int) -> tuple[str, list[object]]:
@@ -73,14 +66,7 @@ def _edge(
 
 def build_graph(limit: int, case_id: int) -> dict[str, Any]:
     where, parameters = _filters(case_id)
-    scope, scope_parameters = _scope()
-    rows = (
-        get_db()
-        .execute(
-            f"SELECT e.* FROM security_events e WHERE {where}{scope} ORDER BY e.event_time DESC, e.id DESC LIMIT ?", (*parameters, *scope_parameters, limit)
-        )
-        .fetchall()
-    )
+    rows = get_db().execute(f"SELECT e.* FROM security_events e WHERE {where} ORDER BY e.event_time DESC, e.id DESC LIMIT ?", (*parameters, limit)).fetchall()
     nodes: OrderedDict[str, dict[str, Any]] = OrderedDict()
     edges: OrderedDict[str, dict[str, Any]] = OrderedDict()
     for event in rows:
@@ -139,8 +125,6 @@ def build_graph(limit: int, case_id: int) -> dict[str, Any]:
         for alert in alerts:
             if not get_db().execute("SELECT 1 FROM case_alerts WHERE case_id = ? AND alert_id = ?", (case_id, alert["id"])).fetchone():
                 continue
-            if not can_access_training_run(alert["training_run_id"]):
-                continue
             alert_node = f"alert:{alert['id']}"
             nodes[alert_node] = _node(alert_node, "Alert", alert["reason"], alert["detected_at"], "rules_engine", alert["id"], alert["confidence"], "derived")
             for event in get_db().execute("SELECT event_id FROM alert_events WHERE alert_id = ?", (alert["id"],)).fetchall():
@@ -166,8 +150,6 @@ def build_graph(limit: int, case_id: int) -> dict[str, Any]:
         )
         for case in cases:
             if case["id"] != case_id:
-                continue
-            if not can_access_training_run(case["training_run_id"]):
                 continue
             case_node = f"incident:{case['id']}"
             nodes[case_node] = _node(case_node, "Incident", f"{case['reference']} {case['title']}", case["created_at"], "case_management", case["id"])

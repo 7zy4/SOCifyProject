@@ -18,7 +18,7 @@ autopsy_intel_api = Blueprint("autopsy_intel", __name__)
 VERDICTS = {"unknown": 0, "benign": 1, "suspicious": 2, "malicious": 3}
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS intelligence_import_receipts (
- workspace_id INTEGER NOT NULL REFERENCES training_workspaces(id), actor_id INTEGER NOT NULL REFERENCES users(id),
+ workspace_id INTEGER NOT NULL REFERENCES workspaces(id), actor_id INTEGER NOT NULL REFERENCES users(id),
  request_key TEXT NOT NULL, request_hash TEXT NOT NULL, response TEXT NOT NULL CHECK(json_valid(response)),
  created_at TEXT NOT NULL, PRIMARY KEY(workspace_id,actor_id,request_key)
 );

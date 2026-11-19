@@ -164,9 +164,7 @@ def test_queue_rechecks_permissions_membership_selection_and_closed_case(assigne
 
 
 def test_other_workspace_cannot_enumerate_or_update_assignments(assigned, client, database, user_ids):
-    tenant = database.execute(
-        "INSERT INTO training_workspaces(public_id,name,created_at) VALUES ('assignment-other','Other team','2026-11-03T00:00:00Z')"
-    ).lastrowid
+    tenant = database.execute("INSERT INTO workspaces(public_id,name,created_at) VALUES ('assignment-other','Other team','2026-11-03T00:00:00Z')").lastrowid
     member = database.execute(
         "INSERT INTO users(email,password_hash,name,role,workspace_id,is_active) SELECT 'assignment-other@team.test',password_hash,'Other manager','soc_manager',?,1 FROM users WHERE id=?",
         (tenant, user_ids["soc_manager"]),

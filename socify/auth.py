@@ -244,7 +244,7 @@ def _login_response(data: dict[str, Any]):
 @auth_api.get("/login")
 def login_page():
     if current_user():
-        return redirect("/dashboard")
+        return redirect("/cases")
     return render_template("login.html", csrf_token=generate_csrf())
 
 
@@ -264,7 +264,7 @@ def login_form():
         if body.get("error", {}).get("code") in {"MFA_REQUIRED", "INVALID_MFA_CODE"}:
             return redirect(url_for("auth.login_page", mfa=1))
         return redirect(url_for("auth.login_page"))
-    return redirect("/dashboard")
+    return redirect("/cases")
 
 
 @auth_api.post("/api/auth/login")
@@ -310,7 +310,7 @@ def _register_account(data: dict[str, Any]):
             invite_row = (
                 get_db()
                 .execute(
-                    "SELECT i.*, w.name AS team_name FROM team_invitations i JOIN training_workspaces w ON w.id = i.workspace_id WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ? AND w.is_active = 1",
+                    "SELECT i.*, w.name AS team_name FROM team_invitations i JOIN workspaces w ON w.id = i.workspace_id WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ? AND w.is_active = 1",
                     (hashlib.sha256(token.encode()).hexdigest(), iso_now()),
                 )
                 .fetchone()

@@ -12,7 +12,7 @@ def test_case_search_and_facets_do_not_disclose_other_workspaces_or_hidden_title
     case = request_case(client, "Private identity investigation")
     reference = client.get(f"/api/cases/{case}").json["reference"]
     record_audit(database, "review", "case", case, details={"decision": "approved"}, actor=user_ids["soc_manager"], workspace=1)
-    other = database.execute("INSERT INTO training_workspaces(public_id,name,created_at) VALUES ('audit-other','Other','2026-11-02T00:00:00Z')").lastrowid
+    other = database.execute("INSERT INTO workspaces(public_id,name,created_at) VALUES ('audit-other','Other','2026-11-02T00:00:00Z')").lastrowid
     record_audit(database, "foreign-only", "foreign-resource", 99, details={"note": "Private identity investigation"}, workspace=other)
     found = client.get("/api/audit", query_string={"q": reference, "action": "review", "resource": "case", "result": "success"}).json
     assert found["total"] == 1

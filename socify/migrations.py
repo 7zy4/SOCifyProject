@@ -6,8 +6,8 @@ Adding a migration:
 - Every step runs inside the start-up write transaction (``BEGIN IMMEDIATE`` in ``socify.schema.ensure_schema``),
   so a failure leaves neither a partial schema nor an advanced ``user_version``, and concurrent processes wait
   for the first one instead of migrating twice.
-- Step 1 is the baseline: the idempotent set-up that ran on every start before steps were numbered. It also
-  reconciles data on each start (expired import leases, built-in rules for every workspace, legacy column fills),
+- Step 1 is the baseline: the idempotent set-up of the whole schema. It also
+  reconciles data on each start (expired import leases, built-in rules for every workspace, column fills),
   so it keeps running on every start; later steps run once. A later step that drops or renames something the
   baseline creates must change the baseline in the same commit, or the next start would create it again.
 """

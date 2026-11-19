@@ -25,7 +25,6 @@ from .operational import case_visible
 from .schema import public_id
 from .security import (
     actor_id,
-    can_access_training_run,
     current_user,
     decrypt_bytes,
     encrypt_bytes,
@@ -738,7 +737,7 @@ def _job_view(row: sqlite3.Row) -> dict[str, Any]:
 
 def _job_access(job_id: int, write: bool = False) -> sqlite3.Row | None:
     row = get_db().execute("SELECT * FROM ingestion_jobs WHERE id = ? AND workspace_id = ?", (job_id, workspace_id())).fetchone()
-    if not row or not can_access_training_run(row["training_run_id"]):
+    if not row:
         return None
     if row["case_id"] is not None and not case_visible(row["case_id"], current_user() or {}):
         return None
@@ -826,7 +825,7 @@ def _store_record(job: sqlite3.Row, registered_source: sqlite3.Row | None, row_n
     try:
         if record.get("__parse_error"):
             raise ValidationError("Record could not be parsed")
-        if registered_source and record.get("source_type") in (None, "import", "training"):
+        if registered_source and record.get("source_type") in (None, "import", "synthetic"):
             record["source_type"] = registered_source["type"]
         if job["case_id"] is not None:
             record["idempotency_key"] = f"pipeline:{hashlib.sha256(job['autopsy_options'].encode()).hexdigest()}:{record.get('idempotency_key', row_number)}"
@@ -835,7 +834,6 @@ def _store_record(job: sqlite3.Row, registered_source: sqlite3.Row | None, row_n
             record,
             int(job["created_by"]),
             int(job["workspace_id"]),
-            job["training_run_id"],
             job["case_id"],
             job["id"] if job["case_id"] is not None else None,
             bool(job["active_version"]),
@@ -1203,7 +1201,7 @@ def create_import():
 
     def matching_import():
         rows = get_db().execute(
-            "SELECT * FROM ingestion_jobs WHERE workspace_id = ? AND content_hash = ? AND training_run_id IS NULL AND case_id IS ? AND autopsy_options = ? AND source_id IS ? AND source_name=? ORDER BY id DESC",
+            "SELECT * FROM ingestion_jobs WHERE workspace_id = ? AND content_hash = ? AND case_id IS ? AND autopsy_options = ? AND source_id IS ? AND source_name=? ORDER BY id DESC",
             (workspace_id(), content_hash, case_id, serialized_options, source_id, source_name),
         )
         return next((row for row in rows if case_id is None or job_visible(row["id"])), None)

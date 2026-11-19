@@ -84,7 +84,7 @@ def test_totp_code_opens_only_one_session(app, client, login_as):
 
 def test_rejected_invitations_are_limited_without_counting_validation_mistakes(app):
     limited = _variant(app, RATE_LIMIT_REGISTER_ATTEMPTS=2).test_client()
-    account = {"name": "Invited analyst", "email": "invited@example.test", "password": "Training-Safe-Password-2026!"}
+    account = {"name": "Invited analyst", "email": "invited@example.test", "password": "Demo-Safe-Password-2026!"}
     weak = {**account, "invitation_token": "x" * 40, "password": "short"}  # pragma: allowlist secret
     for _ in range(4):
         assert limited.post("/api/auth/register", json=weak).status_code == 422
@@ -109,10 +109,8 @@ def test_retention_removes_expired_bookkeeping_and_keeps_current_rows(app, datab
         return (utc_now() - timedelta(days=days)).isoformat().replace("+00:00", "Z")
 
     analyst = user_ids["analyst"]
-    database.execute("DELETE FROM outbox_events")
     for name, days in (("old", 9), ("recent", 1)):
         database.execute("INSERT INTO login_attempts (identifier_hash, ip_address, succeeded, occurred_at) VALUES (?, '192.0.2.1', 0, ?)", (name, stamp(days)))
-        database.execute("INSERT INTO outbox_events (workspace_id, event_type, payload, created_at) VALUES (1, ?, '{}', ?)", (name, stamp(days)))
     sessions = (("expired", stamp(60), stamp(40), None), ("revoked", stamp(60), stamp(-1), stamp(35)), ("active", stamp(1), stamp(-1), None))
     for name, created, expires, revoked in sessions:
         database.execute(
@@ -121,20 +119,19 @@ def test_retention_removes_expired_bookkeeping_and_keeps_current_rows(app, datab
         )
     audit_rows = database.execute("SELECT COUNT(*) FROM security_audit_logs").fetchone()[0]
 
-    assert prune(database) == {"login_attempts": 1, "auth_sessions": 2, "outbox_events": 1}
+    assert prune(database) == {"login_attempts": 1, "auth_sessions": 2}
     assert [row[0] for row in database.execute("SELECT identifier_hash FROM login_attempts")] == ["recent"]
-    assert [row[0] for row in database.execute("SELECT event_type FROM outbox_events")] == ["recent"]
     assert [row[0] for row in database.execute("SELECT session_hash FROM auth_sessions")] == ["active"]
     assert database.execute("SELECT COUNT(*) FROM security_audit_logs").fetchone()[0] == audit_rows
     assert prune_if_due(database) is None
-    assert prune_if_due(database, utc_now() + timedelta(hours=2)) == {"login_attempts": 0, "auth_sessions": 0, "outbox_events": 0}
+    assert prune_if_due(database, utc_now() + timedelta(hours=2)) == {"login_attempts": 0, "auth_sessions": 0}
 
 
 def test_operational_health_reports_queues_to_signed_in_users(autopsy_case, client):
     health = client.get("/api/health")
     assert health.status_code == 200
     assert {"import_jobs", "rule_evaluation_failures"} <= set(health.json)
-    assert client.get("/api/dashboard").status_code == 410
+    assert client.get("/api/dashboard").status_code == 404
 
 
 def test_administrator_can_assign_every_defined_role(client, login_as, user_ids):

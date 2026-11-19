@@ -211,7 +211,7 @@ def test_monitoring_filters_workspace_and_custom_role_permissions(autopsy_case, 
     login_as("soc_manager")
     assert client.get("/api/soc/monitoring").json["total"] == 1
     workspace = database.execute(
-        "INSERT INTO training_workspaces(public_id,name,created_at) VALUES ('soc-isolation-test','Synthetic isolated tenant','2026-10-27T00:00:00Z')"
+        "INSERT INTO workspaces(public_id,name,created_at) VALUES ('soc-isolation-test','Synthetic isolated tenant','2026-10-27T00:00:00Z')"
     ).lastrowid
     database.execute("UPDATE incident_cases SET workspace_id=? WHERE id=?", (workspace, autopsy_case))
     assert client.get("/api/soc/monitoring").json["total"] == 0

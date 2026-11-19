@@ -46,7 +46,7 @@ def test_version_does_not_bypass_member_boundaries(autopsy_case, client, databas
     login_as("soc_manager")
     member = user_ids["auditor"]
     if boundary == "foreign":
-        database.execute("INSERT INTO training_workspaces(id,name,public_id,created_at) VALUES (99,'Separate','separate','2026-11-03T00:00:00Z')")
+        database.execute("INSERT INTO workspaces(id,name,public_id,created_at) VALUES (99,'Separate','separate','2026-11-03T00:00:00Z')")
         database.execute("UPDATE users SET workspace_id=99 WHERE id=?", (member,))
     elif boundary == "inactive":
         database.execute("UPDATE users SET is_active=0 WHERE id=?", (member,))

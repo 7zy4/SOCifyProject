@@ -171,7 +171,7 @@ def authorized_cases():
     from .autopsy_workspace import selection_scope_sql
 
     user = current_user() or {}
-    where = "c.workspace_id=? AND c.archived_at IS NULL AND c.training_run_id IS NULL"
+    where = "c.workspace_id=? AND c.archived_at IS NULL"
     args: list[object] = [workspace_id()]
     for clause, values in (case_scope(user), full_case_scope_sql(user), selection_scope_sql()):
         where += clause

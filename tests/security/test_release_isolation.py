@@ -50,18 +50,12 @@ def test_scope_migration_is_repeatable_and_preserves_events(client, login_as, da
     from socify.schema import ensure_schema
 
     login_as("admin")
-    event = store_event({"source": "migration-fixture", "source_ip": "192.0.2.234", "idempotency_key": "legacy-key"}, "admin")
-    # An indicator written before observations had their own table: the event it was seen in lives only in its context.
-    indicator = database.execute(
-        "INSERT INTO ioc_indicators (workspace_id, type, value, first_seen, last_seen, confidence, source, context, tags) VALUES (1, 'ip', '192.0.2.234', ?, ?, 0.5, 'SOCify extraction', ?, '[]')",
-        ("2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", f'{{"event_id":{event}}}'),
-    ).lastrowid
-    database.execute("DROP INDEX idx_events_scope_idempotency")
-    database.execute("CREATE UNIQUE INDEX idx_events_idempotency ON security_events(workspace_id, idempotency_key) WHERE idempotency_key IS NOT NULL")
+    event = store_event({"source": "migration-fixture", "source_ip": "192.0.2.234", "idempotency_key": "repeat-key"}, "admin")
+    database.execute("DROP INDEX idx_events_workspace_idempotency")
     ensure_schema(database)
     ensure_schema(database)
     assert database.execute("SELECT COUNT(*) FROM security_events WHERE id = ?", (event,)).fetchone()[0] == 1
-    assert database.execute("SELECT COUNT(*) FROM ioc_observations WHERE ioc_id = ?", (indicator,)).fetchone()[0] == 1
+    assert database.execute("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_events_workspace_idempotency'").fetchone()
     assert database.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     assert not database.execute("PRAGMA foreign_key_check").fetchall()
 

@@ -451,7 +451,7 @@ BUILTIN_RULES: tuple[dict[str, Any], ...] = (
 
 def seed_builtin_rules(connection: sqlite3.Connection) -> int:
     """Idempotently ensure all built-in detection rules exist in every workspace."""
-    workspaces = [int(row[0]) for row in connection.execute("SELECT id FROM training_workspaces").fetchall()]
+    workspaces = [int(row[0]) for row in connection.execute("SELECT id FROM workspaces").fetchall()]
     if not workspaces:
         return 0
     known_mitre = {str(row[0]) for row in connection.execute("SELECT technique_id FROM attack_techniques WHERE revoked = 0").fetchall()}
@@ -488,7 +488,7 @@ def seed_builtin_rules(connection: sqlite3.Connection) -> int:
             dsl["condition"] = {
                 "logic": "and",
                 "conditions": [
-                    {"field": "source_type", "operator": "not_equals", "value": "training"},
+                    {"field": "source_type", "operator": "not_equals", "value": "synthetic"},
                     dsl["condition"],
                 ],
             }

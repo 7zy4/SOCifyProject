@@ -44,7 +44,7 @@ def provision(directory: Path):
             "DATABASE": str(directory / "socify.db"),
             "ENV_NAME": "development",
             "DEMO_MODE": True,
-            # This retained scenario includes an intake awaiting manager approval.
+            # The demo includes an intake awaiting manager approval.
             "REQUIRE_CASE_APPROVAL": True,
             "SECRET_KEY": keys["SOCIFY_SECRET_KEY"],
             "CREDENTIAL_KEY": keys["SOCIFY_CREDENTIAL_KEY"],
@@ -82,12 +82,12 @@ def provision(directory: Path):
         {
             "name": "SOCify synthetic invoice campaign",
             "version": "1",
-            "source": "Local fictional QA scenario; no external reputation claims",
+            "source": "Local fictional demo data; no external reputation claims",
             "license": "CC0 synthetic fixture",
             "expires_at": expires,
             "format": "flat",
             "content": [
-                {"type": kind, "value": value, "verdict": "malicious", "confidence": 90, "notes": "Synthetic training classification only"}
+                {"type": kind, "value": value, "verdict": "malicious", "confidence": 90, "notes": "Synthetic demo classification only"}
                 for kind, value in [("ip", "198.51.100.42"), ("domain", "invoice-update.test"), ("sha256", hashlib.sha256(MARKER).hexdigest())]
             ],
         },

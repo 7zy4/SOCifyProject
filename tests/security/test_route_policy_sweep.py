@@ -1,4 +1,4 @@
-"""Every URL rule under the production request policy: CSRF, authentication and the removed training API.
+"""Every URL rule under the production request policy: CSRF, authentication and reachability.
 
 The sweep walks the whole URL map, so a new route is checked without being listed. The exceptions below are
 written out on purpose: changing any of them should be a visible decision in review.
@@ -9,7 +9,6 @@ from urllib.parse import urlsplit
 
 from werkzeug.routing import IntegerConverter
 
-from socify import RETIRED_API_PREFIXES
 from socify.case_policy import ANY_METHOD, CasePolicy
 from tests.conftest import issue_session
 
@@ -88,35 +87,20 @@ def test_anonymous_requests_are_refused_outside_the_public_list(app):
     assert not mismatches, mismatches
 
 
-def test_no_registered_route_is_refused_as_retired(app, user_ids):
-    # The training platform's routes were deleted; a registered route answering 410 would be a view nobody can reach.
+def test_every_registered_route_reaches_its_view(app, user_ids):
+    # Under an administrator session the request policy lets every registered route through to its view.
     for endpoint in list(app.view_functions):
         if endpoint != "static":
             app.view_functions[endpoint] = lambda **_: ("", 299)  # reached the view: not blocked by request policy
     client = app.test_client()
-    blocked, other = set(), []
+    other = []
     for method, rule, path in _requests(app):
         with client.session_transaction() as state:
             state.update(user_id=user_ids["admin"], workspace_id=1, user_role="admin", session_id=issue_session(app, user_ids["admin"]))
         status, code, _ = _outcome(client, method, path)
-        if (status, code) == (410, "CASE_CONTEXT_REQUIRED"):
-            blocked.add((method, rule))
-        elif status != 299:
+        if status != 299:
             other.append((method, rule, status, code))
-    assert not blocked, sorted(blocked)
     assert not other, other
-
-
-def test_removed_legacy_paths_still_answer_gone(app, user_ids):
-    # The training platform's API was deleted, not hidden: old clients get a stable 410 instead of a bare 404.
-    client = app.test_client()
-    for anonymous in (True, False):
-        if not anonymous:
-            with client.session_transaction() as state:
-                state.update(user_id=user_ids["admin"], workspace_id=1, user_role="admin", session_id=issue_session(app, user_ids["admin"]))
-        for prefix in sorted(RETIRED_API_PREFIXES):
-            for method, path in (("GET", f"/api/{prefix}"), ("POST", f"/api/{prefix}/1/anything"), ("GET", f"/api/{prefix}/runs/1")):
-                assert _outcome(client, method, path)[:2] == (410, "CASE_CONTEXT_REQUIRED"), (anonymous, method, path)
 
 
 # Views exempt from part of the case guards (socify.case_policy). Every other view that names a case is strict: the case

@@ -113,7 +113,7 @@ def test_case_mitre_uses_offline_catalog_requires_own_log_and_appears_in_report(
     [
         "timeline?limit=101",
         "timeline?page=0",
-        "timeline?training_run_id=1",
+        "timeline?unknown=1",
         "timeline?severity=invalid",
         "graph?limit=101",
         "graph?limit=bad",

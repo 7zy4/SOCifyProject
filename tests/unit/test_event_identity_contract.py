@@ -22,7 +22,7 @@ def normalized(raw):
 
 
 def context(**changes):
-    return {"workspace_id": 1, "case_id": 2, "training_run_id": None, "source_id": 3, "autopsy_options": "{}", **changes}
+    return {"workspace_id": 1, "case_id": 2, "source_id": 3, "autopsy_options": "{}", **changes}
 
 
 @seed(20261104)
@@ -43,9 +43,7 @@ def test_json_order_and_whitespace_only_preserve_identity_but_unknown_facts_do_n
     assert identity_key(normalized(changed), context()) != baseline
 
 
-@pytest.mark.parametrize(
-    "different", [{"workspace_id": 4}, {"case_id": 4}, {"training_run_id": 4}, {"source_id": 4}, {"autopsy_options": '{"mapping":{"unknown":"hostname"}}'}]
-)
+@pytest.mark.parametrize("different", [{"workspace_id": 4}, {"case_id": 4}, {"source_id": 4}, {"autopsy_options": '{"mapping":{"unknown":"hostname"}}'}])
 def test_context_and_effective_policy_cannot_share_identity(different):
     event = normalized({"external_id": "explicit-1"})
     assert identity_key(event, context()) != identity_key(event, context(**different))

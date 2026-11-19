@@ -12,19 +12,7 @@ def index():
     return redirect("/cases" if current_user() else "/login")
 
 
-@ui.get("/dashboard")
-@ui.get("/events")
-@ui.get("/alerts")
-@ui.get("/rules")
-@ui.get("/sources")
-@ui.get("/imports")
-@ui.get("/incidents")
-@ui.get("/lab")
-@ui.get("/attack")
-@ui.get("/hunt")
-@ui.get("/graph")
 @ui.get("/playbooks")
-@ui.get("/scores")
 @ui.get("/audit")
 @ui.get("/admin")
 @ui.get("/profile")
@@ -60,8 +48,6 @@ def dashboard(case_id: int | None = None):
         return render_template("unavailable.html"), 403
     if case_id is not None and not _case_row(case_id):
         return render_template("unavailable.html"), 404
-    if request.path in {"/lab", "/scores"}:
-        return render_template("unavailable.html"), 410
     if (
         request.path
         not in {

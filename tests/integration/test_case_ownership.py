@@ -62,9 +62,7 @@ def test_unassigned_case_queue_and_claim_ownership_workflow(app, client, databas
     )
     assert restricted_case.status_code == 201
 
-    other_ws = database.execute(
-        "INSERT INTO training_workspaces(public_id,name,created_at) VALUES ('v6-other-tenant','Other WS','2026-11-01T00:00:00Z')"
-    ).lastrowid
+    other_ws = database.execute("INSERT INTO workspaces(public_id,name,created_at) VALUES ('v6-other-tenant','Other WS','2026-11-01T00:00:00Z')").lastrowid
     other_case = client.post("/api/cases", json={"title": "Other tenant unassigned", "assignee": None}).json["id"]
     database.execute("UPDATE incident_cases SET workspace_id = ? WHERE id = ?", (other_ws, other_case))
 
