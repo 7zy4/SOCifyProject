@@ -41,7 +41,7 @@
     </section>
 
     {% if report["executive_note"] %}<div class="note-box"><strong data-ui-copy>خلاصة المحقق</strong>: {{ report["executive_note"] | dash }}</div>{% endif %}
-    {% if report["manager_decision"] %}<div class="note-box manager-box"><strong data-ui-copy>قرار المدير</strong>: <span data-ui-copy>{{ manager_label }}</span> · {{ report["manager_comment"] | dash }} · <span class="mono" dir="ltr">{{ report["acknowledged_at"] | dash }}</span></div>{% endif %}
+    {% if report["manager_decision"] %}<div class="note-box manager-box"><strong data-ui-copy>قرار المدير</strong>: <span data-ui-copy>{{ manager_label }}</span> · {{ report["manager_comment"] | dash }} · <span class="mono" dir="ltr">{{ report["acknowledged_at"] | utc_time }} UTC</span></div>{% endif %}
 
     <h2 class="section-title" data-ui-copy>قرارات التحقيق</h2>
     <table class="qa-table">
@@ -51,17 +51,17 @@
 
     <h2 class="section-title" data-ui-copy>التنبيهات</h2>
     <table class="evidence-table">
-      <thead data-ui-copy><tr><th>المعرف</th><th>الخطورة</th><th>القاعدة / سبب التنبيه</th><th>وقت الرصد</th></tr></thead>
-      <tbody>{% for a in summary["alerts"] %}<tr><td><code dir="ltr">{{ a["alert_id"] | dash }}</code></td><td><span class="badge {{ tone(a["severity"]) }}" data-ui-copy>{{ label(a["severity"]) | dash }}</span></td><td>{{ a["reason"] | dash }}</td><td><span class="mono" dir="ltr">{{ a["detected_at"] | dash }}</span></td></tr>{% else %}<tr><td colspan="4" data-ui-copy>لا توجد تنبيهات مسجلة في القضية حتى لحظة التقرير.</td></tr>{% endfor %}</tbody>
+      <thead data-ui-copy><tr><th>المعرف</th><th>الخطورة</th><th>القاعدة / سبب التنبيه</th><th>وقت الرصد (UTC)</th></tr></thead>
+      <tbody>{% for a in summary["alerts"] %}<tr><td><code dir="ltr">{{ a["alert_id"] | dash }}</code></td><td><span class="badge {{ tone(a["severity"]) }}" data-ui-copy>{{ label(a["severity"]) | dash }}</span></td><td>{{ a["reason"] | dash }}</td><td><span class="mono" dir="ltr">{{ a["detected_at"] | utc_time }}</span></td></tr>{% else %}<tr><td colspan="4" data-ui-copy>لا توجد تنبيهات مسجلة في القضية حتى لحظة التقرير.</td></tr>{% endfor %}</tbody>
     </table>
 
     {#- A small, explicit projection of each review and shared note; never a dump of review or log JSON. -#}
     <h2 class="section-title">{{ bilingual("التقييم والملاحظات (Assessment and Notes)") }}</h2>
     {%- if summary["alerts"] | length < summary["alerts_count"] %}<p>{{ bilingual("المعروض %d من %d (Showing %d of %d)" | format(summary["alerts"] | length, summary["alerts_count"], summary["alerts"] | length, summary["alerts_count"])) }}</p>{% endif %}
-    {%- for alert in summary["alerts"] %}<section class="note-box report-narrative"><h3><code dir="ltr">{{ alert["alert_id"] | dash }}</code></h3><p>{{ bilingual("حكم التنبيه (Alert verdict)") }}: <span data-ui-copy>{{ label(alert["review"]["verdict"]) | dash }}</span> · {{ bilingual("نتيجة الهجوم (Attack outcome)") }}: <span data-ui-copy>{{ label(alert["review"]["attack_outcome"]) | dash }}</span></p><p dir="auto">{{ alert["review"]["reason"] | dash }}</p></section>{% endfor -%}
+    {%- for alert in summary["alerts"] %}<section class="note-box report-narrative"><h3><code dir="ltr">{{ alert["alert_id"] | dash }}</code></h3><p>{{ bilingual("حكم التنبيه (Alert verdict)") }}: <span data-ui-copy>{{ label(alert["review"]["verdict"]) | dash }}</span> · {{ bilingual("نتيجة الهجوم (Attack outcome)") }}: <span data-ui-copy>{{ label(alert["review"]["attack_outcome"]) | dash }}</span></p>{% if alert["review"]["reason"] %}<p dir="auto">{{ alert["review"]["reason"] }}</p>{% endif %}</section>{% endfor -%}
     <h3>{{ bilingual("ملاحظات الأدلة المشتركة (Shared Evidence Notes)") }}</h3>
     {%- if summary["evidence_notes"] | length < summary["evidence_notes_count"] %}<p>{{ bilingual("المعروض %d من %d (Showing %d of %d)" | format(summary["evidence_notes"] | length, summary["evidence_notes_count"], summary["evidence_notes"] | length, summary["evidence_notes_count"])) }}</p>{% endif %}
-    {%- for note in summary["evidence_notes"] %}<section class="note-box report-narrative"><h3 dir="auto">{{ note["title"] | dash }}</h3><p>{{ bilingual("مرجع السجل (Log reference)") }}: {{ note["event_id"] | dash }} · <bdi dir="auto">{{ note["event_title"] | dash }}</bdi><br>{{ bilingual("وقت الحدث (Event time)") }} (UTC): <bdi class="mono" dir="ltr">{{ note["event_time"] | dash }}</bdi><br>{{ bilingual("وقت التوثيق (Documentation time)") }} (UTC): <bdi class="mono" dir="ltr">{{ note["documented_at"] | dash }}</bdi></p><p dir="auto">{{ note["notes"] | dash }}</p><p><strong>{{ bilingual("وصف الدليل (Evidence description)") }}:</strong> <bdi dir="auto">{{ note["source_description"] | dash }}</bdi></p></section>{% endfor %}
+    {%- for note in summary["evidence_notes"] %}<section class="note-box report-narrative"><h3 dir="auto">{{ note["title"] | dash }}</h3><p>{{ bilingual("مرجع السجل (Log reference)") }}: {{ note["event_id"] | dash }} · <bdi dir="auto">{{ note["event_title"] | dash }}</bdi><br>{{ bilingual("وقت الحدث (Event time)") }} (UTC): <bdi class="mono" dir="ltr">{{ note["event_time"] | utc_time }}</bdi><br>{{ bilingual("وقت التوثيق (Documentation time)") }} (UTC): <bdi class="mono" dir="ltr">{{ note["documented_at"] | utc_time }}</bdi></p><p dir="auto">{{ note["notes"] | dash }}</p><p><strong>{{ bilingual("وصف الدليل (Evidence description)") }}:</strong> <bdi dir="auto">{{ note["source_description"] | dash }}</bdi></p></section>{% endfor %}
 
     <h2 class="section-title" data-ui-copy>فحص الملفات والبريد</h2>
     <table class="evidence-table">

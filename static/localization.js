@@ -324,6 +324,7 @@
   "دخول بعيد ببيانات مخزنة": "Cached remote interactive logon",
   "فتح القفل ببيانات مخزنة": "Cached unlock",
   "وقت الرصد": "Detected at",
+  "وقت الرصد (UTC)": "Detected at (UTC)",
   "معتمد": "Approved",
   "تقرير التحقيق": "Investigation report",
   "تنبيهات الشبكة": "Network alerts",

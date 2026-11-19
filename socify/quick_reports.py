@@ -13,7 +13,7 @@ from .case_counts import consistent_read
 from .cases import _case_row
 from .db import get_db, transaction
 from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
-from .timeutils import iso_now
+from .timeutils import iso_now, parse_timestamp
 from .validation import ValidationError, public_error_message
 
 quick_reports_api = Blueprint("quick_reports", __name__)
@@ -627,6 +627,17 @@ def _bilingual(value: object) -> str:
 def _dash(value: object) -> object:
     """Missing values print as an em dash; the template escapes whatever this returns."""
     return "—" if value is None else value
+
+
+@quick_reports_api.app_template_filter("utc_time")
+def _utc_time(value: object) -> object:
+    """A stored timestamp as YYYY-MM-DD HH:MM:SS in UTC, like the report's generation time; an unreadable one prints as stored."""
+    if value is None or value == "":
+        return "—"
+    try:
+        return parse_timestamp(value).strftime("%Y-%m-%d %H:%M:%S")
+    except ValidationError:
+        return value
 
 
 def _badge_tone(raw: object) -> str:
