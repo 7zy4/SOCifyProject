@@ -6,11 +6,15 @@ from contextlib import closing
 
 import bcrypt
 
-from app import app, ensure_phase1_schema
+from app import app
+from socify.db import connect_path
+from socify.schema import ensure_schema
 from tests.conftest import issue_session
 
 
-class PhaseOneTests(unittest.TestCase):
+class LegacyDatabaseUpgradeTests(unittest.TestCase):
+    """A database from the first release, with its original tables and rows, upgrades in place and keeps working."""
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.old_database = app.config["DATABASE"]
@@ -54,7 +58,11 @@ class PhaseOneTests(unittest.TestCase):
                 (name, type, endpoint, api_key, is_active) VALUES
                 ('test', 'syslog', 'localhost', 'private-token', 1)""")
         with app.app_context():
-            ensure_phase1_schema()
+            connection = connect_path(str(app.config["DATABASE"]), True)
+            try:
+                ensure_schema(connection)
+            finally:
+                connection.close()
         self.client = app.test_client()
 
     def tearDown(self):

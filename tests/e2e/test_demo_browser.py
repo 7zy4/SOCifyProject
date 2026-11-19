@@ -34,8 +34,8 @@ def test_real_demo_scope_review_roles_and_visual_matrix(tmp_path):
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    output = Path("work/v4-browser")
-    output.mkdir(parents=True, exist_ok=True)
+    output = tmp_path / "screenshots"
+    output.mkdir()
     primary, related, pending = [manifest[key] for key in ("primary_case", "related_case", "pending_case")]
     try:
         with sync_playwright() as playwright:
