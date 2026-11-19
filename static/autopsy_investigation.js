@@ -73,8 +73,11 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
       const marks = data.bookmarks.filter((item) => item.payload.event_id === event.id);
       const content = node("li", { class: marks.length ? `timeline-mark-${marks[0].payload.color || "blue"}` : "" }, [node("h3", { text: event.title }), node("p", { text: `${event.observed_time_known ? formatTime(event.event_time) : SOCifyLocale.text("وقت الحدث غير معروف؛ لا يُستبدل بوقت الاستيراد")} · ${event.source} · ${autopsyLabel(event.severity)}` }), node("p", { text: SOCifyLocale.template`أساس التوقيت: ${autopsyTimeBasisLabel(event.time_basis)}` }), node("small", { text: SOCifyLocale.template`وقت الاستيراد: ${formatTime(event.ingested_at)}` })]);
       for (const mark of marks) content.append(node("p", { text: `${mark.payload.title} · ${mark.payload.notes || ""} · ${(mark.payload.tags || []).join(", ")}` }));
-      content.append(button(SOCifyLocale.text("تفاصيل السجل"), async () => { try { const detail = await api(`/api/cases/${caseId}/logs/${event.id}`); autopsyModal(SOCifyLocale.text("الدليل الخام والمطبع"), node("pre", { text: JSON.stringify(detail, null, 2) })); } catch (error) { handleError(error); } }));
-      if (autopsy.current.can_update && autopsy.current.status !== "closed") content.append(button(SOCifyLocale.text("تمييز السجل وإضافة ملاحظة"), () => {
+      // The record's actions get a row of their own so they never sit on top of its time text.
+      const actions = node("div", { class: "action-row timeline-actions" });
+      content.append(actions);
+      actions.append(button(SOCifyLocale.text("تفاصيل السجل"), async () => { try { const detail = await api(`/api/cases/${caseId}/logs/${event.id}`); autopsyModal(SOCifyLocale.text("الدليل الخام والمطبع"), node("pre", { text: JSON.stringify(detail, null, 2) })); } catch (error) { handleError(error); } }));
+      if (autopsy.current.can_update && autopsy.current.status !== "closed") actions.append(button(SOCifyLocale.text("تمييز السجل وإضافة ملاحظة"), () => {
         let dialog;
         const form = autopsyForm({ title: { required: true, max: 255 }, color: { choices: ["blue", "orange", "gold"] }, tags: { list: true }, notes: { max: 2000 }, visibility: { required: true, choices: ["team", "private"] } }, async (payload) => { await api(`/api/cases/${caseId}/records/bookmark`, { method: "POST", body: { ...payload, event_id: event.id } }); dialog.close(); await load(page); }, { title: event.title, color: "blue", visibility: "team" });
         dialog = autopsyModal(SOCifyLocale.text("علامة مرتبطة بسجل القضية"), form);
