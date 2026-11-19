@@ -33,11 +33,10 @@ docker compose ps
 docker compose logs --tail 100 analysis autopsy-worker import-worker
 ```
 
-- في التشغيل المحلي تظهر رسائل التطبيق في طرفية `python run.py`.
 - لفحص حساب وقاعدة دون تغييرهما:
 
 ```bash
-python -m scripts.bootstrap_team --email owner@example.com --status
+docker compose exec socify python -m scripts.bootstrap_team --email owner@example.com --status
 ```
 
 - تعليمات استعادة الحساب في [Codespaces](codespaces.md#استعادة-الدخول).
@@ -60,17 +59,12 @@ python -m scripts.bootstrap_team --email owner@example.com --status
 | `REFERRER_MISMATCH` | طابق عنوان الموقع والمنفذ وإعداد الوكيل؛ لا توسع الثقة عشوائيًا |
 | `VALIDATION_FAILED` | احفظ معرّف الطلب وراجع إعداد الخادم |
 
-- لتجميع سجل محلي بعد إيقاف الخادم السابق:
+- لعرض أسباب الرفض من سجل التطبيق:
 
 ```bash
-python run.py 2>&1 | tee /tmp/socify-login-debug.log
-```
-
-- ابحث من طرفية ثانية:
-
-```bash
-rg 'csrf_rejected' /tmp/socify-login-debug.log
+docker compose logs socify | grep csrf_rejected
 ```
 
 - يحتوي سطر التشخيص على السبب ومعرّف الطلب؛ لا تنشر بقية سجل التشغيل قبل مراجعته.
-- [دليل التشغيل](operations.md) · [دليل الأمان](security-guide.md).
+
+[دليل التشغيل](operations.md) · [دليل الأمان](security-guide.md)

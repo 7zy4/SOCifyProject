@@ -2,10 +2,12 @@
 
 <p align="center">
   <a href="https://github.com/7zy4/SOCifyProject/actions/workflows/enterprise-quality.yml"><img alt="Quality gates" src="https://github.com/7zy4/SOCifyProject/actions/workflows/enterprise-quality.yml/badge.svg?branch=final"></a>
-  <a href="CHANGELOG.md"><img alt="Version 1.0.1" src="https://img.shields.io/badge/version-1.0.1-C9A84C"></a>
+  <a href="CHANGELOG.md"><img alt="Version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-C9A84C"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2E3B33"></a>
   <img alt="Interface: Arabic and English" src="https://img.shields.io/badge/interface-Arabic%20%7C%20English-5D491C">
 </p>
+
+<p align="center"><em>Case-centred incident investigation for SOC teams: from raw logs to an approved report. Arabic and English interface, self-hosted with Docker.</em></p>
 
 <div dir="rtl">
 
@@ -157,10 +159,6 @@ SOCifyProject/
 ├── deploy/                 # إعداد مدخل NGINX
 ├── docs/                   # أدلة الاستخدام والتشغيل والأمان ومواصفات API
 ├── fixtures/               # عينات سجلات للتجربة
-├── tests/                  # اختبارات الوحدات والتكامل والأمان والمتصفح
-├── tools/                  # أدوات الجودة التي يشغّلها التحقق الآلي
-├── .github/                # التحقق الآلي وتحديثات الاعتماديات
-├── .devcontainer/          # بيئة Codespaces
 ├── app.py                  # نقطة دخول خدمة التطبيق
 ├── Dockerfile              # صور التطبيق والتحليل والمدخل
 └── docker-compose.yml      # ربط الخدمات ومساحات التخزين
