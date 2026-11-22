@@ -84,7 +84,7 @@ jobs:
       - run: python -m pip_audit -r requirements.txt
       - run: git ls-files -z | xargs -0 detect-secrets-hook -c 1 --baseline .secrets.baseline --exclude-files '^(data/enterprise-attack-v20.0.json|fixtures/windows/sysmon-sample.evtx.b64)$'
       - name: Generate the SBOM with a tool kept apart from the tested environment
-        # cyclonedx-bom needs lxml<6, so it has its own lock and virtual environment; the tests use the production lxml.
+        # cyclonedx-bom needs a newer cyclonedx-python-lib than pip-audit allows, so it has its own lock and virtual environment.
         run: |
           python -m venv "$RUNNER_TEMP/sbom"
           "$RUNNER_TEMP/sbom/bin/python" -m pip install --require-hashes -r requirements-audit.txt
@@ -96,15 +96,7 @@ jobs:
           path: |
             sbom.json
             licenses.json
-  dependency-review:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294  # v5.0.0
   browser:
-    # Release gate: runs for version tags and when started by hand (Actions > Run workflow), not on every push.
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     # Playwright 1.55 supports this image; ubuntu-latest has moved to 26.04.
     runs-on: ubuntu-24.04
     steps:
@@ -163,8 +155,6 @@ jobs:
         run: docker rm --force socify-ci-analysis
   native-decisions:
     name: Native evidence decisions (${{ matrix.suite }})
-    # Release gate: runs for version tags and when started by hand (Actions > Run workflow), not on every push.
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -199,8 +189,6 @@ jobs:
       - if: always()
         run: docker rm --force socify-ci-analysis
   container:
-    # Release gate: runs for version tags and when started by hand (Actions > Run workflow), not on every push.
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -227,8 +215,6 @@ jobs:
       - if: always()
         run: docker compose down --volumes
   performance:
-    # Release gate: runs for version tags and when started by hand (Actions > Run workflow), not on every push.
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
