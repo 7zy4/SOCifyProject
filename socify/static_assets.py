@@ -7,7 +7,7 @@ of an older version, keeps the default of revalidating with the ETag, so a stale
 """
 
 import hashlib
-from pathlib import Path
+import os
 
 from flask import Flask, Response, request
 from flask.sessions import SecureCookieSessionInterface
@@ -25,21 +25,26 @@ class _NoCookieOnStaticFiles(SecureCookieSessionInterface):
 
 def register_static_fingerprints(app: Flask) -> None:
     app.session_interface = _NoCookieOnStaticFiles()
-    root = Path(str(app.static_folder)).resolve()
-    known: dict[Path, tuple[int, int, str]] = {}
+    root = os.path.realpath(str(app.static_folder))
+    # The trailing separator keeps a sibling such as "static-other" from passing as part of "static".
+    inside_root = os.path.join(root, "")
+    known: dict[str, tuple[int, int, str]] = {}
 
     def fingerprint(filename: str) -> str | None:
-        path = (root / filename).resolve()
-        if root not in path.parents:
+        # The name can come from the request path: resolve "..", absolute paths and symbolic links first, then
+        # accept only a file that is still inside the static folder.
+        path = os.path.realpath(os.path.join(root, filename))
+        if not path.startswith(inside_root):
             return None
         try:
-            stat = path.stat()
+            stat = os.stat(path)
+            cached = known.get(path)
+            if cached is None or cached[:2] != (stat.st_mtime_ns, stat.st_size):
+                with open(path, "rb") as file:
+                    cached = (stat.st_mtime_ns, stat.st_size, hashlib.sha256(file.read()).hexdigest()[:16])
+                known[path] = cached
         except OSError:
             return None
-        cached = known.get(path)
-        if cached is None or cached[:2] != (stat.st_mtime_ns, stat.st_size):
-            cached = (stat.st_mtime_ns, stat.st_size, hashlib.sha256(path.read_bytes()).hexdigest()[:16])
-            known[path] = cached
         return cached[2]
 
     @app.url_defaults

@@ -43,6 +43,8 @@ def test_fingerprint_follows_the_content_and_never_leaves_the_static_folder(tmp_
     static = tmp_path / "static"
     static.mkdir()
     (tmp_path / "secret.txt").write_text("outside", encoding="utf-8")
+    (tmp_path / "static-other").mkdir()
+    (tmp_path / "static-other" / "b.js").write_text("sibling", encoding="utf-8")
     asset = static / "a.js"
     asset.write_text("one", encoding="utf-8")
     app = Flask(__name__, static_folder=str(static))
@@ -55,8 +57,12 @@ def test_fingerprint_follows_the_content_and_never_leaves_the_static_folder(tmp_
         os.utime(asset, ns=(asset.stat().st_atime_ns, asset.stat().st_mtime_ns + 10_000_000))
         after = url_for("static", filename="a.js")
         outside = url_for("static", filename="../secret.txt")
+        sibling = url_for("static", filename="../static-other/b.js")
+        absolute = url_for("static", filename=str(tmp_path / "secret.txt"))
     assert before != after and "?v=" in after
     assert "v=" not in outside
+    assert "v=" not in sibling
+    assert "v=" not in absolute
     client = app.test_client()
     assert client.get(before).headers["Cache-Control"] == "no-cache"
     assert client.get(after).headers["Cache-Control"] == IMMUTABLE
