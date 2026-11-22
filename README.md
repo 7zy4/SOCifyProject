@@ -7,6 +7,14 @@
   <img alt="Interface: Arabic and English" src="https://img.shields.io/badge/interface-Arabic%20%7C%20English-2E2E31">
 </p>
 
+<p align="center">
+  <img alt="App: Python and Flask" src="https://img.shields.io/badge/app-Python%20%7C%20Flask-2E2E31">
+  <img alt="Database: SQLite" src="https://img.shields.io/badge/database-SQLite-2E2E31">
+  <img alt="Deploy: Docker, Gunicorn and NGINX" src="https://img.shields.io/badge/deploy-Docker%20%7C%20Gunicorn%20%7C%20NGINX-2E2E31">
+  <img alt="Reports: WeasyPrint and python-docx" src="https://img.shields.io/badge/reports-WeasyPrint%20%7C%20python--docx-2E2E31">
+  <img alt="File scanning: YARA" src="https://img.shields.io/badge/file%20scanning-YARA-2E2E31">
+</p>
+
 <p align="center"><em>Case-centred incident investigation for SOC teams: from raw logs to an approved report. Arabic and English interface, self-hosted with Docker.</em></p>
 
 <div dir="rtl">
@@ -131,19 +139,6 @@ docker compose exec socify python -m scripts.bootstrap_team --email you@example.
 | بيئة تجربة خاصة في GitHub | [Codespaces](docs/codespaces.md) |
 | معالجة مشكلة | [استكشاف الأعطال](docs/troubleshooting.md) |
 | الربط مع أنظمة أخرى | [مواصفات API](docs/api/openapi.yaml) |
-
-## التقنيات
-
-![Python وFlask وSQLite وDocker وGunicorn وNGINX وWeasyPrint وYARA](docs/assets/runtime-stack.svg)
-
-| التقنية | الاستخدام |
-|---|---|
-| [Python](https://www.python.org/) و[Flask](https://flask.palletsprojects.com/) | التطبيق وواجهات التكامل |
-| [SQLite](https://www.sqlite.org/) | البيانات والمعاملات والبحث النصي FTS5 |
-| [Docker](https://www.docker.com/) | عزل الخدمات والتحليل |
-| [Gunicorn](https://gunicorn.org/) و[NGINX](https://nginx.org/) | تشغيل التطبيق ومدخل النشر |
-| [WeasyPrint](https://weasyprint.org/) و[python-docx](https://python-docx.readthedocs.io/) | إخراج التقارير |
-| [YARA](https://virustotal.github.io/yara/) | مطابقة قواعد فحص الملفات محليًا |
 
 ## هيكل المشروع
 
