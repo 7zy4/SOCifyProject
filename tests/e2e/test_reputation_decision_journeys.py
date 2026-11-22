@@ -59,9 +59,11 @@ def reputation_session(app, monkeypatch, language, scenario):
         )
         j.page.on(
             "request",
-            lambda request: result["external_browser_requests"].append(request.url)
-            if urlsplit(request.url).scheme in {"http", "https"} and urlsplit(request.url).netloc != urlsplit(j.base).netloc
-            else None,
+            lambda request: (
+                result["external_browser_requests"].append(request.url)
+                if urlsplit(request.url).scheme in {"http", "https"} and urlsplit(request.url).netloc != urlsplit(j.base).netloc
+                else None
+            ),
         )
         try:
             yield j, result, folder

@@ -33,9 +33,11 @@ def test_completed_navigation_retires_only_the_previous_document():
         held = []
         page.route(
             "https://observer.invalid/**",
-            lambda route: held.append(route)
-            if "/held-" in route.request.url
-            else route.fulfill(body="<main id='workspace' aria-busy='false'>Ready</main>", content_type="text/html"),
+            lambda route: (
+                held.append(route)
+                if "/held-" in route.request.url
+                else route.fulfill(body="<main id='workspace' aria-busy='false'>Ready</main>", content_type="text/html")
+            ),
         )
         journey = ReviewJourney(page, "https://observer.invalid", [], network_session=MissingCancellationSession(page))
         page.goto("https://observer.invalid/first")
