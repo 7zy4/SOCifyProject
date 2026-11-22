@@ -221,6 +221,7 @@ CREATE TABLE IF NOT EXISTS incident_cases (
     reference TEXT NOT NULL UNIQUE,
     workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
     title TEXT NOT NULL,
+    title_en TEXT NOT NULL DEFAULT '',
     description TEXT NOT NULL DEFAULT '',
     case_type TEXT NOT NULL DEFAULT 'investigation',
     severity TEXT NOT NULL DEFAULT 'medium',
@@ -564,6 +565,7 @@ COLUMN_MIGRATIONS: dict[str, dict[str, str]] = {
         "suppressions": "INTEGER NOT NULL DEFAULT 0",
     },
     "incident_cases": {
+        "title_en": "TEXT NOT NULL DEFAULT ''",
         "evidence_summary": "TEXT",
         "validation": "TEXT",
     },

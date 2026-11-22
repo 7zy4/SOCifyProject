@@ -4,6 +4,7 @@ from typing import Any
 
 from flask import request
 
+from .case_titles import localized_case_title
 from .db import get_db
 from .security import workspace_id
 from .timeutils import iso_timestamp
@@ -152,7 +153,14 @@ def build_graph(limit: int, case_id: int) -> dict[str, Any]:
             if case["id"] != case_id:
                 continue
             case_node = f"incident:{case['id']}"
-            nodes[case_node] = _node(case_node, "Incident", f"{case['reference']} {case['title']}", case["created_at"], "case_management", case["id"])
+            nodes[case_node] = _node(
+                case_node,
+                "Incident",
+                f"{case['reference']} {localized_case_title(case['title'], case['title_en'])}",
+                case["created_at"],
+                "case_management",
+                case["id"],
+            )
             for event in get_db().execute("SELECT event_id FROM case_events WHERE case_id = ?", (case["id"],)).fetchall():
                 if f"event:{event['event_id']}" in nodes:
                     identifier = f"edge:case:{case['id']}:event:{event['event_id']}"

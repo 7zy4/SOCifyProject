@@ -1,4 +1,4 @@
-/* Printable case summary. The same system as the interface: a graphite toolbar with the gold action,
+/* Printable case summary. The same system as the interface: a graphite toolbar with the navy action,
    then a white sheet with Kufam headings, IBM Plex Sans Arabic text, hairline tables and solid severity tags. */
 :root { color-scheme: light; font-synthesis: none; }
 * { box-sizing: border-box; }
@@ -8,7 +8,8 @@ h1, h2, h3 { font-family: var(--font-heading), sans-serif; font-weight: 700; let
 strong { font-weight: 600; }
 code, .mono { font: inherit; font-size: 0.93em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 
-.print-toolbar { max-width: 1040px; margin: 0 auto 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 10px 12px 10px 16px; background: var(--terminal-bg); color: var(--terminal-text); border-radius: 8px; }
+/* The toolbar is graphite in both themes, so it uses the brighter navy of the dark theme. */
+.print-toolbar { --primary-fill: #4F6FD1; --primary-hover: #4361C4; --on-primary: #FFFFFF; max-width: 1040px; margin: 0 auto 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 10px 12px 10px 16px; background: var(--terminal-bg); color: var(--terminal-text); border-radius: 8px; }
 .toolbar-brand, .toolbar-actions, .brand-kicker { display: inline-flex; align-items: center; gap: 10px; }
 .toolbar-brand strong { font: 700 17px/1.2 var(--font-heading), sans-serif; }
 .toolbar-actions { flex-wrap: wrap; gap: 8px; }
@@ -41,6 +42,7 @@ code, .mono { font: inherit; font-size: 0.93em; font-variant-numeric: tabular-nu
 .qa-table em { font-style: normal; color: var(--paper-muted); }
 
 .badge { display: inline-flex; align-items: center; padding: 2px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel-2); color: var(--paper-text); font: 600 13px/1.6 var(--font-body), sans-serif; white-space: normal; }
+.badge:is(.critical, .high, .medium, .low) { inline-size: 72px; justify-content: center; }
 .badge.critical { background: var(--sev-critical-fill); color: var(--sev-critical-ink); border-color: var(--sev-critical-edge); font-weight: 700; }
 .badge.high { background: var(--sev-high-fill); color: var(--sev-high-ink); border-color: var(--sev-high-edge); font-weight: 700; }
 .badge.medium { background: var(--sev-medium-fill); color: var(--sev-medium-ink); border-color: var(--sev-medium-edge); font-weight: 700; }

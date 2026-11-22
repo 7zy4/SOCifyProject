@@ -274,7 +274,7 @@ def test_shift_lead_acts_on_the_relevant_population(app, database, monkeypatch, 
             assert counter(subject, "قضايا نشطة") == 1 and counter(subject, "أغلقت خلال الفترة") == 0
             expect(subject.page.locator(".performance-chart-empty")).to_be_visible()
             assert attention(subject, "تجاوزت موعد القضية" if language == "ar" else "Past case deadline") == 1
-            critical = subject.page.locator(".performance-severity-list li").filter(has=subject.page.locator(".severity.critical"))
+            critical = subject.page.locator(".performance-severity-list li").filter(has=subject.page.locator(".badge-severity.critical"))
             assert plain(critical.locator("strong").inner_text()) == "1"
             result["decision"] = "A quiet recent chart does not clear the older overdue critical investigation; resume its retained evidence review."
             focus_case(subject, j.case_id)

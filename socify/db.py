@@ -5,6 +5,7 @@ from pathlib import Path
 
 from flask import current_app, g
 
+from .case_titles import localized_case_title
 from .task_titles import task_title
 from .user_names import localized_name
 
@@ -15,6 +16,7 @@ def connect_path(path: str, testing: bool = False) -> sqlite3.Connection:
     connection.row_factory = sqlite3.Row
     connection.create_function("socify_user_name", 3, localized_name)
     connection.create_function("socify_task_title", 2, task_title)
+    connection.create_function("socify_case_title", 2, localized_case_title)
     connection.execute("PRAGMA foreign_keys = ON")
     connection.execute("PRAGMA busy_timeout = 15000")
     connection.execute("PRAGMA journal_mode = WAL")
@@ -29,6 +31,7 @@ def connect_readonly(path: str) -> sqlite3.Connection:
     connection.row_factory = sqlite3.Row
     connection.create_function("socify_user_name", 3, localized_name)
     connection.create_function("socify_task_title", 2, task_title)
+    connection.create_function("socify_case_title", 2, localized_case_title)
     connection.execute("PRAGMA query_only = ON")
     connection.execute("PRAGMA busy_timeout = 15000")
     return connection

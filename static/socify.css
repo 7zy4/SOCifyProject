@@ -123,6 +123,9 @@ html[lang="ar"] .workspace-head h2 { line-height: 1.5; }
 .button.full { width: 100%; }
 .button:disabled, .button[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; transform: none; }
 .action-row, .filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* Fields and buttons in a filter row share one baseline: the bottom edge of the control. */
+.filter-row { align-items: flex-end; }
+.filter-row > label, .filter-row > .field { margin-block-end: 0; }
 .action-row:empty { display: none; }
 
 /* Forms */
@@ -171,6 +174,11 @@ details > summary:hover { color: var(--text); }
 .panel-head h3 { font-size: 16px; font-weight: 700; }
 .panel-head + * { margin-block-start: 0; }
 .panel-body { padding: 16px 20px 20px; min-width: 0; }
+/* One vertical rhythm inside panels; any rule that sets its own margin still wins (zero specificity). */
+.panel-body > :where(* + *) { margin-block-start: 12px; }
+/* Actions that follow a table, a list of records or an empty state never touch it. */
+:is(.table-wrap, table, .empty, .compact-empty, .record-grid) + :is(.action-row, .pagination, form, .button, button, nav) { margin-block-start: 12px; }
+:is(form, .filter-row, .action-row) + :is(.table-wrap, table, .record-grid, .empty, .compact-empty) { margin-block-start: 12px; }
 .panel > .form-grid, .panel > form, .panel > .filter-row { padding: 16px 20px 20px; }
 .panel > .table-wrap { margin: 12px 0 0; border: 0; border-block-start: 1px solid var(--line-soft); border-radius: 0; }
 .panel > .empty, .panel > .compact-empty { border: 0; }
@@ -209,6 +217,15 @@ dd { margin: 2px 0 12px; color: var(--text); font-size: 14px; overflow-wrap: any
 .badge.high, .severity.high { background: var(--sev-high-fill); color: var(--sev-high-ink); border-color: var(--sev-high-edge); font-weight: 700; }
 .badge.medium, .severity.medium { background: var(--sev-medium-fill); color: var(--sev-medium-ink); border-color: var(--sev-medium-edge); font-weight: 700; }
 .badge.low, .severity.low { background: var(--sev-low-fill); color: var(--sev-low-ink); border-color: var(--sev-low-edge); font-weight: 700; }
+.badge-severity, .badge-status { display: inline-block; flex: none; text-align: center; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.badge-severity { inline-size: 72px; }
+.badge-status { inline-size: 128px; }
+html[lang="ar"] .badge-status { inline-size: 96px; }
+.badge-person { display: inline-block; inline-size: 136px; max-inline-size: 100%; line-height: 20px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--panel-2); color: var(--text); font-weight: 500; }
+html[lang="ar"] .badge-person { inline-size: 124px; }
+.badge-person.unassigned { color: var(--faint); }
+a.badge-person { text-decoration: none; }
+a.badge-person:hover { border-color: var(--primary-fill); color: var(--text); }
 .badge:is(.failed, .revoked, .overdue, .rejected) { color: var(--red); background: var(--red-bg); border-color: color-mix(in srgb, var(--red) 55%, transparent); }
 .badge:is(.completed, .approved, .resolved, .closed, .contained) { color: var(--muted); }
 
@@ -261,6 +278,8 @@ tbody tr:last-child td { border-block-end: 0; }
 .monitoring-surface .table-wrap { border: 0; border-radius: 0; max-height: none; }
 .monitoring-surface > .pagination, .monitoring-pagination { padding: 12px 20px; }
 .monitoring-table { min-width: 880px; }
+/* Names and labels in the alert list break between words only; the table scrolls inside its frame when it must. */
+.monitoring-table > tbody > tr > td, .monitoring-table > thead > tr > th { overflow-wrap: break-word; padding-inline: 10px; }
 .monitoring-table time { display: block; unicode-bidi: isolate; font-size: 12px; color: var(--faint); white-space: nowrap; }
 .monitoring-table > thead > tr > th:first-child, .monitoring-table > tbody > tr > td:first-child { width: 40px; min-width: 40px; padding-inline: 8px; }
 .rule-cell { min-width: 220px; max-width: 360px; }
@@ -350,11 +369,19 @@ td .button { min-height: 28px; padding: 0 10px; font-size: 12px; }
 .timeline-actions { flex-wrap: nowrap; }
 .timeline-actions .button { min-height: 28px; padding: 0 10px; font-size: 12px; border-color: transparent; background: transparent; color: var(--muted); }
 .timeline-actions .button:hover { background: var(--panel-2); color: var(--text); }
-@media (max-width: 700px) { .autopsy-timeline > li { grid-template-columns: minmax(0, 1fr); } }
+/* Log entries lead with their severity tag in a fixed column, so the tags line up. */
+.autopsy-timeline > li[class*="severity-"] { grid-template-columns: 72px minmax(0, 1fr) auto; }
+.autopsy-timeline > li[class*="severity-"] > .badge-severity { margin-block-start: 1px; }
+@media (max-width: 700px) { .autopsy-timeline > li, .autopsy-timeline > li[class*="severity-"] { grid-template-columns: minmax(0, 1fr); } }
 .evidence-event { padding: 12px 0; border-block-end: 1px solid var(--line-soft); }
 .evidence-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .graph-canvas { width: 100%; max-width: 100%; min-height: 420px; overflow: auto; background: var(--panel); }
 .graph-canvas svg { min-width: 880px; min-height: 420px; }
+.graph-links path { fill: none; stroke: var(--line); stroke-width: 1.25; }
+.graph-node rect { fill: var(--panel-2); stroke: var(--line); }
+.graph-node.graph-event rect { stroke: var(--primary-fill); }
+.graph-kind { fill: var(--muted); font: 500 11px var(--font-body); }
+.graph-label { fill: var(--text); font: 600 12px var(--font-body); }
 
 /* Raw evidence */
 .raw-log, .email-body, .sample-strings { max-height: 360px; overflow: auto; padding: 12px 16px; background: var(--bg); border: 1px solid var(--line-soft); border-radius: var(--radius-control); white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -390,8 +417,7 @@ td .button { min-height: 28px; padding: 0 10px; font-size: 12px; }
 .insight-counter { padding: 12px 16px; border: 1px solid var(--line-soft); border-radius: var(--radius-card); background: var(--panel); }
 .insight-counter strong { display: block; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .insight-counter span { color: var(--muted); font-size: 12px; }
-.insight-facts, .insight-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
-.insight-bar-row { display: grid; grid-template-columns: minmax(80px, 160px) minmax(0, 1fr) auto; align-items: center; gap: 12px; font-size: 13px; }
+.insight-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
 .audit-entry-details summary { font-size: 12px; }
 .audit-entry-details dl { margin-block-start: 8px; }
 
@@ -448,13 +474,12 @@ progress { width: 100%; height: 6px; accent-color: var(--primary-fill); }
 .performance-view > .channel-tabs { margin-block-end: 0; }
 .performance-toolbar { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
 .performance-overview { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; }
-.performance-overview > .panel, .performance-operations > *, .performance-pace > .panel { margin: 0; }
-.performance-overview > .panel.wide, .performance-operations .panel.wide, .performance-pace > .panel.wide { grid-column: auto; }
+.performance-overview > .panel, .performance-operations > *, .performance-operations > .panel { margin: 0; }
+.performance-overview > .panel.wide, .performance-operations .panel.wide { grid-column: auto; }
 .performance-operations { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr); gap: 16px; align-items: stretch; }
 .performance-overview > .panel, .performance-operations > .panel { display: flex; flex-direction: column; }
 .performance-overview > .panel > .panel-body, .performance-operations > .panel > .panel-body { flex: 1; }
-.performance-operations > .panel > .performance-completion, .performance-operations > .panel > .performance-speed { align-content: center; }
-.performance-pace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; align-content: start; }
+.performance-operations > .panel > .performance-completion, .performance-operations > .panel > .performance-speed { align-content: start; }
 .insight-counters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 a.insight-counter { color: inherit; text-decoration: none; transition: border-color var(--motion-fast) var(--ease-out); }
 a.insight-counter:hover { border-color: var(--line); }
@@ -472,6 +497,7 @@ details.performance-data { margin-block-start: 8px; }
 .performance-key.closed { background: var(--chart-2); }
 .performance-key.within, .performance-key.completed { background: var(--primary-fill); }
 .performance-key.late { background: var(--chart-3); }
+.performance-key.opened { background: transparent; box-shadow: inset 0 0 0 2px var(--chart-1); }
 .performance-key.unknown { background: var(--chart-muted); }
 /* Activity curves */
 .performance-plot { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; height: 240px; }
@@ -494,48 +520,52 @@ details.performance-data { margin-block-start: 8px; }
 .performance-point.closed { inset-block-start: var(--point-closed); background: var(--chart-2); }
 .performance-trend-bucket:hover .performance-point, .performance-trend-bucket.selected .performance-point, .performance-trend-bucket:focus-visible .performance-point { opacity: 1; }
 .performance-x-axis { display: flex; justify-content: space-between; gap: 12px; padding-inline-start: 28px; color: var(--faint); font-size: 11px; }
-.performance-trend-readout, .performance-basis, .performance-sample, .performance-pace > p { margin: 0; color: var(--faint); font-size: 12px; }
-/* Completion ring */
-.performance-completion { display: grid; justify-items: center; align-content: start; gap: 12px; padding: 16px 20px 20px; }
-.performance-ring { position: relative; width: 160px; height: 160px; }
-.performance-ring svg { width: 100%; height: 100%; }
-.performance-ring circle { fill: none; stroke-width: 10; }
-.performance-ring-edge { stroke: none; }
-.performance-ring-track { stroke: var(--panel-2); }
-.performance-ring-value { stroke: var(--primary-fill); stroke-linecap: round; }
-.performance-ring-label { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 6px; color: var(--faint); font-size: 12px; line-height: 1.4; text-align: center; }
-.performance-ring-label strong { color: var(--text); font-size: 26px; font-weight: 500; line-height: 1.2; }
+.performance-trend-readout, .performance-basis, .performance-sample { margin: 0; color: var(--faint); font-size: 12px; }
+/* Completion */
+.performance-completion { display: grid; justify-items: start; align-content: start; gap: 12px; padding: 16px 20px 20px; }
 .performance-completion-count { margin: 0; color: var(--muted); font-size: 13px; }
-/* SLA gauge */
-.performance-speed { display: grid; justify-items: center; gap: 12px; }
-.performance-gauge { position: relative; width: min(220px, 100%); padding-block-end: 8px; }
-.performance-gauge svg { display: block; width: 100%; height: auto; }
-.performance-gauge path { fill: none; stroke-width: 14; stroke-linecap: round; }
-.performance-gauge-track { stroke: var(--panel-2); }
-.performance-gauge-value { stroke: var(--primary-fill); }
-.performance-speed-score { position: absolute; inset-inline: 0; inset-block-end: -4px; display: grid; justify-items: center; gap: 6px; line-height: 1.4; }
-.performance-speed-score strong { font-size: 24px; font-weight: 500; line-height: 1.2; }
-.performance-speed-score span { color: var(--faint); font-size: 12px; }
-.performance-speed-outcomes { display: grid; justify-items: center; gap: 8px; text-align: center; }
-/* Durations: a marker on a line */
-.performance-durations { display: grid; gap: 14px; }
-.performance-duration-row { display: grid; grid-template-columns: minmax(84px, 140px) minmax(0, 1fr) minmax(56px, auto) minmax(40px, auto); align-items: center; gap: 12px; font-size: 13px; }
-.performance-duration-title { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.performance-duration-row > strong { font-weight: 500; text-align: end; white-space: nowrap; }
-.performance-duration-row > .performance-sample { text-align: end; white-space: nowrap; }
-.performance-duration-track { position: relative; height: 12px; }
-.performance-duration-track::before { content: ""; position: absolute; inset-inline: 0; inset-block-start: 50%; height: 2px; margin-block-start: -1px; border-radius: 1px; background: var(--panel-2); }
-.performance-duration-mark { position: absolute; inset-block-start: 50%; inset-inline-start: var(--at); width: 12px; height: 12px; margin-block-start: -6px; margin-inline-start: -6px; border-radius: 50%; background: var(--primary-fill); box-shadow: 0 0 0 3px var(--panel); }
-.performance-duration-mark::before { content: ""; position: absolute; inset-block-start: 50%; inset-inline-end: 50%; width: var(--at); height: 2px; margin-block-start: -1px; }
-/* Workload ring */
+/* Indicators: a figure, then the chart that fits the measure. Navy is done or on time, sky is open work, violet is late. */
+.performance-figure { display: grid; gap: 4px; justify-items: start; }
+.performance-figure strong { color: var(--text); font: 700 32px/1.3 var(--font-body); font-variant-numeric: tabular-nums; }
+.performance-figure span { color: var(--faint); font: 500 12px/1.3 var(--font-body); }
+.performance-figure-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; inline-size: 100%; }
+.performance-figure-row .performance-completion-count { padding-block-end: 4px; }
+.performance-capsule { display: flex; gap: 3px; block-size: 14px; inline-size: 100%; padding: 2px; border-radius: 999px; background: var(--panel-2); }
+.performance-capsule.empty::before { content: ""; flex: 1; }
+.performance-capsule-part { min-inline-size: 10px; border-radius: 999px; }
+.performance-capsule-part.critical { background: var(--sev-critical-fill); }
+.performance-capsule-part.high { background: var(--sev-high-fill); }
+.performance-capsule-part.medium { background: var(--sev-medium-fill); }
+.performance-capsule-part.low { background: var(--sev-low-fill); }
+.performance-workload-figure { display: grid; gap: 14px; flex: 1 1 100%; min-inline-size: 0; }
+.performance-burnup { inline-size: 100%; block-size: 120px; }
+.performance-burnup svg { display: block; inline-size: 100%; block-size: 100%; overflow: visible; }
+.performance-burnup-open { fill: color-mix(in srgb, var(--chart-1) 14%, transparent); }
+.performance-burnup-done { fill: color-mix(in srgb, var(--chart-2) 26%, transparent); }
+.performance-burnup-line { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+.performance-burnup-line.opened { stroke: var(--chart-1); stroke-dasharray: 5 4; }
+.performance-burnup-line.closed { stroke: var(--chart-2); }
+/* SLA: one column per closed case, height = share of its deadline used; the dashed line is the deadline. */
+.performance-sla-columns { position: relative; display: flex; align-items: flex-end; justify-content: center; gap: var(--gap, 6px); inline-size: 100%; block-size: 104px; padding-inline-end: 56px; border-block-end: 1px solid var(--chart-grid); }
+.performance-sla-zone { position: absolute; inset-inline: 0; inset-block: 0 var(--deadline); border-radius: 6px 6px 0 0; background: color-mix(in srgb, var(--chart-3) 9%, transparent); }
+.performance-sla-line { position: absolute; z-index: 2; inset-inline: 0; inset-block-end: var(--deadline); border-block-start: 1.5px dashed var(--chart-3); }
+.performance-sla-line span { position: absolute; inset-inline-end: 2px; inset-block-end: 4px; color: var(--chart-3); font: 600 11px/1 var(--font-body); }
+.performance-sla-column { position: relative; z-index: 1; flex: 1 1 0; max-inline-size: 26px; block-size: var(--used); min-block-size: 4px; border-radius: 5px 5px 1px 1px; }
+.performance-sla-column.within { background: var(--chart-2); }
+.performance-sla-column.late { background: var(--chart-3); }
+/* SLA */
+.performance-speed { display: grid; justify-items: stretch; align-content: start; gap: 12px; }
+/* Durations: one bar per step, its length the step's median against the longest step. */
+.performance-durations { display: grid; align-content: start; }
+.performance-duration-rows { display: grid; gap: 14px; }
+.performance-duration-row { display: grid; grid-template-columns: minmax(92px, 132px) minmax(0, 1fr) 64px; align-items: center; gap: 2px 14px; }
+.performance-duration-title { grid-column: 1; grid-row: 1; color: var(--text); font-size: 13px; font-weight: 500; line-height: 1.3; }
+.performance-duration-row > .performance-sample { grid-column: 1; grid-row: 2; color: var(--faint); font-size: 11px; line-height: 1.3; }
+.performance-duration-track { grid-column: 2; grid-row: 1 / span 2; display: flex; block-size: 14px; border-radius: 999px; background: var(--panel-2); }
+.performance-duration-bar { inline-size: var(--share); min-inline-size: 14px; border-radius: 999px; background: var(--chart-2); }
+.performance-duration-row > strong { grid-column: 3; grid-row: 1 / span 2; text-align: end; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Workload */
 .performance-workload { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; }
-.performance-donut { position: relative; flex: none; width: 140px; height: 140px; }
-.performance-donut svg { width: 100%; height: 100%; }
-.performance-donut circle { fill: none; stroke-width: 12; }
-.performance-donut-track { stroke: var(--panel-2); }
-.performance-donut-value { stroke: var(--primary-fill); stroke-linecap: round; }
-.performance-donut-label { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 6px; color: var(--faint); font-size: 12px; line-height: 1.4; text-align: center; }
-.performance-donut-label strong { color: var(--text); font-size: 26px; font-weight: 700; line-height: 1.2; }
 .performance-severity-list { flex: 1; min-width: 160px; display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .performance-severity-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 13px; }
 .performance-severity-list strong { font-weight: 500; }

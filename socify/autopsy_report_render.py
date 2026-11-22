@@ -601,7 +601,9 @@ def render_html(payload) -> str:
         content.append(f'<section id="report-section-{index}" class="report-section"><h2>{directional_html(title)}</h2>{"".join(rows)}</section>')
     digest = hashlib.sha256(canonical(payload).encode()).hexdigest()
     title_class = ' class="report-title-long"' if len(case["title"]) > 100 else ""
-    cover = f'<header class="report-cover"><p class="report-wordmark" lang="en" dir="ltr">SOCify</p><p>تقرير فرز وتحقيق سريع في حادثة أمنية</p><h1{title_class}><bdi dir="auto">{directional_html(display(case["title"]))}</bdi></h1><p><bdi dir="ltr">{html.escape(case["reference"])}</bdi> | الإصدار {payload["revision"]}</p></header><p class="report-note">نسخة ثابتة من بيانات القضية عند إعدادها. اعتماد هذه النسخة محفوظ منفصلًا في سجل المنصة. البصمة أدناه تخص JSON المعياري، لا بايتات PDF.</p><p dir="ltr">SHA-256: <bdi>{digest}</bdi></p>'
+    # The case keeps the English name its creator gave, under the Arabic one.
+    english_title = f'<p class="report-title-en" lang="en" dir="ltr">{html.escape(case["title_en"])}</p>' if case.get("title_en") else ""
+    cover = f'<header class="report-cover"><p class="report-wordmark" lang="en" dir="ltr">SOCify</p><p>تقرير فرز وتحقيق سريع في حادثة أمنية</p><h1{title_class}><bdi dir="auto">{directional_html(display(case["title"]))}</bdi></h1>{english_title}<p><bdi dir="ltr">{html.escape(case["reference"])}</bdi> | الإصدار {payload["revision"]}</p></header><p class="report-note">نسخة ثابتة من بيانات القضية عند إعدادها. اعتماد هذه النسخة محفوظ منفصلًا في سجل المنصة. البصمة أدناه تخص JSON المعياري، لا بايتات PDF.</p><p dir="ltr">SHA-256: <bdi>{digest}</bdi></p>'
     navigation = '<nav class="report-outline" aria-label="أقسام التقرير"><h2>محتويات التقرير</h2><ul>' + "".join(outline) + "</ul></nav>"
     style = (
         report_style()
@@ -651,6 +653,8 @@ def render_docx(payload) -> bytes:
     title = document.add_paragraph(style="Heading 1")
     set_direction(title)
     add_text(title, display(payload["case"]["title"]), True)
+    if payload["case"].get("title_en"):
+        document.add_paragraph(display(payload["case"]["title_en"]))
     document.add_paragraph(display(payload["case"]["reference"]))
     notice = document.add_paragraph()
     set_direction(notice)
@@ -705,6 +709,7 @@ def render_files(payload):
         "# SOCify",
         "",
         html.escape(display(payload["case"]["title"])).replace("`", "\\u0060"),
+        *([html.escape(display(payload["case"]["title_en"])).replace("`", "\\u0060"), ""] if payload["case"].get("title_en") else []),
         "",
         "نسخة ثابتة؛ راجع سجل الاعتماد في المنصة.",
         "",

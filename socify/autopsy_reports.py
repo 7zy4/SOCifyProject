@@ -77,7 +77,7 @@ def case_metrics(records):
 
 def build_snapshot(case, revision: int, profile: str):
     case_id = case["id"]
-    case_fields = ("reference", "title", "status", "severity", "priority", "created_at", "closed_at", "version")
+    case_fields = ("reference", "title", "title_en", "status", "severity", "priority", "created_at", "closed_at", "version")
     payload = {
         "schema": "socify-report/1",
         "revision": revision,

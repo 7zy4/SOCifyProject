@@ -10,6 +10,7 @@ from flask import Blueprint, current_app, jsonify, request
 from .autopsy_pipeline import full_case_scope_sql
 from .autopsy_workflow import factual_metrics, sla_status
 from .case_counts import consistent_read
+from .case_titles import localized_case_title
 from .db import get_db
 from .operational import case_scope
 from .security import actor_id, current_user, error_response, require_permission, workspace_id
@@ -265,6 +266,8 @@ def performance():
     open_cases, closed_cases, review_cases = [], [], []
     completion = {"total": 0, "completed": 0, "pending": 0, "unmeasured": 0}
     speed = {"on_time": 0, "late": 0, "unmeasured": 0}
+    # Share of each measured closed case's SLA budget that the work used, newest first, for the SLA chart.
+    speed_cases: list[dict[str, object]] = []
 
     def in_period(value):
         stamp = moment(value)
@@ -298,6 +301,16 @@ def performance():
             try:
                 sla = sla_status(case, now, retained_records=records[case["id"]]) if valid_closure else {"configured": False}
                 speed["unmeasured" if not sla["configured"] else "on_time" if sla["remaining_work_seconds"] >= 0 else "late"] += 1
+                if sla["configured"]:
+                    budget = sla["policy"]["minutes"] * 60
+                    speed_cases.append(
+                        {
+                            "reference": case["reference"],
+                            "closed_at": case["closed_at"],
+                            "used": round(sla["elapsed_work_seconds"] / budget, 3) if budget else None,
+                            "on_time": sla["remaining_work_seconds"] >= 0,
+                        }
+                    )
             except (ValueError, TypeError, KeyError, OverflowError):
                 speed["unmeasured"] += 1
     for task in tasks:
@@ -324,7 +337,8 @@ def performance():
 
     def case_view(case):
         return {
-            **{key: case[key] for key in ("id", "reference", "title", "severity", "status", "assignee", "created_at", "closed_at", "sla_due_at")},
+            **{key: case[key] for key in ("id", "reference", "severity", "status", "assignee", "created_at", "closed_at", "sla_due_at")},
+            "title": localized_case_title(case["title"], case["title_en"]),
             "assignee_name": members.get(case["assignee"], {}).get("name"),
         }
 
@@ -363,6 +377,7 @@ def performance():
                 "basis": "configured_case_sla",
                 "included": speed["on_time"] + speed["late"],
                 "compliance_percent": measured_percentage(speed["on_time"], speed["on_time"] + speed["late"]),
+                "cases": sorted(speed_cases, key=lambda item: str(item["closed_at"]), reverse=True)[:40],
             },
             "trend": [{"date": day, **values} for day, values in sorted(trend.items())],
             "members": list(workload.values()) if member_id is None else [workload[member_id]] if member_id in workload else [],
@@ -373,7 +388,11 @@ def performance():
             "queue_pages": pages,
             "queue_page_size": 50,
             "tasks": [
-                {**task, "case_reference": case_by_id[task["case_id"]]["reference"], "case_title": case_by_id[task["case_id"]]["title"]}
+                {
+                    **task,
+                    "case_reference": case_by_id[task["case_id"]]["reference"],
+                    "case_title": localized_case_title(case_by_id[task["case_id"]]["title"], case_by_id[task["case_id"]]["title_en"]),
+                }
                 for task in pending[:50]
             ],
             "task_total": len(pending),

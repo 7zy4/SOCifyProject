@@ -56,6 +56,12 @@ function formatTime(value) {
   return Number.isNaN(date.getTime()) ? String(value) : new Intl.DateTimeFormat(window.SOCifyLocale?.language === "en" ? "en-GB" : "ar-u-ca-gregory-nu-latn", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(date) + " UTC";
 }
 
+// An analyst's name as a tag with the same height and frame as the status tag; the full name stays in the tooltip.
+function personChip(name) {
+  const text = name || SOCifyLocale.text("غير مسند");
+  return node("span", { class: `badge badge-person${name ? "" : " unassigned"}`, title: text, "data-user-content": name ? "true" : null, text });
+}
+
 function badge(value) {
   return node("span", { class: `badge ${String(value || "").toLowerCase()}`, text: value || "—" });
 }

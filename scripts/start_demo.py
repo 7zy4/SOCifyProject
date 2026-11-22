@@ -104,7 +104,7 @@ def incomplete_demo(directory):
     """Recognize the old failed synthetic seeder without claiming arbitrary data."""
     try:
         accounts = json.loads((directory / "accounts.json").read_text(encoding="utf-8"))
-        expected = {f"{handle}@demo.socify.test" for handle, _name, _name_en, _role in TEAM}
+        expected = {f"{handle}@socify.test" for handle, _name, _name_en, _role in TEAM}
         if {account["email"] for account in accounts} != expected or not (directory / "runtime.env").is_file():
             return False
         with closing(sqlite3.connect((directory / "socify.db").as_uri() + "?mode=ro", uri=True)) as database:

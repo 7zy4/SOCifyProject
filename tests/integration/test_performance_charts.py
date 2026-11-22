@@ -108,7 +108,11 @@ def test_speed_uses_configured_working_time_and_retained_pauses(app, client, log
     database.execute("UPDATE incident_cases SET status='closed', closed_at='2026-10-27T10:00:00Z' WHERE id=?", (working,))
     case(client, database, "No agreed target", status="closed", closed="2026-11-03T09:00:00Z")
     data = performance(client, "member=team&days=30")
+    cases = data["speed"].pop("cases")
     assert data["speed"] == {"on_time": 2, "late": 1, "unmeasured": 1, "included": 3, "compliance_percent": 66.7, "basis": "configured_case_sla"}
+    # Each measured closed case reports the share of its SLA budget used; late cases used more than all of it.
+    assert len(cases) == 3 and sum(item["on_time"] for item in cases) == 2
+    assert all((item["used"] <= 1) == item["on_time"] for item in cases)
     # The aggregate is consistent with the individual case's response clock.
     assert client.get(f"/api/cases/{paused}/workflow").json["sla"]["elapsed_work_seconds"] == 3600
     assert client.get(f"/api/cases/{working}/workflow").json["sla"]["remaining_work_seconds"] == 0

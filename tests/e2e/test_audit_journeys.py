@@ -26,6 +26,7 @@ def test_audit_user_goal(app, language, scenario):
                 manager.click("button", "إنشاء قضية")
                 dialog = manager.page.get_by_role("dialog")
                 dialog.locator("input[name=title]").fill(f"Later audit intake {index + 1:02}")
+                dialog.locator("input[name=title_en]").fill(f"Later audit intake {index + 1:02}")
                 manager.click("button", "حفظ", dialog)
             result["setup_only_case_requests"] = 26
         manager.nav("التدقيق")

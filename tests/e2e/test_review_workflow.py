@@ -91,6 +91,7 @@ class ReviewJourney:
         self.click("button", "إنشاء قضية")
         dialog = self.page.get_by_role("dialog")
         dialog.locator("input[name=title]").fill("Authorized maintenance investigation")
+        dialog.locator("input[name=title_en]").fill("Authorized maintenance investigation")
         self.click("button", "حفظ", dialog)
         self.page.wait_for_url("**/cases/*")
         self.case_id = int(re.search(r"/cases/(\d+)", self.page.url)[1])

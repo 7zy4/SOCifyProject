@@ -148,7 +148,7 @@ def test_role_loss_removes_loaded_team_graphics_but_personal_work_continues(app,
         j.click("button", "تطبيق", j.page.locator(".filter-row"))
         capture(j, folder, "denied-refresh")
         assert urlsplit(j.page.url).path == "/login", "PRODUCT: revoked management session did not return to sign-in"
-        assert j.page.locator(".performance-trend, .performance-severity, .performance-ring").count() == 0, (
+        assert j.page.locator(".performance-trend, .performance-severity, .performance-capsule").count() == 0, (
             "PRODUCT: privileged derived graphics retained after rejection"
         )
         assert "Restricted management escalation history" not in j.page.locator("main").inner_text(), "PRODUCT: denied chart retains management case"
@@ -189,7 +189,7 @@ def test_shared_workstation_history_cannot_resurrect_the_prior_accounts_charts(a
         j.settle()
         capture(j, folder, "saved-team-url")
         expect(j.page.get_by_text(j.text("تعذر تحميل الأداء"), exact=True)).to_be_visible()
-        assert j.page.locator(".performance-trend, .performance-severity, .performance-ring").count() == 0, (
+        assert j.page.locator(".performance-trend, .performance-severity, .performance-capsule").count() == 0, (
             "PRODUCT: prior account's chart survived sign-in boundary"
         )
         assert j.page.request.get(j.base + "/api/soc/performance?member=team").status == 403

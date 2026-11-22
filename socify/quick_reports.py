@@ -10,6 +10,7 @@ from .audit import record_audit
 from .autopsy_domain import custody, touch_case
 from .autopsy_pipeline import visibility_sql
 from .case_counts import consistent_read
+from .case_titles import localized_case_title
 from .cases import _case_row
 from .db import get_db, transaction
 from .security import actor_id, current_user, error_response, has_permission, require_permission, workspace_id
@@ -339,7 +340,7 @@ def _collect_case_auto_summary(case_row: sqlite3.Row) -> dict[str, Any]:
         "case": {
             "id": case_id,
             "reference": case_row["reference"],
-            "title": case_row["title"],
+            "title": localized_case_title(case_row["title"], case_row["title_en"]),
             "severity": case_row["severity"],
             "priority": case_row["priority"],
             "status": case_row["status"],
@@ -512,7 +513,7 @@ def list_escalated_reports():
     rows = (
         get_db()
         .execute(
-            f"""SELECT qr.*, c.reference AS case_reference, c.title AS case_title, c.severity AS case_severity, c.status AS case_status,
+            f"""SELECT qr.*, c.reference AS case_reference, socify_case_title(c.title, c.title_en) AS case_title, c.severity AS case_severity, c.status AS case_status,
                       COALESCE(socify_user_name(u.name,u.name_ar,u.name_en), u.email) AS investigator_name
                FROM case_quick_reports qr
                JOIN incident_cases c ON c.id = qr.case_id

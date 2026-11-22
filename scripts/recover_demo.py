@@ -13,7 +13,7 @@ from socify import create_app
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, default=Path("instance/demo"))
-    parser.add_argument("--email", default="manager@demo.socify.test")
+    parser.add_argument("--email", default="manager@socify.test")
     args = parser.parse_args()
     if os.environ.get("SOCIFY_ENV", "development") != "development":
         raise RuntimeError("Demo recovery is restricted to development")

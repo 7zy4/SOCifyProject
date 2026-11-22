@@ -389,7 +389,7 @@ def test_dashboard_decision_advances_scoped_work(app, database, monkeypatch, lan
             result["aggregate_basis"] = "The active case changes its own report metrics; closed-case aggregate correctly remains unchanged."
         elif scenario.startswith("NEXT-05"):
             assert counter(subject, "قضايا نشطة") == 2
-            critical = subject.page.locator(".performance-severity-list li").filter(has=subject.page.locator(".severity.critical"))
+            critical = subject.page.locator(".performance-severity-list li").filter(has=subject.page.locator(".badge-severity.critical"))
             assert plain(critical.locator("strong").inner_text()) == "1"
             result["decision"] = "The distribution counts cases. Choose the critical investigation even though the low case has more alerts."
             open_case(subject, original_id)

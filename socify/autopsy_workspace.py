@@ -111,7 +111,10 @@ def guard_workspace():
 @require_permission("cases.read")
 def selection_get():
     ids = selected_ids()
-    rows = [dict(get_db().execute("SELECT id,reference,title FROM incident_cases WHERE id=?", (value,)).fetchone()) for value in ids]
+    rows = [
+        dict(get_db().execute("SELECT id,reference,socify_case_title(title,title_en) AS title FROM incident_cases WHERE id=?", (value,)).fetchone())
+        for value in ids
+    ]
     return jsonify({"case_ids": ids, "items": rows, "required": current_app.config["REQUIRE_INVESTIGATION_SELECTION"]})
 
 

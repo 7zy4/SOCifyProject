@@ -39,6 +39,7 @@ def test_case_server_rejection_retains_editable_name_reason_objective_and_retry(
     page.get_by_role("button", name="إنشاء قضية", exact=True).click()
     dialog = page.get_by_role("dialog")
     dialog.locator("input[name=title]").fill("x")
+    dialog.locator("input[name=title_en]").fill("x")
     dialog.locator("input[name=reason]").fill("مراجعة تنبيه")
     objective = "Preserve this investigator draft after a server validation error"
     dialog.locator("textarea[name=objective]").fill(objective)
@@ -50,6 +51,7 @@ def test_case_server_rejection_retains_editable_name_reason_objective_and_retry(
     assert dialog.locator("input[name=reason]").input_value() == "مراجعة تنبيه"
     assert dialog.locator("textarea[name=objective]").input_value() == objective
     dialog.locator("input[name=title]").fill("Corrected incident draft")
+    dialog.locator("input[name=title_en]").fill("Corrected incident draft")
     dialog.get_by_role("button", name="حفظ", exact=True).click()
     page.wait_for_url("**/cases/*")
     assert page.locator("textarea[name=objective]").input_value() == objective

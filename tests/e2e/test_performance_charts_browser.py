@@ -205,5 +205,5 @@ def test_boundary_percentages_remain_distinct_from_zero_and_complete(app, langua
                 assert normalized == expected
                 assert j.page.evaluate("document.documentElement.scrollWidth <= innerWidth")
                 assert j.page.locator(".performance-speed-score").evaluate("el => el.scrollWidth <= el.clientWidth")
-                assert j.page.locator(".performance-ring-label strong").evaluate("el => el.scrollWidth <= el.parentElement.clientWidth")
+                assert j.page.locator(".performance-completion .performance-figure strong").evaluate("el => el.scrollWidth <= el.parentElement.clientWidth")
         assert_accessible(j.page)

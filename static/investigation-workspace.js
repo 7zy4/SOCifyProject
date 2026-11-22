@@ -110,7 +110,7 @@ window.SOCifyWorkspace = (() => {
       const input = node("input", {type:"checkbox",value:item.id,checked:chosen.has(item.id),"aria-label":item.title});
       input.addEventListener("change", () => { if (input.checked) chosen.set(item.id, item); else chosen.delete(item.id); update(); });
       const label = node("label", {class:"case-selection-label"}, [input,node("span", {}, [node("bdi", {text:item.reference}),node("strong", {text:item.title}),item.approval?.state && item.approval.state !== "approved" ? node("small", {text:approvalLabel(item.approval.state)}) : null])]);
-      const card = node("article", {class:"case-selection-card"},[label,node("div", {class:"case-card-facts"},[autopsyBadge(item.status),autopsyBadge(item.severity),node("span", {text:item.assignee_name||"—"})]),linkedButton(t("فتح"),`/cases/${item.id}`,"ghost compact")]);
+      const card = node("article", {class:"case-selection-card"},[label,node("div", {class:"case-card-facts"},[autopsyBadge(item.status, "case"),autopsyBadge(item.severity),personChip(item.assignee_name)]),linkedButton(t("فتح"),`/cases/${item.id}`,"ghost compact")]);
       if (item.approval?.state !== "approved") { input.disabled = true; card.classList.add("case-selection-locked"); }
       body.append(card);
     }

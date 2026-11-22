@@ -211,6 +211,7 @@ def audit_logs():
             "socify_user_name(u.name,u.name_ar,u.name_en)",
             "c.reference",
             "c.title",
+            "c.title_en",
         ]
         clauses.append("(" + " OR ".join(f"{field} LIKE ? ESCAPE '\\'" for field in fields) + ")")
         parameters.extend([pattern] * len(fields))

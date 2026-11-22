@@ -34,6 +34,7 @@ def test_late_response_stays_with_its_case_and_respects_navigation_intent(app, l
         dialog = manager.page.get_by_role("dialog")
         title = "Separate investigation with its own evidence and decision"
         dialog.locator("input[name=title]").fill(title)
+        dialog.locator("input[name=title_en]").fill(title)
         manager.click("button", "حفظ", dialog)
         other_id = int(re.search(r"/cases/(\d+)", manager.page.url)[1])
         manager.page.goto(original_url)

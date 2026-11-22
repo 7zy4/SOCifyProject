@@ -281,7 +281,7 @@ def cases_claimable():
     rows = (
         get_db()
         .execute(
-            """SELECT c.id, c.reference, c.title, c.severity, c.priority, c.status, c.created_at, c.updated_at,
+            """SELECT c.id, c.reference, socify_case_title(c.title, c.title_en) AS title, c.title_en, c.severity, c.priority, c.status, c.created_at, c.updated_at,
                       COALESCE(ctx.classification, 'confidential') AS classification, socify_user_name(u.name,u.name_ar,u.name_en) AS creator_name
                FROM incident_cases c
                LEFT JOIN autopsy_case_context ctx ON ctx.case_id = c.id

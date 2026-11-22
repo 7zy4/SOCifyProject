@@ -1,5 +1,5 @@
 /* Exported case report (HTML and PDF). The same system as the interface on white paper:
-   Kufam for headings, IBM Plex Sans Arabic for text, graphite ink, hairlines and one gold accent. */
+   Kufam for headings, IBM Plex Sans Arabic for text, graphite ink, hairlines and one navy accent. */
 @page { size: 595pt 842pt; margin: 42pt 44pt 40pt; background: #FFFFFF; @bottom-right { content: counter(page); font: 400 9pt "IBM Plex Sans Arabic", sans-serif; color: var(--paper-muted); } }
 @page:first { @bottom-right { content: none; } }
 :root { color-scheme: light; font-synthesis: none; }
@@ -29,10 +29,11 @@ tr { break-inside: avoid; }
 .report-record dd { margin: 0 0 6pt; white-space: pre-wrap; overflow-wrap: anywhere; }
 .report-section { break-before: page; scroll-margin-block-start: 16pt; }
 .report-section h2 { margin-block-start: 0; }
-.report-cover { background: var(--terminal-bg); color: var(--terminal-text); padding: 24pt; border-radius: 6pt; border-inline-start: 3pt solid var(--primary-fill); margin-block-end: 18pt; }
+.report-cover { background: var(--terminal-bg); color: var(--terminal-text); padding: 24pt; border-radius: 6pt; border-inline-start: 3pt solid #4F6FD1; margin-block-end: 18pt; }
 .report-cover h1, .report-cover h2, .report-cover p { color: var(--terminal-text); }
 .report-cover h1 { font-size: 22pt; line-height: 1.4; }
 .report-title-long { font-size: 16pt !important; }
+.report-title-en { font: 600 13pt/1.4 "IBM Plex Sans Arabic", sans-serif; margin: -4pt 0 10pt; }
 .report-wordmark { font: 700 20pt/1.2 "Kufam", sans-serif; margin-block-end: 8pt; letter-spacing: 0; }
 .report-note { background: var(--panel-2); color: var(--paper-text); border-radius: 4pt; padding: 8pt 12pt; font-size: 10pt; }
 .report-outline { border: 0.75pt solid var(--line); border-radius: 4pt; padding: 12pt 14pt; margin-block: 16pt; }

@@ -113,6 +113,7 @@ def test_user_can_recover_drafts_without_silent_loss(app, language, scenario):
             j.click("button", "إنشاء قضية")
             dialog = page.get_by_role("dialog")
             dialog.locator("input[name=title]").fill("Retain this investigation draft")
+            dialog.locator("input[name=title_en]").fill("Retain this investigation draft")
             seen = reply_once(page)
             j.click("button", "إغلاق", dialog)
             assert seen == ["confirm"]

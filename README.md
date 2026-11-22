@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/7zy4/SOCifyProject/actions/workflows/enterprise-quality.yml"><img alt="Quality gates" src="https://github.com/7zy4/SOCifyProject/actions/workflows/enterprise-quality.yml/badge.svg?branch=final"></a>
-  <a href="CHANGELOG.md"><img alt="Version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-C9A84C"></a>
+  <a href="CHANGELOG.md"><img alt="Version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-1E3A8A"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2E2E31"></a>
   <img alt="Interface: Arabic and English" src="https://img.shields.io/badge/interface-Arabic%20%7C%20English-2E2E31">
 </p>
@@ -24,12 +24,12 @@
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/images/case-ar-light.png" alt="صفحة قضية بالعربية في الوضع الفاتح"><p align="center">ملخص القضية وفريقها ومهامها</p></td>
-    <td width="50%"><img src="docs/images/timeline-en-dark.png" alt="الخط الزمني للسجلات بالإنجليزية في الوضع الداكن"><p align="center">الخط الزمني الموحد للسجلات</p></td>
+    <td width="50%"><img src="docs/images/cases-ar-light.png" alt="قائمة القضايا بالعربية في الوضع الفاتح"><p align="center">قضايا الفريق بخطورتها وحالتها ومسؤوليها</p></td>
+    <td width="50%"><img src="docs/images/timeline-en-dark.png" alt="الخط الزمني لقضية بالإنجليزية في الوضع الداكن"><p align="center">الخط الزمني لسلسلة الهجوم داخل القضية</p></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/images/monitoring-ar-dark.png" alt="قائمة التنبيهات بالعربية في الوضع الداكن"><p align="center">فرز التنبيهات ومراجعتها</p></td>
-    <td width="50%"><img src="docs/images/performance-en-light.png" alt="لوحة أداء الفريق بالإنجليزية في الوضع الفاتح"><p align="center">أداء الفريق والفرد</p></td>
+    <td width="50%"><img src="docs/images/performance-ar-dark.png" alt="لوحة أداء الفريق بالعربية في الوضع الداكن"><p align="center">أداء الفريق خلال شهر: الحركة والعبء والإنجاز والمهل</p></td>
+    <td width="50%"><img src="docs/images/alerts-en-light.png" alt="مراجعة تنبيه بالإنجليزية في الوضع الفاتح"><p align="center">مراجعة التنبيه مع سجله الأصلي</p></td>
   </tr>
   <tr>
     <td colspan="2" align="center"><img src="docs/images/report-ar-light.png" width="70%" alt="التقرير القابل للطباعة بالعربية"><p align="center">تقرير القضية القابل للطباعة وحفظه PDF</p></td>

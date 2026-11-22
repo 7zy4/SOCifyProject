@@ -13,7 +13,7 @@ from tests.conftest import linux_only
 
 def old_incomplete(directory):
     directory.mkdir()
-    emails = [f"{handle}@demo.socify.test" for handle, _name, _name_en, _role in TEAM]
+    emails = [f"{handle}@socify.test" for handle, _name, _name_en, _role in TEAM]
     (directory / "accounts.json").write_text(json.dumps([{"email": email} for email in emails]))
     (directory / "runtime.env").write_text("Synthetic retained keys")
     with closing(sqlite3.connect(directory / "socify.db")) as database, database:

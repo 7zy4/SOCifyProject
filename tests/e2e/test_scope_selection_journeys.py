@@ -30,6 +30,7 @@ def prepare_pair(j, manager):
     manager.click("button", "إنشاء قضية")
     dialog = manager.page.get_by_role("dialog")
     dialog.locator("input[name=title]").fill(SECOND)
+    dialog.locator("input[name=title_en]").fill(SECOND)
     manager.click("button", "حفظ", dialog)
     manager.page.wait_for_url("**/cases/*")
     second = int(re.search(r"/cases/(\d+)", manager.page.url)[1])

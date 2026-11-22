@@ -41,24 +41,24 @@
       "#323235"
     ],
     "blue": [
-      "#7A5F14",
-      "#D9BE6C"
+      "#1E3A8A",
+      "#A5B8F3"
     ],
     "primary-fill": [
-      "#C9A84C",
-      "#C9A84C"
+      "#1E3A8A",
+      "#4F6FD1"
     ],
     "primary-hover": [
-      "#B8973D",
-      "#D4B55C"
+      "#24469F",
+      "#4361C4"
     ],
     "on-primary": [
-      "#171717",
-      "#141415"
+      "#FFFFFF",
+      "#FFFFFF"
     ],
     "focus": [
-      "#7A5F14",
-      "#D9BE6C"
+      "#1E3A8A",
+      "#A5B8F3"
     ],
     "red": [
       "#B42318",
@@ -133,20 +133,20 @@
       "#EDEDED"
     ],
     "severity-critical": [
-      "#C62828",
-      "#E5484D"
+      "#B91C1C",
+      "#F87171"
     ],
     "severity-high": [
-      "#B4500F",
-      "#F0883E"
+      "#C2410C",
+      "#FB923C"
     ],
     "severity-medium": [
-      "#8A6A00",
-      "#D9B84A"
+      "#A16207",
+      "#FDE047"
     ],
     "severity-low": [
       "#15803D",
-      "#4CC38A"
+      "#4ADE80"
     ],
     "status-resolved": [
       "#15803D",
@@ -177,20 +177,20 @@
       "rgba(0,0,0,0.6)"
     ],
     "selected": [
-      "#B8973D",
-      "#C9A84C"
+      "#1E3A8A",
+      "#4F6FD1"
     ],
     "chart-1": [
-      "#2563EB",
-      "#5B9BF8"
+      "#3B82F6",
+      "#93C5FD"
     ],
     "chart-2": [
-      "#0F9F6E",
-      "#3FD09A"
+      "#1E3A8A",
+      "#4F6FD1"
     ],
     "chart-3": [
-      "#C2410C",
-      "#F59E5B"
+      "#7C3AED",
+      "#A78BFA"
     ],
     "chart-4": [
       "#7C3AED",
@@ -221,52 +221,52 @@
       "#5E501D"
     ],
     "sev-critical-fill": [
-      "#B42318",
-      "#B42318"
+      "#B91C1C",
+      "#DC2626"
     ],
     "sev-critical-ink": [
       "#FFFFFF",
       "#FFFFFF"
     ],
     "sev-critical-edge": [
-      "#7A1610",
-      "#F47F82"
+      "#7F1D1D",
+      "#FCA5A5"
     ],
     "sev-high-fill": [
-      "#C2410C",
-      "#C2410C"
+      "#F97316",
+      "#FB923C"
     ],
     "sev-high-ink": [
-      "#FFFFFF",
-      "#FFFFFF"
+      "#2B0D02",
+      "#2B0D02"
     ],
     "sev-high-edge": [
-      "#7C2D12",
-      "#FDBA74"
+      "#9A3412",
+      "#FED7AA"
     ],
     "sev-medium-fill": [
-      "#E0B000",
-      "#E0B000"
+      "#FACC15",
+      "#FDE047"
     ],
     "sev-medium-ink": [
-      "#171717",
-      "#171717"
+      "#2B2103",
+      "#2B2103"
     ],
     "sev-medium-edge": [
-      "#8A6A00",
-      "#FDE68A"
+      "#A16207",
+      "#FEF9C3"
     ],
     "sev-low-fill": [
       "#86E0A9",
-      "#86E0A9"
+      "#4ADE80"
     ],
     "sev-low-ink": [
       "#0B2E1A",
-      "#0B2E1A"
+      "#052E16"
     ],
     "sev-low-edge": [
       "#15803D",
-      "#D1FAE5"
+      "#BBF7D0"
     ]
   },
   "spacing": [
@@ -333,7 +333,7 @@
   },
   "visualReference": {
     "type": "SOCify Graphite",
-    "description": "A night-shift operations room: graphite surfaces separated by hairlines, with gold as the single accent for the primary action, checked controls, focus, the current selection, links and single-value rings. Severity tags are solid fills. Charts with several series use data colours. Headings in Kufam, everything else in IBM Plex Sans Arabic. Design guidance adapted from unslop by Damir Sokolovsky (CC BY 4.0)."
+    "description": "A night-shift operations room: graphite surfaces separated by hairlines, with royal navy as the single accent for the primary action, checked controls, focus, the current selection, links and single-value rings. Severity tags are solid fills. Charts with several series use data colours. Headings in Kufam, everything else in IBM Plex Sans Arabic. Design guidance adapted from unslop by Damir Sokolovsky (CC BY 4.0)."
   },
   "aliases": {
     "bg-canvas": "bg",

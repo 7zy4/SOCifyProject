@@ -26,6 +26,7 @@ def open_intake(j, queued=False):
     j.click("button", "إيداع في طابور الفريق" if queued else "إنشاء قضية")
     dialog = j.page.get_by_role("dialog")
     dialog.locator("input[name=title]").fill(TITLE)
+    dialog.locator("input[name=title_en]").fill(TITLE)
     dialog.locator("[name=objective]").fill(OBJECTIVE)
     return dialog
 

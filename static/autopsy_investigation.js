@@ -73,7 +73,7 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
       const marks = data.bookmarks.filter((item) => item.payload.event_id === event.id);
       // One line of meta under the title; the severity tag sits beside it, and the time basis shows only when it is not the source's own time.
       const meta = [event.observed_time_known ? formatTime(event.event_time) : SOCifyLocale.text("وقت الحدث غير معروف؛ لا يُستبدل بوقت الاستيراد"), event.source];
-      const content = node("li", { class: `severity-${String(event.severity || "low").replace(/[^a-z]/g, "")}${marks.length ? " bookmarked" : ""}` }, [node("div", { class: "timeline-entry" }, [node("div", { class: "timeline-head" }, [node("h3", { text: event.title }), autopsyBadge(event.severity)]), node("p", { class: "timeline-meta", text: meta.join(" | ") }), event.time_basis && event.time_basis !== "source" ? node("p", { class: "timeline-meta", text: SOCifyLocale.template`أساس التوقيت: ${autopsyTimeBasisLabel(event.time_basis)}` }) : null])]);
+      const content = node("li", { class: `severity-${String(event.severity || "low").replace(/[^a-z]/g, "")}${marks.length ? " bookmarked" : ""}` }, [autopsyBadge(event.severity), node("div", { class: "timeline-entry" }, [node("div", { class: "timeline-head" }, [node("h3", { text: event.title })]), node("p", { class: "timeline-meta", text: meta.join(" | ") }), event.time_basis && event.time_basis !== "source" ? node("p", { class: "timeline-meta", text: SOCifyLocale.template`أساس التوقيت: ${autopsyTimeBasisLabel(event.time_basis)}` }) : null])]);
       for (const mark of marks) content.querySelector(".timeline-entry").append(node("p", { class: "timeline-note", text: [mark.payload.title, mark.payload.notes, (mark.payload.tags || []).join(", ")].filter(Boolean).join(" | ") }));
       // The record's actions get a row of their own so they never sit on top of its time text.
       const actions = node("div", { class: "action-row timeline-actions" });
@@ -105,23 +105,47 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
   const graphBody = node("div", { class: "panel-body" }, node("p", { text: SOCifyLocale.template`${graph.event_count} سجل | ${graph.nodes.length} كيان | ${graph.edges.length} علاقة. ${SOCifyLocale.text(graph.limitations)}${graph.truncated ? SOCifyLocale.text(" عرض محدود؛ لا يمثل كل السجلات.") : ""}` }));
   const graphNodes = graph.nodes.slice(0, 180);
   const canvas = node("div", { class: "graph-canvas", tabindex: "0", "aria-label": SOCifyLocale.text("علاقات الأدلة؛ يوجد جدول بديل أسفل الرسم") });
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  const width = 900, height = Math.max(200, Math.ceil(graphNodes.length / 3) * 90);
-  svg.setAttribute("width", width); svg.setAttribute("height", height); svg.setAttribute("viewBox", `0 0 ${width} ${height}`); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", SOCifyLocale.text("علاقات مرصودة ضمن القضية الحالية"));
-  const positions = new Map(graphNodes.map((item, index) => [item.id, { x: 150 + (index % 3) * 300, y: 45 + Math.floor(index / 3) * 90 }]));
+  // Logs sit in the middle column; the entities they mention sit either side, so links run outwards instead of across the grid.
+  const svgNode = (name, attributes = {}) => {
+    const element = document.createElementNS("http://www.w3.org/2000/svg", name);
+    for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, String(value));
+    return element;
+  };
+  const events = graphNodes.filter((item) => item.type === "Event");
+  const entities = graphNodes.filter((item) => item.type !== "Event");
+  const columns = [entities.filter((_, index) => index % 2 === 0), events, entities.filter((_, index) => index % 2 === 1)];
+  const width = 900, row = 52, nodeWidth = 248, nodeHeight = 34, top = 28;
+  const height = Math.max(200, top * 2 + Math.max(...columns.map((items) => items.length), 1) * row);
+  const svg = svgNode("svg", { width, height, viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": SOCifyLocale.text("علاقات مرصودة ضمن القضية الحالية") });
+  const positions = new Map();
+  columns.forEach((items, column) => {
+    const offset = (height - items.length * row) / 2;
+    items.forEach((item, index) => positions.set(item.id, { x: 150 + column * 300, y: offset + index * row + row / 2 }));
+  });
+  const links = svgNode("g", { class: "graph-links" });
   for (const edge of graph.edges) {
     const from = positions.get(edge.source), to = positions.get(edge.target);
     if (!from || !to) continue;
-    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    for (const [key, value] of Object.entries({ x1: from.x, y1: from.y, x2: to.x, y2: to.y, stroke: "var(--blue)" })) line.setAttribute(key, String(value));
-    svg.append(line);
+    const [left, right] = from.x <= to.x ? [from, to] : [to, from];
+    const startX = left.x + (left.x === right.x ? 0 : nodeWidth / 2), endX = right.x - (left.x === right.x ? 0 : nodeWidth / 2), bend = (endX - startX) / 2;
+    links.append(svgNode("path", { d: `M ${startX} ${left.y} C ${startX + bend} ${left.y}, ${endX - bend} ${right.y}, ${endX} ${right.y}` }));
   }
+  svg.append(links);
   for (const item of graphNodes) {
     const position = positions.get(item.id);
-    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    text.setAttribute("x", position.x); text.setAttribute("y", position.y); text.setAttribute("text-anchor", "middle"); text.setAttribute("fill", "var(--blue)");
-    text.textContent = displayText(`${autopsyGraphLabel(item.type)}: ${item.label}`).slice(0, 30);
-    const title = document.createElementNS("http://www.w3.org/2000/svg", "title"); title.textContent = displayText(item.label); text.append(title); svg.append(text);
+    const group = svgNode("g", { class: `graph-node${item.type === "Event" ? " graph-event" : ""}`, transform: `translate(${position.x - nodeWidth / 2} ${position.y - nodeHeight / 2})` });
+    group.append(svgNode("rect", { width: nodeWidth, height: nodeHeight, rx: 8 }));
+    // The type reads first in the interface language: on the right in Arabic, on the left in English.
+    const rtl = document.documentElement.dir === "rtl";
+    const kind = svgNode("text", { class: "graph-kind", x: rtl ? nodeWidth - 12 : 12, y: 21, direction: "ltr", "text-anchor": rtl ? "end" : "start" });
+    kind.textContent = autopsyGraphLabel(item.type);
+    const label = svgNode("text", { class: "graph-label", x: rtl ? 12 : nodeWidth - 12, y: 21, direction: "ltr", "text-anchor": rtl ? "start" : "end" });
+    const text = displayText(item.label);
+    label.textContent = text.length > 26 ? `${text.slice(0, 25)}…` : text;
+    const title = svgNode("title");
+    title.textContent = `${autopsyGraphLabel(item.type)}: ${text}`;
+    group.append(title, kind, label);
+    svg.append(group);
   }
   canvas.append(svg);
   if (graph.nodes.length) graphBody.append(canvas, panel(SOCifyLocale.text("جدول العلاقات ومراجع الأدلة"), table([{ label: SOCifyLocale.text("الكيان"), value: "label" }, { label: SOCifyLocale.text("النوع"), value: (item) => autopsyGraphLabel(item.type) }, { label: SOCifyLocale.text("المرجع"), value: "reference_id" }, { label: SOCifyLocale.text("طبيعة الربط"), value: (item) => autopsyGraphLabel(item.provenance) }], graph.nodes)));

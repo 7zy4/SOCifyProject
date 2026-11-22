@@ -61,7 +61,7 @@ def team_detail():
         dict(row)
         for row in get_db()
         .execute(
-            f"SELECT a.*, t.status AS task_status, socify_user_name(u.name,u.name_ar,u.name_en) AS assignee_name, c.reference, c.title AS case_title, j.filename FROM team_log_assignments a JOIN case_tasks t ON t.id = a.task_id JOIN users u ON u.id = a.assignee JOIN incident_cases c ON c.id = a.case_id JOIN ingestion_jobs j ON j.id = a.job_id WHERE a.workspace_id = ?{scope} ORDER BY a.id DESC LIMIT 100",
+            f"SELECT a.*, t.status AS task_status, socify_user_name(u.name,u.name_ar,u.name_en) AS assignee_name, c.reference, socify_case_title(c.title, c.title_en) AS case_title, j.filename FROM team_log_assignments a JOIN case_tasks t ON t.id = a.task_id JOIN users u ON u.id = a.assignee JOIN incident_cases c ON c.id = a.case_id JOIN ingestion_jobs j ON j.id = a.job_id WHERE a.workspace_id = ?{scope} ORDER BY a.id DESC LIMIT 100",
             args,
         )
         .fetchall()
@@ -105,14 +105,18 @@ def list_assignments():
         args.append(status)
     if query:
         value = "%" + query.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-        where += " AND (" + " OR ".join(f"LOWER({field}) LIKE ? ESCAPE '\\'" for field in ("a.instructions", "c.title", "c.reference", "j.filename")) + ")"
-        args.extend([value] * 4)
+        where += (
+            " AND ("
+            + " OR ".join(f"LOWER({field}) LIKE ? ESCAPE '\\'" for field in ("a.instructions", "c.title", "c.title_en", "c.reference", "j.filename"))
+            + ")"
+        )
+        args.extend([value] * 5)
     source = "FROM team_log_assignments a JOIN case_tasks t ON t.id=a.task_id JOIN users u ON u.id=a.assignee JOIN incident_cases c ON c.id=a.case_id JOIN ingestion_jobs j ON j.id=a.job_id"
     total = get_db().execute(f"SELECT COUNT(*) {source} WHERE {where}", args).fetchone()[0]
     rows = (
         get_db()
         .execute(
-            f"SELECT a.*, t.status AS task_status, c.status AS case_status, c.reference, c.title AS case_title, j.filename, socify_user_name(u.name,u.name_ar,u.name_en) AS assignee_name {source} WHERE {where} ORDER BY a.id DESC LIMIT ? OFFSET ?",
+            f"SELECT a.*, t.status AS task_status, c.status AS case_status, c.reference, socify_case_title(c.title, c.title_en) AS case_title, j.filename, socify_user_name(u.name,u.name_ar,u.name_en) AS assignee_name {source} WHERE {where} ORDER BY a.id DESC LIMIT ? OFFSET ?",
             [*args, page_size, (page - 1) * page_size],
         )
         .fetchall()

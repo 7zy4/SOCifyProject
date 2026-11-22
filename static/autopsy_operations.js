@@ -355,7 +355,7 @@ window.SOCifyAutopsy.localDetection = async (caseId) => {
     control.dataset.alertReviewId = row.id;
     return control;
   };
-  root.append(table([{ label: SOCifyLocale.text("التنبيه"), value: "reason" }, { label: SOCifyLocale.text("الخطر"), value: "severity" }, { label: SOCifyLocale.text("تقييم المحقق"), value: (row) => `${autopsyLabel(row.review.verdict)} | ${autopsyLabel(row.review.attack_outcome)}` }, { label: SOCifyLocale.text("مجموعة / نطاق"), value: (row) => `${row.review.group || "—"}${row.historical_derivation ? SOCifyLocale.text(" | نسخة تاريخية") : ""}${row.suppressed ? SOCifyLocale.text(" | إشعار مكبوت مؤقتًا") : ""}` }, { label: SOCifyLocale.text("المراجعة"), value: reviewControl }], alerts.items));
+  root.append(table([{ label: SOCifyLocale.text("التنبيه"), value: "reason" }, { label: SOCifyLocale.text("الخطر"), value: (row) => autopsyBadge(row.severity) }, { label: SOCifyLocale.text("تقييم المحقق"), value: (row) => `${autopsyLabel(row.review.verdict)} | ${autopsyLabel(row.review.attack_outcome)}` }, { label: SOCifyLocale.text("مجموعة / نطاق"), value: (row) => `${row.review.group || "—"}${row.historical_derivation ? SOCifyLocale.text(" | نسخة تاريخية") : ""}${row.suppressed ? SOCifyLocale.text(" | إشعار مكبوت مؤقتًا") : ""}` }, { label: SOCifyLocale.text("المراجعة"), value: reviewControl }], alerts.items));
   paging("alerts_page",alerts);
   return panel(SOCifyLocale.text("الإثراء والكشف ومراجعة التنبيهات"), root, true);
 };

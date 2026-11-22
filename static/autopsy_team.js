@@ -46,7 +46,7 @@ async function autopsyAssignmentQueue(mine = false) {
         { label: SOCifyLocale.text("القضية"), value: row => node("div", {}, [linkedButton(row.reference, `/cases/${row.case_id}`), node("p", { text: row.case_title, "data-user-content": "true" })]) },
         { label: SOCifyLocale.text("الملف"), value: "filename" },
         { label: SOCifyLocale.text("التعليمات"), value: "instructions" },
-        ...(!mine ? [{ label: SOCifyLocale.text("المسؤول"), value: "assignee_name" }] : []),
+        ...(!mine ? [{ label: SOCifyLocale.text("المسؤول"), value: (row) => personChip(row.assignee_name) }] : []),
         { label: SOCifyLocale.text("الحالة"), value: row => SOCifyLocale.text(labels[row.task_status] || row.task_status) },
         { label: SOCifyLocale.text("الإجراء"), value: row => {
           const actions = node("div", { class: "action-row" }, linkedButton(SOCifyLocale.text("فتح الدفعة"), `/cases/${row.case_id}?tab=logs&job_id=${row.job_id}`));

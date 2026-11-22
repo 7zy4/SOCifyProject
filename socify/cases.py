@@ -11,6 +11,7 @@ from flask import Blueprint, Response, current_app, jsonify, request
 from .audit import record_audit
 from .autopsy_pipeline import visibility_sql
 from .case_policy import case_policy
+from .case_titles import localized_case_title
 from .db import get_db, inserted_id, transaction
 from .file_names import attachment_disposition
 from .operational import case_scope, case_visible
@@ -195,6 +196,9 @@ def _case_view(row: sqlite3.Row | None) -> dict[str, Any]:
     if row is None:
         raise RuntimeError("case disappeared during request")
     item = dict(row)
+    # `title` follows the interface language; both stored names stay available for forms and exports.
+    item["title_ar"], item["title_en"] = row["title"], row["title_en"]
+    item["title"] = localized_case_title(row["title"], row["title_en"])
     item["tags"] = json.loads(item["tags"] or "[]")
     item["mitre_ids"] = json.loads(item["mitre_ids"] or "[]")
     item["overdue"] = bool(item["sla_due_at"] and item["status"] not in {"closed", "cancelled"} and item["sla_due_at"] < iso_now())
@@ -267,8 +271,8 @@ def list_cases():
         if len(query) > 200:
             return error_response("QUERY_TOO_LONG", "نص البحث طويل جدًا", 422)
         like = f"%{query}%"
-        clauses.append("(c.reference LIKE ? OR c.title LIKE ?)")
-        parameters.extend([like, like])
+        clauses.append("(c.reference LIKE ? OR c.title LIKE ? OR c.title_en LIKE ?)")
+        parameters.extend([like, like, like])
     where = " AND ".join(clauses)
     total = int(get_db().execute(f"SELECT COUNT(*) FROM incident_cases c WHERE {where}", parameters).fetchone()[0])
     rows = (
@@ -337,6 +341,7 @@ def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
 
     allowed = {
         "title",
+        "title_en",
         "reason",
         "objective",
         "classification",
@@ -369,6 +374,9 @@ def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
     assignee = data.get("assignee", data.get("assigned_to"))
     if not isinstance(title, str) or not 3 <= len(title.strip()) <= 255 or not isinstance(description, str) or len(description) > 10000:
         return error_response("INVALID_CASE", "عنوان التحقيق مطلوب ويجب ألا يتجاوز 255 محرفًا", 422)
+    title_en = data.get("title_en", "")
+    if not isinstance(title_en, str) or len(title_en) > 255 or 0 < len(title_en.strip()) < 3:
+        return error_response("INVALID_CASE", "اسم القضية بالإنجليزية من 3 إلى 255 محرفًا", 422)
     if severity not in SEVERITIES or priority not in PRIORITIES:
         return error_response("INVALID_CASE_PRIORITY", "درجة الخطورة أو الأولوية غير صالحة", 422)
     if assignee is not None and not _user_valid(assignee):
@@ -408,13 +416,14 @@ def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
                 return error_response("ALERT_NOT_FOUND", "التنبيه غير موجود", 404)
         cursor = get_db().execute(
             """INSERT INTO incident_cases
-            (reference, workspace_id, title, description, case_type, severity, priority, status,
+            (reference, workspace_id, title, title_en, description, case_type, severity, priority, status,
             assignee, team, sla_due_at, creator, reporter, tags, mitre_ids, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 _reference(get_db()),
                 workspace_id(),
                 title.strip(),
+                title_en.strip(),
                 description.strip(),
                 str(data.get("case_type") or "investigation")[:80],
                 severity,
@@ -513,7 +522,21 @@ def update_case(case_id: int):
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return error_response("INVALID_JSON", "يلزم إرسال كائن JSON صالح", 400)
-    allowed = {"version", "title", "description", "team", "severity", "priority", "assignee", "assigned_to", "tags", "mitre_ids", "status", "reason"}
+    allowed = {
+        "version",
+        "title",
+        "title_en",
+        "description",
+        "team",
+        "severity",
+        "priority",
+        "assignee",
+        "assigned_to",
+        "tags",
+        "mitre_ids",
+        "status",
+        "reason",
+    }
     if set(data) - allowed or type(data.get("version")) is not int:
         return error_response("INVALID_CASE_UPDATE", "أرسل الإصدار والحقول المعروفة", 422)
     supplied_version = data.get("version")
@@ -522,10 +545,13 @@ def update_case(case_id: int):
     if "status" in data:
         return _transition(case_id, row, str(data["status"]), str(data.get("reason") or "Legacy status update"), data)
     updates: dict[str, Any] = {}
-    for field, maximum in (("title", 255), ("description", 10000), ("team", 120)):
+    for field, maximum in (("title", 255), ("title_en", 255), ("description", 10000), ("team", 120)):
         if field in data:
             value = data[field]
-            if not isinstance(value, str) or (field == "title" and len(value.strip()) < 3) or len(value) > maximum:
+            # The Arabic name needs three characters; the English name may be blank (older cases) or three or more.
+            length = len(value.strip()) if isinstance(value, str) else 0
+            short = length < 3 if field == "title" else field == "title_en" and 0 < length < 3
+            if not isinstance(value, str) or short or len(value) > maximum:
                 return error_response("INVALID_CASE_FIELD", f"الحقل {field} غير صالح", 422)
             updates[field] = value.strip()
     for field, allowed in (("severity", SEVERITIES), ("priority", PRIORITIES)):

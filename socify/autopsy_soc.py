@@ -58,9 +58,9 @@ def monitoring():
         where += clause
         args.extend(parameters)
     if query:
-        where += " AND (a.alert_id LIKE ? ESCAPE '\\' OR r.name LIKE ? ESCAPE '\\' OR c.reference LIKE ? ESCAPE '\\' OR c.title LIKE ? ESCAPE '\\')"
+        where += " AND (a.alert_id LIKE ? ESCAPE '\\' OR r.name LIKE ? ESCAPE '\\' OR c.reference LIKE ? ESCAPE '\\' OR c.title LIKE ? ESCAPE '\\' OR c.title_en LIKE ? ESCAPE '\\')"
         like = "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-        args.extend([like] * 4)
+        args.extend([like] * 5)
     if severity:
         where += " AND a.severity=?"
         args.append(severity)
@@ -75,7 +75,7 @@ def monitoring():
         get_db()
         .execute(
             f"""SELECT a.id,a.alert_id,a.severity,a.detected_at,a.reason,a.rule_version,r.name AS rule_name,
-        c.id AS case_id,c.reference,c.title AS case_title,c.status AS case_status,c.version AS case_version,
+        c.id AS case_id,c.reference,socify_case_title(c.title, c.title_en) AS case_title,c.status AS case_status,c.version AS case_version,
         c.assignee,socify_user_name(u.name,u.name_ar,u.name_en) AS assignee_name,
         (SELECT COUNT(*) FROM alert_events ae WHERE ae.alert_id=a.id) AS evidence_events,
         (SELECT json_extract(v.payload,'$.verdict') FROM autopsy_alert_reviews v WHERE v.alert_id=a.id) AS verdict

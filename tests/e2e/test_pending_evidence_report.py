@@ -81,6 +81,7 @@ def test_pending_evidence_handoff_keeps_reasoning_and_source_limits(app, monkeyp
         j.click("button", "إنشاء قضية")
         dialog = j.page.get_by_role("dialog")
         dialog.locator("input[name=title]").fill("VPN evidence awaiting validation")
+        dialog.locator("input[name=title_en]").fill("VPN evidence awaiting validation")
         dialog.locator("textarea[name=objective]").fill("Review authentication evidence and prepare a bounded handoff without assuming compromise.")
         j.click("button", "حفظ", dialog)
         j.case_id = int(urlsplit(j.page.url).path.split("/")[-1])

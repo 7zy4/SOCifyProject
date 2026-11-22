@@ -87,30 +87,53 @@ window.SOCifyInsights = (() => {
       value === undefined ? null : node("strong", {text:n(value)}),
     ])));
   }
+  // Shared drawing helpers for the indicator charts.
+  function monotonePath(points) {
+    if (points.length === 1) return `M${points[0][0]},${points[0][1]}`;
+    const slopes = points.slice(0, -1).map((point, i) => (points[i + 1][1] - point[1]) / (points[i + 1][0] - point[0] || 1));
+    const tangents = points.map((_, i) => i === 0 ? slopes[0] : i === points.length - 1 ? slopes[i - 1] : slopes[i - 1] * slopes[i] <= 0 ? 0 : (slopes[i - 1] + slopes[i]) / 2);
+    let path = `M${points[0][0]},${points[0][1]}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const [x0, y0] = points[i], [x1, y1] = points[i + 1], step = (x1 - x0) / 3;
+      path += ` C${x0 + step},${y0 + tangents[i] * step} ${x1 - step},${y1 - tangents[i + 1] * step} ${x1},${y1}`;
+    }
+    return path;
+  }
+  function figureBlock(value, caption, attributes = {}) {
+    return node("div", {class:"performance-figure", ...attributes.wrapper}, [node("strong", {dir:"ltr", ...attributes.value, text:value}), node("span", {text:caption})]);
+  }
   function completionChart(data) {
     const value = data.completion || {total:null,completed:null,pending:null,unmeasured:null,percentage:null};
-    const known = Number.isFinite(value.percentage);
-    const figure = node("div", {class:"performance-completion"});
-    const circle = node("div", {class:`performance-ring${known ? "" : " unavailable"}`});
-    circle.append(chartSVG("svg", {viewBox:"0 0 220 220", "aria-hidden":"true",focusable:"false"}, [
-      chartSVG("circle", {cx:110,cy:110,r:88,class:"performance-ring-edge"}),
-      chartSVG("circle", {cx:110,cy:110,r:88,class:"performance-ring-track"}),
-      ...(known ? [chartSVG("circle", {cx:110,cy:110,r:88,pathLength:100,class:"performance-ring-value","stroke-dasharray":`${value.percentage} ${100-value.percentage}`,transform:"rotate(-90 110 110)"})] : []),
-    ]));
-    circle.append(node("div", {class:"performance-ring-label"}, [
-      node("strong", {"data-completion-value":"",dir:"ltr",class:precisePercent(value.percentage)?"performance-precise-value":null,text:percent(value.percentage)}),
-      node("span", {text:t("مكتملة", "Completed")}),
-    ]));
-    figure.append(circle);
-    if (value.total !== null) figure.append(node("p", {class:"performance-completion-count","data-completion-count":"",text:`${n(value.completed)} ${t("من", "of")} ${n(value.total)}`}));
-    figure.append(node("p", {class:"performance-basis",text:t("القضايا المنشأة خلال الفترة", "Cases opened in this period")}));
-    if (value.total !== null) figure.append(chartLegend([
-      [t("مكتملة", "Completed"),"completed",value.completed],
-      [t("نشطة", "Active"),"opened",value.pending],
-      ...(value.unmeasured ? [[t("غير قابلة للحساب", "Not measurable"),"unknown",value.unmeasured]] : []),
-    ]));
-    if (!value.total) figure.append(node("p", {class:"performance-empty",text:value.total === 0 ? t("لا قضايا خلال الفترة", "No cases in this period") : t("لا قياس بعد", "Not measured yet")}));
-    return panel(t("إنجاز القضايا", "Case completion"), figure, true);
+    const body = node("div", {class:"performance-completion"});
+    const head = node("div", {class:"performance-figure-row"}, [
+      figureBlock(percent(value.percentage), t("مكتملة", "Completed"), {value:{"data-completion-value":"",class:precisePercent(value.percentage)?"performance-precise-value":null}}),
+      value.total !== null ? node("p", {class:"performance-completion-count","data-completion-count":"",text:`${n(value.completed)} ${t("من", "of")} ${n(value.total)}`}) : null,
+    ]);
+    body.append(head);
+    // Burn-up: cases opened and closed so far in the period; the gap between the lines is the work still open.
+    const buckets = trendBuckets(data);
+    const legend = value.unmeasured ? [[t("غير قابلة للحساب", "Not measurable"),"unknown",value.unmeasured]] : [];
+    if (buckets.length) {
+      let opened = 0, closed = 0;
+      const series = buckets.map(bucket => ({opened:(opened += bucket.opened), closed:(closed += bucket.closed)}));
+      const width = 320, height = 120, top = 10, bottom = height - 6, max = Math.max(1, opened, closed);
+      const x = index => series.length === 1 ? width / 2 : index * width / (series.length - 1);
+      const y = count => bottom - (bottom - top) * count / max;
+      const openedLine = series.map((point, index) => [x(index), y(point.opened)]);
+      const closedLine = series.map((point, index) => [x(index), y(point.closed)]);
+      body.append(node("div", {class:"performance-burnup", dir:"ltr"}, chartSVG("svg", {viewBox:`0 0 ${width} ${height}`, preserveAspectRatio:"none", "aria-hidden":"true", focusable:"false"}, [
+        ...[0.5, 1].map(share => chartSVG("line", {x1:0, x2:width, y1:y(max * share), y2:y(max * share), class:"performance-grid"})),
+        chartSVG("path", {d:`${monotonePath(openedLine)} L${width},${bottom} L0,${bottom} Z`, class:"performance-burnup-open"}),
+        chartSVG("path", {d:`${monotonePath(closedLine)} L${width},${bottom} L0,${bottom} Z`, class:"performance-burnup-done"}),
+        chartSVG("path", {d:monotonePath(openedLine), class:"performance-burnup-line opened"}),
+        chartSVG("path", {d:monotonePath(closedLine), class:"performance-burnup-line closed"}),
+      ])));
+      legend.unshift([t("أنشئت حتى الآن", "Opened so far"),"opened",opened],[t("أغلقت حتى الآن", "Closed so far"),"closed",closed]);
+    }
+    if (legend.length) body.append(chartLegend(legend));
+    body.append(node("p", {class:"performance-basis",text:t("النسبة للقضايا المنشأة خلال الفترة", "Share of cases opened in this period")}));
+    if (!value.total) body.append(node("p", {class:"performance-empty",text:value.total === 0 ? t("لا قضايا خلال الفترة", "No cases in this period") : t("لا قياس بعد", "Not measured yet")}));
+    return panel(t("إنجاز القضايا", "Case completion"), body, true);
   }
   function trendBuckets(data) {
     if (!data.trend.length) return [];
@@ -215,56 +238,79 @@ window.SOCifyInsights = (() => {
     return panel(t("حركة القضايا خلال الفترة", "Case activity during period"), body, true);
   }
   function speedChart(data) {
-    const value = data.speed || {on_time:0,late:0,unmeasured:0,included:0,compliance_percent:null};
+    const value = data.speed || {on_time:0,late:0,unmeasured:0,included:0,compliance_percent:null,cases:[]};
     const body = node("div", {class:"panel-body performance-speed"});
-    const known = value.included > 0 && Number.isFinite(value.compliance_percent);
-    const arc = "M20,100 A80,80 0 0 1 180,100";
-    const gauge = node("div", {class:`performance-gauge${known ? "" : " unavailable"}`}, [
-      chartSVG("svg", {viewBox:"0 0 200 112","aria-hidden":"true",focusable:"false"}, [
-        chartSVG("path", {d:arc,pathLength:100,class:"performance-gauge-track"}),
-        ...(known ? [chartSVG("path", {d:arc,pathLength:100,class:"performance-gauge-value","stroke-dasharray":`${value.compliance_percent} 100`})] : []),
-      ]),
-      node("div", {class:"performance-speed-score"}, [
-        node("strong", {"data-speed-value":"",dir:"ltr",class:precisePercent(value.compliance_percent)?"performance-precise-value":null,text:percent(value.compliance_percent)}),
-        node("span", {text:t("ضمن المهلة", "Within SLA")}),
-      ]),
-    ]);
-    const outcomes = node("div", {class:"performance-speed-outcomes"});
-    outcomes.append(chartLegend([[t("ضمن المهلة", "Within SLA"),"within",value.on_time],[t("متأخرة", "Late"),"late",value.late]]));
-    outcomes.append(node("p", {class:"performance-basis",text:`${t("قضايا مغلقة قابلة للحساب", "Closed cases measured")} ${n(value.included)} ${t("من", "of")} ${n(value.included+value.unmeasured)}`}));
-    if (!value.included) outcomes.append(node("p", {class:"performance-empty",text:t("لا قياسات لمهلة الاستجابة", "No SLA measurements")}));
-    body.append(gauge,outcomes);
+    body.append(figureBlock(percent(value.compliance_percent), t("ضمن المهلة", "Within SLA"), {wrapper:{class:"performance-figure performance-speed-score"}, value:{"data-speed-value":"",class:precisePercent(value.compliance_percent)?"performance-precise-value":null}}));
+    // Each closed case is a column, oldest first: its height is the share of its deadline it used, and columns above the line ran late.
+    const cases = (value.cases || []).filter(item => Number.isFinite(item.used)).reverse();
+    if (cases.length) {
+      const scale = Math.max(1.25, Math.min(2.5, Math.max(...cases.map(item => item.used)) * 1.08));
+      const share = used => `${(100 * Math.min(used, scale) / scale).toFixed(2)}%`;
+      const chart = node("div", {class:"performance-sla-columns", dir:"ltr", role:"img", "aria-label":`${t("نسبة المهلة المستخدمة لكل قضية مغلقة", "Share of the deadline used by each closed case")}: ${t("ضمن المهلة", "Within SLA")} ${n(cases.filter(item => item.on_time).length)} | ${t("متأخرة", "Late")} ${n(cases.filter(item => !item.on_time).length)}`});
+      chart.style.setProperty("--deadline", share(1));
+      chart.style.setProperty("--gap", cases.length > 16 ? "2px" : "6px");
+      chart.append(node("span", {class:"performance-sla-zone"}), node("span", {class:"performance-sla-line"}, node("span", {text:t("المهلة", "Deadline")})));
+      for (const item of cases) {
+        const column = node("span", {class:`performance-sla-column ${item.on_time ? "within" : "late"}`, title:`${item.reference} | ${percent(item.used * 100)}`});
+        column.style.setProperty("--used", share(item.used));
+        chart.append(column);
+      }
+      body.append(chart);
+    }
+    body.append(chartLegend([[t("ضمن المهلة", "Within SLA"),"within",value.on_time],[t("متأخرة", "Late"),"late",value.late]]));
+    body.append(node("p", {class:"performance-basis",text:`${t("قضايا مغلقة قابلة للحساب", "Closed cases measured")} ${n(value.included)} ${t("من", "of")} ${n(value.included+value.unmeasured)}`}));
+    if (!value.included) body.append(node("p", {class:"performance-empty",text:t("لا قياسات لمهلة الاستجابة", "No SLA measurements")}));
     return panel(t("الالتزام بمهلة الاستجابة", "Response SLA compliance"),body,true);
   }
   function durationChart(data) {
     const titles = {detection_delay_seconds:t("الرصد", "Detection"),acknowledgement_delay_seconds:t("إقرار الاستلام", "Acknowledgement"),containment_delay_seconds:t("الاحتواء", "Containment"),recovery_delay_seconds:t("التعافي", "Recovery"),closure_delay_seconds:t("الإغلاق", "Closure")};
     const values = Object.entries(titles).map(([key,title]) => ({key,title,...data.metrics[key]}));
-    const max = Math.max(1,...values.map(item => item.median_seconds || 0));
     const body = node("div", {class:"panel-body performance-durations"});
+    // One bar per step, its length the step's median time against the longest step.
+    const longest = Math.max(0, ...values.map(item => item.median_seconds || 0));
+    const rows = node("div", {class:"performance-duration-rows"});
     for (const item of values) {
       const track = node("div", {class:"performance-duration-track","aria-hidden":"true"});
       if (item.median_seconds !== null) {
-        const mark = node("span", {class:"performance-duration-mark"}); mark.style.setProperty("--at", `${100*item.median_seconds/max}%`); track.append(mark);
+        const bar = node("span", {class:"performance-duration-bar", title:`${item.title} | ${duration(item.median_seconds)}`});
+        bar.style.setProperty("--share", `${longest ? (100 * item.median_seconds / longest).toFixed(2) : 0}%`);
+        track.append(bar);
       }
-      body.append(node("div", {class:"performance-duration-row"}, [
-        node("span", {class:"performance-duration-title",text:item.title}),track,node("strong", {text:duration(item.median_seconds)}),
+      rows.append(node("div", {class:"performance-duration-row"}, [
+        node("span", {class:"performance-duration-title",text:item.title}),
+        track,
+        node("strong", {text:duration(item.median_seconds)}),
         node("span", {class:"performance-sample",text:`${n(item.included)} ${t("من", "of")} ${n(item.included+item.excluded)}`}),
       ]));
     }
+    body.append(rows);
     return panel(t("وسيط مدد القضايا المغلقة", "Median closed-case durations"),body,true);
+  }
+  // One capsule split by severity: each part's length is its share of the active cases.
+  function severityCapsule(counts) {
+    const parts = ["critical","high","medium","low"].map(severity => [severity, counts[severity] || 0]);
+    const total = parts.reduce((sum, [, count]) => sum + count, 0);
+    const capsule = node("div", {class:`performance-capsule${total ? "" : " empty"}`, role:"img", "aria-label":parts.map(([severity, count]) => `${label(severity)} ${n(count)}`).join(" | ")});
+    for (const [severity, count] of parts) {
+      if (!count) continue;
+      const part = node("span", {class:`performance-capsule-part ${severity}`, title:`${label(severity)} ${n(count)}`});
+      part.style.flexGrow = String(count);
+      capsule.append(part);
+    }
+    return capsule;
   }
   function severityChart(data) {
     const body = node("div", {class:"panel-body performance-severity"});
     const legend = node("ul", {class:"performance-severity-list"});
-    const ring = chartSVG("svg", {viewBox:"0 0 120 120","aria-hidden":"true",focusable:"false"}, [
-      chartSVG("circle", {cx:60,cy:60,r:48,class:"performance-donut-track"}),
-      ...(data.counts.open ? [chartSVG("circle", {cx:60,cy:60,r:48,class:"performance-donut-value"})] : []),
-    ]);
     for (const severity of ["critical","high","medium","low"]) {
-      legend.append(node("li", {}, [node("span", {class:`severity ${severity}`,text:label(severity)}),node("strong", {text:n(data.severity[severity] || 0)})]));
+      legend.append(node("li", {}, [autopsyBadge(severity),node("strong", {text:n(data.severity[severity] || 0)})]));
     }
-    const donut = node("div", {class:`performance-donut${data.counts.open ? "" : " unavailable"}`}, [ring, node("div", {class:"performance-donut-label"}, [node("strong", {text:n(data.counts.open)}),node("span", {text:t("قضايا نشطة", "Active cases")})])]);
-    body.append(node("div", {class:"performance-workload"}, [donut, legend]));
+    // The capsule shows the active cases split by severity: here colour means severity and nothing else.
+    const figure = node("div", {class:"performance-workload-figure"}, [
+      node("div", {class:"performance-figure"}, [node("strong", {text:n(data.counts.open)}),node("span", {text:t("قضايا نشطة", "Active cases")})]),
+      severityCapsule(data.severity),
+    ]);
+    body.append(node("div", {class:"performance-workload"}, [figure, legend]));
     body.append(node("dl", {class:"performance-attention"}, [
       [t("تنبيهات دون قرار", "Alerts without a verdict"),data.counts.unreviewed_alerts],
       [t("قضايا دون مسؤول", "Unassigned cases"),data.counts.unassigned],
@@ -295,12 +341,12 @@ window.SOCifyInsights = (() => {
       root.append(node("div", {class:"performance-overview"}, [activityChart(data),severityChart(data)]));
       root.append(node("div", {class:"performance-operations"}, [completionChart(data),speedChart(data),durationChart(data)]));
       if(data.members.length) {
-        const members = panel(t("الفريق والإنجاز", "Team delivery"),table([{label:t("المحلل", "Analyst"),value:r=>data.can_manage?node("a",{href:queueURL({member:r.id,page:1}),text:r.name}):userText(r.name)},{label:t("الدور", "Role"),value:r=>r.role === "instructor" ? t("مدرب", "Instructor") : label(r.role)},{label:t("نشطة", "Active"),value:r=>n(r.open)},{label:t("مغلقة خلال الفترة", "Closed in period"),value:r=>n(r.closed)},{label:t("مهام أنجزها", "Tasks completed"),value:r=>n(r.tasks_completed)}],data.members),true);
+        const members = panel(t("الفريق والإنجاز", "Team delivery"),table([{label:t("المحلل", "Analyst"),value:r=>data.can_manage?node("a",{class:"badge badge-person",href:queueURL({member:r.id,page:1}),title:r.name,text:r.name}):personChip(r.name)},{label:t("الدور", "Role"),value:r=>r.role === "instructor" ? t("مدرب", "Instructor") : label(r.role)},{label:t("نشطة", "Active"),value:r=>n(r.open)},{label:t("مغلقة خلال الفترة", "Closed in period"),value:r=>n(r.closed)},{label:t("مهام أنجزها", "Tasks completed"),value:r=>n(r.tasks_completed)}],data.members),true);
         members.classList.add("performance-members");root.append(members);
       }
       const queueTitle = data.queue_kind === "closed" ? t("القضايا المغلقة", "Closed cases") : data.queue_kind === "awaiting_review" ? t("بانتظار المراجعة", "Awaiting review") : t("قائمة المتابعة", "Work queue");
       const emptyQueue = data.queue_kind === "closed" ? t("لا قضايا مغلقة خلال الفترة", "No cases closed in this period") : data.queue_kind === "awaiting_review" ? t("لا قضايا بانتظار المراجعة", "No cases awaiting review") : t("لا قضايا نشطة", "No active cases");
-      const queueContent = data.queue.length ? table([{label:t("القضية", "Case"),value:r=>node("a",{href:`/cases/${r.id}${data.queue_kind === "awaiting_review" ? "?tab=reports" : ""}`,text:`${r.reference} | ${r.title}`})},{label:t("الخطورة", "Severity"),value:r=>node("span",{class:`severity ${r.severity}`,text:label(r.severity)})},{label:t("المسؤول", "Owner"),value:r=>userText(r.assignee_name)},{label:t("الحالة", "Status"),value:r=>label(r.status)},{label:data.queue_kind === "closed" ? t("الإغلاق", "Closed at") : t("الموعد", "Deadline"),value:r=>time(data.queue_kind === "closed" ? r.closed_at : r.sla_due_at)}],data.queue) : emptyState(emptyQueue,null,[linkedButton(t("إدارة القضايا", "Case management"),"/cases")]);
+      const queueContent = data.queue.length ? table([{label:t("القضية", "Case"),value:r=>node("a",{href:`/cases/${r.id}${data.queue_kind === "awaiting_review" ? "?tab=reports" : ""}`,text:`${r.reference} | ${r.title}`})},{label:t("الخطورة", "Severity"),value:r=>autopsyBadge(r.severity)},{label:t("المسؤول", "Owner"),value:r=>personChip(r.assignee_name)},{label:t("الحالة", "Status"),value:r=>autopsyBadge(r.status, "case")},{label:data.queue_kind === "closed" ? t("الإغلاق", "Closed at") : t("الموعد", "Deadline"),value:r=>time(data.queue_kind === "closed" ? r.closed_at : r.sla_due_at)}],data.queue) : emptyState(emptyQueue,null,[linkedButton(t("إدارة القضايا", "Case management"),"/cases")]);
       const queuePanel = panel(`${queueTitle} | ${n(data.queue_total)}`, queueContent, true);
       queuePanel.id = "performance-cases";
       queuePanel.setAttribute("aria-label",queueTitle);
@@ -329,7 +375,7 @@ window.SOCifyInsights = (() => {
     const details=detailTable(t("تفاصيل التنبيه", "Alert details"),[
       [t("معرف التنبيه", "Alert ID"),data.alert.alert_id],
       [t("اسم القاعدة", "Rule name"),data.alert.rule_name],
-      [t("الخطورة", "Severity"),node("span",{class:`severity ${data.alert.severity}`,text:label(data.alert.severity)})],
+      [t("الخطورة", "Severity"),autopsyBadge(data.alert.severity)],
       [t("سبب الكشف", "Detection reason"),data.alert.reason],
       [t("وقت الكشف", "Detection time"),time(data.alert.detected_at)],
       [t("القضية", "Case"),node("a",{href:`/cases/${item.case_id}`,text:[data.case.reference,caseTitle].filter(Boolean).join(" | ")})],

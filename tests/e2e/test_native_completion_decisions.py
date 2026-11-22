@@ -145,6 +145,7 @@ def next_case(j):
     j.click("button", "إنشاء قضية")
     dialog = j.page.get_by_role("dialog")
     dialog.locator("input[name=title]").fill("Next gateway investigation")
+    dialog.locator("input[name=title_en]").fill("Next gateway investigation")
     j.click("button", "حفظ", dialog)
     j.page.wait_for_url("**/cases/*")
     identifier = int(j.page.url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
