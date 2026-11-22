@@ -168,6 +168,41 @@ def test_theme_control_works_when_browser_storage_is_unavailable(app):
 
 
 @pytest.mark.e2e
+def test_theme_change_swaps_every_colour_at_once(app):
+    """Text never fades in the old theme's colour against the new background, which axe reads as low contrast."""
+    server = make_server("127.0.0.1", 0, app)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as playwright:
+            browser = launch_browser(playwright)
+            page = browser.new_page(locale="ar-SA", color_scheme="dark")
+            page.goto(f"http://127.0.0.1:{server.server_port}/login")
+            page.get_by_label("البريد الإلكتروني", exact=True).fill("manager@socify.local")
+            page.get_by_label("كلمة المرور", exact=True).fill(DEMO_LOGIN_VALUE)
+            page.get_by_role("button", name="دخول", exact=True).click()
+            page.wait_for_url("**/cases")
+            page.wait_for_function("() => document.querySelector('#workspace').getAttribute('aria-busy') === 'false'")
+            switch = """theme => {
+                const link = document.querySelector('#primary-nav [data-section="my-tasks"]');
+                document.querySelector(`[data-theme-option="${theme}"]`).click();
+                return [getComputedStyle(link).color, getComputedStyle(link).transitionProperty];
+            }"""
+            light, transition = page.evaluate(switch, "light")
+            assert light == "rgb(82, 82, 82)" and transition == "none", (light, transition)
+            page.wait_for_function("() => !('themeSwitching' in document.documentElement.dataset)")
+            dark, _ = page.evaluate(switch, "dark")
+            assert dark == "rgb(161, 161, 166)", dark
+            page.wait_for_function("() => !('themeSwitching' in document.documentElement.dataset)")
+            restored = page.evaluate("getComputedStyle(document.querySelector('#primary-nav [data-section=\"my-tasks\"]')).transitionProperty")
+            assert "color" in restored, restored
+            browser.close()
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+@pytest.mark.e2e
 def test_public_pages_theme_typography_and_responsive_layout(app):
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)

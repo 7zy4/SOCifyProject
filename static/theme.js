@@ -16,11 +16,18 @@
 
   function apply() {
     const resolved = preference === "system" ? (system.matches ? "dark" : "light") : preference;
+    // Without this, colour transitions would briefly show text in the old theme's colour on the new background.
+    const switching = Boolean(root.dataset.theme) && root.dataset.theme !== resolved && document.body;
+    if (switching) root.dataset.themeSwitching = "";
     root.dataset.theme = resolved;
     root.dataset.themePreference = preference;
     root.style.colorScheme = resolved;
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", resolved === "dark" ? "#141415" : "#FAFAFA");
     controls.forEach(control => control.update());
+    if (switching) {
+      void document.body.offsetHeight; // apply the new colours while transitions are off
+      requestAnimationFrame(() => requestAnimationFrame(() => { delete root.dataset.themeSwitching; }));
+    }
   }
   function choose(value) {
     preference = value;

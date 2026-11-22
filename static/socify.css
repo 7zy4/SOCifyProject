@@ -316,7 +316,8 @@ td .button { min-height: 28px; padding: 0 10px; font-size: 12px; }
 .case-selection-label bdi { color: var(--faint); font-size: 12px; }
 .case-selection-label strong { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
 .case-selection-label small { color: var(--faint); font-size: 12px; }
-.case-selection-locked { opacity: 0.72; }
+/* Locked without fading: opacity would pull the card's text and status tag below readable contrast. */
+.case-selection-locked { background: var(--bg); border-style: dashed; }
 .case-selection-locked .case-selection-label { cursor: default; }
 .case-card-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--faint); font-size: 12px; padding-inline-start: 28px; }
 .case-selection-card > .button { justify-self: start; margin-inline-start: 28px; }
@@ -641,6 +642,11 @@ details.performance-data { margin-block-start: 8px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+/* A theme change swaps every colour at once (theme.js), so no text fades against the new background; only the
+   appearance control keeps its motion. */
+html[data-theme-switching] *:not(.theme-switch, .theme-switch *),
+html[data-theme-switching] *:not(.theme-switch, .theme-switch *)::before,
+html[data-theme-switching] *:not(.theme-switch, .theme-switch *)::after { transition: none !important; }
 @page { size: 595pt 842pt; margin: 42pt 44pt 40pt; }
 @media print {
   body { background: #FFFFFF; }
