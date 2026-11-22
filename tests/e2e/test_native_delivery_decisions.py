@@ -245,13 +245,14 @@ def normalized_text(text):
 
 def assert_pdf_cell(text, caption, expected):
     """Read a whole labelled value; a zero inside 10/30/120 is never zero."""
-    # Poppler's Cairo glyph extraction reorders these Arabic ligatures. These
-    # exact alternatives were verified against the native PDF pages, not fuzzy
-    # matches: a missing row or a different whole numeric value must still fail.
+    # Poppler's glyph extraction reorders these Arabic ligatures in the report
+    # font (IBM Plex Sans Arabic). These exact alternatives were verified against
+    # the native PDF pages with pdftotext 24.02, not fuzzy matches: a missing row
+    # or a different whole numeric value must still fail.
     extracted_labels = {
-        "المدة حتى الإقرار بالثواني": "المدة حىت اإلقرار بالثواني",
-        "المدة حتى الاحتواء بالثواني": "المدة حىت االحتواء بالثواني",
-        "المدة حتى التعافي بالثواني": "المدة حىت التعافي بالثواني",
+        "المدة حتى الإقرار بالثواني": "المدة حىت اإلقرار بالثواين",
+        "المدة حتى الاحتواء بالثواني": "المدة حىت االحتواء بالثواين",
+        "المدة حتى التعافي بالثواني": "المدة حىت التعايف بالثواين",
     }
     labels = {"".join(normalized_text(item).split()) for item in (caption, extracted_labels.get(caption, caption))}
     labels |= {label[::-1] for label in labels}
