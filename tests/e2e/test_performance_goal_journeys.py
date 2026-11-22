@@ -6,7 +6,7 @@ import pytest
 from playwright.sync_api import expect
 
 from socify.timeutils import parse_timestamp
-from tests.e2e.browser_helpers import assert_accessible
+from tests.e2e.browser_helpers import account_menu, assert_accessible
 from tests.e2e.test_assignment_handoff_journeys import handoff_form
 from tests.e2e.test_batch_boundary_journeys import restrict_batch, upload_logs
 from tests.e2e.test_review_workflow import ARTIFACTS, review_session
@@ -147,10 +147,10 @@ def test_performance_supports_the_next_user_decision(app, monkeypatch, language,
             assert "days=7" in manager.page.url and "member=" in manager.page.url
             expect(manager.page.get_by_label(manager.text("فترة الإنجاز"), exact=True)).to_have_value("7")
             assert delivery(manager).get_by_role("row").count() == 2
-            manager.page.locator("[data-language-toggle]").click()
+            account_menu(manager.page).locator("[data-language-toggle]").click()
             manager.settle()
             expect(manager.page.get_by_label(manager.text("فترة الإنجاز"), exact=True)).to_have_value("7")
-            manager.page.locator("[data-language-toggle]").click()
+            account_menu(manager.page).locator("[data-language-toggle]").click()
             manager.settle()
             manager.click("link", "الفريق", manager.page.locator(".channel-tabs"))
             assert "days=7" in manager.page.url

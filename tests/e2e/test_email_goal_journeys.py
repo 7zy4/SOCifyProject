@@ -63,7 +63,7 @@ def reviews(j):
 )
 def test_mail_findings_are_readable_and_recoverable(app, language, scenario):
     with review_session(app, language, scenario) as (j, _manager, result):
-        j.nav("أمن البريد الإلكتروني")
+        j.nav("البريد")
         if scenario in {"mail-invalid-recovery", "mail-oversized-recovery"}:
             upload(j, b"X" * (5 * 1024 * 1024 + 1) if scenario == "mail-oversized-recovery" else b"This is not an email message")
             assert not reviews(j)["items"]
@@ -93,9 +93,9 @@ def test_mail_findings_are_readable_and_recoverable(app, language, scenario):
             first = reviews(j)["items"][0]
             first_case = j.case_id
             if scenario == "mail-case-isolation":
-                j.nav("إدارة القضايا")
+                j.nav("القضايا")
                 j.create_case()
-                j.nav("أمن البريد الإلكتروني")
+                j.nav("البريد")
                 expect(j.page.get_by_role("heading", name="Retained service notice", exact=True)).to_have_count(0)
                 upload(j, message())
                 current = reviews(j)["items"][0]
@@ -175,7 +175,7 @@ def test_mail_findings_are_readable_and_recoverable(app, language, scenario):
 def test_mail_investigation_entry_and_untitled_identity(app, language, scenario):
     with review_session(app, language, scenario) as (j, _manager, result):
         if scenario == "mail-case-analysis-entry":
-            j.nav("تحليل الأدلة")
+            j.nav("الملفات")
             j.page.get_by_role("link", name="الملفات والبريد" if language == "ar" else "Files & email", exact=True).click()
             j.settle()
             j.page.locator("input[name=eml_file]").set_input_files({"name": "review.eml", "mimeType": "message/rfc822", "buffer": message(attachment=True)})
@@ -192,11 +192,11 @@ def test_mail_investigation_entry_and_untitled_identity(app, language, scenario)
             expect(j.page.locator(".record-card")).not_to_contain_text("email_risk_score")
             j.page.evaluate("window.scrollTo(0, 0)")
             j.page.screenshot(path=str(ARTIFACTS / f"{scenario}-{language}-record.png"), full_page=True)
-            j.nav("أمن البريد الإلكتروني")
+            j.nav("البريد")
             expect(j.page.get_by_role("heading", name="Retained service notice", exact=True)).to_be_visible()
             assert len(reviews(j)["items"]) == 1
         else:
-            j.nav("أمن البريد الإلكتروني")
+            j.nav("البريد")
             content = message().replace(b"Subject: Retained service notice\r\n", b"")
             upload(j, content, "untitled.eml")
             before = reviews(j)["items"]

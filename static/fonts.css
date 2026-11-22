@@ -1,7 +1,7 @@
-/* Locally hosted OFL fonts. Sources and licenses accompany each family. */
-@font-face { font-family:"IBM Plex Sans"; font-style:normal; font-weight:100 700; font-display:swap; src:url("fonts/IBMPlexSans.woff2") format("woff2"); }
+/* Locally hosted OFL fonts. Sources and licenses accompany each family.
+   Two families only, both drawn for Arabic and Latin: Kufam for headings, IBM Plex Sans Arabic for everything else. */
 @font-face { font-family:"IBM Plex Sans Arabic"; font-style:normal; font-weight:400; font-display:swap; src:url("fonts/IBMPlexSansArabic-Regular.woff2") format("woff2"); }
+@font-face { font-family:"IBM Plex Sans Arabic"; font-style:normal; font-weight:500; font-display:swap; src:url("fonts/IBMPlexSansArabic-Medium.woff2") format("woff2"); }
+@font-face { font-family:"IBM Plex Sans Arabic"; font-style:normal; font-weight:600; font-display:swap; src:url("fonts/IBMPlexSansArabic-SemiBold.woff2") format("woff2"); }
 @font-face { font-family:"IBM Plex Sans Arabic"; font-style:normal; font-weight:700; font-display:swap; src:url("fonts/IBMPlexSansArabic-Bold.woff2") format("woff2"); }
-@font-face { font-family:"Bangers"; font-style:normal; font-weight:400; font-display:swap; src:url("fonts/Bangers-Regular.woff2") format("woff2"); }
-@font-face { font-family:"Cairo"; font-style:normal; font-weight:200 1000; font-display:swap; src:url("fonts/Cairo.woff2") format("woff2"); }
-@font-face { font-family:"JetBrains Mono"; font-style:normal; font-weight:100 800; font-display:swap; src:url("fonts/JetBrainsMono.woff2") format("woff2"); }
+@font-face { font-family:"Kufam"; font-style:normal; font-weight:400 900; font-display:swap; src:url("fonts/Kufam.woff2") format("woff2"); }

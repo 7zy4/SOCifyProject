@@ -3,44 +3,39 @@
   "conversion": "fonttools 4.60.1; Brotli 1.2.1; WOFF2 lossless",
   "files": [
     {
-      "file": "BalooBhaijaan2-OFL.txt",
-      "bytes": 4383,
-      "sha256": "a15158d76445b1892b82387a50d92e9c6adbe1eff04a46c8fc414a6308cd6e38"
-    },
-    {
-      "file": "BalooBhaijaan2.ttf",
-      "bytes": 285508,
-      "sha256": "3e9f07fbc796c0ddcb3e6e0aa26f9c86741d9f5b7f5cb72f4ed3c06e55a19336"
-    },
-    {
-      "file": "BalooBhaijaan2.woff2",
-      "bytes": 105096,
-      "sha256": "1f57fdea281af43e856308677e6014d6d56c7404b8ed94538ae74b67d6de5a6e"
-    },
-    {
-      "file": "IBMPlexSansArabic-Bold.ttf",
-      "bytes": 246992,
-      "sha256": "691e0c891a38637ae6bbdb69700f8042cb0724a137bee615068ffdb92244f61f"
-    },
-    {
       "file": "IBMPlexSansArabic-Bold.woff2",
-      "bytes": 73372,
-      "sha256": "e81cebc1f33cc7a758a9bbec5d15b7ff1b8c2e7c65063d671731d95ac23a8303"
+      "bytes": 73628,
+      "sha256": "c0095af81488b6d3cd6a96999ed67cef44dd1c2c70a37ef237fcc8c45ecd35d6"
     },
     {
-      "file": "IBMPlexSansArabic-OFL.txt",
-      "bytes": 4362,
-      "sha256": "d741e57d5f865e294df801f96b7b5161a88b211df65887e4358d271c9fc5fb4f"
-    },
-    {
-      "file": "IBMPlexSansArabic-Regular.ttf",
-      "bytes": 235924,
-      "sha256": "6f611412270a132bbac838da9259d4c68569b4175f3b3b8fa3fa36a30b56dab9"
+      "file": "IBMPlexSansArabic-Medium.woff2",
+      "bytes": 75408,
+      "sha256": "fc3393a902cd866e961199f32207e1ac368941d50926a2d66965c84d6cabce60"
     },
     {
       "file": "IBMPlexSansArabic-Regular.woff2",
-      "bytes": 71584,
-      "sha256": "508a0e83392dcfec7f0c6ace5918ed1dd0aa997b5e29f7e69b26c7cac7aadb82"
+      "bytes": 71452,
+      "sha256": "f9954569d8698b5cbfc01fa75e149fba9a035952e53b5c1cf9eba29233dfed53"
+    },
+    {
+      "file": "IBMPlexSansArabic-SemiBold.woff2",
+      "bytes": 75976,
+      "sha256": "740aeadfb7cb4f782cca8a0d27dd065230d167a3aaf16db6546c4562c21ba9a2"
+    },
+    {
+      "file": "Kufam.woff2",
+      "bytes": 135048,
+      "sha256": "acfc67e6089b4bb7bf6ee4b2361ff51c157b7a967c78e2c91ebca40863a0da3c"
+    },
+    {
+      "file": "IBMPlexSansArabic-OFL.txt",
+      "bytes": 4455,
+      "sha256": "3ff4395aeb203050b3d4e775861cf0b93b598e0a6d2b16f0eb41df3350b15695"
+    },
+    {
+      "file": "kufam-OFL.txt",
+      "bytes": 4383,
+      "sha256": "7069e8473b9886c4c73a07432b3a8715fa50bc0382e1ec4061853585a96c5034"
     }
   ]
 }

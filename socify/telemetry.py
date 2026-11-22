@@ -206,7 +206,7 @@ def _zeek_profile(record):
         "destination_ip": record["id.resp_h"],
         "event_time": record.get("ts"),
         "http_status": record.get("status_code"),
-        "title": f"Zeek {kind} · {record['id.orig_h']} → {record['id.resp_h']}",
+        "title": f"Zeek {kind} | {record['id.orig_h']} → {record['id.resp_h']}",
     }
     return fields, result
 
@@ -256,7 +256,7 @@ def _suricata_profile(record, section):
         "destination_ip": record["dest_ip"],
         "event_time": flow.get("start", record.get("timestamp")) if kind == "flow" else record.get("timestamp"),
         "severity": {1: "high", 2: "medium", 3: "low"}.get(fields["ids_severity"], "low"),
-        "title": alert.get("signature") or f"Suricata {kind} · {record['src_ip']} → {record['dest_ip']}",
+        "title": alert.get("signature") or f"Suricata {kind} | {record['src_ip']} → {record['dest_ip']}",
         "action": alert.get("action"),
         "http_status": http.get("status"),
     }
@@ -286,7 +286,7 @@ def _osquery_profile(record):
         "hostname": record["hostIdentifier"],
         "event_time": record.get("unixTime"),
         "action": record.get("action"),
-        "title": f"{record['name']} · {record.get('action', '')}",
+        "title": f"{record['name']} | {record.get('action', '')}",
         "process_name": columns.get("name") if "pid" in columns else None,
         "username": columns.get("username"),
         "source_ip": columns.get("local_address"),

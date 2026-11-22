@@ -70,9 +70,9 @@ def test_source_owner_recovers_incomplete_delivery_without_partial_evidence(app,
         assert report(manager, prior_path)["payload"] == prior_report["payload"]
         if fault == "slow-headers":
             source_case_id, source_case_url = manager.case_id, manager.case_url
-            manager.nav("إدارة القضايا")
+            manager.nav("القضايا")
             manager.create_case()
-            manager.click("link", "التحقيق والخط الزمني")
+            manager.click("link", "التحقيق")
             dialog = note_dialog(manager)
             note = "Continue this independent evidence review while the source owner restores the other case export."
             dialog.locator("textarea[name=body]").fill(note)
@@ -106,7 +106,7 @@ def test_source_owner_recovers_incomplete_delivery_without_partial_evidence(app,
         assert connector["ingest_key"] not in manager.page.locator("body").inner_text()
         assert len(tls_source["requests"]) == 3
         assert report(manager, prior_path)["payload"] == prior_report["payload"]
-        manager.nav("المراقبة")
+        manager.nav("التنبيهات")
         manager.page.locator("[data-alert-toggle]").first.click()
         manager.settle()
         expect(manager.page.locator(".dossier-view")).to_contain_text("SOURCE-REVIEW-HOST")

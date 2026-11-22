@@ -3,7 +3,7 @@
 import pytest
 from playwright.sync_api import expect
 
-from tests.e2e.browser_helpers import assert_accessible
+from tests.e2e.browser_helpers import account_menu, assert_accessible
 from tests.e2e.test_assignment_handoff_journeys import handoff_form, role_permission
 from tests.e2e.test_batch_boundary_journeys import restrict_batch, upload_logs
 from tests.e2e.test_review_workflow import ARTIFACTS, review_session
@@ -201,7 +201,7 @@ def test_case_task_backlog_can_be_found_reviewed_and_recovered(app, language, sc
             untouched = j.page.evaluate("({id,focus}) => api(`/api/cases/${id}/tasks?focus=${focus}`)", {"id": j.case_id, "focus": duplicate["id"]})
             assert next(task for task in untouched["items"] if task["id"] == duplicate["id"])["status"] == "pending"
         elif scenario == "case-backlog-foreign-focus":
-            manager.nav("إدارة القضايا")
+            manager.nav("القضايا")
             manager.create_case()
             foreign = manager.page.evaluate(
                 "id => api(`/api/incidents/${id}/tasks`,{method:'POST',body:{title:'Private finance containment decision',assignee:state.user.id}})",
@@ -283,10 +283,10 @@ def test_case_task_backlog_can_be_found_reviewed_and_recovered(app, language, sc
                 j.page.reload()
                 j.settle()
                 expect(task_row(j, title)).to_be_visible()
-                j.page.locator("[data-language-toggle]").click()
+                account_menu(j.page).locator("[data-language-toggle]").click()
                 j.settle()
                 expect(task_row(j, title)).to_be_visible()
-                j.page.locator("[data-language-toggle]").click()
+                account_menu(j.page).locator("[data-language-toggle]").click()
                 j.settle()
                 j.click("button", "السابق", j.page.locator(".case-task-queue"))
                 assert "case_task_page=4" in j.page.url

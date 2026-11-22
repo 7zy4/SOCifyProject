@@ -143,7 +143,7 @@ def open_case_from_tool(j):
 
 def save_note(j, title, body):
     open_case_from_tool(j)
-    j.click("link", "التحقيق والخط الزمني")
+    j.click("link", "التحقيق")
     dialog = note_dialog(j)
     dialog.locator("input[name=title]").fill(title)
     dialog.locator("textarea[name=body]").fill(body)
@@ -214,7 +214,7 @@ def test_expired_invitation_is_renewed_before_first_case_action(app, database, m
         assert database.execute("SELECT COUNT(*) FROM workspaces").fetchone()[0] == workspaces_before
         assert database.execute("SELECT consumed_at FROM team_invitations WHERE token_hash=?", (token_hash,)).fetchone()[0] is None
         grant(manager, name)
-        j.nav("إدارة القضايا")
+        j.nav("القضايا")
         j.page.locator("a.case-link").filter(has_text="Authorized maintenance investigation").click()
         j.settle()
         saved = save_note(
@@ -235,7 +235,7 @@ def test_expired_invitation_is_renewed_before_first_case_action(app, database, m
 
 
 def publish_indicator(manager, version, valid_until, verdict="malicious"):
-    manager.nav("مكتبة التحليل المحلي")
+    manager.nav("مكتبة القواعد")
     intel_draft(manager)
     scope = intel_area(manager)
     scope.locator("input[name=version]").fill(version)
@@ -247,7 +247,7 @@ def publish_indicator(manager, version, valid_until, verdict="malicious"):
 
 
 def enrich(j):
-    j.nav("استخبارات التهديدات")
+    j.nav("المؤشرات")
     dialog = inspect_enrichment(j)
     j.click("button", "إثراء محلي بالإصدارات الحالية", dialog)
     return inspect_enrichment(j)
@@ -350,7 +350,7 @@ def test_rule_change_while_scan_is_pending_uses_start_time_policy(app, monkeypat
     with decision_session(app, monkeypatch, language, "AFTER-42") as (j, manager, result, folder):
         manager_case(j, manager)
         upload_scan(j, 2, prefix="Suspicious gateway")
-        manager.nav("مكتبة التحليل المحلي")
+        manager.nav("مكتبة القواعد")
         attach(manager, "Suspicious gateway")
         check(manager)
         first = publish(manager)

@@ -1,10 +1,10 @@
-<h1 align="center"><img src="docs/assets/brand-lockup.svg" width="420" alt="SOCify"></h1>
+<h1 align="center"><img src="docs/assets/brand-lockup.svg" width="308" alt="SOCify"></h1>
 
 <p align="center">
   <a href="https://github.com/7zy4/SOCifyProject/actions/workflows/enterprise-quality.yml"><img alt="Quality gates" src="https://github.com/7zy4/SOCifyProject/actions/workflows/enterprise-quality.yml/badge.svg?branch=final"></a>
   <a href="CHANGELOG.md"><img alt="Version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-C9A84C"></a>
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2E3B33"></a>
-  <img alt="Interface: Arabic and English" src="https://img.shields.io/badge/interface-Arabic%20%7C%20English-5D491C">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2E2E31"></a>
+  <img alt="Interface: Arabic and English" src="https://img.shields.io/badge/interface-Arabic%20%7C%20English-2E2E31">
 </p>
 
 <p align="center"><em>Case-centred incident investigation for SOC teams: from raw logs to an approved report. Arabic and English interface, self-hosted with Docker.</em></p>
@@ -14,11 +14,11 @@
 **SOCify** منصة لفرق مراكز العمليات الأمنية تجمع التحقيق في الحادثة من أوله إلى آخره: ترفع السجلات، وتراجع التنبيهات مع أدلتها، وتوثّق القرارات والمهام، ثم تصدر تقرير القضية جاهزًا للاعتماد. الواجهة بالعربية والإنجليزية، بوضعين فاتح وداكن، وتعمل على الكمبيوتر والجوال.
 
 <p align="center">
-  <a href="#التشغيل">التشغيل</a> ·
-  <a href="docs/features.md">المميزات</a> ·
-  <a href="docs/analyst-guide.md">دليل المحلل</a> ·
-  <a href="docs/operations.md">دليل التشغيل</a> ·
-  <a href="SECURITY.md">الأمان</a> ·
+  <a href="#التشغيل">التشغيل</a> |
+  <a href="docs/features.md">المميزات</a> |
+  <a href="docs/analyst-guide.md">دليل المحلل</a> |
+  <a href="docs/operations.md">دليل التشغيل</a> |
+  <a href="SECURITY.md">الأمان</a> |
   <a href="CHANGELOG.md">سجل التغييرات</a>
 </p>
 
@@ -28,7 +28,7 @@
     <td width="50%"><img src="docs/images/timeline-en-dark.png" alt="الخط الزمني للسجلات بالإنجليزية في الوضع الداكن"><p align="center">الخط الزمني الموحد للسجلات</p></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/images/monitoring-ar-dark.png" alt="قائمة التنبيهات بالعربية في الوضع الداكن"><p align="center">المراقبة وفرز التنبيهات</p></td>
+    <td width="50%"><img src="docs/images/monitoring-ar-dark.png" alt="قائمة التنبيهات بالعربية في الوضع الداكن"><p align="center">فرز التنبيهات ومراجعتها</p></td>
     <td width="50%"><img src="docs/images/performance-en-light.png" alt="لوحة أداء الفريق بالإنجليزية في الوضع الفاتح"><p align="center">أداء الفريق والفرد</p></td>
   </tr>
   <tr>

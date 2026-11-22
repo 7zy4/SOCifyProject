@@ -1,32 +1,26 @@
 [
   {
-    "file": "Cairo-Regular.ttf",
-    "source": "Cairo.woff2",
+    "file": "IBMPlexSansArabic-Regular.ttf",
+    "source": "IBMPlexSansArabic-Regular.ttf",
     "weight": 400,
-    "sha256": "0465a9531abb8fa1392153d2548728d9a8bda69a2980e7c74178a77e2bb6d255"
+    "sha256": "6f611412270a132bbac838da9259d4c68569b4175f3b3b8fa3fa36a30b56dab9"
   },
   {
-    "file": "Cairo-Bold.ttf",
-    "source": "Cairo.woff2",
+    "file": "IBMPlexSansArabic-Bold.ttf",
+    "source": "IBMPlexSansArabic-Bold.ttf",
     "weight": 700,
-    "sha256": "64122b3e08dbb037c5ad7f814334bb35129826ef9dbb3fcfb8e869ada1e501ce"
+    "sha256": "691e0c891a38637ae6bbdb69700f8042cb0724a137bee615068ffdb92244f61f"
   },
   {
-    "file": "IBMPlexSans-Regular.ttf",
-    "source": "IBMPlexSans.woff2",
+    "file": "Kufam-Regular.ttf",
+    "source": "Kufam.woff2",
     "weight": 400,
-    "sha256": "2666f3ea32852074e383c796abb89d4a98b7f288dc7e35c7e4eb18b2b4dff4a2"
+    "sha256": "8bfef8d8e365a578d5d500e1584fdd016b64607a7b0db5452b808eae137b97b8"
   },
   {
-    "file": "IBMPlexSans-Bold.ttf",
-    "source": "IBMPlexSans.woff2",
+    "file": "Kufam-Bold.ttf",
+    "source": "Kufam.woff2",
     "weight": 700,
-    "sha256": "9afa6762fcfe3a481f4da3619a4aa0e90107b8499e720e80530677bafd01c598"
-  },
-  {
-    "file": "Bangers-Regular.ttf",
-    "source": "Bangers-Regular.woff2",
-    "weight": 400,
-    "sha256": "4925f764ba373550986dfc6d78a207f8c48c4d0f65d7605d9b0815a3a8660272"
+    "sha256": "4b086713c6b0b4d59d25e4296d1a2fbcab820e99854d6a731c76607d59cd766a"
   }
 ]

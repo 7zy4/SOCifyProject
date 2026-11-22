@@ -31,7 +31,7 @@ def test_investigator_selects_actual_evidence_from_the_correct_case(app, languag
             manager.create_case()
             upload_logs(manager, "unrelated.json", "Other case only")
             upload_logs(j, "authorized.json", "This case only")
-            j.click("link", "التحقيق والخط الزمني")
+            j.click("link", "التحقيق")
             dialog = record_dialog(j, "root_cause")
             dialog.locator("input[name=category]").fill(j.page.evaluate("autopsyLabel('other')"))
             dialog.locator("textarea[name=conclusion]").fill("Only the evidence retained in this case supports this conclusion.")
@@ -47,7 +47,7 @@ def test_investigator_selects_actual_evidence_from_the_correct_case(app, languag
             records = j.page.evaluate("id => api(`/api/cases/${id}/records?kind=root_cause`)", j.case_id)
             assert len(records["items"]) == 1 and records["items"][0]["payload"]["evidence_id"]
         else:
-            j.click("link", "الاستجابة والتصعيد")
+            j.click("link", "الاستجابة")
             form = j.page.locator("form").filter(has=j.page.locator("input[name=recipe_id]"))
             form.locator("input[name=recipe_id]").press("ArrowDown")
             form.get_by_role("option").first.click()
@@ -71,7 +71,7 @@ def test_investigator_selects_actual_evidence_from_the_correct_case(app, languag
             j.page.once("dialog", lambda event: event.accept())
             j.click("button", "إغلاق", dialog)
             upload_logs(j, "collected.json", "Retained collection result")
-            j.click("link", "الاستجابة والتصعيد")
+            j.click("link", "الاستجابة")
             dialog = collection_form(j)
             dialog.locator("input[name=evidence_id]").press("ArrowDown")
             dialog.get_by_role("option").filter(has_text="collected.json").first.click()
@@ -99,7 +99,7 @@ def test_investigator_selects_actual_evidence_from_the_correct_case(app, languag
 def test_detection_author_can_verify_and_correct_before_publication(app, language, scenario):
     with review_session(app, language, scenario) as (_analyst, j, result):
         j.login("manager@socify.local")
-        j.nav("مكتبة التحليل المحلي")
+        j.nav("مكتبة القواعد")
         area = panel(j, "اختبار قاعدة ونشرها")
         sigma = "title: Identity detection review\nlogsource:\n  category: socify_normalized\ndetection:\n  selected:\n    title|contains: Suspicious identity\n  condition: selected\nlevel: high\n"
         source = area.get_by_label(j.text("ملف Sigma"), exact=True)
@@ -149,7 +149,7 @@ def test_reprocessing_an_import_marks_its_previous_report_outdated(app, language
         report_id = j.state()["reports"][0]["id"]
         report_path = f"/api/cases/{j.case_id}/reports/{report_id}"
         before = j.page.evaluate("path => api(path)", report_path)
-        j.click("link", "السجلات والأدلة")
+        j.click("link", "السجلات")
         j.page.locator("summary").filter(has_text=j.text("خيارات الاستيراد")).click()
         j.page.locator("input[name=source_timezone]").fill("Asia/Riyadh")
         j.page.locator("input[name=file]").set_input_files(

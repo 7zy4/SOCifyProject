@@ -96,7 +96,7 @@ def test_case_local_access_removal_is_safe_and_recoverable(app, language, scenar
         original_case = (j.case_id, j.case_url)
         other_case = None
         if scenario == "membership-other-case":
-            j.nav("إدارة القضايا")
+            j.nav("القضايا")
             j.create_case()
             other_case = j.case_id
             j.case_id, j.case_url = original_case
@@ -129,7 +129,7 @@ def test_case_local_access_removal_is_safe_and_recoverable(app, language, scenar
             manager.page.goto(j.case_url)
             manager.settle()
         if scenario == "membership-stale-note":
-            j.click("link", "التحقيق والخط الزمني")
+            j.click("link", "التحقيق")
             note = note_dialog(j)
             note.locator("textarea[name=body]").fill("Unsaved case note after the shift ended")
         if scenario == "membership-open-assignment":
@@ -170,7 +170,7 @@ def test_case_local_access_removal_is_safe_and_recoverable(app, language, scenar
             dialog.locator("[name=reason]").fill("End this case access after the shift completed")
             colleague = None
             if scenario == "membership-stale-case":
-                j.click("link", "التحقيق والخط الزمني")
+                j.click("link", "التحقيق")
                 note = note_dialog(j)
                 j.click("button", "حفظ", note)
             manager.click("button", "سحب الوصول", dialog)

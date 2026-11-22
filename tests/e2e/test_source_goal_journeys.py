@@ -12,7 +12,7 @@ from tests.e2e.test_review_workflow import review_session
 
 
 def create_connector(journey, endpoint=None):
-    journey.click("link", "السجلات والأدلة")
+    journey.click("link", "السجلات")
     journey.page.locator("summary").filter(has_text=journey.text("إضافة مصدر SIEM")).click()
     form = journey.page.get_by_role("form", name=journey.text("ربط SIEM مباشر"), exact=True)
     form.locator("input[name=name]").fill("Identity gateway records")

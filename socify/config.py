@@ -44,7 +44,7 @@ def build_config() -> dict[str, object]:
     return {
         "ENV_NAME": environment,
         "CODESPACE_PUBLIC_HOST": codespace_host,
-        "PRODUCT_NAME": "SOCify Tactical Workbench",
+        "PRODUCT_NAME": "SOCify",
         "REQUIRE_CASE_APPROVAL": _boolean("SOCIFY_REQUIRE_CASE_APPROVAL", False),
         "REQUIRE_INVESTIGATION_SELECTION": _boolean("SOCIFY_REQUIRE_INVESTIGATION_SELECTION", False),
         "DEMO_MODE": _boolean("SOCIFY_DEMO_MODE", False),

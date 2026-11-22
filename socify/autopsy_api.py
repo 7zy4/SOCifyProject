@@ -373,7 +373,7 @@ def catalog():
 
     return jsonify(
         {
-            "product": "SOCify Tactical Workbench",
+            "product": "SOCify",
             "import_formats": ["auto", "csv", "json", "jsonl", "zeek_tsv", "syslog", "cef", "linux_auth", "web", "sysmon_xml", "evtx", "pcap", "pcapng"],
             "source_timezones": sorted(available_timezones()),
             "mapping_fields": [

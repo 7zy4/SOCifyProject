@@ -108,7 +108,7 @@ def network_snapshot(connection, case_id, workspace):
         (case_id, workspace, MAX_NETWORK_EVENTS + 1),
     ).fetchall()
     if len(rows) > MAX_NETWORK_EVENTS:
-        raise ValidationError("تجاوز تحليل الشبكة حد ٢٠٠٠٠ سجل للقضية")
+        raise ValidationError("تجاوز تحليل الشبكة حد 20000 سجل للقضية")
     events = []
     for row in rows:
         item = dict(row)
@@ -130,7 +130,7 @@ def network_snapshot(connection, case_id, workspace):
 def telemetry_report(connection, case_id, workspace):
     network = network_snapshot(connection, case_id, workspace)
     if len(network["items"]) > 2000:
-        raise ValidationError("تجاوز التقرير حد ٢٠٠٠ اتصال")
+        raise ValidationError("تجاوز التقرير حد 2000 اتصال")
     endpoints = []
     size = 0
     for row in connection.execute(

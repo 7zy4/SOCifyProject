@@ -4,7 +4,7 @@ import pytest
 from conftest import DEMO_LOGIN_VALUE
 from playwright.sync_api import expect
 
-from tests.e2e.browser_helpers import assert_accessible
+from tests.e2e.browser_helpers import account_menu, assert_accessible
 from tests.e2e.test_draft_recovery import fill_answers
 from tests.e2e.test_review_workflow import ARTIFACTS, review_session
 
@@ -17,7 +17,7 @@ def test_expired_session_preserves_the_user_task(app, language, scenario):
         page = j.page
         note = "Pending identity approval: preserve this unsaved assessment."
         if scenario == "session-dialog-reauthentication":
-            j.click("link", "التحقيق والخط الزمني")
+            j.click("link", "التحقيق")
             label = page.evaluate("() => SOCifyLocale.template`إضافة ${autopsyLabel('hypothesis')}`")
             page.get_by_role("button", name=label, exact=True).click()
             form_dialog = page.get_by_role("dialog")
@@ -60,7 +60,7 @@ def test_expired_session_preserves_the_user_task(app, language, scenario):
             j.click("button", "متابعة العمل", recovery)
             expect(recovery.get_by_role("alert")).to_contain_text(j.text("سجّل الدخول بالحساب نفسه لمتابعة هذه المسودة."))
             expect(page.locator("input[name=executive_note]")).to_have_value(note)
-            login.locator(".account-menu summary").click()
+            account_menu(login)
             login.locator("form[action='/logout'] button").click()
             login.wait_for_url("**/login")
             login.locator("input[name=email]").fill("analyst@socify.local")
@@ -97,12 +97,12 @@ def test_signing_in_again_in_another_tab_preserves_the_original_draft(app, langu
         j.click("link", "التقارير والمراجعة")
         note = "Retain this assessment while I sign in again in another tab."
         fill_answers(j, note)
-        j.page.locator(".account-menu summary").click()
+        account_menu(j.page)
         with j.page.context.expect_page() as opened:
             j.page.locator(".account-menu a[href='/profile']").click(button="middle")
         tab = opened.value
         tab.locator("#workspace[aria-busy=false]").wait_for()
-        tab.locator(".account-menu summary").click()
+        account_menu(tab)
         tab.locator("form[action='/logout'] button").click()
         tab.wait_for_url("**/login")
         tab.locator("input[name=email]").fill("analyst@socify.local")

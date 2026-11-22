@@ -76,7 +76,7 @@ def choose_start(j, title):
 
 
 def publish_rule(manager):
-    manager.nav("مكتبة التحليل المحلي")
+    manager.nav("مكتبة القواعد")
     area = panel(manager, "اختبار قاعدة ونشرها")
     source = "title: Gateway retained match\nlogsource:\n  category: socify_normalized\ndetection:\n  selected:\n    title|contains: Gateway retained session\n  condition: selected\nlevel: high\n"
     area.locator("input[type=file]").nth(0).set_input_files({"name": "gateway.yml", "mimeType": "text/yaml", "buffer": source.encode()})

@@ -17,11 +17,10 @@ def embed_report_fonts(document):
     root = parse_xml(font_table.blob)
     directory = Path(__file__).resolve().parents[1] / "static" / "fonts" / "report"
     for family, filename, style in [
-        ("Cairo", "Cairo-Regular.ttf", "Regular"),
-        ("Cairo", "Cairo-Bold.ttf", "Bold"),
-        ("IBM Plex Sans", "IBMPlexSans-Regular.ttf", "Regular"),
-        ("IBM Plex Sans", "IBMPlexSans-Bold.ttf", "Bold"),
-        ("Bangers", "Bangers-Regular.ttf", "Regular"),
+        ("IBM Plex Sans Arabic", "IBMPlexSansArabic-Regular.ttf", "Regular"),
+        ("IBM Plex Sans Arabic", "IBMPlexSansArabic-Bold.ttf", "Bold"),
+        ("Kufam", "Kufam-Regular.ttf", "Regular"),
+        ("Kufam", "Kufam-Bold.ttf", "Bold"),
     ]:
         content = bytearray((directory / filename).read_bytes())
         key = UUID(bytes=hashlib.sha256(content).digest()[:16])
@@ -62,7 +61,8 @@ def add_report_run(paragraph, text, bold=False):
     run = paragraph.add_run(text)
     run.bold = run.font.cs_bold = bold
     arabic = any("\u0600" <= character <= "\u06ff" for character in text)
-    run.font.name = "Cairo" if arabic else "IBM Plex Sans"
+    # One family draws both scripts, so mixed Arabic and Latin lines keep one texture.
+    run.font.name = "IBM Plex Sans Arabic"
     run._r.get_or_add_rPr().get_or_add_rFonts().set(qn("w:cs"), run.font.name)
     run.font.complex_script = run.font.rtl = arabic
 

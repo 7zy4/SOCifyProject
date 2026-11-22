@@ -27,7 +27,7 @@ SOURCES = (
 
 
 def import_source(j, name, prefix, country, asn):
-    j.nav("مكتبة التحليل المحلي")
+    j.nav("مكتبة القواعد")
     form = panel(j, "استيراد إصدار محلي جديد").locator("form")
     for key, value in {
         "name": name,
@@ -116,7 +116,7 @@ def test_overlapping_geoip_claims_remain_context_not_a_security_verdict(app, mon
         j.page.locator("input[name=file]").set_input_files({"name": "gateway-context.json", "mimeType": "application/json", "buffer": raw})
         j.click("button", "استيراد وفحص فوري")
         expect(j.page.get_by_role("cell", name="Retained gateway connection", exact=True)).to_be_visible()
-        j.nav("استخبارات التهديدات")
+        j.nav("المؤشرات")
         dialog = details(j, SUBJECT)
         j.click("button", "إثراء محلي بالإصدارات الحالية", dialog)
         dialog = details(j, SUBJECT)

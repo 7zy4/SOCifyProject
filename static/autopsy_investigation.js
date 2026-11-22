@@ -39,7 +39,7 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
   end.value = localTime(saved.get("timeline_end"));
   if (saved.has("timeline_scope") && !["all", "logs"].includes(saved.get("timeline_scope"))) throw new Error(SOCifyLocale.text("نطاق الخط الزمني غير معروف؛ راجع رابط القضية"));
   scope.value = saved.get("timeline_scope") || "all";
-  filters.append(field(SOCifyLocale.text("نطاق الخط الزمني"), scope), field(SOCifyLocale.text("بحث الخط الزمني"), query), field(SOCifyLocale.text("خطورة السجلات"), severity), field(SOCifyLocale.text("بداية الفترة · وقت المتصفح"), start), field(SOCifyLocale.text("نهاية الفترة · وقت المتصفح"), end), node("button", { type: "submit", class: "button ghost", text: SOCifyLocale.text("تطبيق الفلاتر") }));
+  filters.append(field(SOCifyLocale.text("نطاق الخط الزمني"), scope), field(SOCifyLocale.text("بحث الخط الزمني"), query), field(SOCifyLocale.text("خطورة السجلات"), severity), field(SOCifyLocale.text("بداية الفترة | وقت المتصفح"), start), field(SOCifyLocale.text("نهاية الفترة | وقت المتصفح"), end), node("button", { type: "submit", class: "button ghost", text: SOCifyLocale.text("تطبيق الفلاتر") }));
   const load = async (page = 1) => {
     const parameters = new URLSearchParams({ page, limit: 50, q: query.value });
     if (severity.value) parameters.set("severity", severity.value);
@@ -53,16 +53,16 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
     for (const event of data.items) {
       if (event.entry_type && event.entry_type !== "log") {
         const actor = autopsy.team.members.find((member) => member.id === event.actor_id);
-        const item = node("li", {}, [node("h3", { text: `${autopsyLabel(event.kind)} · ${event.title}` }), node("p", { text: `${formatTime(event.event_time)} · ${autopsyLabel(event.time_basis)}` }), node("small", { text: SOCifyLocale.template`${actor?.name || SOCifyLocale.template`عضو ${event.actor_id}`} · الإصدار ${event.version} · آخر تعديل ${formatTime(event.updated_at)}` })]);
+        const item = node("li", {}, [node("h3", { text: `${autopsyLabel(event.kind)} | ${event.title}` }), node("p", { text: `${formatTime(event.event_time)} | ${autopsyLabel(event.time_basis)}` }), node("small", { text: SOCifyLocale.template`${actor?.name || SOCifyLocale.template`عضو ${event.actor_id}`} | الإصدار ${event.version} | آخر تعديل ${formatTime(event.updated_at)}` })]);
         if (event.body) item.append(node("p", { text: event.body }));
         if (event.record) {
           const payload = event.record.payload;
           item.append(node("p", { text: payload.body || payload.details || payload.notes || payload.source || "" }));
           if (payload.decision) item.append(node("p", { text: SOCifyLocale.template`القرار: ${payload.decision}` }));
-          if (event.kind === "response") item.append(node("p", { text: `${autopsyLabel(payload.phase)} · ${autopsyLabel(payload.status)}` }));
+          if (event.kind === "response") item.append(node("p", { text: `${autopsyLabel(payload.phase)} | ${autopsyLabel(payload.status)}` }));
           if (payload.evidence_id) {
             const evidence = (autopsy.current.evidence || []).find((entry) => String(entry.id) === String(payload.evidence_id));
-            item.append(node("p", { dir: "auto", "data-user-content": true, text: `${SOCifyLocale.text("الدليل المرتبط")}: ${evidence ? `${evidence.title} · ${evidence.id}` : SOCifyLocale.text("الدليل غير متاح")}` }));
+            item.append(node("p", { dir: "auto", "data-user-content": true, text: `${SOCifyLocale.text("الدليل المرتبط")}: ${evidence ? `${evidence.title} | ${evidence.id}` : SOCifyLocale.text("الدليل غير متاح")}` }));
           }
           item.append(button(SOCifyLocale.text("تفاصيل ملاحظة التحقيق"), () => autopsyModal(SOCifyLocale.text("سجل التحقيق وإصداره وأدلته"), autopsyRecordCard(event.record))));
         }
@@ -71,20 +71,22 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
         continue;
       }
       const marks = data.bookmarks.filter((item) => item.payload.event_id === event.id);
-      const content = node("li", { class: marks.length ? `timeline-mark-${marks[0].payload.color || "blue"}` : "" }, [node("h3", { text: event.title }), node("p", { text: `${event.observed_time_known ? formatTime(event.event_time) : SOCifyLocale.text("وقت الحدث غير معروف؛ لا يُستبدل بوقت الاستيراد")} · ${event.source} · ${autopsyLabel(event.severity)}` }), node("p", { text: SOCifyLocale.template`أساس التوقيت: ${autopsyTimeBasisLabel(event.time_basis)}` }), node("small", { text: SOCifyLocale.template`وقت الاستيراد: ${formatTime(event.ingested_at)}` })]);
-      for (const mark of marks) content.append(node("p", { text: `${mark.payload.title} · ${mark.payload.notes || ""} · ${(mark.payload.tags || []).join(", ")}` }));
+      // One line of meta under the title; the severity tag sits beside it, and the time basis shows only when it is not the source's own time.
+      const meta = [event.observed_time_known ? formatTime(event.event_time) : SOCifyLocale.text("وقت الحدث غير معروف؛ لا يُستبدل بوقت الاستيراد"), event.source];
+      const content = node("li", { class: `severity-${String(event.severity || "low").replace(/[^a-z]/g, "")}${marks.length ? " bookmarked" : ""}` }, [node("div", { class: "timeline-entry" }, [node("div", { class: "timeline-head" }, [node("h3", { text: event.title }), autopsyBadge(event.severity)]), node("p", { class: "timeline-meta", text: meta.join(" | ") }), event.time_basis && event.time_basis !== "source" ? node("p", { class: "timeline-meta", text: SOCifyLocale.template`أساس التوقيت: ${autopsyTimeBasisLabel(event.time_basis)}` }) : null])]);
+      for (const mark of marks) content.querySelector(".timeline-entry").append(node("p", { class: "timeline-note", text: [mark.payload.title, mark.payload.notes, (mark.payload.tags || []).join(", ")].filter(Boolean).join(" | ") }));
       // The record's actions get a row of their own so they never sit on top of its time text.
       const actions = node("div", { class: "action-row timeline-actions" });
       content.append(actions);
-      actions.append(button(SOCifyLocale.text("تفاصيل السجل"), async () => { try { const detail = await api(`/api/cases/${caseId}/logs/${event.id}`); autopsyModal(SOCifyLocale.text("الدليل الخام والمطبع"), node("pre", { text: JSON.stringify(detail, null, 2) })); } catch (error) { handleError(error); } }));
-      if (autopsy.current.can_update && autopsy.current.status !== "closed") actions.append(button(SOCifyLocale.text("تمييز السجل وإضافة ملاحظة"), () => {
+      actions.append(button(SOCifyLocale.text("التفاصيل"), async () => { try { const detail = await api(`/api/cases/${caseId}/logs/${event.id}`); autopsyModal(SOCifyLocale.text("الدليل الخام والمطبع"), node("pre", { text: JSON.stringify(detail, null, 2) })); } catch (error) { handleError(error); } }));
+      if (autopsy.current.can_update && autopsy.current.status !== "closed") actions.append(button(SOCifyLocale.text("ملاحظة"), () => {
         let dialog;
         const form = autopsyForm({ title: { required: true, max: 255 }, color: { choices: ["blue", "orange", "gold"] }, tags: { list: true }, notes: { max: 2000 }, visibility: { required: true, choices: ["team", "private"] } }, async (payload) => { await api(`/api/cases/${caseId}/records/bookmark`, { method: "POST", body: { ...payload, event_id: event.id } }); dialog.close(); await load(page); }, { title: event.title, color: "blue", visibility: "team" });
         dialog = autopsyModal(SOCifyLocale.text("علامة مرتبطة بسجل القضية"), form);
       }));
       timeline.append(content);
     }
-    const pages = node("div", { class: "action-row" }, node("p", { text: SOCifyLocale.template`${data.total_relation === "gte" ? SOCifyLocale.text("على الأقل ") : ""}${data.total} عنصر · الصفحة ${page}` }));
+    const pages = node("div", { class: "action-row" }, node("p", { text: SOCifyLocale.template`${data.total_relation === "gte" ? SOCifyLocale.text("على الأقل ") : ""}${data.total} عنصر | الصفحة ${page}` }));
     if (page > 1) pages.append(button(SOCifyLocale.text("السابق"), () => load(page - 1).catch(handleError)));
     if (data.has_next ?? (page * 50 < data.total)) pages.append(button(SOCifyLocale.text("التالي"), () => load(page + 1).catch(handleError)));
     const views = node("div", { class: "action-row" });
@@ -100,7 +102,7 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
   root.append(panel(SOCifyLocale.text("الخط الزمني الموحد للسجلات"), node("div", { class: "panel-body" }, [filters, viewport]), true));
   await load(Math.max(1, Number(saved.get("timeline_page")) || 1));
   const graph = await api(`/api/cases/${caseId}/graph?limit=30`);
-  const graphBody = node("div", { class: "panel-body" }, node("p", { text: SOCifyLocale.template`${graph.event_count} سجل · ${graph.nodes.length} كيان · ${graph.edges.length} علاقة. ${SOCifyLocale.text(graph.limitations)}${graph.truncated ? SOCifyLocale.text(" عرض محدود؛ لا يمثل كل السجلات.") : ""}` }));
+  const graphBody = node("div", { class: "panel-body" }, node("p", { text: SOCifyLocale.template`${graph.event_count} سجل | ${graph.nodes.length} كيان | ${graph.edges.length} علاقة. ${SOCifyLocale.text(graph.limitations)}${graph.truncated ? SOCifyLocale.text(" عرض محدود؛ لا يمثل كل السجلات.") : ""}` }));
   const graphNodes = graph.nodes.slice(0, 180);
   const canvas = node("div", { class: "graph-canvas", tabindex: "0", "aria-label": SOCifyLocale.text("علاقات الأدلة؛ يوجد جدول بديل أسفل الرسم") });
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -130,8 +132,8 @@ window.SOCifyAutopsy.investigation = async (caseId) => {
   const searchForm = node("form", { class: "filter-row" }, [field(SOCifyLocale.text("بحث كتالوج MITRE المحلي"), search), node("button", { type: "submit", class: "button ghost", text: SOCifyLocale.text("بحث التقنيات") })]);
   const searchAttack = async () => {
     const catalog = await api(`/api/cases/${caseId}/attack?q=${encodeURIComponent(search.value)}`);
-    const select = autopsyChoice("technique_id", catalog.items.filter((item) => !item.revoked && !item.deprecated).map((item) => ({ value: item.technique_id, label: `${item.technique_id} · ${item.name}` })), "", true);
-    const evidenceChoice = (current = "") => autopsyChoice("event_id", visibleEvents.map((item) => ({ value: item.id, label: `${item.title} · ${item.id}` })), current, false);
+    const select = autopsyChoice("technique_id", catalog.items.filter((item) => !item.revoked && !item.deprecated).map((item) => ({ value: item.technique_id, label: `${item.technique_id} | ${item.name}` })), "", true);
+    const evidenceChoice = (current = "") => autopsyChoice("event_id", visibleEvents.map((item) => ({ value: item.id, label: `${item.title} | ${item.id}` })), current, false);
     let evidence = evidenceChoice();
     let evidenceField = field(SOCifyLocale.text("دليل من السجلات المعروضة"), evidence.control);
     refreshEvidence = () => {

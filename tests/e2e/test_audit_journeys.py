@@ -22,13 +22,13 @@ def test_audit_user_goal(app, language, scenario):
         reference = manager.state()["reference"]
         if scenario == "audit-history-pagination":
             for index in range(26):
-                manager.nav("إدارة القضايا")
+                manager.nav("القضايا")
                 manager.click("button", "إنشاء قضية")
                 dialog = manager.page.get_by_role("dialog")
                 dialog.locator("input[name=title]").fill(f"Later audit intake {index + 1:02}")
                 manager.click("button", "حفظ", dialog)
             result["setup_only_case_requests"] = 26
-        manager.nav("سجل التدقيق")
+        manager.nav("التدقيق")
         form = manager.page.get_by_role("form", name=manager.text("بحث سجل التدقيق"))
         if scenario == "audit-case-decision-search":
             form.get_by_role("searchbox", name=manager.text("بحث"), exact=True).fill(reference)

@@ -19,7 +19,7 @@
     root.dataset.theme = resolved;
     root.dataset.themePreference = preference;
     root.style.colorScheme = resolved;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", resolved === "dark" ? "#15191C" : "#E4DFD1");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", resolved === "dark" ? "#141415" : "#FAFAFA");
     controls.forEach(control => control.update());
   }
   function choose(value) {

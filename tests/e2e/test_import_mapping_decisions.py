@@ -13,7 +13,7 @@ from flask import request as flask_request
 from playwright.sync_api import expect
 
 import tests.e2e.test_review_workflow as review_module
-from tests.e2e.browser_helpers import assert_accessible
+from tests.e2e.browser_helpers import account_menu, assert_accessible
 from tests.e2e.test_review_workflow import review_session
 
 ARTIFACTS = Path("artifacts/usability_campaign/import-mapping-decisions")
@@ -130,7 +130,7 @@ def test_remove_wrong_mapping_preserves_other_fields_and_requires_fresh_preview(
             setup_provenance="Isolated seeded analyst creates a case through the UI; import, mapping, corrections and original download use visible controls. API checks are read-only.",
             checked_revision=subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),  # noqa: S603,S607
             production_hash_before=production_hash(),
-            stylesheet_hash_before=hashlib.sha256(Path("static/comic-workspace.css").read_bytes()).hexdigest(),
+            stylesheet_hash_before=hashlib.sha256(Path("static/socify.css").read_bytes()).hexdigest(),
             test_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             evidence_folder=str(folder),
             native_output_claim=False,
@@ -138,10 +138,10 @@ def test_remove_wrong_mapping_preserves_other_fields_and_requires_fresh_preview(
         )
         try:
             if j.page.locator("html").get_attribute("lang") != language:
-                j.page.locator("[data-language-toggle]").click()
+                account_menu(j.page).locator("[data-language-toggle]").click()
                 j.settle()
             expect(j.page.locator("html")).to_have_attribute("lang", language)
-            j.click("link", "السجلات والأدلة")
+            j.click("link", "السجلات")
             form = j.page.get_by_role("form", name=j.text("استيراد أدلة القضية"), exact=True)
             form.locator("input[name=file]").set_input_files({"name": "firewall-fields.csv", "mimeType": "text/csv", "buffer": RAW})
             form.locator(".import-options > summary").click()
@@ -272,4 +272,4 @@ def test_remove_wrong_mapping_preserves_other_fields_and_requires_fresh_preview(
             raise
         finally:
             result["production_hash_after"] = production_hash()
-            result["stylesheet_hash_after"] = hashlib.sha256(Path("static/comic-workspace.css").read_bytes()).hexdigest()
+            result["stylesheet_hash_after"] = hashlib.sha256(Path("static/socify.css").read_bytes()).hexdigest()

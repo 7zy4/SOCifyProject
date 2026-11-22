@@ -42,7 +42,7 @@ def test_source_owner_recovers_provider_status_without_importing_error_content(a
         manager.click("button", "إعداد تقرير جديد")
         prior_path = report_path(manager)
         prior = report(manager, prior_path)
-        manager.click("link", "السجلات والأدلة")
+        manager.click("link", "السجلات")
         before = manager.state()
         tls_source["responses"]["status"] = status
         tls_source["responses"]["error_body"] = json.dumps(
@@ -84,7 +84,7 @@ def test_source_owner_recovers_provider_status_without_importing_error_content(a
         assert len(sources) == 1 and sources[0]["id"] == connector["id"] and sources[0]["rows_ingested"] == 2
         assert sources[0]["status"] == "connected"
         assert connector["ingest_key"] not in manager.page.locator("body").inner_text()
-        manager.click("link", "التحقيق والخط الزمني")
+        manager.click("link", "التحقيق")
         dialog = note_dialog(manager)
         note = "Provider delivery recovered; both retained records reviewed and the provider error excluded from investigation evidence."
         dialog.locator("textarea[name=body]").fill(note)

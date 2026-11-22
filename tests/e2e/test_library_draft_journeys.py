@@ -48,7 +48,7 @@ def assert_yara_draft(j):
 def test_author_retains_unpublished_file_rules_while_publishing_a_log_rule(app, language, scenario):
     with review_session(app, language, scenario) as (analyst, j, result):
         j.login("manager@socify.local")
-        j.nav("مكتبة التحليل المحلي")
+        j.nav("مكتبة القواعد")
         attach(j)
         check(j)
         if scenario.endswith("before-sigma"):
@@ -130,7 +130,7 @@ def intel_items(j):
 def test_author_saves_intelligence_without_losing_other_work(app, language, scenario):
     with review_session(app, language, scenario) as (analyst, j, result):
         j.login("manager@socify.local")
-        j.nav("مكتبة التحليل المحلي")
+        j.nav("مكتبة القواعد")
         sigma = scenario in {"library-sigma-before-intel", "library-sigma-during-intel", "library-sigma-intel-invalid-recovery", "library-intel-draft-on-sigma"}
         if sigma and scenario != "library-sigma-during-intel":
             attach(j)
@@ -195,7 +195,7 @@ def test_author_saves_intelligence_without_losing_other_work(app, language, scen
 def test_late_library_refresh_keeps_both_completed_publications_visible(app, language):
     with review_session(app, language, "library-parallel-late-refresh") as (analyst, j, result):
         j.login("manager@socify.local")
-        j.nav("مكتبة التحليل المحلي")
+        j.nav("مكتبة القواعد")
         attach(j)
         intel_draft(j)
         waiting_post = []

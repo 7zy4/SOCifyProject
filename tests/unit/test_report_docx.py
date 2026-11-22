@@ -32,7 +32,7 @@ def test_recipient_can_read_bilingual_report_with_fonts_embedded_and_evidence_un
         relations = ET.fromstring(archive.read("word/_rels/fontTable.xml.rels"))
         destinations = {r.attrib["Id"]: r.attrib["Target"] for r in relations}
         embedded = [item for font in table for item in font if item.tag.endswith(("embedRegular", "embedBold"))]
-        assert len(embedded) == 5
+        assert len(embedded) == 4
         for entry in embedded:
             target = destinations[entry.attrib[f"{{{NS['r']}}}id"]]
             obfuscated = bytearray(archive.read("word/" + target))
@@ -47,7 +47,7 @@ def test_recipient_can_read_bilingual_report_with_fonts_embedded_and_evidence_un
             assert style.find("w:pPr/w:pBdr", NS) is None
             fonts = style.find("w:rPr/w:rFonts", NS)
             assert not any(key.lower().endswith("theme") for key in fonts.attrib)
-            assert fonts.attrib[f"{{{NS['w']}}}cs"] == "Cairo"
+            assert fonts.attrib[f"{{{NS['w']}}}cs"] == ("IBM Plex Sans Arabic" if name == "Normal" else "Kufam")
             assert style.find("w:rPr/w:sz", NS).attrib == style.find("w:rPr/w:szCs", NS).attrib
         assert not any(b'TargetMode="External"' in archive.read(name) for name in archive.namelist() if name.endswith(".rels"))
 
@@ -67,7 +67,7 @@ def test_docx_preserves_latin_fragments_in_rtl_paragraphs_and_keeps_digest_ident
     document = Document(io.BytesIO(render_docx(payload)))
     heading = next(paragraph for paragraph in document.paragraphs if "5 Whys" in paragraph.text)
     latin_run = next(run for run in heading.runs if run.text == "5 Whys")
-    assert latin_run.font.rtl is False and latin_run.font.name == "IBM Plex Sans"
+    assert latin_run.font.rtl is False and latin_run.font.name == "IBM Plex Sans Arabic"
     url_run = next(
         run
         for table in document.tables

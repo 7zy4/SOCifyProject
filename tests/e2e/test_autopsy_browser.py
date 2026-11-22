@@ -75,7 +75,7 @@ def test_manager_procedure_library_and_report_worker_browser(app):
             page.locator("input[name=password]").fill("Demo-Safe-Password-2026!")
             page.locator("button[type=submit]").click()
             page.wait_for_url("**/cases")
-            page.get_by_role("link", name="كتيبات الاستجابة", exact=True).click()
+            page.get_by_role("link", name="الكتيبات", exact=True).click()
             page.get_by_role("button", name="إضافة القوالب الإرشادية للمراجعة").click()
             page.get_by_role("button", name="اعتماد ونشر هذا الإصدار").first.wait_for()
             page.get_by_role("button", name="اعتماد ونشر هذا الإصدار").first.click()
@@ -164,7 +164,7 @@ def test_local_sample_manual_reputation_and_team_assignment_browser(app):
                     "attributes": {"sha256": digest, "last_analysis_date": 1790000000, "last_analysis_stats": {"malicious": 1, "undetected": 2}},
                 }
             }
-            page.locator("input[name=subject]").fill(f"عينة: browser-sample.bin · {digest}")
+            page.locator("input[name=subject]").fill(f"عينة: browser-sample.bin | {digest}")
             page.locator("input[name=vt_report]").set_input_files(
                 {"name": "manual-vt.json", "mimeType": "application/json", "buffer": json.dumps(report).encode()}
             )
@@ -172,24 +172,24 @@ def test_local_sample_manual_reputation_and_team_assignment_browser(app):
             page.get_by_text("VirusTotal v3 manual import", exact=True).wait_for()
             page.get_by_role("link", name="الفريق", exact=True).click()
             choice = page.locator("input[name=case_id]")
-            choice.fill(f"{case['reference']} · Browser forensic evidence")
+            choice.fill(f"{case['reference']} | Browser forensic evidence")
             choice.press("Tab")
             page.locator("input[name=job_id]").wait_for()
-            page.locator("input[name=job_id]").fill("browser-assigned.jsonl · 1 سجل")
-            page.locator("input[name=assignee]").fill("L2 Browser Responder · مستجيب L2")
+            page.locator("input[name=job_id]").fill("browser-assigned.jsonl | 1 سجل")
+            page.locator("input[name=assignee]").fill("L2 Browser Responder | مستجيب L2")
             page.locator("textarea[name=instructions]").fill("Record shared team findings")
             page.locator("form").filter(has=page.locator("textarea[name=instructions]")).get_by_role("button", name="حفظ", exact=True).click()
             page.get_by_role("cell", name="Record shared team findings", exact=True).wait_for()
             page.locator(".assignment-queue").get_by_role("link", name=case["reference"], exact=True).click()
-            page.get_by_role("link", name="التحقيق والخط الزمني", exact=True).click()
+            page.locator(".case-tabs").get_by_role("link", name="التحقيق", exact=True).click()
             page.get_by_role("heading", name="Browser assignment log", exact=True).wait_for()
             assert page.get_by_text("وقت الحدث غير معروف؛ لا يُستبدل بوقت الاستيراد", exact=False).count() == 1
-            page.get_by_role("button", name="تمييز السجل وإضافة ملاحظة", exact=True).click()
+            page.get_by_role("button", name="ملاحظة", exact=True).click()
             dialog = page.get_by_role("dialog")
             dialog.locator("input[name=title]").fill("Important shared evidence")
             dialog.locator("textarea[name=notes]").fill("Investigators should examine this retained record")
             dialog.get_by_role("button", name="حفظ", exact=True).click()
-            page.get_by_role("heading", name="علامات السجلات المهمة · Important shared evidence", exact=True).wait_for()
+            page.get_by_role("heading", name="علامات السجلات المهمة | Important shared evidence", exact=True).wait_for()
             assert "Investigators should examine this retained record" in page.locator(".autopsy-timeline").inner_text()
             page.locator("input[name=attack_search]").fill("T1059")
             previous_choices = page.locator("input[name=technique_id]").get_attribute("list")
@@ -198,7 +198,7 @@ def test_local_sample_manual_reputation_and_team_assignment_browser(app):
                 page.get_by_role("button", name="بحث التقنيات", exact=True).click()
             assert search.value.status == 200
             page.locator(f'datalist[id="{previous_choices}"]').wait_for(state="detached")
-            page.locator("input[name=technique_id]").fill("T1059 · Command and Scripting Interpreter")
+            page.locator("input[name=technique_id]").fill("T1059 | Command and Scripting Interpreter")
             page.locator("input[name=assessment]").fill("مقترح")
             page.locator("textarea[name=reason]").fill("Retain as a hypothesis until command execution evidence is found")
             with page.expect_response(lambda response: response.url.endswith("/attack") and response.request.method == "POST") as annotation:
@@ -231,7 +231,7 @@ def test_local_sample_manual_reputation_and_team_assignment_browser(app):
             join.wait_for_url("**/login")
             join.locator("input[name=email]").fill("invited-investigator@example.test")
             join.locator("input[name=password]").fill("Demo-Safe-Password-2026!")
-            join.get_by_role("button", name="دخول إلى المنصة", exact=True).click()
+            join.get_by_role("button", name="دخول", exact=True).click()
             join.wait_for_url("**/cases")
             join.get_by_text("لا توجد قضايا في النطاق المصرح", exact=True).wait_for()
             browser.close()
@@ -263,7 +263,7 @@ def test_case_import_preview_commit_and_export_browser(app):
             dialog.locator("textarea[name=objective]").fill("Preserve and inspect the original log evidence")
             dialog.get_by_role("button", name="حفظ", exact=True).click()
             page.wait_for_url("**/cases/*")
-            page.get_by_role("link", name="السجلات والأدلة", exact=True).click()
+            page.locator(".case-tabs").get_by_role("link", name="السجلات", exact=True).click()
             raw = b'{"title":"Browser linked log","event_time":"2026-10-24T12:00:00Z","source_ip":"192.0.2.20"}\n'
             page.locator("input[type=file]").set_input_files({"name": "browser-evidence.jsonl", "mimeType": "application/x-ndjson", "buffer": raw})
             page.get_by_role("button", name="معاينة السجلات والبصمة", exact=True).click()

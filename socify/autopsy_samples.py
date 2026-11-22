@@ -359,7 +359,7 @@ def _triage_pack(case, identifier):
 
 def _retain_triage(case_id, sample_id, evidence_id, triage, duplicate_sample=True):
     payload = {
-        "title": f"Quick Static Triage · {triage['filename'][:180]}",
+        "title": f"Quick Static Triage | {triage['filename'][:180]}",
         "method": "quick_static_triage",
         "sample_id": sample_id,
         "evidence_id": evidence_id,

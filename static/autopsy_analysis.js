@@ -26,7 +26,7 @@ function autopsyReputationCard(record, sample = null) {
     failure: text("تعذر الفحص", "Scan failure"),
   };
   const counts = Object.entries(p.stats || {}).map(([key, count]) => ({ category: categories[key] || key, count }));
-  for (const result of counts) add(`${text("المحركات", "Engines")} · ${result.category}`, String(result.count));
+  for (const result of counts) add(`${text("المحركات", "Engines")} | ${result.category}`, String(result.count));
   add(text("بصمة التقرير الأصلي", "Original report SHA-256"), node("bdi", { dir: "ltr", text: p.source_sha256 }));
   const card = node("article", { class: "card record-card reputation-record" }, [
     node("h3", { text: heading }),
@@ -62,24 +62,24 @@ function autopsyStaticFileType(value) {
 function autopsyEmailView(mail, watch = () => null) {
   const t = SOCifyLocale.text;
   const body = node("div", { class: "panel-body email-result" });
-  if (mail.email_verdict) body.append(node("p", { class: "notice", text: `${t("الحكم الساكن")}: ${autopsyStaticVerdict(mail.email_verdict)} · ${mail.email_risk_score || 0}/100` }));
+  if (mail.email_verdict) body.append(node("p", { class: "notice", text: `${t("الحكم الساكن")}: ${autopsyStaticVerdict(mail.email_verdict)} | ${mail.email_risk_score || 0}/100` }));
   const summary = [];
   for (const [label, value] of [["المرسل", mail.sender_email || mail.headers?.From], ["عنوان الرد", mail.reply_to_email || mail.headers?.["Reply-To"]]]) {
     if (value) summary.push({ label: t(label), value: node("div", { class: "action-row" }, [node("bdi", { dir: "ltr", "data-user-content": "true", text: value }), watch("email", value, "Retained email address")]) });
   }
   if (summary.length) body.append(table([{ label: t("الحقل"), value: "label" }, { label: t("القيمة"), value: "value" }], summary));
   const flags = { reply_to_domain_mismatch: "نطاق الرد يختلف عن نطاق المرسل", return_path_domain_mismatch: "نطاق مسار العودة يختلف عن نطاق المرسل", auth_failure_claimed: "رأس المصادقة يذكر فشلًا؛ لم يُتحقق منه مستقلًا", urgent_lure_subject: "صياغة استعجال في عنوان الرسالة", suspicious_url_host: "رابط بعنوان IP مباشر أو نطاق Punycode" };
-  if (mail.header_flags?.length) body.append(node("ul", { class: "email-findings" }, mail.header_flags.map(flag => node("li", { text: `${autopsyLabel(flag.severity)} · ${t(flags[flag.code] || flag.detail)}` }))));
+  if (mail.header_flags?.length) body.append(node("ul", { class: "email-findings" }, mail.header_flags.map(flag => node("li", {}, [autopsyBadge(flag.severity), " ", t(flags[flag.code] || flag.detail)]))));
   const headers = node("dl");
   for (const [key, value] of Object.entries(mail.headers || {})) if (value) headers.append(node("dt", { dir: "ltr", text: key }), node("dd", { "data-user-content": "true", text: value }));
   body.append(node("details", {}, [node("summary", { text: t("رؤوس الرسالة") }), headers, node("p", { dir: "ltr", class: "cell-meta", text: `SHA-256: ${mail.sha256}` })]));
   body.append(node("h4", { text: t("نص الرسالة") }), node("pre", { class: "email-body", tabindex: 0, "data-user-content": "true", text: mail.body || t("لا يوجد نص متاح") }));
   if (mail.body_truncated) body.append(node("p", { class: "notice", text: t("النص المعروض مختصر؛ الأصل محفوظ في الحجر.") }));
-  if (mail.urls?.length) body.append(node("details", {}, [node("summary", { text: `${t("الروابط المرصودة")} · ${mail.urls.length}` }), node("ul", { class: "email-links" }, mail.urls.map(value => node("li", {}, [node("bdi", { dir: "ltr", "data-user-content": "true", text: value }), watch("url", value, "Retained email URL")])))]));
+  if (mail.urls?.length) body.append(node("details", {}, [node("summary", { text: `${t("الروابط المرصودة")} | ${mail.urls.length}` }), node("ul", { class: "email-links" }, mail.urls.map(value => node("li", {}, [node("bdi", { dir: "ltr", "data-user-content": "true", text: value }), watch("url", value, "Retained email URL")])))]));
   if (mail.attachments?.length) body.append(table([
     { label: t("المرفق"), value: item => item.original_filename || item.filename },
     { label: t("النوع المعلن"), value: "content_type" },
-    { label: t("الفحص الساكن (بدون تشغيل)"), value: item => item.triage ? `${autopsyStaticVerdict(item.triage.verdict)} (${item.triage.risk_score}/100) · ${autopsyStaticFileType(item.triage.detected_magic)}${item.triage.extension_mismatch ? " · " + t("تعارض امتداد") : ""}` : t("بصمة فقط") },
+    { label: t("الفحص الساكن (بدون تشغيل)"), value: item => item.triage ? `${autopsyStaticVerdict(item.triage.verdict)} (${item.triage.risk_score}/100) | ${autopsyStaticFileType(item.triage.detected_magic)}${item.triage.extension_mismatch ? " | " + t("تعارض امتداد") : ""}` : t("بصمة فقط") },
     { label: t("الحجم"), value: "size" },
     { label: "SHA-256", value: item => node("div", {}, [node("bdi", { dir: "ltr", text: item.sha256 }), watch("sha256", item.sha256, `Attachment ${item.original_filename || item.filename}`)]) },
   ], mail.attachments));
@@ -89,11 +89,11 @@ function autopsyEmailView(mail, watch = () => null) {
 function autopsySampleView(result) {
   const t=SOCifyLocale.text;
   const root=node("div",{class:"panel-body sample-result"});
-  if(result.verdict)root.append(node("p",{class:"notice",text:`${autopsyStaticVerdict(result.verdict)} · ${result.risk_score}/100`}));
+  if(result.verdict)root.append(node("p",{class:"notice",text:`${autopsyStaticVerdict(result.verdict)} | ${result.risk_score}/100`}));
   const rows=[];
   const add=(label,value)=>{if(value!==null&&value!==undefined&&value!=="")rows.push({label:t(label),value});};
   add("الملف",result.filename);
-  add("الحجم",`${Number(result.size||0).toLocaleString(SOCifyLocale.language)} ${t("بايت")}`);
+  add("الحجم",`${Number(result.size||0).toLocaleString(SOCifyLocale.locale)} ${t("بايت")}`);
   const observedTypes={"DOS signature; PE not yet verified":"dos_executable","PE header verified; content never executed":"pe_executable","ELF signature; content never executed":"elf_executable","ZIP-compatible container; not extracted or executed":"zip_container"};
   const detected=result.detected_magic||observedTypes[result.file_type_observation];
   add("النوع المكتشف",detected?autopsyStaticFileType(detected):t("نوع غير محدد"));
@@ -102,7 +102,7 @@ function autopsySampleView(result) {
   add("SHA-256",node("bdi",{dir:"ltr",text:result.sha256}));
   root.append(table([{label:t("الحقل"),value:"label"},{label:t("القيمة"),value:"value"}],rows));
   const flags={filename_bidi_spoofing:"محارف اتجاه قد تخفي امتداد الملف",double_extension:"امتداد مزدوج مضلل",magic_extension_mismatch:"نوع الملف لا يطابق امتداده",executable_binary:"محتوى تنفيذي",zip_bomb_ratio_warning:"نسبة ضغط أو عدد ملفات مرتفع",vba_macro_detected:"وحدات ماكرو داخل المستند",archive_contains_executable_or_script:"ملفات تنفيذية أو سكربتات داخل الأرشيف",corrupt_zip_container:"أرشيف تالف أو مشفر",pdf_active_content:"محتوى نشط داخل PDF",rtf_embedded_object:"كائن مضمّن داخل RTF",html_smuggling_indicator:"مؤشرات بناء ملف من محتوى HTML",suspicious_execution_strings:"سلاسل مرتبطة بالتنفيذ أو الحقن",high_entropy_packed_or_encrypted:"محتوى قد يكون مضغوطًا أو مشفرًا",high_window_entropy_embedded_blob:"كتلة بيانات عالية العشوائية داخل النص",yara_rule_match:"تطابق مع قواعد الفحص"};
-  if(result.flags?.length)root.append(table([{label:t("الخطورة"),value:flag=>autopsyLabel(flag.severity)},{label:t("النتيجة"),value:flag=>t(flags[flag.code]||flag.detail)}],result.flags));
+  if(result.flags?.length)root.append(table([{label:t("الخطورة"),value:flag=>autopsyBadge(flag.severity)},{label:t("النتيجة"),value:flag=>t(flags[flag.code]||flag.detail)}],result.flags));
   root.append(node("h4",{text:"YARA"}),node("p",{text:result.yara_pack?.name||"EICAR"}));
   root.append(result.yara_matches?.length ? node("ul",{},result.yara_matches.map(match=>node("li",{text:match.rule}))) : node("p",{text:t("لا تطابقات مع القواعد المختارة")}));
   for(const [key,label] of [["extracted_urls","الروابط المرصودة"],["extracted_ips","عناوين IP"],["extracted_emails","عناوين البريد"]]) {
@@ -156,7 +156,7 @@ window.SOCifyAutopsy.analysis = async (caseId) => {
   const jobViews=new Map();
   const packs = await api("/api/autopsy/yara");
   const selectedPack=new URLSearchParams(location.search).get("yara_pack")||"";
-  const packChoice = autopsyChoice("yara_pack_id", [{ value: "", label: "EICAR" }, ...packs.items.map((pack) => ({ value: pack.id, label: packs.items.filter(other=>other.name===pack.name).length>1?`${pack.name} · ${pack.sha256.slice(0,8)}`:pack.name }))], selectedPack);
+  const packChoice = autopsyChoice("yara_pack_id", [{ value: "", label: "EICAR" }, ...packs.items.map((pack) => ({ value: pack.id, label: packs.items.filter(other=>other.name===pack.name).length>1?`${pack.name} | ${pack.sha256.slice(0,8)}`:pack.name }))], selectedPack);
   if(selectedPack&&!packs.items.some(pack=>String(pack.id)===selectedPack))packChoice.input.value=SOCifyLocale.text("الحزمة المختارة غير متاحة");
   packChoice.input.addEventListener("change",()=>{
     try{
@@ -237,7 +237,7 @@ window.SOCifyAutopsy.analysis = async (caseId) => {
   }) : "—" }, { label: SOCifyLocale.text("الأصل المحجور"), value: (row) => permission("samples.download") ? linkedButton(SOCifyLocale.text("تنزيل ثنائي للمتخصص المصرح"), `/api/cases/${caseId}/samples/${row.id}/download`) : SOCifyLocale.text("تنزيل الأصل مقيد بدور مستقل") }], samples.items));
   root.append(panel(SOCifyLocale.text("العينات والتحليل الساكن"), body, true));
   if (autopsy.current.can_update && autopsy.current.status !== "closed") {
-    const choices = [...samples.items.map((sample) => ({ value: `sample_id:${sample.id}`, label: SOCifyLocale.template`عينة: ${sample.filename} · ${sample.sha256}` })), ...indicators.filter((item) => item.payload.type === "sha256").map((item) => ({ value: `indicator_id:${item.id}`, label: SOCifyLocale.template`مؤشر SHA-256: ${item.payload.value}` }))];
+    const choices = [...samples.items.map((sample) => ({ value: `sample_id:${sample.id}`, label: SOCifyLocale.template`عينة: ${sample.filename} | ${sample.sha256}` })), ...indicators.filter((item) => item.payload.type === "sha256").map((item) => ({ value: `indicator_id:${item.id}`, label: SOCifyLocale.template`مؤشر SHA-256: ${item.payload.value}` }))];
     const subject = autopsyChoice("subject", choices, "", true);
     const file = node("input", { name: "vt_report", type: "file", required: true, accept: ".json,application/json" });
     const error = node("p", { class: "notice span-2 reputation-import-error", role: "alert", hidden: true });

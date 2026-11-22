@@ -30,7 +30,7 @@ def pdf_link(j):
 def approve(manager):
     manager.click("button", "مراجعة واعتماد النسخة", manager.page.locator(".report-revision").first)
     manager.click("button", "حفظ", manager.page.get_by_role("dialog"))
-    expect(manager.page.locator(".report-revision").first.locator(".report-status")).to_have_text(manager.text("معتمد") + " · " + manager.text("جاهز للتنزيل"))
+    expect(manager.page.locator(".report-revision").first.locator(".report-status")).to_have_text(manager.text("معتمد") + " | " + manager.text("جاهز للتنزيل"))
 
 
 @pytest.mark.e2e
@@ -42,9 +42,9 @@ def test_closed_investigation_can_publish_actual_corrective_followup_and_preserv
     with local_worker_services(app.config), review_session(app, language, scenario) as (j, manager, result):
         upload_logs(j, "retained-approval.json", "Service owner approved the maintenance activity")
         j.assessment("Approved maintenance verified against retained evidence; no compromise established.")
-        j.click("link", "التحقيق والخط الزمني")
+        j.click("link", "التحقيق")
         j.record("root_cause", {"category": "other", "conclusion": "Retained approval explains the observed activity", "evidence_id": "retained-approval.json"})
-        j.click("link", "الاستجابة والتصعيد")
+        j.click("link", "الاستجابة")
         j.record(
             "response",
             {
@@ -80,7 +80,7 @@ def test_closed_investigation_can_publish_actual_corrective_followup_and_preserv
         j.settle()
         j.page.locator(f"#performance-cases a[href='/cases/{j.case_id}']").click()
         j.settle()
-        j.click("link", "الاستجابة والتصعيد")
+        j.click("link", "الاستجابة")
         dialog = edit(j, title)
         validation = "The closed investigation corrective procedure was independently verified"
         set_status(j, dialog, "validated", validation)
@@ -95,7 +95,7 @@ def test_closed_investigation_can_publish_actual_corrective_followup_and_preserv
         manager.settle()
         if scenario.endswith("stale-report-review"):
             manager.click("button", "مراجعة واعتماد النسخة", manager.page.locator(".report-revision").first)
-            j.click("link", "الاستجابة والتصعيد")
+            j.click("link", "الاستجابة")
             dialog = edit(j, title)
             validation = "Additional retained verification reconciled before final independent approval"
             set_status(j, dialog, "validated", validation)

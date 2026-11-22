@@ -21,7 +21,7 @@ def test_manager_can_find_and_apply_readable_role_permissions(app, language):
         assert "cases.create" not in role.inner_text()
         create.uncheck()
         manager.click("button", "حفظ حدود الدور", role)
-        analyst.nav("إدارة القضايا")
+        analyst.nav("القضايا")
         expect(analyst.page.get_by_role("button", name=analyst.text("إنشاء قضية"), exact=True)).to_have_count(0)
         role.locator("summary").click()
         expect(create).not_to_be_checked()

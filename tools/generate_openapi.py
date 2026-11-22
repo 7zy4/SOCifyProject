@@ -391,7 +391,7 @@ def generate() -> dict[str, object]:
     return {
         "openapi": "3.1.0",
         "info": {
-            "title": "SOCify Tactical Workbench API",
+            "title": "SOCify API",
             "version": VERSION,
             "description": "Fast-triage SOC workbench API for SIEM log ingestion, built-in detection rules, safe static file and email inspection, suspicious IP and email watchlists, direct case ownership, and guided printable reporting with manager escalation. All writes require an authenticated session, permission and CSRF token.",
         },

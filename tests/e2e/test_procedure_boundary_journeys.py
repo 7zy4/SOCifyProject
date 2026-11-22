@@ -24,7 +24,7 @@ GAP = "خطوات كتيب استجابة إلزامية"
 
 
 def publish(journey, *, required=True, approval=False, manager_only=False, replacement=False):
-    journey.nav("كتيبات الاستجابة")
+    journey.nav("الكتيبات")
     if replacement:
         journey.click("button", "إنشاء إصدار قابل للتعديل من هذا القالب")
     else:
@@ -87,7 +87,7 @@ def test_response_requirements_remain_actionable_during_review(app, language, sc
             manager_only=scenario == "procedure-role-boundary",
         )
         attach(manager)
-        j.click("link", "الاستجابة والتصعيد")
+        j.click("link", "الاستجابة")
 
         if scenario in {"closure-required-procedure", "closure-pending-approval"}:
             if scenario == "closure-pending-approval":
@@ -123,7 +123,7 @@ def test_response_requirements_remain_actionable_during_review(app, language, sc
             report_id = manager.state()["reports"][0]["id"]
             path = f"/api/cases/{manager.case_id}/reports/{report_id}"
             report = manager.page.evaluate("path => api(path)", path)
-            manager.click("link", "الاستجابة والتصعيد")
+            manager.click("link", "الاستجابة")
             update(manager, "in_progress", "A discrepancy requires rechecking the approval scope", evidence=True)
             requirements(manager, True)
             after = manager.page.evaluate("path => api(path)", path)
@@ -182,7 +182,7 @@ def test_response_requirements_remain_actionable_during_review(app, language, sc
 
         elif scenario == "procedure-evidence-access-recovery":
             update(j, "completed", "Retained identity approval has been checked", evidence=True)
-            manager.click("link", "السجلات والأدلة")
+            manager.click("link", "السجلات")
             restrict_batch(manager, "approval.json")
             j.page.locator(".procedure-step").get_by_role("button").filter(has_text="approval.json").click()
             j.settle()

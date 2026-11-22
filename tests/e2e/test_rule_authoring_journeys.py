@@ -108,16 +108,16 @@ def test_author_reaches_a_current_reviewed_rule(app, language, scenario):
     with review_session(app, language, scenario) as (analyst, manager, result):
         manager.login("manager@socify.local")
         manager.case_url = analyst.case_url
-        manager.nav("مكتبة التحليل المحلي")
+        manager.nav("مكتبة القواعد")
         j = manager
         if scenario in {"rule-concurrent-update-recovery", "rule-late-current-rule-recovery", "rule-author-permission-recovery"}:
             change_author_role(manager, "soc_manager")
             analyst.login("analyst@socify.local")
-            manager.nav("مكتبة التحليل المحلي")
+            manager.nav("مكتبة القواعد")
         if scenario == "rule-author-permission-recovery":
             analyst.page.reload()
             analyst.settle()
-            analyst.nav("مكتبة التحليل المحلي")
+            analyst.nav("مكتبة القواعد")
             j = analyst
         before = rules(j)
         attach(j, empty_positive=scenario == "rule-empty-positive-recovery", invalid_json=scenario == "rule-json-recovery")
@@ -183,11 +183,11 @@ def test_author_reaches_a_current_reviewed_rule(app, language, scenario):
                 upload(j, 1, "original.json", prefix="Suspicious gateway")
                 original_alerts = j.page.evaluate("id=>api(`/api/cases/${id}/alerts`)", j.case_id)["items"]
                 assert len(original_alerts) == 1
-                j.nav("مكتبة التحليل المحلي")
+                j.nav("مكتبة القواعد")
             if scenario in {"rule-concurrent-update-recovery", "rule-late-current-rule-recovery"}:
                 analyst.page.reload()
                 analyst.settle()
-                analyst.nav("مكتبة التحليل المحلي")
+                analyst.nav("مكتبة القواعد")
                 attach(analyst, "Final gateway")
                 target(analyst)
             attach(j, "Revised gateway")
@@ -234,7 +234,7 @@ def test_author_reaches_a_current_reviewed_rule(app, language, scenario):
                 alerts = j.page.evaluate("id=>api(`/api/cases/${id}/alerts`)", j.case_id)["items"]
                 assert len(alerts) == 2 and original_alerts[0] in alerts
                 result["outcomes"] = ["updated rule only matched new intended input", "previous alert retained"]
-                j.nav("مكتبة التحليل المحلي")
+                j.nav("مكتبة القواعد")
             attach(j, "Final gateway" if scenario in {"rule-concurrent-update-recovery", "rule-late-current-rule-recovery"} else "Revised gateway")
             target(j)
             check(j)

@@ -37,7 +37,7 @@ def test_author_retries_a_committed_publication(app, language, scenario):
             change_author_role(manager, "soc_manager")
             analyst.login("analyst@socify.local")
         j = analyst if scenario == "rule-receipt-permission-recovery" else manager
-        j.nav("مكتبة التحليل المحلي")
+        j.nav("مكتبة القواعد")
         if scenario == "rule-receipt-storage-disabled":
             j.page.evaluate("Object.defineProperty(window, 'sessionStorage', {get() {throw new DOMException('Blocked', 'SecurityError')}})")
         before = rules(j)
@@ -77,7 +77,7 @@ def test_author_retries_a_committed_publication(app, language, scenario):
                 area(j).screenshot(path=str(ARTIFACTS / f"{scenario}-{language}-recovery-{width}.png"))
         assert len(committed) == (0 if scenario == "rule-receipt-reload-conflict" else 1)
         if scenario in {"rule-receipt-concurrent-update", "rule-receipt-reload-conflict"}:
-            analyst.nav("مكتبة التحليل المحلي")
+            analyst.nav("مكتبة القواعد")
             attach(analyst, "Colleague gateway")
             target(analyst)
             colleague = publish(analyst)

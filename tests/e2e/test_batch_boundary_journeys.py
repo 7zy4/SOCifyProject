@@ -12,7 +12,7 @@ from tests.e2e.test_review_workflow import review_session
 
 
 def upload_logs(journey, filename, title):
-    journey.click("link", "السجلات والأدلة")
+    journey.click("link", "السجلات")
     journey.page.locator("input[name=file]").set_input_files(
         {
             "name": filename,
@@ -51,12 +51,12 @@ def test_analyst_only_uses_the_granted_batch(app, language, scenario):
         upload_logs(manager, "assigned.json", "Assigned review record")
         upload_logs(manager, "sensitive.json", "Restricted identity review record")
         name = j.page.evaluate("state.user.name")
-        j.click("link", "السجلات والأدلة")
+        j.click("link", "السجلات")
         expect(j.page.get_by_role("cell", name="Restricted identity review record", exact=True)).to_be_visible()
         if scenario == "batch-export-boundary":
             j.click("link", "التقارير والمراجعة")
             previous_export = j.page.get_by_role("link", name=j.text("تصدير حزمة الفريق"), exact=True).get_attribute("href")
-            j.click("link", "السجلات والأدلة")
+            j.click("link", "السجلات")
         restrict_batch(manager, "sensitive.json")
         if scenario == "batch-live-revocation":
             stale = j.page.locator("tr").filter(has=j.page.get_by_role("cell", name="Restricted identity review record", exact=True))
@@ -72,7 +72,7 @@ def test_analyst_only_uses_the_granted_batch(app, language, scenario):
         expect(j.page.locator("main")).not_to_contain_text("sensitive.json")
         expect(j.page.get_by_role("link", name=j.text("التقارير والمراجعة"), exact=True)).to_have_count(0)
         if scenario == "batch-export-boundary":
-            label = j.page.evaluate("() => SOCifyLocale.template`${'CSV'} · بيانات وصفية محجوبة`")
+            label = j.page.evaluate("() => SOCifyLocale.template`${'CSV'} | بيانات وصفية محجوبة`")
             with j.page.expect_download() as exported:
                 j.page.get_by_role("link", name=label, exact=True).click()
             content = Path(exported.value.path()).read_text(encoding="utf-8-sig")

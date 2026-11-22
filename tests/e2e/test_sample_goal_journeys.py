@@ -23,7 +23,7 @@ FAILED = "تعذر إكمال التحليل. العينة محفوظة."
 
 
 def files(j):
-    j.nav("تحليل الأدلة")
+    j.nav("الملفات")
     j.page.get_by_role("link", name="الملفات والبريد" if j.page.locator("html").get_attribute("lang") == "ar" else "Files & email", exact=True).click()
     j.settle()
 
@@ -215,7 +215,7 @@ def test_retained_file_edge_conditions(app, database, user_ids, language, scenar
             before = analyses(j)[0]
             old_case = j.case_id
             if scenario == "file-case-isolation":
-                j.nav("إدارة القضايا")
+                j.nav("القضايا")
                 j.create_case()
                 files(j)
                 assert samples(j) == []

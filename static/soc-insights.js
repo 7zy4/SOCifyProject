@@ -2,7 +2,7 @@
 
 window.SOCifyInsights = (() => {
   const t = (ar, en) => SOCifyLocale.language === "ar" ? ar : en;
-  const n = value => new Intl.NumberFormat(SOCifyLocale.language).format(value);
+  const n = value => new Intl.NumberFormat(SOCifyLocale.locale).format(value);
   const label = value => autopsyLabel(value);
   const time = value => value ? formatTime(value) : "—";
   const duration = value => value === null ? "—" : value < 60 ? `${n(Math.round(value))} ${t("ث", "s")}` : value < 3600 ? `${n(Math.round(value/60))} ${t("د", "min")}` : `${n(Math.round(value/360)/10)} ${t("س", "h")}`;
@@ -36,11 +36,11 @@ window.SOCifyInsights = (() => {
     for(const content of inspection.decoded) {
       rows.push([t("الحقل المرمّز", "Encoded field"),content.field]);
       for(const layer of content.layers) {
-        rows.push([`${t("الطبقة", "Layer")} ${n(layer.depth)} · ${layer.encoding}`,node("pre",{dir:"auto",tabindex:0,"data-user-content":"true",text:layer.text==="[REDACTED]"?t("محجوبة", "Redacted"):layer.text})]);
+        rows.push([`${t("الطبقة", "Layer")} ${n(layer.depth)} | ${layer.encoding}`,node("pre",{dir:"auto",tabindex:0,"data-user-content":"true",text:layer.text==="[REDACTED]"?t("محجوبة", "Redacted"):layer.text})]);
       }
-      if(content.depth_limit_reached)rows.push([t("حد الطبقات", "Layer limit"),t("٤ طبقات", "4 layers")]);
+      if(content.depth_limit_reached)rows.push([t("حد الطبقات", "Layer limit"),t("4 طبقات", "4 layers")]);
     }
-    if(inspection.truncated)rows.push([t("حالة الفحص", "Inspection status"),t("فحص جزئي — تجاوز حد المحتوى", "Partial inspection — content limit exceeded")]);
+    if(inspection.truncated)rows.push([t("حالة الفحص", "Inspection status"),t("فحص جزئي - تجاوز حد المحتوى", "Partial inspection - content limit exceeded")]);
     return rows;
   }
   async function contentInspection(caseId) {
@@ -48,7 +48,7 @@ window.SOCifyInsights = (() => {
     async function load(page=1) {
       const data=await api(`/api/cases/${caseId}/content-inspection?page=${page}`);
       const items=data.items.map(item=>{
-        const detail=node("details",{class:"evidence-event"},node("summary",{"data-user-content":"true",text:`#${item.event_id} · ${item.title}`}));
+        const detail=node("details",{class:"evidence-event"},node("summary",{"data-user-content":"true",text:`#${item.event_id} | ${item.title}`}));
         detail.append(detailTable(t("نتائج الفحص", "Inspection results"),inspectionRows(item.inspection)));
         return detail;
       });
@@ -68,12 +68,12 @@ window.SOCifyInsights = (() => {
   const precisePercent = value => (value > 0 && value < 1) || (value > 99 && value < 100);
   const percent = value => {
     if (!Number.isFinite(value)) return "—";
-    const formatter = new Intl.NumberFormat(SOCifyLocale.language, {style:"percent",maximumFractionDigits:precisePercent(value) ? 2 : 0});
+    const formatter = new Intl.NumberFormat(SOCifyLocale.locale, {style:"percent",maximumFractionDigits:precisePercent(value) ? 2 : 0});
     if (value > 0 && value < 0.01) return `<${formatter.format(0.0001)}`;
     if (value > 99.99 && value < 100) return `>${formatter.format(0.9999)}`;
     return formatter.format(value / 100);
   };
-  const chartDate = value => new Intl.DateTimeFormat(SOCifyLocale.language, {month:"short",day:"numeric",timeZone:"UTC",calendar:"gregory"}).format(new Date(value));
+  const chartDate = value => new Intl.DateTimeFormat(SOCifyLocale.locale, {month:"short",day:"numeric",timeZone:"UTC",calendar:"gregory"}).format(new Date(value));
   function chartSVG(tag, attributes = {}, children = []) {
     const element = document.createElementNS("http://www.w3.org/2000/svg", tag);
     for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, String(value));
@@ -105,7 +105,7 @@ window.SOCifyInsights = (() => {
     if (value.total !== null) figure.append(node("p", {class:"performance-completion-count","data-completion-count":"",text:`${n(value.completed)} ${t("من", "of")} ${n(value.total)}`}));
     figure.append(node("p", {class:"performance-basis",text:t("القضايا المنشأة خلال الفترة", "Cases opened in this period")}));
     if (value.total !== null) figure.append(chartLegend([
-      [t("مكتملة", "Completed"),"closed",value.completed],
+      [t("مكتملة", "Completed"),"completed",value.completed],
       [t("نشطة", "Active"),"opened",value.pending],
       ...(value.unmeasured ? [[t("غير قابلة للحساب", "Not measurable"),"unknown",value.unmeasured]] : []),
     ]));
@@ -136,33 +136,59 @@ window.SOCifyInsights = (() => {
     if (!buckets.length) {
       body.append(node("div", {class:"performance-chart-empty",text:t("لا حركة قضايا خلال الفترة", "No case activity in this period")}));
     } else {
-      const highest = Math.max(1, ...buckets.flatMap(bucket => [bucket.opened,bucket.closed]));
-      const max = highest <= 4 ? highest : Math.ceil(highest / 4) * 4;
-      const divisions = Math.min(4, max);
+      // Opened cases rise above the baseline and closed cases mirror below it, drawn as smooth curves.
+      const max = Math.max(1, ...buckets.flatMap(bucket => [bucket.opened,bucket.closed]));
+      const width = 1000, height = 240, middle = height / 2, reach = middle - 14;
+      const x = index => buckets.length === 1 ? width / 2 : (index / (buckets.length - 1)) * width;
+      // Monotone cubic interpolation: smooth, and never overshoots the counts (no dips below zero, no false peaks).
+      const curve = points => {
+        if (points.length === 1) return `M0,${points[0][1]} L${width},${points[0][1]}`;
+        const slopes = points.slice(0, -1).map((point, i) => (points[i + 1][1] - point[1]) / (points[i + 1][0] - point[0]));
+        const tangents = points.map((_, i) => i === 0 ? slopes[0] : i === points.length - 1 ? slopes[i - 1] : slopes[i - 1] * slopes[i] <= 0 ? 0 : (slopes[i - 1] + slopes[i]) / 2);
+        slopes.forEach((slope, i) => {
+          if (slope === 0) { tangents[i] = 0; tangents[i + 1] = 0; return; }
+          const a = tangents[i] / slope, b = tangents[i + 1] / slope, h = a * a + b * b;
+          if (h > 9) { const tau = 3 / Math.sqrt(h); tangents[i] = tau * a * slope; tangents[i + 1] = tau * b * slope; }
+        });
+        let path = `M${points[0][0]},${points[0][1]}`;
+        for (let i = 0; i < points.length - 1; i++) {
+          const [x0, y0] = points[i], [x1, y1] = points[i + 1], step = (x1 - x0) / 3;
+          path += ` C${x0 + step},${y0 + tangents[i] * step} ${x1 - step},${y1 - tangents[i + 1] * step} ${x1},${y1}`;
+        }
+        return path;
+      };
+      const series = (key, sign) => buckets.map((bucket, index) => [x(index), middle - sign * reach * bucket[key] / max]);
+      const opened = series("opened", 1), closed = series("closed", -1);
+      const area = points => `${curve(points)} L${points.at(-1)[0]},${middle} L${points[0][0]},${middle} Z`;
+      const svg = chartSVG("svg", {viewBox:`0 0 ${width} ${height}`, preserveAspectRatio:"none", class:"performance-curves", "aria-hidden":"true", focusable:"false"}, [
+        ...[0.25, 0.5, 0.75].map(share => chartSVG("line", {x1:0, x2:width, y1:middle - reach * share, y2:middle - reach * share, class:"performance-grid"})),
+        ...[0.25, 0.5, 0.75].map(share => chartSVG("line", {x1:0, x2:width, y1:middle + reach * share, y2:middle + reach * share, class:"performance-grid"})),
+        chartSVG("path", {d:area(opened), class:"performance-area opened"}),
+        chartSVG("path", {d:area(closed), class:"performance-area closed"}),
+        chartSVG("path", {d:curve(opened), class:"performance-line opened"}),
+        chartSVG("path", {d:curve(closed), class:"performance-line closed"}),
+        chartSVG("line", {x1:0, x2:width, y1:middle, y2:middle, class:"performance-baseline"}),
+      ]);
       const plot = node("div", {class:"performance-plot",dir:"ltr",role:"group","aria-label":t("حركة القضايا", "Case activity")});
-      const scale = node("div", {class:"performance-y-axis","aria-hidden":"true"}, Array.from({length:divisions+1}, (_, index) => node("span", {text:n(max-index*max/divisions)})));
+      const scale = node("div", {class:"performance-y-axis","aria-hidden":"true"}, [n(max), "0", n(max)].map(text => node("span", {text})));
+      const canvas = node("div", {class:"performance-canvas"}, [svg]);
       const columns = node("div", {class:"performance-trend-columns"});
-      columns.style.setProperty("--bucket-count", String(buckets.length));
-      columns.style.setProperty("--chart-step", `${100/divisions}%`);
       const detail = node("p", {class:"performance-trend-readout"});
       const show = index => {
         const bucket = buckets[index];
-        const dates = bucket.start === bucket.end ? chartDate(bucket.start) : `${chartDate(bucket.start)} – ${chartDate(bucket.end)}`;
-        detail.textContent = `${dates} · ${t("أنشئت", "Opened")} ${n(bucket.opened)} · ${t("أغلقت", "Closed")} ${n(bucket.closed)}`;
+        const dates = bucket.start === bucket.end ? chartDate(bucket.start) : `${chartDate(bucket.start)} - ${chartDate(bucket.end)}`;
+        detail.textContent = `${dates} | ${t("أنشئت", "Opened")} ${n(bucket.opened)} | ${t("أغلقت", "Closed")} ${n(bucket.closed)}`;
         [...columns.children].forEach((item, i) => {
           item.classList.toggle("selected", i === index);
           item.setAttribute("aria-pressed", String(i === index));
         });
       };
       for (const [index,bucket] of buckets.entries()) {
-        const dates = bucket.start === bucket.end ? chartDate(bucket.start) : `${chartDate(bucket.start)} – ${chartDate(bucket.end)}`;
+        const dates = bucket.start === bucket.end ? chartDate(bucket.start) : `${chartDate(bucket.start)} - ${chartDate(bucket.end)}`;
         const control = node("button", {type:"button",class:"performance-trend-bucket","aria-label":`${dates}: ${t("أنشئت", "Opened")} ${n(bucket.opened)}, ${t("أغلقت", "Closed")} ${n(bucket.closed)}`});
-        for (const key of ["opened","closed"]) {
-          const bar = node("span", {class:`performance-trend-bar ${key}`,"aria-hidden":"true"});
-          bar.style.height = `${100*bucket[key]/max}%`;
-          if (!bucket[key]) bar.classList.add("zero");
-          control.append(bar);
-        }
+        control.style.setProperty("--point-opened", `${50 - 50 * (reach / middle) * bucket.opened / max}%`);
+        control.style.setProperty("--point-closed", `${50 + 50 * (reach / middle) * bucket.closed / max}%`);
+        control.append(node("span", {class:"performance-point opened","aria-hidden":"true"}), node("span", {class:"performance-point closed","aria-hidden":"true"}));
         control.addEventListener("pointerenter", () => show(index));
         control.addEventListener("focus", () => show(index));
         control.addEventListener("click", () => show(index));
@@ -174,7 +200,9 @@ window.SOCifyInsights = (() => {
         });
         columns.append(control);
       }
-      plot.append(scale, columns);
+      columns.style.setProperty("--bucket-count", String(buckets.length));
+      canvas.append(columns);
+      plot.append(scale, canvas);
       const ticks = node("div", {class:"performance-x-axis",dir:"ltr","aria-hidden":"true"}, [buckets[0].start,buckets[Math.floor(buckets.length/2)].start,buckets.at(-1).end].map(date => node("span", {text:chartDate(date)})));
       body.append(plot,ticks,detail);
       show(buckets.length-1);
@@ -189,22 +217,23 @@ window.SOCifyInsights = (() => {
   function speedChart(data) {
     const value = data.speed || {on_time:0,late:0,unmeasured:0,included:0,compliance_percent:null};
     const body = node("div", {class:"panel-body performance-speed"});
-    const score = node("div", {class:"performance-speed-score"}, [
-      node("strong", {"data-speed-value":"",dir:"ltr",class:precisePercent(value.compliance_percent)?"performance-precise-value":null,text:percent(value.compliance_percent)}),
-      node("span", {text:t("ضمن المهلة", "Within SLA")}),
+    const known = value.included > 0 && Number.isFinite(value.compliance_percent);
+    const arc = "M20,100 A80,80 0 0 1 180,100";
+    const gauge = node("div", {class:`performance-gauge${known ? "" : " unavailable"}`}, [
+      chartSVG("svg", {viewBox:"0 0 200 112","aria-hidden":"true",focusable:"false"}, [
+        chartSVG("path", {d:arc,pathLength:100,class:"performance-gauge-track"}),
+        ...(known ? [chartSVG("path", {d:arc,pathLength:100,class:"performance-gauge-value","stroke-dasharray":`${value.compliance_percent} 100`})] : []),
+      ]),
+      node("div", {class:"performance-speed-score"}, [
+        node("strong", {"data-speed-value":"",dir:"ltr",class:precisePercent(value.compliance_percent)?"performance-precise-value":null,text:percent(value.compliance_percent)}),
+        node("span", {text:t("ضمن المهلة", "Within SLA")}),
+      ]),
     ]);
     const outcomes = node("div", {class:"performance-speed-outcomes"});
-    const strip = node("div", {class:"performance-segment-strip","aria-hidden":"true"});
-    for (const [key,kind] of [["on_time","closed"],["late","late"]]) {
-      const segment = node("span", {class:kind});
-      segment.style.flexGrow = String(value[key]);
-      strip.append(segment);
-    }
-    if (!value.included) strip.classList.add("unavailable");
-    outcomes.append(strip,chartLegend([[t("ضمن المهلة", "Within SLA"),"closed",value.on_time],[t("متأخرة", "Late"),"late",value.late]]));
+    outcomes.append(chartLegend([[t("ضمن المهلة", "Within SLA"),"within",value.on_time],[t("متأخرة", "Late"),"late",value.late]]));
     outcomes.append(node("p", {class:"performance-basis",text:`${t("قضايا مغلقة قابلة للحساب", "Closed cases measured")} ${n(value.included)} ${t("من", "of")} ${n(value.included+value.unmeasured)}`}));
     if (!value.included) outcomes.append(node("p", {class:"performance-empty",text:t("لا قياسات لمهلة الاستجابة", "No SLA measurements")}));
-    body.append(score,outcomes);
+    body.append(gauge,outcomes);
     return panel(t("الالتزام بمهلة الاستجابة", "Response SLA compliance"),body,true);
   }
   function durationChart(data) {
@@ -215,26 +244,27 @@ window.SOCifyInsights = (() => {
     for (const item of values) {
       const track = node("div", {class:"performance-duration-track","aria-hidden":"true"});
       if (item.median_seconds !== null) {
-        const mark = node("span"); mark.style.width = `${100*item.median_seconds/max}%`; track.append(mark);
+        const mark = node("span", {class:"performance-duration-mark"}); mark.style.setProperty("--at", `${100*item.median_seconds/max}%`); track.append(mark);
       }
       body.append(node("div", {class:"performance-duration-row"}, [
-        node("span", {text:item.title}),node("strong", {text:duration(item.median_seconds)}),track,
-        node("span", {class:"performance-sample",text:`${t("حالات قابلة للحساب", "Cases measured")} ${n(item.included)} ${t("من", "of")} ${n(item.included+item.excluded)}`}),
+        node("span", {class:"performance-duration-title",text:item.title}),track,node("strong", {text:duration(item.median_seconds)}),
+        node("span", {class:"performance-sample",text:`${n(item.included)} ${t("من", "of")} ${n(item.included+item.excluded)}`}),
       ]));
     }
     return panel(t("وسيط مدد القضايا المغلقة", "Median closed-case durations"),body,true);
   }
   function severityChart(data) {
     const body = node("div", {class:"panel-body performance-severity"});
-    const strip = node("div", {class:"performance-severity-strip","aria-hidden":"true"});
     const legend = node("ul", {class:"performance-severity-list"});
+    const ring = chartSVG("svg", {viewBox:"0 0 120 120","aria-hidden":"true",focusable:"false"}, [
+      chartSVG("circle", {cx:60,cy:60,r:48,class:"performance-donut-track"}),
+      ...(data.counts.open ? [chartSVG("circle", {cx:60,cy:60,r:48,class:"performance-donut-value"})] : []),
+    ]);
     for (const severity of ["critical","high","medium","low"]) {
-      const count = data.severity[severity] || 0;
-      if (count) {const segment = node("span", {class:severity});segment.style.flexGrow = String(count);strip.append(segment);}
-      legend.append(node("li", {}, [node("span", {class:`severity ${severity}`,text:label(severity)}),node("strong", {text:n(count)})]));
+      legend.append(node("li", {}, [node("span", {class:`severity ${severity}`,text:label(severity)}),node("strong", {text:n(data.severity[severity] || 0)})]));
     }
-    if (!data.counts.open) strip.classList.add("unavailable");
-    body.append(node("div", {class:"performance-workload-total"}, [node("strong", {text:n(data.counts.open)}),node("span", {text:t("قضايا نشطة", "Active cases")})]), strip, legend);
+    const donut = node("div", {class:`performance-donut${data.counts.open ? "" : " unavailable"}`}, [ring, node("div", {class:"performance-donut-label"}, [node("strong", {text:n(data.counts.open)}),node("span", {text:t("قضايا نشطة", "Active cases")})])]);
+    body.append(node("div", {class:"performance-workload"}, [donut, legend]));
     body.append(node("dl", {class:"performance-attention"}, [
       [t("تنبيهات دون قرار", "Alerts without a verdict"),data.counts.unreviewed_alerts],
       [t("قضايا دون مسؤول", "Unassigned cases"),data.counts.unassigned],
@@ -257,20 +287,21 @@ window.SOCifyInsights = (() => {
       const targets = [["me",t("أدائي", "My performance")]];
       if (data.can_manage) targets.unshift(["team",t("الفريق", "Team")]);
       for (const [value, name] of targets) nav.append(node("a", {class:"channel-tab", href:queueURL({member:value,page:1}), "aria-current":value===data.member?"page":null, text:name}));
-      const days = node("select", {name:"days"}, [["7",t("آخر ٧ أيام", "Last 7 days")],["30",t("آخر ٣٠ يومًا", "Last 30 days")],["90",t("آخر ٩٠ يومًا", "Last 90 days")],["all",t("كل الفترات", "All time")]].map(([value,text])=>node("option", {value, selected:value===data.days, text})));
-      const form = node("form", {class:"filter-row"}, [field(t("فترة الإنجاز", "Completion period"),days),node("input",{type:"hidden",name:"member",value:data.member}),node("input",{type:"hidden",name:"queue",value:data.queue_kind}),node("button",{class:"button primary",type:"submit",text:t("تطبيق", "Apply")})]);
+      const days = node("select", {name:"days"}, [["7",t("آخر 7 أيام", "Last 7 days")],["30",t("آخر 30 يومًا", "Last 30 days")],["90",t("آخر 90 يومًا", "Last 90 days")],["all",t("كل الفترات", "All time")]].map(([value,text])=>node("option", {value, selected:value===data.days, text})));
+      const form = node("form", {class:"filter-row"}, [field(t("فترة الإنجاز", "Completion period"),days),node("input",{type:"hidden",name:"member",value:data.member}),node("input",{type:"hidden",name:"queue",value:data.queue_kind}),node("button",{class:"button ghost",type:"submit",text:t("تطبيق", "Apply")})]);
       root.append(node("div", {class:"performance-toolbar"}, [nav,form]));
       root.append(node("div", {class:"insight-counters"}, [["open",t("قضايا نشطة", "Active cases")],["closed",t("أغلقت خلال الفترة", "Closed in period")],["awaiting_review",t("بانتظار المراجعة", "Awaiting review")],["pending_tasks",t("مهام معلقة", "Pending tasks")]].map(([key,text])=>node(key === "pending_tasks" ? "div" : "a",{class:"insight-counter",href:key === "pending_tasks" ? null : queueURL({queue:key,page:1},true),"aria-current":key === data.queue_kind ? "page" : null},[node("span",{text}),node("strong",{text:n(data.counts[key])})]))));
-      root.append(node("div", {class:"performance-overview"}, [activityChart(data),completionChart(data)]));
-      root.append(node("div", {class:"performance-operations"}, [node("div", {class:"performance-pace"}, [speedChart(data),durationChart(data)]),severityChart(data)]));
+      // Main chart beside the live workload, then the three single measures in one row.
+      root.append(node("div", {class:"performance-overview"}, [activityChart(data),severityChart(data)]));
+      root.append(node("div", {class:"performance-operations"}, [completionChart(data),speedChart(data),durationChart(data)]));
       if(data.members.length) {
         const members = panel(t("الفريق والإنجاز", "Team delivery"),table([{label:t("المحلل", "Analyst"),value:r=>data.can_manage?node("a",{href:queueURL({member:r.id,page:1}),text:r.name}):userText(r.name)},{label:t("الدور", "Role"),value:r=>r.role === "instructor" ? t("مدرب", "Instructor") : label(r.role)},{label:t("نشطة", "Active"),value:r=>n(r.open)},{label:t("مغلقة خلال الفترة", "Closed in period"),value:r=>n(r.closed)},{label:t("مهام أنجزها", "Tasks completed"),value:r=>n(r.tasks_completed)}],data.members),true);
         members.classList.add("performance-members");root.append(members);
       }
       const queueTitle = data.queue_kind === "closed" ? t("القضايا المغلقة", "Closed cases") : data.queue_kind === "awaiting_review" ? t("بانتظار المراجعة", "Awaiting review") : t("قائمة المتابعة", "Work queue");
       const emptyQueue = data.queue_kind === "closed" ? t("لا قضايا مغلقة خلال الفترة", "No cases closed in this period") : data.queue_kind === "awaiting_review" ? t("لا قضايا بانتظار المراجعة", "No cases awaiting review") : t("لا قضايا نشطة", "No active cases");
-      const queueContent = data.queue.length ? table([{label:t("القضية", "Case"),value:r=>node("a",{href:`/cases/${r.id}${data.queue_kind === "awaiting_review" ? "?tab=reports" : ""}`,text:`${r.reference} · ${r.title}`})},{label:t("الخطورة", "Severity"),value:r=>node("span",{class:`severity ${r.severity}`,text:label(r.severity)})},{label:t("المسؤول", "Owner"),value:r=>userText(r.assignee_name)},{label:t("الحالة", "Status"),value:r=>label(r.status)},{label:data.queue_kind === "closed" ? t("الإغلاق", "Closed at") : t("الموعد", "Deadline"),value:r=>time(data.queue_kind === "closed" ? r.closed_at : r.sla_due_at)}],data.queue) : emptyState(emptyQueue,null,[linkedButton(t("إدارة القضايا", "Case management"),"/cases")]);
-      const queuePanel = panel(`${queueTitle} · ${n(data.queue_total)}`, queueContent, true);
+      const queueContent = data.queue.length ? table([{label:t("القضية", "Case"),value:r=>node("a",{href:`/cases/${r.id}${data.queue_kind === "awaiting_review" ? "?tab=reports" : ""}`,text:`${r.reference} | ${r.title}`})},{label:t("الخطورة", "Severity"),value:r=>node("span",{class:`severity ${r.severity}`,text:label(r.severity)})},{label:t("المسؤول", "Owner"),value:r=>userText(r.assignee_name)},{label:t("الحالة", "Status"),value:r=>label(r.status)},{label:data.queue_kind === "closed" ? t("الإغلاق", "Closed at") : t("الموعد", "Deadline"),value:r=>time(data.queue_kind === "closed" ? r.closed_at : r.sla_due_at)}],data.queue) : emptyState(emptyQueue,null,[linkedButton(t("إدارة القضايا", "Case management"),"/cases")]);
+      const queuePanel = panel(`${queueTitle} | ${n(data.queue_total)}`, queueContent, true);
       queuePanel.id = "performance-cases";
       queuePanel.setAttribute("aria-label",queueTitle);
       if(data.queue_pages > 1) {
@@ -282,7 +313,7 @@ window.SOCifyInsights = (() => {
         queuePanel.append(paging);
       }
       root.append(queuePanel);
-      if(data.tasks.length) root.append(panel(`${t("المهام المعلقة", "Pending tasks")} · ${n(data.task_total)}`,stackedTable([{label:t("المهمة", "Task"),value:r=>node("a",{href:`/cases/${r.case_id}?tab=summary#case-task-${r.id}`,text:r.display_title})},{label:t("القضية", "Case"),value:r=>node("a",{href:`/cases/${r.case_id}`,"data-user-content":"true",text:`${r.case_reference} · ${r.case_title}`})},{label:t("الحالة", "Status"),value:r=>label(r.status)}],data.tasks),true));
+      if(data.tasks.length) root.append(panel(`${t("المهام المعلقة", "Pending tasks")} | ${n(data.task_total)}`,stackedTable([{label:t("المهمة", "Task"),value:r=>node("a",{href:`/cases/${r.case_id}?tab=summary#case-task-${r.id}`,text:r.display_title})},{label:t("القضية", "Case"),value:r=>node("a",{href:`/cases/${r.case_id}`,"data-user-content":"true",text:`${r.case_reference} | ${r.case_title}`})},{label:t("الحالة", "Status"),value:r=>label(r.status)}],data.tasks),true));
       if(data.task_total>50)root.append(linkedButton(t("إدارة القضايا", "Case management"),"/cases"));
       finish(root);
       if(location.hash === "#performance-cases") {queuePanel.tabIndex=-1;queuePanel.focus({preventScroll:true});queuePanel.scrollIntoView({block:"start"});}
@@ -301,7 +332,7 @@ window.SOCifyInsights = (() => {
       [t("الخطورة", "Severity"),node("span",{class:`severity ${data.alert.severity}`,text:label(data.alert.severity)})],
       [t("سبب الكشف", "Detection reason"),data.alert.reason],
       [t("وقت الكشف", "Detection time"),time(data.alert.detected_at)],
-      [t("القضية", "Case"),node("a",{href:`/cases/${item.case_id}`,text:[data.case.reference,caseTitle].filter(Boolean).join(" · ")})],
+      [t("القضية", "Case"),node("a",{href:`/cases/${item.case_id}`,text:[data.case.reference,caseTitle].filter(Boolean).join(" | ")})],
       [t("حالة القضية", "Case status"),label(data.case.status)],
       [t("المسؤول", "Owner"),owner],
       [t("السجلات المرتبطة", "Linked events"),linkedEvents],
@@ -317,7 +348,7 @@ window.SOCifyInsights = (() => {
       if(data.assessment.manager_comment)decisions.push([t("ملاحظة المراجع", "Reviewer note"),data.assessment.manager_comment]);
       section(t("قرارات القضية", "Case decisions"),decisions,"decisions");
     }
-    for(const technique of data.techniques)section("MITRE ATT&CK · "+technique.technique_id,[[t("التقنية", "Technique"),technique.technique_id],[t("التقييم", "Assessment"),label(technique.assessment)],[t("الدليل", "Evidence"),technique.reason]],"technique");
+    for(const technique of data.techniques)section("MITRE ATT&CK | "+technique.technique_id,[[t("التقنية", "Technique"),technique.technique_id],[t("التقييم", "Assessment"),label(technique.assessment)],[t("الدليل", "Evidence"),technique.reason]],"technique");
     for(const event of data.events){
       const fields=event.normalized_fields;
       const names={windows_event_id:t("معرف حدث Windows", "Windows event ID"),account_domain:t("نطاق الحساب", "Account domain"),logon_type:t("نوع الدخول", "Logon type"),logon_type_code:t("رمز نوع الدخول", "Logon type code"),authentication_package:t("آلية المصادقة", "Authentication package"),logon_id:t("معرف جلسة الدخول", "Logon session ID"),source_workstation:t("جهاز المصدر", "Source workstation"),logon_status:t("رمز الحالة", "Status code"),logon_substatus:t("رمز الحالة الفرعي", "Substatus code"),outcome:t("النتيجة", "Outcome"),ids_rule:t("معرف قاعدة الرصد", "Sensor rule ID"),ids_priority:t("أولوية الرصد", "Sensor priority"),ids_signature:t("وصف التنبيه", "Alert message"),ids_classification:t("تصنيف التنبيه", "Alert classification"),packet_number:t("رقم الحزمة", "Packet number"),source_timestamp:t("توقيت المصدر", "Source timestamp"),source_port:t("منفذ المصدر", "Source port"),destination_port:t("منفذ الوجهة", "Destination port"),protocol:t("البروتوكول", "Protocol"),process_name:t("العملية", "Process"),parent_process:t("العملية الأم", "Parent process"),command_line:t("سطر الأوامر", "Command line"),file_hash:t("بصمة الملف", "File hash"),runtime_rule:t("قاعدة الرصد", "Sensor rule"),runtime_priority:t("أولوية الرصد", "Sensor priority"),runtime_source:t("مصدر الحدث", "Event source"),sensor_hostname:t("حساس الجمع", "Collector"),process_id:t("معرف العملية", "Process ID"),parent_process_id:t("معرف العملية الأم", "Parent process ID"),process_path:t("مسار العملية", "Process path"),file_path:t("مسار الملف", "File path"),container_id:t("معرف الحاوية", "Container ID"),container_name:t("الحاوية", "Container"),container_image:t("صورة الحاوية", "Container image"),container_image_tag:t("وسم الصورة", "Image tag"),kubernetes_namespace:t("نطاق الحاويات", "Namespace"),kubernetes_pod:t("مجموعة الحاويات", "Pod"),kubernetes_node:t("عقدة التشغيل", "Node")};
@@ -342,7 +373,7 @@ window.SOCifyInsights = (() => {
     const data=await api(`/api/cases/${caseId}/observed-hosts?${query}`);
     const root=node("div",{class:"panel-body"});
     const search=node("input",{type:"search",name:"host_q",maxlength:200,value:query.get("q")});
-    root.append(node("form",{class:"filter-row"},[node("input",{type:"hidden",name:"case_id",value:caseId}),field(t("اسم الجهاز", "Hostname"),search),node("button",{type:"submit",class:"button primary",text:t("بحث", "Search")})]));
+    root.append(node("form",{class:"filter-row"},[node("input",{type:"hidden",name:"case_id",value:caseId}),field(t("اسم الجهاز", "Hostname"),search),node("button",{type:"submit",class:"button ghost",text:t("بحث", "Search")})]));
     const target=(host,page=1)=>`/endpoint-security?${new URLSearchParams({case_id:caseId,host,host_page:page,host_q:query.get("q")})}`;
     root.append(data.items.length?table([{label:t("الجهاز", "Host"),value:r=>node("a",{href:target(r.hostname),text:r.hostname})},{label:t("السجلات", "Events"),value:"events"},{label:t("أول ظهور", "First observed"),value:r=>time(r.first_seen)},{label:t("آخر ظهور", "Last observed"),value:r=>time(r.last_seen)}],data.items):emptyState(t("لا أجهزة", "No devices"),null));
     const pages=node("div",{class:"pagination"});
@@ -352,7 +383,7 @@ window.SOCifyInsights = (() => {
     if(data.host){
       root.append(node("h3",{"data-user-content":"true",text:data.host}));
       for(const event of data.events){
-        const detail=node("details",{class:"evidence-event"},node("summary",{text:`#${event.id} · ${event.event_time_known?time(event.event_time):"—"} · ${event.process_name||event.username||""}`}));
+        const detail=node("details",{class:"evidence-event"},node("summary",{text:`#${event.id} | ${event.event_time_known?time(event.event_time):"—"} | ${event.process_name||event.username||""}`}));
         detail.append(definition([[t("العملية", "Process"),event.process_name],[t("العملية الأم", "Parent process"),event.parent_process],[t("سطر الأوامر", "Command line"),event.command_line],[t("المصدر", "Source"),event.source_ip],[t("الوجهة", "Destination"),event.destination_ip],[t("الحساب", "Account"),event.username],[t("بصمة الملف", "File hash"),event.file_hash]]));
         root.append(detail);
       }

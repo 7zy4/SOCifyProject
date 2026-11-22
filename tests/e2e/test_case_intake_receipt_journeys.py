@@ -5,6 +5,7 @@ import time
 import pytest
 from playwright.sync_api import expect
 
+from tests.e2e.browser_helpers import account_menu
 from tests.e2e.test_assignment_handoff_journeys import role_permission
 from tests.e2e.test_batch_boundary_journeys import upload_logs
 from tests.e2e.test_case_task_backlog_journeys import task_row
@@ -58,7 +59,7 @@ def test_new_investigator_recovers_the_original_case(app, language, scenario):
         before = cases(j)
         queued = scenario in {"case-queue-receipt-lost", "case-queue-colleague-claim"}
         if scenario == "case-intake-from-logs":
-            j.nav("إدارة السجلات")
+            j.nav("السجلات")
         if scenario == "case-intake-storage-disabled":
             j.page.evaluate("Object.defineProperty(window, 'sessionStorage', {get() {throw new DOMException('Blocked', 'SecurityError')}})")
         dialog = open_intake(j, queued=queued)
@@ -115,7 +116,7 @@ def test_new_investigator_recovers_the_original_case(app, language, scenario):
             elif scenario == "case-intake-language-recovery":
                 j.page.once("dialog", lambda message: message.accept())
                 j.click("button", "إغلاق", dialog)
-                j.page.locator("[data-language-toggle]").click()
+                account_menu(j.page).locator("[data-language-toggle]").click()
                 j.page.wait_for_function("expected => document.documentElement.lang === expected", arg="en" if language == "ar" else "ar")
                 j.settle()
                 dialog = open_intake(j)
@@ -145,7 +146,7 @@ def test_new_investigator_recovers_the_original_case(app, language, scenario):
         assert created["title"] == TITLE
         if scenario == "case-intake-changed-intent":
             # The first request still has no received response. Recover it independently.
-            j.nav("إدارة القضايا")
+            j.nav("القضايا")
             dialog = open_intake(j)
             j.click("button", "حفظ", dialog)
             assert j.page.url.endswith(f"/cases/{created['id']}")
@@ -153,7 +154,7 @@ def test_new_investigator_recovers_the_original_case(app, language, scenario):
         if scenario == "case-queue-colleague-claim":
             assert created["assignee"] == manager.page.evaluate("state.user.id")
         if scenario == "case-intake-same-title-new-case":
-            j.nav("إدارة القضايا")
+            j.nav("القضايا")
             dialog = open_intake(j)
             j.click("button", "حفظ", dialog)
             assert len(cases(j)) == len(before) + 2
@@ -174,11 +175,11 @@ def test_new_investigator_recovers_the_original_case(app, language, scenario):
             if scenario == "case-intake-from-logs":
                 assert "tab=logs" in j.page.url
             upload_logs(j, "gateway-intake.json", "Authorized gateway connection")
-            j.click("link", "التحقيق والخط الزمني")
+            j.click("link", "التحقيق")
             note = note_dialog(j)
             j.click("button", "حفظ", note)
             assert len(records(j, "war_room")) == 1
-            j.click("link", "الملخص والمسؤوليات")
+            j.click("link", "الملخص")
             j.click("button", "إكمال المهمة", task_row(j, "Validate primary evidence"))
             assert next(task for task in j.state()["tasks"] if task["title"] == "Validate primary evidence")["status"] == "completed"
         if scenario != "case-intake-storage-disabled":

@@ -141,7 +141,7 @@ def approve_and_close(manager, path):
 
 
 def next_case(j):
-    j.nav("إدارة القضايا")
+    j.nav("القضايا")
     j.click("button", "إنشاء قضية")
     dialog = j.page.get_by_role("dialog")
     dialog.locator("input[name=title]").fill("Next gateway investigation")
@@ -253,7 +253,7 @@ def test_reopened_source_requires_fresh_native_review_before_redelivery(app, mon
             original_pdf, original_docx, _, _ = first_files
             approve_and_close(manager, first_path)
             baseline = manager.state()
-            manager.click("link", "السجلات والأدلة")
+            manager.click("link", "السجلات")
             pull = source_row(manager).get_by_role("button", name=manager.text("سحب السجلات الآن"), exact=True)
             if pull.count() and pull.is_enabled():
                 with manager.page.expect_response(lambda r: r.url.endswith("/pull") and r.request.method == "POST") as rejected:
@@ -309,7 +309,7 @@ def test_reopened_source_requires_fresh_native_review_before_redelivery(app, mon
 
 
 def response_milestone(j, phase, at):
-    j.click("link", "الاستجابة والتصعيد")
+    j.click("link", "الاستجابة")
     dialog = record_dialog(j, "response")
     dialog.locator("input[name=title]").fill(f"Gateway {phase}")
     for field, value in (("phase", phase), ("status", "succeeded")):
@@ -345,7 +345,7 @@ def test_corrected_chronology_is_read_in_native_files_before_independent_approva
         initial = report(j, initial_path)
         assert initial["payload"]["metrics"]["containment_delay_seconds"] is None
         native.manager_context(j, manager)
-        manager.click("link", "الاستجابة والتصعيد")
+        manager.click("link", "الاستجابة")
         manager.page.locator(".response-metrics summary").click()
         metrics = manager.page.locator(".response-metrics")
         expect(metrics.locator("[data-response-duration=containment_delay_seconds]")).to_have_text(manager.text("غير مقاس"))
@@ -360,9 +360,9 @@ def test_corrected_chronology_is_read_in_native_files_before_independent_approva
         )
         assert report(manager, initial_path)["state"] == "draft"
         native.visit(j, j.case_id)
-        j.click("link", "التحقيق والخط الزمني")
+        j.click("link", "التحقيق")
         expect(j.page.locator("main")).to_contain_text("Containment confirmed at gateway")
-        j.click("link", "الاستجابة والتصعيد")
+        j.click("link", "الاستجابة")
         dialog = edit(j, "Gateway containment")
         dialog.locator("input[name=performed_at]").fill(local_input(j, (start + timedelta(minutes=20)).isoformat()))
         dialog.locator("textarea[name=details]").fill(

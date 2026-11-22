@@ -91,7 +91,7 @@ LABELS = {
     "protocol": "البروتوكول",
     "first_seen": "أول اتصال",
     "last_seen": "آخر اتصال",
-    "events_truncated": "روابط الأدلة مقتصرة على أول ٥٠ سجلًا",
+    "events_truncated": "روابط الأدلة مقتصرة على أول 50 سجلًا",
     "names": "النطاقات",
     "byte_measurements": "الاتصالات ذات قياس حجم",
     "longest_connection_seconds": "أطول اتصال بالثواني",
@@ -287,10 +287,10 @@ ENUM_LABELS = {
     "internal": "داخلي",
     "confidential": "سري",
     "restricted": "مقيد",
-    "critical": "حرج",
-    "high": "عالٍ",
-    "medium": "متوسط",
-    "low": "منخفض",
+    "critical": "حرجة",
+    "high": "عالية",
+    "medium": "متوسطة",
+    "low": "منخفضة",
     "soc_manager": "مدير الفريق",
     "investigator": "محقق",
     "reviewer": "مراجع",
@@ -601,7 +601,7 @@ def render_html(payload) -> str:
         content.append(f'<section id="report-section-{index}" class="report-section"><h2>{directional_html(title)}</h2>{"".join(rows)}</section>')
     digest = hashlib.sha256(canonical(payload).encode()).hexdigest()
     title_class = ' class="report-title-long"' if len(case["title"]) > 100 else ""
-    cover = f'<header class="report-cover"><p class="report-wordmark" lang="en" dir="ltr">SOCify</p><p dir="ltr">TACTICAL WORKBENCH</p><p>تقرير فرز وتحقيق سريع في حادثة أمنية</p><h1{title_class}><bdi dir="auto">{directional_html(display(case["title"]))}</bdi></h1><p><bdi dir="ltr">{html.escape(case["reference"])}</bdi> · الإصدار {payload["revision"]}</p></header><p class="report-note">نسخة ثابتة من بيانات القضية عند إعدادها. اعتماد هذه النسخة محفوظ منفصلًا في سجل المنصة. البصمة أدناه تخص JSON المعياري، لا بايتات PDF.</p><p dir="ltr">SHA-256: <bdi>{digest}</bdi></p>'
+    cover = f'<header class="report-cover"><p class="report-wordmark" lang="en" dir="ltr">SOCify</p><p>تقرير فرز وتحقيق سريع في حادثة أمنية</p><h1{title_class}><bdi dir="auto">{directional_html(display(case["title"]))}</bdi></h1><p><bdi dir="ltr">{html.escape(case["reference"])}</bdi> | الإصدار {payload["revision"]}</p></header><p class="report-note">نسخة ثابتة من بيانات القضية عند إعدادها. اعتماد هذه النسخة محفوظ منفصلًا في سجل المنصة. البصمة أدناه تخص JSON المعياري، لا بايتات PDF.</p><p dir="ltr">SHA-256: <bdi>{digest}</bdi></p>'
     navigation = '<nav class="report-outline" aria-label="أقسام التقرير"><h2>محتويات التقرير</h2><ul>' + "".join(outline) + "</ul></nav>"
     style = (
         report_style()
@@ -615,15 +615,7 @@ def bundled_report_asset_fetcher(url, timeout=10, ssl_context=None):
     from weasyprint.urls import URLFetcherResponse, URLFetchingError
 
     root = Path(__file__).resolve().parent.parent / "static" / "fonts"
-    for filename in {
-        "Almarai-Regular.woff2",
-        "Almarai-Bold.woff2",
-        "IBMPlexSans.woff2",
-        "BalooBhaijaan2.woff2",
-        "IBMPlexSansArabic-Regular.woff2",
-        "IBMPlexSansArabic-Bold.woff2",
-        *(font["file"] for font in report_fonts()),
-    }:
+    for filename in {font["file"] for font in report_fonts()}:
         content = (root / filename).read_bytes()
         if url == "data:font/woff2;base64," + base64.b64encode(content).decode():
             return URLFetcherResponse(url, body=content, headers={"Content-Type": "font/woff2"})
@@ -647,13 +639,15 @@ def render_docx(payload) -> bytes:
     section.left_margin, section.right_margin = Pt(44), Pt(44)
     tokens = design_tokens()
     ink = tokens["colors"]["paper-text"][0].lstrip("#")
+    body, heading = tokens["typography"]["body"]["family"], tokens["typography"]["heading"]["family"]
     for name, size in [("Normal", 14), ("Title", 24), ("Heading 1", 20), ("Heading 2", 18)]:
-        configure_style(document.styles[name], tokens["typography"]["en"]["family"], tokens["typography"]["ar"]["family"], size, ink, name != "Normal")
+        family = body if name == "Normal" else heading
+        configure_style(document.styles[name], family, family, size, ink, name != "Normal")
     embed_report_fonts(document)
     wordmark = document.add_paragraph().add_run("SOCify")
-    wordmark.font.name = tokens["typography"]["display"]["en"]
+    wordmark.font.name = tokens["typography"]["heading"]["family"]
     wordmark.font.size = Pt(26)
-    document.add_heading("SOCify Tactical Workbench", 0)
+    document.add_heading("تقرير التحقيق | Investigation report", 0)
     title = document.add_paragraph(style="Heading 1")
     set_direction(title)
     add_text(title, display(payload["case"]["title"]), True)
@@ -708,7 +702,7 @@ def render_files(payload):
 
     html_document = render_html(payload)
     markdown = [
-        "# SOCify Tactical Workbench",
+        "# SOCify",
         "",
         html.escape(display(payload["case"]["title"])).replace("`", "\\u0060"),
         "",

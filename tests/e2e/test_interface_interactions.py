@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import expect
 
-from tests.e2e.browser_helpers import assert_accessible
+from tests.e2e.browser_helpers import account_menu, assert_accessible
 from tests.e2e.test_review_workflow import review_session
 
 ARTIFACTS = Path("artifacts/interface-interactions")
@@ -23,9 +23,9 @@ def test_interface_interactions(app, language, theme, motion):
         page = j.page
         page.emulate_media(reduced_motion=motion)
         if page.locator("html").get_attribute("lang") != language:
-            page.locator("[data-language-toggle]").click()
+            account_menu(page).locator("[data-language-toggle]").click()
             j.settle()
-        page.locator(f'[data-theme-option="{theme}"]').click()
+        account_menu(page).locator(f'[data-theme-option="{theme}"]').click()
         prefix = f"{name}-{language}"
         menu = page.locator("#menu-toggle")
         sidebar = page.locator("#workspace-navigation")
@@ -64,16 +64,21 @@ def test_interface_interactions(app, language, theme, motion):
         expect(page.locator(".navigation-shade")).not_to_be_visible()
         page.set_viewport_size({"width": 390, "height": 844})
         expect(sidebar).not_to_be_visible()
-        page.locator(".account-menu summary").click()
+        account_menu(page)
         page.screenshot(animations="disabled", path=str(ARTIFACTS / f"{prefix}-account.png"))
         assert_accessible(page)
         page.keyboard.press("Escape")
         expect(page.locator(".account-menu summary")).to_be_focused()
         page.locator(".account-menu summary").press("Enter")
-        page.locator(".language-toggle").focus()
+        # The language control now sits inside the account menu; moving focus outside the menu closes it.
+        page.locator("#menu-toggle").focus()
         expect(page.locator(".account-popover")).not_to_be_visible()
         page.set_viewport_size({"width": 1440, "height": 1000})
-        control = page.locator(".choice-control").first
+        # Summary edits are collapsed rows; open the case status row to reach its searchable choice.
+        status = page.locator("section.panel").filter(has=page.get_by_role("heading", name=j.text("حالة القضية"), exact=True))
+        if status.locator("details").get_attribute("open") is None:
+            status.locator("summary").click()
+        control = status.locator(".choice-control").first
         control.locator(".choice-toggle").click()
         expect(control.locator(".choice-toggle")).to_have_attribute("aria-expanded", "true")
         page.screenshot(animations="disabled", path=str(ARTIFACTS / f"{prefix}-choice.png"))

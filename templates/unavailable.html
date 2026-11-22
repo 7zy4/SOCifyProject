@@ -7,11 +7,11 @@
   <title data-ui-copy>الصفحة غير متاحة | {{ product_name }}</title>
   <script src="{{ url_for('static', filename='localization.js') }}"></script>
   <script src="{{ url_for('static', filename='theme.js') }}"></script>
-  {% for sheet in ['fonts.css', 'tokens.css', 'app.css', 'design-system.css', 'comic-workspace.css'] %}
-  <link rel="stylesheet" href="{{ url_for('static', filename=sheet) }}">
-  {% endfor %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='socify.css') }}">
 </head>
-<body class="auth-shell">
+<body class="auth-shell unavailable">
   <main class="auth-layout auth-focused">
     <a class="brand auth-logo" translate="no" href="{{ url_for('ui.index') }}">{{ brand_mark() }}<span class="brand-wordmark" lang="en" dir="ltr">SOCify</span></a>
     <section class="auth-card" aria-labelledby="unavailable-title">

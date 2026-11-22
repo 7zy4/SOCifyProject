@@ -137,8 +137,8 @@ def test_pending_evidence_is_a_truthful_documented_decision_without_response_sid
     html = client.get(f"/cases/{autopsy_case}/quick-report/print", headers={"X-SOCify-Language": "en"}).text
     assert "Classification Pending Evidence" in html
     assert "Unauthorized Access / Brute Force" not in html
-    assert "Undetermined — Awaiting Evidence" in html
-    assert "No Containment Performed — Awaiting Evidence" in html
+    assert "Undetermined - Awaiting Evidence" in html
+    assert "No Containment Performed - Awaiting Evidence" in html
     assert "Collect and Validate Evidence Before Response" in html
     after_case = client.get(base).json
     assert after_case["status"] == before["case"]["status"]

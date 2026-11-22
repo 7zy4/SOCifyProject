@@ -3,6 +3,7 @@
 import pytest
 from playwright.sync_api import Error, expect
 
+from tests.e2e.browser_helpers import account_menu
 from tests.e2e.test_review_workflow import ANSWERS, review_session
 
 
@@ -53,7 +54,7 @@ def test_user_can_recover_drafts_without_silent_loss(app, language, scenario):
         page = j.page
         note = "Correlate identity records before reaching a final assessment."
         if scenario == "root-cause-branch":
-            j.click("link", "التحقيق والخط الزمني")
+            j.click("link", "التحقيق")
             label = page.evaluate("() => SOCifyLocale.template`إضافة ${autopsyLabel('root_cause')}`")
             page.get_by_role("button", name=label, exact=True).click()
             j.settle()
@@ -79,9 +80,9 @@ def test_user_can_recover_drafts_without_silent_loss(app, language, scenario):
             result["outcomes"] = ["documented linked hypotheses saved", "unmodified adjacent forms do not block refresh"]
         elif scenario == "untouched-library":
             manager.login("manager@socify.local")
-            manager.nav("مكتبة التحليل المحلي")
+            manager.nav("مكتبة القواعد")
             assert not manager.page.evaluate("SOCifyDrafts.hasChanges()")
-            manager.nav("إدارة القضايا")
+            manager.nav("القضايا")
             result["outcomes"] = ["untouched source and rule forms do not interrupt navigation"]
         elif scenario == "background-report-change":
             j.assessment("Review in progress", escalate=False)
@@ -108,7 +109,7 @@ def test_user_can_recover_drafts_without_silent_loss(app, language, scenario):
                 "saved work reveals updated report status",
             ]
         elif scenario == "close-draft-dialog":
-            j.nav("إدارة القضايا")
+            j.nav("القضايا")
             j.click("button", "إنشاء قضية")
             dialog = page.get_by_role("dialog")
             dialog.locator("input[name=title]").fill("Retain this investigation draft")
@@ -158,12 +159,12 @@ def test_user_can_recover_drafts_without_silent_loss(app, language, scenario):
             field = page.locator("input[name=executive_note]")
             if scenario == "leave-assessment":
                 seen = reply_once(page)
-                j.click("link", "السجلات والأدلة")
+                j.click("link", "السجلات")
                 assert seen == ["beforeunload"]
                 expect(field).to_have_value(note)
                 expect(page.locator("select[name=incident_classification]")).to_have_value("benign_activity")
                 j.click("button", "حفظ إجابات التقرير")
-                j.click("link", "السجلات والأدلة")
+                j.click("link", "السجلات")
                 j.click("link", "التقارير والمراجعة")
                 expect(field).to_have_value(note)
                 result["outcomes"] = [
@@ -174,12 +175,12 @@ def test_user_can_recover_drafts_without_silent_loss(app, language, scenario):
             elif scenario == "switch-language":
                 before = page.locator("html").get_attribute("lang")
                 seen = reply_once(page)
-                page.locator("[data-language-toggle]").click()
+                account_menu(page).locator("[data-language-toggle]").click()
                 assert seen == ["confirm"]
                 expect(field).to_have_value(note)
                 assert page.locator("html").get_attribute("lang") == before
                 j.click("button", "حفظ إجابات التقرير")
-                page.locator("[data-language-toggle]").click()
+                account_menu(page).locator("[data-language-toggle]").click()
                 j.settle()
                 assert page.locator("html").get_attribute("lang") != before
                 expect(field).to_have_value(note)

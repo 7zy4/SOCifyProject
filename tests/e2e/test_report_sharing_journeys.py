@@ -5,6 +5,7 @@ import json
 import pytest
 from playwright.sync_api import expect
 
+from tests.e2e.browser_helpers import account_menu
 from tests.e2e.test_assignment_handoff_journeys import role_permission
 from tests.e2e.test_batch_boundary_journeys import restrict_batch, upload_logs
 from tests.e2e.test_report_recovery_journeys import report, report_path, screenshots
@@ -57,11 +58,11 @@ def test_reviewer_can_keep_sharing_scope_and_read_retained_report(app, language,
                 j.page.reload()
                 j.settle()
             elif scenario == "report-sharing-language":
-                j.page.locator("[data-language-toggle]").click()
+                account_menu(j.page).locator("[data-language-toggle]").click()
                 j.settle()
             else:
                 original_id, original_url = j.case_id, j.case_url
-                j.nav("إدارة القضايا")
+                j.nav("القضايا")
                 j.create_case()
                 j.click("link", "التقارير والمراجعة")
                 expect(j.page.locator('input[name="profile"]')).to_have_value(j.text(FULL))
@@ -193,7 +194,7 @@ def test_report_reader_recovers_without_exposing_unshared_material(app, language
             else:
                 expect(j.page.locator(".report-revision")).to_have_count(0)
         else:
-            j.click("link", "التحقيق والخط الزمني")
+            j.click("link", "التحقيق")
             for visibility, title in [("private", "Private author assessment"), ("team", "Shared review conclusion")]:
                 j.record(
                     "war_room",

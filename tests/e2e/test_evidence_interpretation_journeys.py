@@ -29,7 +29,7 @@ FILES = (
     "static/autopsy_analysis.js",
     "static/telemetry.js",
     "static/autopsy_reports.js",
-    "static/comic-workspace.css",
+    "static/socify.css",
 )
 SCENARIOS = {
     "AFTER-47": {
@@ -138,7 +138,7 @@ def capture(j, result, folder, stage):
 def conclude(j, note, followup):
     if not urlsplit(j.page.url).path.startswith(f"/cases/{j.case_id}"):
         j.click("link", "فتح التحقيق")
-    j.click("link", "التحقيق والخط الزمني")
+    j.click("link", "التحقيق")
     dialog = note_dialog(j)
     dialog.locator("input[name=title]").fill("Qualified evidence assessment and follow-up")
     dialog.locator("textarea[name=body]").fill(note + "\n\n" + followup)
@@ -180,7 +180,7 @@ def test_conflicting_mail_claims_lead_to_qualified_followup(app, monkeypatch, la
         content = mail("Forwarded authentication claims", conflicting=True)
         fixture(folder, result, "unrelated-control.eml", control, "Unrelated inert message with no Authentication-Results")
         fixture(folder, result, "conflicting-authentication.eml", content, "Two contrary untrusted authserv-id claims; no DNS, attachment or active content")
-        j.nav("أمن البريد الإلكتروني")
+        j.nav("البريد")
         upload(j, control, "unrelated-control.eml")
         upload(j, content, "conflicting-authentication.eml")
         current = j.page.locator("section[id^=email-review-]").filter(has=j.page.get_by_role("heading", name="Forwarded authentication claims", exact=True))
@@ -223,7 +223,7 @@ def test_conflicting_mail_claims_lead_to_qualified_followup(app, monkeypatch, la
 
 
 def upload_records(j, rows, filename):
-    j.click("link", "السجلات والأدلة")
+    j.click("link", "السجلات")
     body = json.dumps(rows).encode()
     j.page.locator("input[name=file]").set_input_files({"name": filename, "mimeType": "application/json", "buffer": body})
     j.click("button", "استيراد وفحص فوري")
@@ -269,7 +269,7 @@ def test_periodicity_is_compared_with_maintenance_evidence(app, monkeypatch, lan
         expect(j.page.get_by_role("dialog")).to_contain_text("every 60 seconds")
         capture(j, result, folder, "maintenance-source")
         j.click("button", "إغلاق", j.page.get_by_role("dialog"))
-        j.click("link", "تحليل الأدلة")
+        j.click("link", "الملفات")
         j.click("link", "الشبكة")
         row = j.page.locator(".network-results tbody tr").filter(has=j.page.get_by_role("button", name="203.0.113.9", exact=True))
         expect(row).to_contain_text("دوري" if language == "ar" else "Periodic")

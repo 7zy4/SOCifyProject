@@ -185,7 +185,7 @@ async function autopsyQuickDropdownReportPanel(caseId) {
   const sum = data.auto_summary;
   grid.append(node("p", {
     class: "span-2",
-    text: SOCifyLocale.template`${sum.logs_count} سجل · ${sum.alerts_count} تنبيه · ${sum.static_triage_items.length} فحص`,
+    text: SOCifyLocale.template`${sum.logs_count} سجل | ${sum.alerts_count} تنبيه | ${sum.static_triage_items.length} فحص`,
   }));
 
   for (const q of data.questions) {
@@ -344,9 +344,9 @@ window.SOCifyAutopsy.reports = async (caseId) => {
     const card = node("article", { class: "card report-revision" }, [
       node("h3", { text: SOCifyLocale.template`تقرير ${report.revision}` }),
       node("p", { class: "report-sharing", text: autopsyReportSharingLabel(report.profile) }),
-      node("p", { class: "report-status", text: `${autopsyQuickReportLabel(report.state)} · ${autopsyReportProcessingLabel(report.job.state)}` }),
+      node("p", { class: "report-status", text: `${autopsyQuickReportLabel(report.state)} | ${autopsyReportProcessingLabel(report.job.state)}` }),
       node("p", { text: SOCifyLocale.text(stale ? "تغيرت القضية بعد إعداد هذا التقرير" : "يتضمن أحدث بيانات القضية") }),
-      node("p", { text: SOCifyLocale.template`أُعد: ${formatTime(report.created_at)}${report.approved_at ? SOCifyLocale.template` · اعتُمد: ${formatTime(report.approved_at)}` : ""}` }),
+      node("p", { text: SOCifyLocale.template`أُعد: ${formatTime(report.created_at)}${report.approved_at ? SOCifyLocale.template` | اعتُمد: ${formatTime(report.approved_at)}` : ""}` }),
       node("details", {}, [node("summary", { text: SOCifyLocale.text("بصمة الملف") }), node("bdi", { text: `SHA-256: ${report.sha256}` })]),
     ]);
     const links = node("div", { class: "action-row report-downloads" });

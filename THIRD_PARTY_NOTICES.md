@@ -18,14 +18,6 @@ Direct runtime dependencies are listed in `requirements.in`; `requirements.txt` 
 
 Local defensive processing/reporting dependencies: WeasyPrint (BSD, `https://github.com/Kozea/WeasyPrint`), python-docx (MIT, `https://github.com/python-openxml/python-docx`), dpkt (BSD, `https://github.com/kbandla/dpkt`), PyYAML (MIT, `https://github.com/yaml/pyyaml`), yara-python (Apache 2.0 binding with the upstream YARA engine's own notices, `https://github.com/VirusTotal/yara-python`), and maxminddb (Apache 2.0, `https://github.com/maxmind/MaxMind-DB-Reader-python`). These libraries do not imply an installed GeoIP database, threat feed, YARA rule collection, sandbox, or external VirusTotal integration. Any separately imported intelligence, GeoIP or rule data retains its own license and version requirements.
 
-## Brand fonts
+## Fonts
 
-Baloo Bhaijaan 2 and IBM Plex Sans Arabic are self-hosted from the Google Fonts repository under the SIL Open Font License 1.1. Copyright notices and complete license terms are retained beside the original fonts in `static/fonts/`. Printable HTML embeds the WOFF2 fonts for offline use.
-
-## Additional bundled fonts
-
-Bundled fonts include Almarai and IBM Plex Sans. Sources: https://github.com/google/fonts/tree/main/ofl/almarai and https://github.com/google/fonts/tree/main/ofl/ibmplexsans. Both are distributed under SIL OFL 1.1; licenses are in `static/fonts/Almarai-OFL.txt` and `static/fonts/IBMPlexSans-OFL.txt`. Original WOFF2 builds are recorded in `static/fonts/interface-manifest.json`. IBM Plex Sans fixes the width axis at 100 and retains the variable weight axis.
-
-## Interface and report fonts
-
-The current type system uses Bangers, Cairo, IBM Plex Sans Arabic, IBM Plex Sans and JetBrains Mono. Fonts are bundled locally under SIL OFL 1.1 with the corresponding license beside each family. The added upstream sources, input hashes and converted WOFF2 hashes are recorded in `static/fonts/sources.json`; the retained IBM Plex Sans face uses the preceding interface manifest. `static/design-tokens.json` selects the active families. No runtime request to a font provider is required.
+SOCify ships two font families, self-hosted under the SIL Open Font License 1.1: Kufam for headings and IBM Plex Sans Arabic for all other text. Both come from the Google Fonts repository (`https://github.com/google/fonts/tree/main/ofl/kufam` and `https://github.com/google/fonts/tree/main/ofl/ibmplexsansarabic`). Each license sits beside its font in `static/fonts/`, and the upstream sources and file hashes are recorded in `static/fonts/sources.json` and `static/fonts/manifest.json`. Word reports embed the TrueType instances in `static/fonts/report/`; printable HTML embeds the WOFF2 files. No request to a font provider is made at runtime.

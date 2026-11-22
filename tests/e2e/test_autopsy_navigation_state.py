@@ -69,8 +69,8 @@ def test_team_list_batch_search_pagination_and_saved_timeline_filters_survive_na
     page.get_by_role("cell", name="Browser saved case context", exact=True).wait_for()
     page.reload()
     assert page.get_by_role("form", name="بحث القضايا").locator("input[name=q]").input_value() == "saved case context"
-    page.get_by_role("link", name="فتح القضية", exact=True).click()
-    page.get_by_role("link", name="السجلات والأدلة", exact=True).click()
+    page.get_by_role("link", name="فتح", exact=True).click()
+    page.locator(".case-tabs").get_by_role("link", name="السجلات", exact=True).click()
     page.get_by_role("link", name="سجلات هذه النسخة", exact=True).click()
     logs = page.get_by_role("form", name="بحث سجلات القضية", exact=True)
     logs.locator("input[name=q]").fill("Retained")
@@ -79,11 +79,11 @@ def test_team_list_batch_search_pagination_and_saved_timeline_filters_survive_na
     page.reload()
     assert parse_qs(urlparse(page.url).query)["page"] == ["2"]
     assert parse_qs(urlparse(page.url).query)["job_id"] == [str(created["jobId"])]
-    page.get_by_role("link", name="الملخص والمسؤوليات", exact=True).click()
-    page.get_by_role("link", name="السجلات والأدلة", exact=True).click()
+    page.locator(".case-tabs").get_by_role("link", name="الملخص", exact=True).click()
+    page.locator(".case-tabs").get_by_role("link", name="السجلات", exact=True).click()
     assert page.get_by_role("form", name="بحث سجلات القضية").locator("input[name=q]").input_value() == "Retained"
     assert parse_qs(urlparse(page.url).query)["page"] == ["2"]
-    page.get_by_role("link", name="التحقيق والخط الزمني", exact=True).click()
+    page.locator(".case-tabs").get_by_role("link", name="التحقيق", exact=True).click()
     page.locator("input[name=timeline_q]").fill("Retained")
     page.locator("select[name=timeline_severity]").select_option("high")
     page.locator("input[name=timeline_start]").fill("2026-10-20T09:00")
@@ -103,10 +103,10 @@ def test_team_list_batch_search_pagination_and_saved_timeline_filters_survive_na
     page.get_by_role("button", name="تطبيق الفلاتر", exact=True).click()
     page.get_by_role("button", name="Retained scoped timeline view", exact=True).click()
     assert page.locator("input[name=timeline_q]").input_value() == "Retained"
-    page.get_by_role("link", name="الاستجابة والتصعيد", exact=True).click()
-    page.get_by_role("link", name="التحقيق والخط الزمني", exact=True).click()
+    page.locator(".case-tabs").get_by_role("link", name="الاستجابة", exact=True).click()
+    page.locator(".case-tabs").get_by_role("link", name="التحقيق", exact=True).click()
     assert page.locator("select[name=timeline_severity]").input_value() == "high"
-    page.get_by_role("link", name="جميع القضايا", exact=True).click()
+    page.locator("#primary-nav").get_by_role("link", name="القضايا", exact=True).click()
     assert page.get_by_role("form", name="بحث القضايا").locator("input[name=q]").input_value() == "saved case context"
     assert not errors
 

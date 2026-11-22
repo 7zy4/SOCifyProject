@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import expect
 
-from tests.e2e.browser_helpers import assert_accessible
+from tests.e2e.browser_helpers import account_menu, assert_accessible
 from tests.e2e.test_review_workflow import review_session
 
 ARTIFACTS = Path("artifacts/interaction-final-review")
@@ -85,6 +85,7 @@ def test_reflow_focus_and_live_motion_preference_remain_operable(app, language):
         expect(page.locator("#primary-nav a").first).to_be_focused()
         page.keyboard.press("Escape")
         expect(menu).to_be_focused()
+        account_menu(page)
         light = page.locator('[data-theme-option="light"]')
         dark = page.locator('[data-theme-option="dark"]')
         system = page.locator('[data-theme-option="system"]')
@@ -97,10 +98,8 @@ def test_reflow_focus_and_live_motion_preference_remain_operable(app, language):
         expect(dark).to_have_attribute("aria-pressed", "true")
         expect(page.locator("html")).to_have_attribute("data-theme", "dark")
         # wait_for_function re-evaluates a non-function string with eval() on every animation frame; the product CSP refuses that.
-        expect(page.locator(".theme-switch-thumb")).to_have_css("transform", "matrix(1, 0, 0, 1, 80, 0)")
-        stopped = page.locator(".theme-switch-thumb").evaluate("e => getComputedStyle(e).transform")
-        page.wait_for_timeout(120)
-        assert page.locator(".theme-switch-thumb").evaluate("e => getComputedStyle(e).transform") == stopped
+        expect(dark).to_have_css("transition-duration", "0s")
+        expect(light).to_have_attribute("aria-pressed", "false")
         page.emulate_media(color_scheme="light")
         system.focus()
         system.press("Enter")
@@ -114,12 +113,12 @@ def test_reflow_focus_and_live_motion_preference_remain_operable(app, language):
         result["outcomes"] = [
             "focus returns to visible menu after responsive reflow",
             "theme accepts keyboard interruption",
-            "live reduced-motion change stops spring at selected theme",
+            "live reduced-motion change removes the theme transition",
             "system theme updates without losing focus",
         ]
         (ARTIFACTS / f"reflow-motion-{language}.json").write_text(
             json.dumps(
-                {"outcomes": result["outcomes"], "browser": page.context.browser.version, "reduced_motion_transform": stopped}, ensure_ascii=False, indent=2
+                {"outcomes": result["outcomes"], "browser": page.context.browser.version, "reduced_motion_transition": "0s"}, ensure_ascii=False, indent=2
             ),
             encoding="utf-8",
         )
@@ -135,7 +134,7 @@ def test_current_case_tab_stays_visible_without_moving_the_document(app, languag
         page.goto(f"{j.base}/cases/{j.case_id}?tab=response")
         j.settle()
         if language == "en":
-            page.locator('[data-theme-option="light"]').click()
+            account_menu(page).locator('[data-theme-option="light"]').click()
         nav = page.locator(".case-tabs")
         active = nav.locator('[aria-current="page"]')
 
@@ -150,14 +149,14 @@ def test_current_case_tab_stays_visible_without_moving_the_document(app, languag
         values = measurements()
         capture(page, f"current-tab-direct-{language}")
         (ARTIFACTS / f"current-tab-direct-{language}.json").write_text(json.dumps(values, indent=2), encoding="utf-8")
-        expect(active).to_contain_text(j.text("الاستجابة والتصعيد"))
+        expect(active).to_contain_text(j.text("الاستجابة"))
         assert values["tabLeft"] >= values["left"] - 1 and values["tabRight"] <= values["right"] + 1, values
         assert values["pageY"] == 0, values
         fonts = json.loads(Path("static/design-tokens.json").read_text(encoding="utf-8"))["fonts"]
         loaded = page.evaluate(
             """async fonts => Promise.all(fonts.map(async font => {
             const weight=font.weight === '700' ? 700 : 400;
-            const sample=font.family.includes('Arabic') || font.family === 'Cairo' ? 'عربي' : 'Aa12';
+            const sample=font.family.includes('Arabic') || font.family === 'Kufam' ? 'عربي' : 'Aa12';
             const faces=await document.fonts.load(`${weight} 16px "${font.family}"`, sample);
             return {family:font.family,file:font.file,statuses:faces.map(face => face.status)};
         }))""",

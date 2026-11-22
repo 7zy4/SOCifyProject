@@ -62,7 +62,7 @@ def test_runtime_context_typography_and_case_report(app, language, width):
                 "collector-pod-7"
                 in page.get_by_role("row", name=("حساس الجمع" if language == "ar" else "Collector") + " collector-pod-7", exact=True).inner_text()
             )
-            assert "JetBrains Mono" in page.locator(".dossier-view pre").evaluate("el => getComputedStyle(el).fontFamily")
+            assert "IBM Plex Sans Arabic" in page.locator(".dossier-view pre").evaluate("el => getComputedStyle(el).fontFamily")
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             assert_accessible(page)
             page.evaluate("window.scrollTo(0,0)")

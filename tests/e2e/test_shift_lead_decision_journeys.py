@@ -213,13 +213,13 @@ def test_shift_lead_acts_on_the_relevant_population(app, database, monkeypatch, 
             period(subject, "7")
             select_queue(subject, "أغلقت خلال الفترة")
             focus_case(subject, histories[-1])
-            subject.click("link", "التحقيق والخط الزمني")
+            subject.click("link", "التحقيق")
             earliest = subject.page.locator(".record-card").filter(
                 has=subject.page.get_by_role("heading", name="Earliest retained gateway activity", exact=True)
             )
             expect(earliest).to_be_visible()
             result["earliest_evidence_read"] = earliest.inner_text()
-            subject.click("link", "الاستجابة والتصعيد")
+            subject.click("link", "الاستجابة")
             detected = subject.page.locator(".record-card").filter(has=subject.page.get_by_role("heading", name="detection timestamp", exact=True))
             expect(detected).to_be_visible()
             result["detection_evidence_read"] = detected.inner_text()
@@ -278,7 +278,7 @@ def test_shift_lead_acts_on_the_relevant_population(app, database, monkeypatch, 
             assert plain(critical.locator("strong").inner_text()) == "1"
             result["decision"] = "A quiet recent chart does not clear the older overdue critical investigation; resume its retained evidence review."
             focus_case(subject, j.case_id)
-            subject.click("link", "السجلات والأدلة")
+            subject.click("link", "السجلات")
             expect(subject.page.get_by_role("cell", name="Unresolved gateway access review", exact=True)).to_be_visible()
             subject.transition("investigating")
             save_note(
@@ -302,7 +302,7 @@ def test_shift_lead_acts_on_the_relevant_population(app, database, monkeypatch, 
             assert counter(subject, "أغلقت خلال الفترة") == 19
             select_queue(subject, "أغلقت خلال الفترة")
             focus_case(subject, histories[-1])
-            subject.click("link", "الاستجابة والتصعيد")
+            subject.click("link", "الاستجابة")
             overdue = subject.page.locator(".sla-summary tr").filter(has=subject.page.get_by_role("cell", name=subject.text("مدة التجاوز"), exact=True))
             assert plain(overdue.get_by_role("cell").nth(1).inner_text()).startswith("60 ")
             result["chosen_case_sla"] = subject.page.locator(".sla-summary").inner_text()
@@ -350,7 +350,7 @@ def test_source_owner_reopens_closed_work_before_receiving_later_evidence(app, m
         assert prior_bytes.startswith(b"%PDF-")
         manager.decision("closed", "Independent review accepted the report and retained maintenance evidence")
         before = manager.state()
-        manager.click("link", "السجلات والأدلة")
+        manager.click("link", "السجلات")
         pull = source_row(manager).get_by_role("button", name=manager.text("سحب السجلات الآن"), exact=True)
         if pull.count() and pull.is_enabled():
             with manager.page.expect_response(lambda response: response.url.endswith("/pull") and response.request.method == "POST") as blocked:
@@ -371,7 +371,7 @@ def test_source_owner_reopens_closed_work_before_receiving_later_evidence(app, m
             "Later evidence requires authorized reopening; keep the approved closed report unchanged and prepare a separate reviewable snapshot."
         )
         manager.transition("reopened")
-        manager.click("link", "السجلات والأدلة")
+        manager.click("link", "السجلات")
         with manager.page.expect_response(lambda response: response.url.endswith("/pull") and response.request.method == "POST") as delivered:
             manager.click("button", "سحب السجلات الآن", source_row(manager))
         assert delivered.value.status == 200 and delivered.value.json()["accepted"] == 1

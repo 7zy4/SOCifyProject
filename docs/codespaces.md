@@ -72,4 +72,4 @@ curl -fsS http://127.0.0.1:5000/health/ready
 
 - إذا غاب Docker، أعد بناء الحاوية.
 - إذا فشل فك الأدلة، استعد المفاتيح الأصلية بدل إنشاء مفاتيح جديدة.
-- [استكشاف الأعطال](troubleshooting.md) · [التشغيل المؤسسي](operations.md).
+- [استكشاف الأعطال](troubleshooting.md) | [التشغيل المؤسسي](operations.md).

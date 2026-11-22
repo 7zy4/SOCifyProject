@@ -40,7 +40,7 @@ def test_import_actions_wrap_between_words_and_download_the_retained_original(ap
         for number in (1, 2):
             raw = json.dumps([{"title": f"Retained gateway event {number}", "timestamp": "2026-11-02T09:00:00Z", "hostname": "GATEWAY-REVIEW"}]).encode()
             originals.append(raw)
-            j.click("link", "السجلات والأدلة")
+            j.click("link", "السجلات")
             j.page.locator("input[name=file]").set_input_files({"name": f"gateway-{number}.json", "mimeType": "application/json", "buffer": raw})
             j.click("button", "استيراد وفحص فوري")
         table = j.page.locator(".import-jobs")

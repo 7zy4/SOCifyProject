@@ -6,7 +6,7 @@ from conftest import DEMO_LOGIN_VALUE
 from playwright.sync_api import sync_playwright
 from werkzeug.serving import make_server
 
-from tests.e2e.browser_helpers import assert_accessible, launch_browser
+from tests.e2e.browser_helpers import account_menu, assert_accessible, launch_browser
 
 
 @pytest.mark.e2e
@@ -160,7 +160,7 @@ def test_uploaded_case_dashboard_dossier_and_explicit_report_answers(app, langua
             page.goto(base + "/performance")
             page.locator(".insight-counters").wait_for()
             assert not errors, errors
-            page.locator(".account-menu summary").click()
+            account_menu(page)
             assert_accessible(page)
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             page.screenshot(path=str(output / f"account-{language}-{theme}-{width}.png"))

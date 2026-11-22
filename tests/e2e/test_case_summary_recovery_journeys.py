@@ -42,6 +42,8 @@ def member_form(j, person):
 
 def status_form(j):
     section = panel(j, "حالة القضية")
+    if section.locator("details").get_attribute("open") is None:
+        section.locator("summary").click()
     section.locator("[name=status]").fill(j.page.evaluate("autopsyLabel('investigating')"))
     section.locator("[name=reason]").fill("Start the retained evidence investigation")
     return section
@@ -120,12 +122,12 @@ def test_independent_case_work_survives_refresh_review_and_recovery(app, languag
             context_form(j)
             seen = retain_prompts(j, result)
             role_permission(manager, "cases.update", False)
-            j.click("button", "تحديث القضية")
+            j.click("button", "تحديث")
             form = j.page.locator('form[data-case-form="context"]')
             expect(form.locator("[name=objective]")).to_have_value(DRAFT)
             expect(form.get_by_role("button", name=j.text("حفظ"), exact=True)).to_be_disabled()
             role_permission(manager, "cases.update", True)
-            j.click("button", "تحديث القضية")
+            j.click("button", "تحديث")
             section = panel(j, "سبب القضية وهدفها ونتيجتها")
             expect(section.locator("[name=objective]")).to_have_value(DRAFT)
             j.click("button", "حفظ", section)

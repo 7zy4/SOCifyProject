@@ -12,16 +12,16 @@ window.SOCifyWorkspace = (() => {
     const header = document.querySelector("[data-investigation-context]");
     if (header) {
       header.hidden = !selection.required;
-      header.replaceChildren(node("span", {class:"scope-caption",text:t("نطاق التحقيق")}));
+      header.replaceChildren(node("span", {class:"scope-caption",text:t("القضية")}));
       if (selection.items.length) {
-        const control = node("select", {"aria-label":t("القضية النشطة")}, selection.items.map(item => node("option", {value:item.id,selected:item.id === active.id,text:`${item.reference} · ${item.title}`})));
+        const control = node("select", {"aria-label":t("القضية النشطة")}, selection.items.map(item => node("option", {value:item.id,selected:item.id === active.id,text:`${item.reference} | ${item.title}`})));
         control.addEventListener("change", () => {
           const identifier = Number(control.value);
           if (Number.isSafeInteger(identifier) && identifier > 0 && selection.items.some(item => item.id === identifier)) location.assign(`/cases/${identifier}`);
         });
         header.append(control);
         window.SOCifyWorkbench.bindCase(active);
-      } else header.append(node("span", {text:t("لم تُحدد قضية بعد")}));
+      } else header.append(node("a", {class:"scope-empty",href:"/cases",text:t("اختر قضية")}));
     }
     const switcher = document.querySelector("[data-account-switch]");
     if (switcher && !switcher.dataset.bound) {
@@ -34,8 +34,8 @@ window.SOCifyWorkspace = (() => {
             form.requestSubmit();
             return;
           }
-          const content = node("div", {class:"panel-body account-options"}, node("p", {class:"notice",text:t("بيئة تجربة معزولة · تبديل الحساب يمسح نطاق التحقيق")}));
-          for (const user of data.items) content.append(button(`${user.name} · ${autopsyLabel(user.role)}`, async () => {
+          const content = node("div", {class:"panel-body account-options"}, node("p", {class:"notice",text:t("بيئة تجربة معزولة | تبديل الحساب يمسح نطاق التحقيق")}));
+          for (const user of data.items) content.append(button(`${user.name} | ${autopsyLabel(user.role)}`, async () => {
             try { await api("/api/demo/switch", {method:"POST",body:{user_id:user.id}}); location.assign("/cases"); }
             catch (error) { handleError(error); }
           }));
@@ -84,15 +84,15 @@ window.SOCifyWorkspace = (() => {
     }
     const body = node("div", {class:"case-selection-grid"});
     const selected = node("ul", {class:"case-selected-list", "aria-label":t("القضايا المختارة")});
-    const status = node("p", {role:"status",text:t("اختر قضية واحدة أو قضيتين مرتبطتين ثم ابدأ التحقيق")});
-    const submit = button(t("بدء التحقيق بالنطاق المحدد"), async () => {
+    const status = node("p", {role:"status",class:"muted"});
+    const submit = button(t("بدء التحقيق"), async () => {
       submit.disabled = true;
       try { await select([...chosen.keys()]); }
       catch (error) { handleError(error); submit.disabled = chosen.size === 0; }
     }, "primary");
     const update = () => {
       submit.disabled = chosen.size === 0;
-      status.replaceChildren(t("القضايا المختارة") + ": ",node("bdi", {text:`${chosen.size} / 2`})," · ",t("اختر قضية واحدة أو قضيتين مرتبطتين ثم ابدأ التحقيق"));
+      status.replaceChildren(t("المختارة") + " ",node("bdi", {text:`${chosen.size} / 2`}));
       selected.hidden = chosen.size === 0;
       selected.replaceChildren(...[...chosen.values()].map(item => {
         const remove = button(t("إلغاء الاختيار"), () => { chosen.delete(item.id); update(); }, "ghost compact");
@@ -109,8 +109,8 @@ window.SOCifyWorkspace = (() => {
     for (const item of items) {
       const input = node("input", {type:"checkbox",value:item.id,checked:chosen.has(item.id),"aria-label":item.title});
       input.addEventListener("change", () => { if (input.checked) chosen.set(item.id, item); else chosen.delete(item.id); update(); });
-      const label = node("label", {class:"case-selection-label"}, [input,node("span", {}, [node("bdi", {text:item.reference}),node("strong", {text:item.title}),node("small", {text:approvalLabel(item.approval?.state)})])]);
-      const card = node("article", {class:"case-selection-card"},[label,node("div", {class:"case-card-facts"},[autopsyBadge(item.status),autopsyBadge(item.severity),node("span", {text:item.assignee_name||"—"})]),linkedButton(t("فتح القضية"),`/cases/${item.id}`)]);
+      const label = node("label", {class:"case-selection-label"}, [input,node("span", {}, [node("bdi", {text:item.reference}),node("strong", {text:item.title}),item.approval?.state && item.approval.state !== "approved" ? node("small", {text:approvalLabel(item.approval.state)}) : null])]);
+      const card = node("article", {class:"case-selection-card"},[label,node("div", {class:"case-card-facts"},[autopsyBadge(item.status),autopsyBadge(item.severity),node("span", {text:item.assignee_name||"—"})]),linkedButton(t("فتح"),`/cases/${item.id}`,"ghost compact")]);
       if (item.approval?.state !== "approved") { input.disabled = true; card.classList.add("case-selection-locked"); }
       body.append(card);
     }
@@ -118,7 +118,7 @@ window.SOCifyWorkspace = (() => {
     // Pending requests remain disabled even when the two-case limit changes.
     for (const input of body.querySelectorAll(".case-selection-locked input")) input.disabled = true;
     if (!items.length) body.append(emptyState(t("لا توجد نتائج"), null));
-    return panel(t("مساحة التحقيق"),node("div", {class:"panel-body"},[status,selected,body,submit]),true);
+    return node("section", {class:"case-chooser","aria-label":t("مساحة التحقيق")},[node("div", {class:"case-chooser-bar"},[status,submit]),selected,body]);
   }
   function relationship(current) {
     if (!current.can_review_request) return null;
@@ -126,7 +126,7 @@ window.SOCifyWorkspace = (() => {
       await api(`/api/cases/${current.id}/relationships`, {method:"POST",body:{...payload,related_case_id:Number(payload.related_case_id)}});
       showMessage(t("تم ربط القضيتين؛ يمكنك اختيارهما من صفحة القضايا"), "success");
     });
-    return autopsyEditPanel(t("ربط قضية ذات صلة"),node("div", {class:"panel-body"},[node("p", {text:t("أدخل رقم القضية الداخلي وسبب الربط؛ تبقى أدلة كل قضية مستقلة")}),form]));
+    return autopsyEditPanel(t("ربط قضية ذات صلة"),node("div", {class:"panel-body"},[form]));
   }
   return {initialize,intake,chooser,approvalLabel,relationship,get selection(){return selection;}};
 })();

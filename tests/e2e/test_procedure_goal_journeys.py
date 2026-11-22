@@ -15,18 +15,18 @@ from tests.e2e.test_review_workflow import review_session
 def test_template_author_can_cancel_navigation_without_losing_the_draft(app, language):
     with review_session(app, language, "procedure-template-draft") as (_analyst, j, result):
         j.login("manager@socify.local")
-        j.nav("كتيبات الاستجابة")
+        j.nav("الكتيبات")
         j.page.get_by_label(j.text("اسم القالب أو اسم الإصدار السابق"), exact=True).fill("Preserve the response plan")
         step = j.page.locator("fieldset")
         step.get_by_label(j.text("العنوان"), exact=True).fill("Check retained identity evidence")
         seen = []
         j.page.once("dialog", lambda dialog: (seen.append(dialog.type), dialog.dismiss()))
-        j.nav("إدارة القضايا")
+        j.nav("القضايا")
         assert seen == ["beforeunload"]
         expect(j.page.get_by_label(j.text("اسم القالب أو اسم الإصدار السابق"), exact=True)).to_have_value("Preserve the response plan")
         j.click("button", "حفظ إصدار مسودة")
-        j.nav("إدارة القضايا")
-        j.nav("كتيبات الاستجابة")
+        j.nav("القضايا")
+        j.nav("الكتيبات")
         expect(j.page.locator("article.card")).to_contain_text("Preserve the response plan")
         expect(j.page.locator("article.card > p")).to_have_text(j.text("مسودة"))
         result["outcomes"] = ["cancelled navigation retained template draft", "explicit save persisted the template", "saved work permitted navigation"]
@@ -42,7 +42,7 @@ def procedure(journey):
 
 
 def create_procedure(manager, case_url, approval=False):
-    manager.nav("كتيبات الاستجابة")
+    manager.nav("الكتيبات")
     manager.page.get_by_label(manager.text("اسم القالب أو اسم الإصدار السابق"), exact=True).fill("Identity response review")
     step = manager.page.locator("fieldset")
     step.get_by_label(manager.text("العنوان"), exact=True).fill("Verify the identity provider result")
@@ -81,7 +81,7 @@ def test_documented_response_tasks_have_honest_outcomes(app, language, scenario)
         manager.settle()
         upload_logs(manager, "approval.json", "Identity approval retained")
         create_procedure(manager, j.case_url, scenario == "procedure-independent-approval")
-        j.click("link", "الاستجابة والتصعيد")
+        j.click("link", "الاستجابة")
         j.click("button", "تحديث الخطوة")
         dialog = j.page.get_by_role("dialog")
         if scenario == "procedure-missing-evidence":

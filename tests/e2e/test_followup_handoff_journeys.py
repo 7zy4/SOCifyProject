@@ -113,7 +113,7 @@ def test_corrective_owner_can_finish_the_work_without_rewriting_history(app, lan
         elif scenario == "corrective-concurrent-review":
             dialog = edit(j, title)
             set_status(j, dialog, "in_progress", "Outgoing verification must not replace the independent finding")
-            manager.click("link", "الاستجابة والتصعيد")
+            manager.click("link", "الاستجابة")
             other = edit(manager, title)
             set_status(manager, other, "completed", "Independent reviewer retained the corrected remediation")
             manager.click("button", "حفظ", other)
@@ -156,7 +156,7 @@ def test_corrective_owner_can_finish_the_work_without_rewriting_history(app, lan
                 expect(dialog.locator("form > [role=alert]")).to_be_visible()
                 expect(dialog.locator("textarea[name=validation]")).to_have_value("Unsubmitted outgoing verification")
                 assert records(manager, "corrective")[0] == transferred
-            manager.click("link", "الاستجابة والتصعيد")
+            manager.click("link", "الاستجابة")
             expect(card(manager, title)).to_contain_text(person if status == "validated" else manager_name)
             manager.click("button", "عرض فرع السبب", card(manager, title))
             expect(manager.page.get_by_role("dialog")).to_contain_text("Why was the identity scope missed?")
@@ -182,13 +182,13 @@ def test_incoming_reader_respects_private_decisions_and_can_recover_after_public
     title = "Identity evidence review decision"
     with review_session(app, language, scenario) as (j, manager, result):
         manager_case(j, manager)
-        manager.click("link", "التحقيق والخط الزمني")
+        manager.click("link", "التحقيق")
         dialog = note_dialog(manager)
         choose(manager, dialog, "task_id", "Validate primary evidence")
         visibility = "private" if scenario == "private-decision-published" else "team"
         dialog.locator("input[name=visibility]").fill(manager.page.evaluate("v=>autopsyLabel(v)", visibility))
         manager.click("button", "حفظ", dialog)
-        j.click("link", "التحقيق والخط الزمني")
+        j.click("link", "التحقيق")
         if visibility == "private":
             expect(card(j, title)).to_have_count(0)
             assert records(j, "war_room") == []

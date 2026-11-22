@@ -62,14 +62,14 @@ def decision_session(app, language, scenario):
 
 
 def upload_logs(j, rows, filename):
-    j.click("link", "السجلات والأدلة")
+    j.click("link", "السجلات")
     j.page.locator("input[name=file]").set_input_files({"name": filename, "mimeType": "application/json", "buffer": json.dumps(rows).encode()})
     j.click("button", "استيراد وفحص فوري")
     expect(j.page.get_by_role("cell", name=rows[0]["title"], exact=True)).to_be_visible()
 
 
 def conclude(j, note):
-    j.click("link", "التحقيق والخط الزمني")
+    j.click("link", "التحقيق")
     dialog = note_dialog(j)
     dialog.locator("input[name=title]").fill("Scoped evidence conclusion")
     dialog.locator("textarea[name=body]").fill(note)
@@ -119,7 +119,7 @@ def test_historical_event_is_not_described_as_current_attack_volume(app, languag
         expect(j.page.locator(".performance-trend")).to_contain_text(j.text("أنشئت"))
         result["observed_unit"] = "The chart labels opened/closed cases; the source event predates the case."
         capture(j, scenario, language, "case-activity")
-        j.nav("المراقبة")
+        j.nav("التنبيهات")
         j.page.locator("[data-alert-toggle]").first.click()
         j.settle()
         dossier = j.page.locator(".dossier-view")
@@ -157,7 +157,7 @@ def test_same_name_attachment_siblings_remain_distinguishable_in_the_report(app,
         mail.add_attachment(body, maintype="application", subtype="pdf", filename="invoice.pdf")
     mail.set_boundary("socify-distinct-sibling-attachments")
     with decision_session(app, language, scenario) as (j, _manager, result):
-        j.nav("أمن البريد الإلكتروني")
+        j.nav("البريد")
         external = []
         j.page.on("request", lambda request: external.append(request.url) if request.url.startswith("https://") else None)
         upload_mail(j, mail.as_bytes(), "sibling-documents.eml")
@@ -216,7 +216,7 @@ def test_reused_hostname_is_dated_case_evidence_not_a_live_contained_device(app,
             await api(`/api/cases/${other.id}/imports`,{method:'POST',body:{filename:'unrelated.json',content:JSON.stringify([{hostname:'REUSED-HOST',title:'Unrelated observation must not be merged',source_ip:'192.0.2.99',username:'unrelated.operator',timestamp:'2026-01-01T01:00:00Z'}])}});
         }""")
         result["setup_only"] = "One unrelated case and log prepared with authenticated API calls; the task uses the analyst's visible case."
-        j.nav("أمن الأجهزة والأصول")
+        j.nav("الأجهزة")
         j.page.get_by_role("link", name="REUSED-HOST", exact=True).click()
         j.settle()
         devices = j.page.locator("section.panel").filter(has=j.page.get_by_role("heading", name=j.text("أجهزة القضية"), exact=True))

@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import expect
 
-from tests.e2e.browser_helpers import assert_accessible
+from tests.e2e.browser_helpers import account_menu, assert_accessible
 from tests.e2e.test_batch_boundary_journeys import upload_logs
 from tests.e2e.test_investigation_link_journeys import choose
 from tests.e2e.test_performance_charts_browser import appearance, prepare_history
@@ -47,8 +47,8 @@ def test_record_evidence_and_relationships_remain_clear_across_appearance(app, d
     with review_session(app, language, f"interface-clarity-{phase}") as (j, manager, result):
         result["scope"] = "One simulated task per language; themes and widths are visual checks, not additional users. No native PDF export claimed."
         upload_logs(j, "gateway-evidence.json", "Source")
-        j.click("link", "الاستجابة والتصعيد")
-        actor = j.page.evaluate("`${state.user.name} · ${autopsyLabel(state.user.role)}`")
+        j.click("link", "الاستجابة")
+        actor = j.page.evaluate("`${state.user.name} | ${autopsyLabel(state.user.role)}`")
         j.record(
             "response",
             {
@@ -70,7 +70,7 @@ def test_record_evidence_and_relationships_remain_clear_across_appearance(app, d
             "gateway-evidence.json"
         )
         for _ in range(2):
-            j.page.locator("[data-language-toggle]").click()
+            account_menu(j.page).locator("[data-language-toggle]").click()
             j.settle()
             expect(card.get_by_role("heading", name="source", exact=True)).to_be_visible()
             expect(card.get_by_role("cell", name="open", exact=True)).to_be_visible()
@@ -93,9 +93,10 @@ def test_record_evidence_and_relationships_remain_clear_across_appearance(app, d
         expect(dialog.locator("input[name=phase]")).to_be_focused()
         j.click("button", "إغلاق", dialog)
 
-        j.click("link", "التحقيق والخط الزمني")
+        j.click("link", "التحقيق")
         capture(j, result, "investigation")
-        expect(j.page.locator(".autopsy-timeline")).to_contain_text(j.text("وقت مسجل في المصدر"))
+        expect(j.page.locator(".autopsy-timeline")).to_contain_text("UTC")
+        expect(j.page.locator(".autopsy-timeline")).not_to_contain_text(j.text("وقت مسجل في المصدر"))
         expect(j.page.locator(".autopsy-timeline").get_by_role("heading", name="Source", exact=True)).to_be_visible()
         graph = j.page.locator("section.panel").filter(has=j.page.get_by_role("heading", name=j.text("جدول العلاقات ومراجع الأدلة"), exact=True)).last
         if language == "ar":
@@ -143,7 +144,7 @@ def test_response_allowance_summary_stays_readable_without_horizontal_scroll(app
         j.login("manager@socify.local")
         j.page.goto(analyst.case_url)
         j.settle()
-        j.click("link", "الاستجابة والتصعيد")
+        j.click("link", "الاستجابة")
         for state in ("unconfigured", "configured"):
             if state == "configured":
                 form = j.page.locator("form").filter(has=j.page.locator("input[name=minutes]"))

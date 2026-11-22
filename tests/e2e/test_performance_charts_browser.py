@@ -8,7 +8,7 @@ import pytest
 from playwright.sync_api import expect
 
 from socify.timeutils import utc_now
-from tests.e2e.browser_helpers import assert_accessible
+from tests.e2e.browser_helpers import account_menu, assert_accessible
 from tests.e2e.test_performance_goal_journeys import counter, delivery, period
 from tests.e2e.test_review_workflow import review_session
 
@@ -59,9 +59,9 @@ def prepare_history(j, manager, database, result):
 
 def appearance(j, language, theme):
     if j.page.locator("html").get_attribute("lang") != language:
-        j.page.locator("[data-language-toggle]").click()
+        account_menu(j.page).locator("[data-language-toggle]").click()
         j.settle()
-    j.page.locator(f'[data-theme-option="{theme}"]').click()
+    account_menu(j.page).locator(f'[data-theme-option="{theme}"]').click()
     expect(j.page.locator("html")).to_have_attribute("data-theme", theme)
 
 

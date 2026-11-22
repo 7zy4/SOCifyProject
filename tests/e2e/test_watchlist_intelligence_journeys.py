@@ -63,7 +63,7 @@ def observable(j):
 
 
 def bundle(manager, name, verdict="malicious", value=IP, activate=True):
-    manager.nav("مكتبة التحليل المحلي")
+    manager.nav("مكتبة القواعد")
     form = panel(manager, "استيراد إصدار محلي جديد").locator("form")
     for key, text in {"name": name, "version": "1", "source": name + " source", "license": "Internal review data", "expires_at": "2030-01-01T00:00"}.items():
         form.locator(f"input[name={key}]").fill(text)
@@ -115,7 +115,7 @@ def test_analyst_can_interpret_and_act_on_retained_indicators(app, language, sce
             bundle(manager, "Gateway malicious assessment")
             bundle(manager, "Gateway benign assessment", verdict="benign")
         upload(manager if scenario == "watchlist-scope-restoration" else j)
-        j.nav("استخبارات التهديدات")
+        j.nav("المؤشرات")
         if scenario.startswith("watchlist-"):
             if scenario == "watchlist-invalid-recovery":
                 form = fill_watch(j, "203.0.113.0/99", "cidr")
@@ -170,7 +170,7 @@ def test_analyst_can_interpret_and_act_on_retained_indicators(app, language, sce
                         j.click("button", "إيقاف", watch_row(j))
                         upload(j, "later")
                         assert len(state(j)[1]["items"]) == 1
-                        j.nav("استخبارات التهديدات")
+                        j.nav("المؤشرات")
                         expect(watch_row(j)).to_contain_text(j.text("متوقف"))
                         j.click("button", "تفعيل", watch_row(j))
                         j.click("button", SCAN, watch(j))

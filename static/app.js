@@ -11,12 +11,12 @@ const workspace = document.getElementById("workspace");
 const messageBox = document.getElementById("global-message");
 const titles = {
   dashboard: [SOCifyLocale.text("مركز العمليات"), "SECURITY OPERATIONS"],
-  playbooks: [SOCifyLocale.text("كتيبات الاستجابة"), "RESPONSE PLAYBOOKS"],
-  audit: [SOCifyLocale.text("سجل التدقيق"), "IMMUTABLE ACTIVITY"],
-  admin: [SOCifyLocale.text("إدارة المنصة"), "ROLE GOVERNANCE"],
-  profile: [SOCifyLocale.text("الملف والأمان"), "ACCOUNT SECURITY"],
-  "analysis-library": [SOCifyLocale.text("مكتبة التحليل المحلي"), "OFFLINE ANALYSIS"],
-  team: [SOCifyLocale.text("الفريق والمهام"), "TEAM OPERATIONS"]
+  playbooks: [SOCifyLocale.text("الكتيبات"), "PLAYBOOKS"],
+  audit: [SOCifyLocale.text("التدقيق"), "AUDIT"],
+  admin: [SOCifyLocale.text("الإدارة"), "ADMIN"],
+  profile: [SOCifyLocale.text("الملف الشخصي"), "PROFILE"],
+  "analysis-library": [SOCifyLocale.text("مكتبة القواعد"), "RULE LIBRARY"],
+  team: [SOCifyLocale.text("الفريق"), "TEAM"]
 };
 
 function displayText(value) {
@@ -52,7 +52,8 @@ function node(tag, attributes = {}, children = []) {
 function formatTime(value) {
   if (!value) return "—";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : new Intl.DateTimeFormat(window.SOCifyLocale?.language === "en" ? "en-GB" : "ar-SA", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(date) + " UTC";
+  // One calendar and one digit system in both languages: Gregorian dates with Western digits, always in UTC.
+  return Number.isNaN(date.getTime()) ? String(value) : new Intl.DateTimeFormat(window.SOCifyLocale?.language === "en" ? "en-GB" : "ar-u-ca-gregory-nu-latn", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(date) + " UTC";
 }
 
 function badge(value) {
@@ -199,7 +200,7 @@ function stackedTable(columns, rows) {
 }
 
 function metric(label, value, style = "", detail = SOCifyLocale.text("من قاعدة البيانات")) {
-  return node("article", { class: `metric ${style}` }, [node("span", { text: label }), node("strong", { text: Number(value || 0).toLocaleString("ar-SA") }), node("small", { text: detail })]);
+  return node("article", { class: `metric ${style}` }, [node("span", { text: label }), node("strong", { text: Number(value || 0).toLocaleString(SOCifyLocale.locale) }), node("small", { text: detail })]);
 }
 
 function button(label, handler, style = "ghost") {
@@ -253,7 +254,7 @@ async function renderAudit() {
     const values = [...new Set([...(data.filters?.[facet] || []), ...(applied[key] ? [applied[key]] : [])])];
     controls[key] = node("select", {name:key}, [node("option", {value:"",text:t("الكل")}), ...values.map(value => node("option", {value,selected:value === applied[key],text:label(value)}))]);
   }
-  const filters = node("form", {class:"filter-row", "aria-label":t("بحث سجل التدقيق")}, [field(t("بحث"),query),field(t("العملية"),controls.action),field(t("المورد"),controls.resource),field(t("النتيجة"),controls.result),node("button", {type:"submit",class:"button primary",text:t("بحث")}),button(t("مسح المرشحات"), () => navigate({}))]);
+  const filters = node("form", {class:"filter-row", "aria-label":t("بحث سجل التدقيق")}, [field(t("بحث"),query),field(t("العملية"),controls.action),field(t("المورد"),controls.resource),field(t("النتيجة"),controls.result),node("button", {type:"submit",class:"button ghost",text:t("بحث")}),button(t("مسح المرشحات"), () => navigate({}))]);
   filters.addEventListener("submit", event => { event.preventDefault(); navigate({q:query.value.trim(),action:controls.action.value,resource:controls.resource.value,result:controls.result.value}); });
   const columns = [
     {label:t("الوقت"),value:row => formatTime(row.created_at)},
@@ -263,10 +264,10 @@ async function renderAudit() {
     {label:t("النتيجة"),value:row => node("span", {class:`badge ${String(row.result).replace(/[^a-z_]/g, "")}`,text:label(row.result)})},
     {label:t("التفاصيل"),value:row => node("details", {class:"audit-entry-details"}, [node("summary", {text:t("تفاصيل العملية")}),node("dl", {}, [node("dt", {text:t("معرف التتبع")}),node("dd", {}, node("bdi", {text:row.correlation_id}))]),...(Object.keys(row.details).length ? [detailValue(row.details)] : [])])}
   ];
-  const pages = node("div", {class:"action-row pagination"}, node("p", {role:"status",text:SOCifyLocale.template`${data.total} عملية · الصفحة ${page}`}));
+  const pages = node("div", {class:"action-row pagination"}, node("p", {role:"status",text:SOCifyLocale.template`${data.total} عملية | الصفحة ${page}`}));
   if (page > 1) pages.append(button(t("السابق"), () => navigate(applied,page - 1)));
   if (page * data.page_size < data.total) pages.append(button(t("التالي"), () => navigate(applied,page + 1)));
-  const root = node("div", {class:"audit-view"}, [pageHead(t("سجل التدقيق"),null),filters,panel(t("النشاط"),data.items.length ? table(columns,data.items) : emptyState(t("لا توجد نتائج"),null),true),pages]);
+  const root = node("div", {class:"audit-view"}, [pageHead(t("التدقيق"),null),filters,panel(t("النشاط"),data.items.length ? table(columns,data.items) : emptyState(t("لا توجد نتائج"),null),true),pages]);
   finish(root);
 }
 
@@ -275,13 +276,13 @@ async function renderAdmin() {
   const [users, roles] = await Promise.all([api("/api/admin/users"), api("/api/admin/role-matrix")]);
   const root = node("div");
   const userColumns = [{ label: SOCifyLocale.text("المستخدم"), value: (row) => node("div", { class: "cell-title" }, [node("strong", { text: row.name }), node("small", { text: row.email })]) }, { label: SOCifyLocale.text("الدور"), value: (row) => badge(row.role) }, { label: SOCifyLocale.text("الفريق"), value: "team" }, { label: SOCifyLocale.text("نشط"), value: (row) => row.is_active ? SOCifyLocale.text("نعم") : SOCifyLocale.text("لا") }, { label: SOCifyLocale.text("آخر دخول"), value: (row) => formatTime(row.last_login) }];
-  const roleColumns = [{ label: SOCifyLocale.text("الدور"), value: (row) => badge(row.role) }, { label: SOCifyLocale.text("الصلاحيات"), value: (row) => node("span", { text: row.permissions.join(" · ") }) }];
-  root.append(pageHead(SOCifyLocale.text("الحوكمة والصلاحيات"), null), node("div", { class: "panel-grid" }, [panel(SOCifyLocale.text("المستخدمون"), table(userColumns, users.items)), panel(SOCifyLocale.text("مصفوفة الصلاحيات"), table(roleColumns, roles.items))]));
+  const roleColumns = [{ label: SOCifyLocale.text("الدور"), value: (row) => badge(row.role) }, { label: SOCifyLocale.text("الصلاحيات"), value: (row) => node("span", { text: row.permissions.join(" | ") }) }];
+  root.append(pageHead(SOCifyLocale.text("الصلاحيات"), null), node("div", { class: "panel-grid" }, [panel(SOCifyLocale.text("المستخدمون"), table(userColumns, users.items)), panel(SOCifyLocale.text("مصفوفة الصلاحيات"), table(roleColumns, roles.items))]));
   finish(root);
 }
 
 function handleError(error) {
-  const details = error.details ? ` · ${JSON.stringify(error.details)}` : "";
+  const details = error.details ? ` | ${JSON.stringify(error.details)}` : "";
   showMessage(`${error.message || SOCifyLocale.text("حدث خطأ غير متوقع")}${details}`);
   console.error(error.code || error.name, error.status || "", error.message);
 }
@@ -331,10 +332,12 @@ document.addEventListener("focusin", event => {
   if (!event.target.closest(".sidebar, #menu-toggle")) closeNavigation();
   if (!event.target.closest(".account-menu")) document.querySelector(".account-menu")?.removeAttribute("open");
 });
+// Escape closes the innermost layer first: the account menu, then the navigation drawer around it.
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && document.querySelector(".sidebar.open")) { closeNavigation(); menu.focus(); }
+  if (event.key !== "Escape") return;
   const account = document.querySelector(".account-menu[open]");
-  if (event.key === "Escape" && account) { account.open = false; account.querySelector("summary").focus(); }
+  if (account) { account.open = false; account.querySelector("summary").focus(); return; }
+  if (document.querySelector(".sidebar.open")) { closeNavigation(); menu.focus(); }
 });
 document.addEventListener("click", (event) => {
   if (!event.target.closest(".sidebar, #menu-toggle")) closeNavigation();

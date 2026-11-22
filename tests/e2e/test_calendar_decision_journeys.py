@@ -128,7 +128,7 @@ def visit_history(j, identifier, result):
     period(j, "all")
     select_queue(j, "أغلقت خلال الفترة")
     open_case(j, identifier)
-    j.click("link", "الاستجابة والتصعيد")
+    j.click("link", "الاستجابة")
     summary = j.page.locator(".sla-summary")
     expect(summary).to_be_visible()
     data = workflow(j)["sla"]
@@ -153,7 +153,7 @@ def follow_up(j, result, cause, title):
 
 
 def open_named_case(j, identifier, title):
-    j.nav("إدارة القضايا")
+    j.nav("القضايا")
     j.page.get_by_label(j.text("بحث"), exact=True).fill(title)
     j.click("button", "بحث")
     j.page.get_by_role("link", name=title, exact=True).click()
@@ -312,7 +312,7 @@ def test_calendar_decisions_preserve_evidenced_work(app, database, monkeypatch, 
             assert data["elapsed_work_seconds"] == 5400
             assert sla_value(manager, "الوقت المحتسب").startswith("90 ")
             result["initial_action"] = "Compare the two retained event instants with ninety counted minutes and record the clock-change review."
-            manager.click("link", "التحقيق والخط الزمني")
+            manager.click("link", "التحقيق")
             times = [manager.page.evaluate("v => formatTime(v)", stamp(value)) for value in (start, end)]
             assert times[0] != times[1]
             for value in times:
@@ -320,9 +320,9 @@ def test_calendar_decisions_preserve_evidenced_work(app, database, monkeypatch, 
             before = manager.page.evaluate("id => api(`/api/cases/${id}/timeline`)", target)
             shot(manager, result, "distinct-event-times")
             open_named_case(analyst, target, "Repeated-hour gateway response")
-            analyst.click("link", "الاستجابة والتصعيد")
+            analyst.click("link", "الاستجابة")
             analyst.click("button", "إنشاء مسودة مراجعة ما بعد الحادثة")
-            manager.click("link", "الاستجابة والتصعيد")
+            manager.click("link", "الاستجابة")
             manager.click("button", "مراجعة المسودة")
             dialog = manager.page.get_by_role("dialog")
             summary = "01:15 -04:00 to 01:45 -05:00 is 05:15Z to 06:45Z, a 90-minute response within the 120-minute target."
@@ -378,7 +378,7 @@ def test_calendar_decisions_preserve_evidenced_work(app, database, monkeypatch, 
             assert initial["payload"]["metrics"]["containment_delay_seconds"] is None
             manager.page.goto(manager.case_url)
             manager.settle()
-            manager.click("link", "الاستجابة والتصعيد")
+            manager.click("link", "الاستجابة")
             manager.page.get_by_text(manager.text("قياسات الاستجابة وأساس حسابها"), exact=True).click()
             visible_metrics = manager.page.locator(".response-metrics")
             expect(visible_metrics.locator("[data-response-duration=containment_delay_seconds]")).to_have_text(manager.text("غير مقاس"))
@@ -397,10 +397,10 @@ def test_calendar_decisions_preserve_evidenced_work(app, database, monkeypatch, 
             assert report(manager, initial_path)["state"] == "draft"
             analyst.page.reload()
             analyst.settle()
-            analyst.click("link", "التحقيق والخط الزمني")
+            analyst.click("link", "التحقيق")
             expect(analyst.page.locator("main")).to_contain_text("Containment confirmed at gateway")
             shot(analyst, result, "supporting-evidence")
-            analyst.click("link", "الاستجابة والتصعيد")
+            analyst.click("link", "الاستجابة")
             dialog = edit(analyst, "Gateway containment")
             dialog.locator("input[name=performed_at]").fill(local_input(analyst, stamp(start + timedelta(minutes=20))))
             dialog.locator("textarea[name=details]").fill(

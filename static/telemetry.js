@@ -2,7 +2,7 @@
 
 window.SOCifyTelemetry = (() => {
   const t = (ar,en) => SOCifyLocale.language === "ar" ? ar : en;
-  const n = value => value === null || value === undefined ? "—" : new Intl.NumberFormat(SOCifyLocale.language,{maximumFractionDigits:2}).format(value);
+  const n = value => value === null || value === undefined ? "—" : new Intl.NumberFormat(SOCifyLocale.locale,{maximumFractionDigits:2}).format(value);
   const text = value => node("bdi",{"data-user-content":"true",text:value ?? "—"});
   const facts = (caption,rows) => node("table",{class:"alert-property-table"},[node("caption",{text:caption}),node("tbody",{},rows.map(([label,value])=>node("tr",{},[node("th",{scope:"row",text:label}),node("td",{},value instanceof Node?value:text(value))])))]);
   const actionName = value => ({added:t("مضاف","Added"),removed:t("محذوف","Removed"),snapshot:t("لقطة","Snapshot"),unchanged:t("دون تغيير","Unchanged")}[value] || value);
@@ -37,7 +37,7 @@ window.SOCifyTelemetry = (() => {
         [t("المرسل (بايت)","Sent (bytes)"),n(item.bytes_sent)],[t("المستقبل (بايت)","Received (bytes)"),n(item.bytes_received)],
         [t("اتصالات بقياس الحجم","Connections with size measurements"),n(item.byte_measurements)],
         [t("أطول اتصال (ث)","Longest connection (s)"),n(item.longest_connection_seconds)],
-        [t("النطاقات","Domains"),item.names.join(" · ") || "—"],
+        [t("النطاقات","Domains"),item.names.join(" | ") || "—"],
         [t("الأدلة","Evidence"),node("div",{class:"evidence-links"},item.event_ids.map(id=>button(`#${id}`,()=>evidence(caseId,id),"ghost")))],
       ]));
       if(item.events_truncated)detail.append(linkedButton(t("جميع السجلات","All events"),autopsyCaseURL(caseId,{tab:"logs"})));
@@ -80,7 +80,7 @@ window.SOCifyTelemetry = (() => {
         const data=await api(`/api/cases/${caseId}/endpoint-queries?`+new URLSearchParams({page,host:host.value.trim(),action:action.value}));
         if(version!==generation)return;
         const items=data.items.map(item=>{
-          const entry=node("details",{class:"evidence-event"},node("summary",{"data-user-content":"true",text:`${item.hostname} · ${item.query} · ${actionName(item.action)}`}));
+          const entry=node("details",{class:"evidence-event"},node("summary",{"data-user-content":"true",text:`${item.hostname} | ${item.query} | ${actionName(item.action)}`}));
           entry.append(facts(t("نتيجة الاستعلام","Query result"),[[t("الجهاز","Host"),item.hostname],[t("الاستعلام","Query"),item.query],[t("التغيير","Change"),actionName(item.action)],[t("الوقت","Time"),item.event_time_known?formatTime(item.event_time):"—"],...Object.entries(item.columns),[t("الدليل","Evidence"),button(`#${item.id}`,()=>evidence(caseId,item.id),"ghost")]]));
           return entry;
         });

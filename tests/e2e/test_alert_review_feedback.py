@@ -15,7 +15,7 @@ ARTIFACTS = Path("artifacts/usability_campaign/blind-review/alert-repair")
 
 
 def import_alert(j):
-    j.click("link", "السجلات والأدلة")
+    j.click("link", "السجلات")
     raw = json.dumps(
         [
             {

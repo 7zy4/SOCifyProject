@@ -64,7 +64,7 @@ def test_case_continuity_from_the_user_interface(app, language, scenario):
         page = j.page
         result["goal"] = scenario
         if scenario.startswith("sla-"):
-            j.click("link", "الاستجابة والتصعيد")
+            j.click("link", "الاستجابة")
             form = panel(j, "SLA وجمع الأدلة ومراجعة ما بعد الحادثة").locator("form").filter(has=page.locator("input[name=minutes]"))
             form.locator("input[name=minutes]").fill("120")
             form.locator("input[name=reason]").fill("Agreed response target for the investigation")
@@ -112,13 +112,13 @@ def test_case_continuity_from_the_user_interface(app, language, scenario):
                         page.wait_for_timeout(1100)
                         assert abs(workflow(j)["sla"]["elapsed_work_seconds"] - first) < 0.01
             if scenario == "sla-analyst-permissions":
-                analyst.click("link", "الاستجابة والتصعيد")
+                analyst.click("link", "الاستجابة")
                 expect(analyst.page.locator("input[name=minutes]")).to_have_count(0)
                 expect(analyst.page.get_by_role("button", name=analyst.text("إيقاف SLA مؤقتًا"), exact=True)).to_have_count(0)
                 assert workflow(analyst)["sla"]["configured"]
             result["outcomes"] = ["response policy persisted", scenario, "result inspected through the interface and read-only stored state"]
         elif scenario.startswith("collection-"):
-            analyst.click("link", "الاستجابة والتصعيد")
+            analyst.click("link", "الاستجابة")
             form = analyst.page.locator("form").filter(has=analyst.page.locator("input[name=recipe_id]"))
             form.locator("input[name=recipe_id]").press("ArrowDown")
             form.get_by_role("option").first.click()
@@ -127,7 +127,7 @@ def test_case_continuity_from_the_user_interface(app, language, scenario):
             form.locator("textarea[name=reason]").fill("Collect identity records for the documented incident window")
             analyst.click("button", "حفظ", form)
             assert workflow(analyst)["collections"][0]["payload"]["state"] == "pending_approval"
-            j.click("link", "الاستجابة والتصعيد")
+            j.click("link", "الاستجابة")
             j.click("button", "اعتماد نطاق الجمع" if scenario == "collection-approved" else "رفض نطاق الجمع")
             dialog = page.get_by_role("dialog")
             dialog.locator("input[name=reason]").fill(
@@ -150,7 +150,7 @@ def test_case_continuity_from_the_user_interface(app, language, scenario):
         elif scenario == "postmortem-independent-review":
             j.transition("investigating")
             j.transition("awaiting_review")
-            j.click("link", "الاستجابة والتصعيد")
+            j.click("link", "الاستجابة")
             j.click("button", "إنشاء مسودة مراجعة ما بعد الحادثة")
             j.click("button", "مراجعة المسودة")
             dialog = page.get_by_role("dialog")
@@ -165,7 +165,7 @@ def test_case_continuity_from_the_user_interface(app, language, scenario):
             assert workflow(j)["postmortems"][0]["payload"]["state"] == "reviewed"
             result["outcomes"] = ["unexplained self-review blocked", "draft retained after rejection", "manager exception explicitly documented"]
         elif scenario.startswith("capsule-"):
-            analyst.click("link", "التحقيق والخط الزمني")
+            analyst.click("link", "التحقيق")
             for visibility, title in [("private", "Confidential author assessment"), ("team", "Shared investigation assessment")]:
                 dialog = record_dialog(analyst, "war_room")
                 dialog.locator("input[name=title]").fill(title)
@@ -205,7 +205,7 @@ def test_case_continuity_from_the_user_interface(app, language, scenario):
                 analyst.click("button", "إغلاق", dialog)
             result["outcomes"] = ["private content absent from team download", scenario, "source case preserved"]
         elif scenario == "timeline-saved-search":
-            analyst.click("link", "التحقيق والخط الزمني")
+            analyst.click("link", "التحقيق")
             expect(analyst.page.locator(".graph-canvas")).to_have_count(0)
             query = analyst.page.get_by_label(analyst.text("بحث الخط الزمني"), exact=True)
             query.fill("identity approval")
@@ -224,7 +224,7 @@ def test_case_continuity_from_the_user_interface(app, language, scenario):
             expect(analyst.page.get_by_label(analyst.text("بحث الخط الزمني"), exact=True)).to_have_value("identity approval")
             result["outcomes"] = ["named private search recalled", "filter retained after reload", "no result fabricated for empty matching set"]
         elif scenario == "response-unproven-success":
-            analyst.click("link", "الاستجابة والتصعيد")
+            analyst.click("link", "الاستجابة")
             dialog = record_dialog(analyst, "response")
             dialog.locator("input[name=title]").fill("Account session containment")
             choose(analyst, dialog, "phase", "containment")

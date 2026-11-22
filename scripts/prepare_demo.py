@@ -20,11 +20,12 @@ from socify.db import get_db
 from socify.seeding import _seed_rules, _user
 from socify.timeutils import iso_now, utc_now
 
+# Each demo account carries an Arabic and an English display name; the interface shows the one for its language.
 TEAM = [
-    ("manager", "نورة · مدير التجربة", "soc_manager"),
-    ("analyst", "عمر · محلل التجربة", "l1_analyst"),
-    ("responder", "ريم · مستجيب التجربة", "l2_responder"),
-    ("reviewer", "سلمان · مراجع التجربة", "reviewer"),
+    ("manager", "نورة - مدير التجربة", "Noura - Demo manager", "soc_manager"),
+    ("analyst", "عمر - محلل التجربة", "Omar - Demo analyst", "l1_analyst"),
+    ("responder", "ريم - مستجيب التجربة", "Reem - Demo responder", "l2_responder"),
+    ("reviewer", "سلمان - مراجع التجربة", "Salman - Demo reviewer", "reviewer"),
 ]
 MARKER = b"SOCIFY-DEMO-INVOICE\nInert synthetic evidence, never executable.\nhttps://invoice-update.test/review\n198.51.100.42\n"
 
@@ -54,10 +55,11 @@ def provision(directory: Path):
     users: list[dict[str, Any]] = []
     with app.app_context():
         db = get_db()
-        for handle, name, role in TEAM:
+        for handle, name, name_en, role in TEAM:
             password = secrets.token_urlsafe(20) + "!7aA"
             email = f"{handle}@demo.socify.test"
-            identifier = _user(db, email, name, role, "وحدة الاستجابة التجريبية", password)
+            identifier = _user(db, email, name, role, "SOC demo", password)
+            db.execute("UPDATE users SET name_ar = ?, name_en = ? WHERE id = ?", (name, name_en, identifier))
             db.execute("INSERT INTO demo_accounts(user_id) VALUES (?)", (identifier,))
             users.append({"id": identifier, "email": email, "name": name, "role": role, "password": password})
         _seed_rules(db, users[0]["id"])
@@ -117,10 +119,10 @@ def provision(directory: Path):
     )
     cases = []
     titles = [
-        "رسالة الفاتورة المشبوهة · INV-042",
+        "رسالة الفاتورة المشبوهة - INV-042",
         "نشاط حساب مرتبط بحملة الفواتير",
-        "طلب فحص بوابة البريد · بانتظار المدير",
-        "مراجعة نسخ احتياطي مستقلة · نطاق المدير",
+        "طلب فحص بوابة البريد - بانتظار المدير",
+        "مراجعة نسخ احتياطي مستقلة - نطاق المدير",
     ]
     for index, title in enumerate(titles):
         case = call(

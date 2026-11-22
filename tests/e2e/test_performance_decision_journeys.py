@@ -71,7 +71,7 @@ def describe(result, scenario):
                 "socify/autopsy_reports.py",
                 "socify/autopsy_report_render.py",
                 "static/soc-insights.js",
-                "static/comic-workspace.css",
+                "static/socify.css",
                 "static/autopsy_reports.js",
                 "static/localization.js",
             )
@@ -124,7 +124,7 @@ def open_case(j, case_id, *, keyboard=False):
 
 def save_note(j, body, *, keyboard=False):
     if keyboard:
-        link = j.page.get_by_role("link", name=j.text("التحقيق والخط الزمني"), exact=True)
+        link = j.page.get_by_role("link", name=j.text("التحقيق"), exact=True)
         tab_to(j, link)
         link.press("Enter")
         j.settle()
@@ -135,7 +135,7 @@ def save_note(j, body, *, keyboard=False):
         dialog = j.page.get_by_role("dialog")
         dialog.locator("input[name=title]").fill("Next shift investigation decision")
     else:
-        j.click("link", "التحقيق والخط الزمني")
+        j.click("link", "التحقيق")
         dialog = note_dialog(j)
     dialog.locator("textarea[name=body]").fill(body)
     if keyboard:
@@ -149,7 +149,7 @@ def save_note(j, body, *, keyboard=False):
 
 
 def configure_policy(j):
-    j.click("link", "الاستجابة والتصعيد")
+    j.click("link", "الاستجابة")
     form = panel(j, "SLA وجمع الأدلة ومراجعة ما بعد الحادثة").locator("form").filter(has=j.page.locator("input[name=minutes]"))
     form.locator("input[name=minutes]").fill("120")
     form.locator("input[name=reason]").fill("Agreed target for this active investigation after reviewing measurement coverage")
@@ -299,7 +299,7 @@ def test_dashboard_decision_advances_scoped_work(app, database, monkeypatch, lan
                 result["decision"] = "Only two of ten closures have agreed targets; one is late. Inspect its retained policy, then configure the active case."
                 select_queue(subject, "أغلقت خلال الفترة")
                 open_case(subject, historical[1])
-                subject.click("link", "الاستجابة والتصعيد")
+                subject.click("link", "الاستجابة")
                 assert workflow(subject)["sla"]["remaining_work_seconds"] < 0
                 expect(subject.page.locator("input[name=minutes]")).to_have_count(0)
                 subject.nav("الأداء")
@@ -324,7 +324,7 @@ def test_dashboard_decision_advances_scoped_work(app, database, monkeypatch, lan
                 "Zero detection delay is measured in the closed history; containment is unmeasured. Document the available containment proof for the active case."
             )
             open_case(subject, original_id)
-            subject.click("link", "الاستجابة والتصعيد")
+            subject.click("link", "الاستجابة")
             dialog = record_dialog(subject, "response")
             dialog.locator("input[name=title]").fill("Gateway containment confirmed")
             dialog.locator("input[name=phase]").fill(subject.page.evaluate("autopsyLabel('containment')"))
@@ -438,9 +438,9 @@ def test_dashboard_decision_advances_scoped_work(app, database, monkeypatch, lan
 def prepare_review(j):
     upload_logs(j, "approved-maintenance.json", "Service owner confirmed the retained activity")
     j.assessment("Retained owner approval confirms authorized maintenance; no compromise established.")
-    j.click("link", "التحقيق والخط الزمني")
+    j.click("link", "التحقيق")
     j.record("root_cause", {"category": "other", "conclusion": "Retained owner approval explains the activity", "evidence_id": "approved-maintenance.json"})
-    j.click("link", "الاستجابة والتصعيد")
+    j.click("link", "الاستجابة")
     j.record(
         "response",
         {

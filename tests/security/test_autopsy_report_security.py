@@ -50,13 +50,13 @@ def test_rendered_reports_escape_active_content_and_never_resolve_network(monkey
     assert b"&lt;script" in files["html"]
     assert b"\\u202e" in files["html"]
     assert files["md"].count(b"```") == 2 * sum(1 for line in files["md"].splitlines() if line.startswith(b"## "))
-    assert not files["md"].startswith(b"# SOCify Tactical Workbench\n\n<script")
+    assert not files["md"].startswith(b"# SOCify\n\n<script")
     with zipfile.ZipFile(io.BytesIO(files["docx"])) as archive:
         assert b"&lt;script" in archive.read("word/document.xml")
         assert b'TargetMode="External"' not in archive.read("word/_rels/document.xml.rels")
-        assert b'w:cs="Cairo"' in archive.read("word/styles.xml")
-        assert b'w:cs="IBM Plex Sans Arabic"' not in archive.read("word/styles.xml")
-        assert b'w:ascii="IBM Plex Sans"' in archive.read("word/styles.xml")
+        styles = archive.read("word/styles.xml")
+        assert b'w:cs="IBM Plex Sans Arabic"' in styles and b'w:cs="Kufam"' in styles
+        assert b"Cairo" not in styles
     assert list(lines(None)) == [(0, "غير مسجل")]
     assert list(lines([])) == [(0, "لا توجد عناصر مسجلة")]
     with pytest.raises(PermissionError):

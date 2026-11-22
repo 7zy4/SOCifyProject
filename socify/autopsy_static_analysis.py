@@ -332,7 +332,7 @@ def _flag_type_mismatch(add_flag, declared_ext, magic_code, magic_desc):
         add_flag("magic_extension_mismatch", "high", 45, f"صفحة HTML/Script متنكرة بامتداد مستند أو صورة ({declared_ext}).")
 
     if is_exec_magic:
-        add_flag("executable_binary", "high", 35, f"ملف تنفيذي ثنائي ({magic_desc}) — لم يُشغّل نهائيًا.")
+        add_flag("executable_binary", "high", 35, f"ملف تنفيذي ثنائي ({magic_desc}) - لم يُشغّل نهائيًا.")
     return (extension_mismatch,)
 
 

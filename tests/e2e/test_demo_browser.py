@@ -11,7 +11,7 @@ from werkzeug.serving import make_server
 
 from scripts.prepare_demo import provision
 from socify import create_app
-from tests.e2e.browser_helpers import assert_accessible, launch_browser
+from tests.e2e.browser_helpers import account_menu, assert_accessible, launch_browser
 
 
 @pytest.mark.e2e
@@ -63,7 +63,7 @@ def test_real_demo_scope_review_roles_and_visual_matrix(tmp_path):
             assert_accessible(page)
             page.locator(f'.case-selection-card input[value="{primary}"]').check()
             page.locator(f'.case-selection-card input[value="{related}"]').check()
-            page.get_by_role("button", name="بدء التحقيق بالنطاق المحدد", exact=True).click()
+            page.get_by_role("button", name="بدء التحقيق", exact=True).click()
             page.wait_for_url(f"**/cases/{primary}")
             loaded()
             expect(page.locator("[data-investigation-context] option")).to_have_count(2)
@@ -116,9 +116,9 @@ def test_real_demo_scope_review_roles_and_visual_matrix(tmp_path):
             page.locator("textarea[name=review_reason]").fill("مراجعة المدير اكتملت؛ اعتماد طلب التجربة")
             page.get_by_role("button", name="حفظ قرار المدير", exact=True).click()
             page.get_by_role("button", name="بدء التحقيق في هذه القضية", exact=True).wait_for()
-            page.locator(".account-menu summary").click()
+            account_menu(page)
             page.locator("[data-account-switch]").click()
-            page.get_by_role("dialog").get_by_role("button", name="عمر · محلل التجربة · محلل L1", exact=True).click()
+            page.get_by_role("dialog").get_by_role("button", name="عمر - محلل التجربة | محلل L1", exact=True).click()
             page.wait_for_url("**/cases")
             loaded()
             expect(page.locator(".case-selection-card")).to_have_count(3)
@@ -129,13 +129,13 @@ def test_real_demo_scope_review_roles_and_visual_matrix(tmp_path):
             assert page.get_by_role("link", name="العودة إلى القضايا", exact=True).is_visible()
             page.goto(root + "/cases")
             loaded()
-            page.locator(".account-menu summary").click()
+            account_menu(page)
             page.locator("[data-account-switch]").click()
-            page.get_by_role("dialog").get_by_role("button", name="سلمان · مراجع التجربة · مراجع", exact=True).click()
+            page.get_by_role("dialog").get_by_role("button", name="سلمان - مراجع التجربة | مراجع", exact=True).click()
             page.wait_for_url("**/cases")
             loaded()
             page.locator(f'.case-selection-card input[value="{primary}"]').check()
-            page.get_by_role("button", name="بدء التحقيق بالنطاق المحدد", exact=True).click()
+            page.get_by_role("button", name="بدء التحقيق", exact=True).click()
             page.wait_for_url(f"**/cases/{primary}")
             loaded()
             page.goto(root + f"/sandbox?case_id={primary}")

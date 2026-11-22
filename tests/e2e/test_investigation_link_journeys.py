@@ -89,7 +89,7 @@ def test_investigator_can_recover_and_keep_the_intended_reference(app, language,
                 j.case_id,
             )
             result["setup_only_tasks"] = 2
-        j.click("link", "التحقيق والخط الزمني")
+        j.click("link", "التحقيق")
         dialog = note_dialog(j)
         if scenario in {"investigation-reference-edit-retry", "investigation-reference-unlink"}:
             choose(j, dialog, "task_id", "Validate primary evidence")
@@ -115,7 +115,7 @@ def test_investigator_can_recover_and_keep_the_intended_reference(app, language,
             control = dialog.locator("input[name=task_id]")
             control.fill("Repeated review title")
             control.press("ArrowDown")
-            dialog.get_by_role("option", name=f"Repeated review title · {duplicates[0]['id']}", exact=True).click()
+            dialog.get_by_role("option", name=f"Repeated review title | {duplicates[0]['id']}", exact=True).click()
         elif scenario.endswith("keyboard"):
             control = dialog.locator("input[name=task_id]")
             control.fill("Validate")
@@ -198,7 +198,7 @@ def test_investigator_can_recover_and_keep_the_intended_reference(app, language,
 
 
 def root_cause(j, conclusion="Retained identity policy gap", question="Why was the identity scope missed?"):
-    j.click("link", "التحقيق والخط الزمني")
+    j.click("link", "التحقيق")
     dialog = record_dialog(j, "root_cause")
     dialog.locator("input[name=category]").fill(j.text("غير معروف"))
     dialog.locator("textarea[name=conclusion]").fill(conclusion)
@@ -211,7 +211,7 @@ def root_cause(j, conclusion="Retained identity policy gap", question="Why was t
 
 
 def corrective_dialog(j):
-    j.click("link", "الاستجابة والتصعيد")
+    j.click("link", "الاستجابة")
     dialog = record_dialog(j, "corrective")
     dialog.locator("input[name=title]").fill("Review the identity approval procedure")
     choose(j, dialog, "owner_id", j.page.evaluate("state.user.name"))
@@ -309,7 +309,7 @@ def test_corrective_followup_preserves_the_investigation_relationship(app, datab
         j.page.reload()
         j.settle()
         if scenario.endswith("linked-branch-removal"):
-            j.click("link", "التحقيق والخط الزمني")
+            j.click("link", "التحقيق")
             card = j.page.locator(".record-card").filter(has_text="Retained identity policy gap")
             j.click("button", "تعديل", card)
             dialog = j.page.get_by_role("dialog")
@@ -319,11 +319,11 @@ def test_corrective_followup_preserves_the_investigation_relationship(app, datab
             assert len(records(j, "root_cause")[0]["payload"]["whys"]) == 1
             j.page.once("dialog", lambda confirm: confirm.accept())
             j.click("button", "إغلاق", dialog)
-            j.click("link", "الاستجابة والتصعيد")
+            j.click("link", "الاستجابة")
             dialog = edit_corrective(j)
             dialog.locator("input[name=why_id]").fill("")
             j.click("button", "حفظ", dialog)
-            j.click("link", "التحقيق والخط الزمني")
+            j.click("link", "التحقيق")
             j.click("button", "تعديل", j.page.locator(".record-card").filter(has_text="Retained identity policy gap"))
             dialog = j.page.get_by_role("dialog")
             j.click("button", "حذف الخطوة", dialog)
@@ -351,9 +351,9 @@ def test_corrective_followup_preserves_the_investigation_relationship(app, datab
             assert saved["root_cause_id"] == selected["id"] and saved["why_id"] == selected["payload"]["whys"][0]["id"]
             if scenario.endswith("closed-case-followup"):
                 assert j.state()["status"] == "closed" and saved["status"] == "validated"
-                j.click("link", "التحقيق والخط الزمني")
+                j.click("link", "التحقيق")
                 expect(j.page.locator(".record-card").get_by_role("button", name=j.text("تعديل"), exact=True)).to_have_count(0)
-                j.click("link", "الاستجابة والتصعيد")
+                j.click("link", "الاستجابة")
         result["outcomes"] = [scenario, "retained relationships and case scope verified after the visible follow-up"]
         capture(j, result)
 
@@ -396,7 +396,7 @@ def test_investigation_note_retains_an_old_task_link(app, language, scenario):
     with review_session(app, language, scenario) as (j, manager, result):
         old_task = next(task for task in j.state()["tasks"] if task["title"] == "Validate primary evidence")
         if scenario.endswith("edit"):
-            j.click("link", "التحقيق والخط الزمني")
+            j.click("link", "التحقيق")
             dialog = note_dialog(j)
             choose(j, dialog, "task_id", "Validate primary evidence")
             j.click("button", "حفظ", dialog)
@@ -410,7 +410,7 @@ def test_investigation_note_retains_an_old_task_link(app, language, scenario):
             dialog.locator("textarea[name=body]").fill("Original review remains assigned; retain this decision for the next shift.")
             j.click("button", "حفظ", dialog)
         else:
-            j.click("link", "التحقيق والخط الزمني")
+            j.click("link", "التحقيق")
             dialog = note_dialog(j)
             choose(j, dialog, "task_id", "Validate primary evidence")
             j.click("button", "حفظ", dialog)
@@ -420,6 +420,6 @@ def test_investigation_note_retains_an_old_task_link(app, language, scenario):
         assert result["saved_task_id"] == result["expected_task_id"]
         j.click("link", "فتح المهمة")
         expect(j.page.locator(f"#case-task-{old_task['id']}")).to_contain_text(j.system_task_title("Validate primary evidence"))
-        j.click("link", "التحقيق والخط الزمني")
+        j.click("link", "التحقيق")
         capture(j, result)
         result["outcomes"] = ["old retained task selected or preserved through visible note controls", "setup records excluded from user counts"]

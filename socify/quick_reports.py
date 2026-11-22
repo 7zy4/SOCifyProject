@@ -55,10 +55,10 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
         "default": "",
         "options": [
             {"value": "confirmed_true_positive", "label": "حادثة أمنية مؤكدة (Confirmed True Positive)"},
-            {"value": "suspicious_needs_deep_forensics", "label": "اشتباه مرتفع يتطلب أدوات جنائية ثقيلة (Suspicious — Needs Deep Forensics)"},
+            {"value": "suspicious_needs_deep_forensics", "label": "اشتباه مرتفع يتطلب أدوات جنائية ثقيلة (Suspicious - Needs Deep Forensics)"},
             {"value": "benign_true_positive", "label": "تنبيه صحيح لنشاط مصرح به (Benign True Positive / Authorized)"},
             {"value": "false_positive", "label": "إنذار كاذب / ضجيج قاعدة (False Positive)"},
-            {"value": "undetermined_pending_evidence", "label": "غير محدد بانتظار أدلة إضافية (Undetermined — Awaiting Evidence)"},
+            {"value": "undetermined_pending_evidence", "label": "غير محدد بانتظار أدلة إضافية (Undetermined - Awaiting Evidence)"},
         ],
     },
     {
@@ -66,7 +66,7 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
         "label": "4. نطاق التأثير المرصود (Observed Impact Scope)",
         "default": "",
         "options": [
-            {"value": "no_compromise_blocked", "label": "لم يحدث اختراق — تم الرصد أو الإحباط مبكرًا (Blocked / No Compromise)"},
+            {"value": "no_compromise_blocked", "label": "لم يحدث اختراق - تم الرصد أو الإحباط مبكرًا (Blocked / No Compromise)"},
             {"value": "single_user_or_host", "label": "محصور في مستخدم واحد أو جهاز واحد (Single User / Host)"},
             {"value": "multiple_hosts_or_accounts", "label": "ممتد لعدة أجهزة أو حسابات داخلية (Multiple Hosts / Accounts)"},
             {"value": "critical_server_or_domain", "label": "يمس خادمًا حساسًا أو البنية التحتية للهوية (Critical Server / Identity Infra)"},
@@ -106,7 +106,7 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
             {"value": "monitoring_enhanced", "label": "تعزيز المراقبة دون حاجة لعزل فوري (Enhanced Monitoring)"},
             {"value": "pending_manager_authorization", "label": "بانتظار توجيه واعتماد مدير مركز العمليات (Pending SOC Manager Approval)"},
             {"value": "no_action_needed", "label": "لا يلزم إجراء احتواء (No Containment Needed)"},
-            {"value": "not_performed_pending_evidence", "label": "لم يُنفذ احتواء بانتظار الأدلة (No Containment Performed — Awaiting Evidence)"},
+            {"value": "not_performed_pending_evidence", "label": "لم يُنفذ احتواء بانتظار الأدلة (No Containment Performed - Awaiting Evidence)"},
         ],
     },
     {
@@ -126,13 +126,13 @@ QUICK_REPORT_QUESTIONS: list[dict[str, Any]] = [
     },
     {
         "id": "urgency_level",
-        "label": "9. مستوى الاستعجال للتصعيد الإداري (Manager Escalation Urgency)",
+        "label": "9. أولوية التصعيد الإداري (Manager Escalation Priority)",
         "default": "",
         "options": [
-            {"value": "immediate_p1", "label": "فوري وحرج (P1 — Immediate Executive Action)"},
-            {"value": "high_p2", "label": "عالٍ خلال المناوبة الحالية (P2 — High Shift Priority)"},
-            {"value": "routine_p3", "label": "اعتيادي للمراجعة والتوثيق (P3 — Routine Manager Review)"},
-            {"value": "informational_p4", "label": "إحاطة علم وإغلاق (P4 — Informational)"},
+            {"value": "immediate_p1", "label": "فورية وحرجة (P1 - Immediate Executive Action)"},
+            {"value": "high_p2", "label": "عالية خلال المناوبة الحالية (P2 - High Shift Priority)"},
+            {"value": "routine_p3", "label": "اعتيادية للمراجعة والتوثيق (P3 - Routine Manager Review)"},
+            {"value": "informational_p4", "label": "للعلم والإغلاق (P4 - Informational)"},
         ],
     },
 ]
@@ -641,16 +641,16 @@ def _utc_time(value: object) -> object:
 
 
 def _badge_tone(raw: object) -> str:
-    token = str(raw or "").strip().lower()
-    if token in {"critical", "malicious", "immediate_p1"}:
+    level = str(raw or "").strip().lower()
+    if level in {"critical", "malicious", "immediate_p1"}:
         return "critical"
-    if token in {"high", "high_risk", "suspicious", "escalated"}:
+    if level in {"high", "high_risk", "suspicious"}:
         return "high"
-    if token in {"medium", "draft", "unsaved preview"}:
+    if level == "medium":
         return "medium"
-    if token in {"clean", "approved", "acknowledged", "resolved"}:
-        return "ok"
-    return "low"
+    if level == "low":
+        return "low"
+    return "neutral"
 
 
 @quick_reports_api.get("/cases/<int:case_id>/quick-report/print")

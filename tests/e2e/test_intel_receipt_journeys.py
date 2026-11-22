@@ -49,7 +49,7 @@ def test_author_recovers_the_intended_intelligence_import(app, language, scenari
             change_author_role(manager, "soc_manager")
             analyst.login("analyst@socify.local")
         j = analyst if permissions else manager
-        j.nav("مكتبة التحليل المحلي")
+        j.nav("مكتبة القواعد")
         if scenario == "intel-receipt-storage-disabled":
             j.page.evaluate("Object.defineProperty(window, 'sessionStorage', {get() {throw new DOMException('Blocked', 'SecurityError')}})")
         intel_draft(j)
@@ -104,7 +104,7 @@ def test_author_recovers_the_intended_intelligence_import(app, language, scenari
             j.settle()
             intel_draft(j)
         if scenario == "intel-receipt-already-active":
-            analyst.nav("مكتبة التحليل المحلي")
+            analyst.nav("مكتبة القواعد")
             analyst.click("button", "تفعيل الإصدار")
             assert intel_items(analyst)[0]["active"]
         if permissions:

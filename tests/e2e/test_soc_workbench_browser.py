@@ -6,7 +6,7 @@ from conftest import DEMO_LOGIN_VALUE
 from playwright.sync_api import expect, sync_playwright
 from werkzeug.serving import make_server
 
-from tests.e2e.browser_helpers import assert_accessible, launch_browser
+from tests.e2e.browser_helpers import account_menu, assert_accessible, launch_browser
 from tests.integration.test_soc_workbench import alert, message
 
 
@@ -43,7 +43,7 @@ def test_soc_triage_case_tools_email_and_immediate_report_permissions(app, datab
             page.goto(base + "/monitoring")
             expect(page.locator("[data-alert-row]")).to_have_count(25)
             assert page.locator(".desktop-window,.desktop-taskbar,.case-folder-grid").count() == 0
-            page.locator('[data-theme-option="dark"]').click()
+            account_menu(page).locator('[data-theme-option="dark"]').click()
             page.screenshot(path=str(output / "monitoring-en-dark.png"), full_page=False)
             assert_accessible(page)
             expand = page.locator(".row-expand").first
@@ -57,7 +57,7 @@ def test_soc_triage_case_tools_email_and_immediate_report_permissions(app, datab
             page.get_by_role("button", name="Apply", exact=True).click()
             expect(page.locator("[data-alert-row]")).to_have_count(15)
             assert "severity=critical" in page.url and "page=1" in page.url
-            page.get_by_role("link", name="Investigation Channel", exact=False).click()
+            page.get_by_role("link", name="Under investigation", exact=False).click()
             expect(page.locator("[data-alert-row]")).to_have_count(0)
             page.goto(base + f"/cases/{case['id']}")
             page.get_by_role("heading", name=case["title"], exact=True).wait_for()
@@ -85,14 +85,14 @@ def test_soc_triage_case_tools_email_and_immediate_report_permissions(app, datab
             report = database.execute("SELECT payload FROM autopsy_reports WHERE case_id=?", (case["id"],)).fetchone()[0]
             assert "email_static_triage" in report
             assert database.execute("SELECT COUNT(*) FROM autopsy_reports WHERE case_id=?", (case["id"],)).fetchone()[0] == 1
-            page.locator('[data-theme-option="light"]').click()
+            account_menu(page).locator('[data-theme-option="light"]').click()
             page.goto(base + "/monitoring")
             page.screenshot(path=str(output / "monitoring-en-light.png"), full_page=False)
-            page.locator("[data-language-toggle]").click()
+            account_menu(page).locator("[data-language-toggle]").click()
             page.wait_for_function(
                 "() => document.documentElement.lang === 'ar' && document.querySelector('#workspace')?.getAttribute('aria-busy') === 'false'"
             )
-            page.locator('[data-theme-option="dark"]').click()
+            account_menu(page).locator('[data-theme-option="dark"]').click()
             assert_accessible(page)
             page.screenshot(path=str(output / "monitoring-ar-dark.png"), full_page=False)
             page.set_viewport_size({"width": 390, "height": 844})
@@ -108,12 +108,12 @@ def test_soc_triage_case_tools_email_and_immediate_report_permissions(app, datab
                 "INSERT INTO autopsy_case_members(case_id,user_id,responsibility,assigned_by,assigned_at) VALUES (?,?,'reviewer',?,'2026-10-27T00:00:00Z')",
                 (case["id"], user_ids["auditor"], user_ids["soc_manager"]),
             )
-            page.locator(".account-menu summary").click()
+            account_menu(page)
             page.get_by_role("button", name="خروج", exact=True).click()
             page.wait_for_url("**/login")
             page.get_by_label("البريد الإلكتروني", exact=True).fill("auditor@socify.local")
             page.get_by_label("كلمة المرور", exact=True).fill(DEMO_LOGIN_VALUE)
-            page.get_by_role("button", name="دخول إلى المنصة", exact=True).click()
+            page.get_by_role("button", name="دخول", exact=True).click()
             page.wait_for_url("**/cases")
             page.goto(base + f"/endpoint-security?case_id={case['id']}")
             expect(page.locator(".asset-table")).to_contain_text("Identity gateway")

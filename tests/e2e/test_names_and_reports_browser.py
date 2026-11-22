@@ -7,7 +7,7 @@ from conftest import DEMO_LOGIN_VALUE
 from playwright.sync_api import sync_playwright
 from werkzeug.serving import make_server
 
-from tests.e2e.browser_helpers import assert_accessible, launch_browser
+from tests.e2e.browser_helpers import account_menu, assert_accessible, launch_browser
 from tests.unit.test_snort import snort
 
 
@@ -44,10 +44,10 @@ def test_account_language_and_labelled_network_report(app, language, width):
             # Explicitly exercise both directions with persistent saved names.
             first = "نورة" if language == "ar" else "Noura"
             other = "Noura" if language == "ar" else "نورة"
-            page.locator("[data-language-toggle]").click()
+            account_menu(page).locator("[data-language-toggle]").click()
             page.wait_for_function("expected => document.querySelector('[data-account-name]').textContent === expected", arg=other)
             page.locator('#workspace[aria-busy="false"]').wait_for()
-            page.locator("[data-language-toggle]").click()
+            account_menu(page).locator("[data-language-toggle]").click()
             page.wait_for_function("expected => document.querySelector('[data-account-name]').textContent === expected", arg=first)
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             assert_accessible(page)

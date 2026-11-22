@@ -49,6 +49,10 @@ def validate_tokens() -> list[dict]:
             ("on-primary", "primary-fill"),
             ("on-primary", "primary-hover"),
             ("terminal-text", "terminal-bg"),
+            ("sev-critical-ink", "sev-critical-fill"),
+            ("sev-high-ink", "sev-high-fill"),
+            ("sev-medium-ink", "sev-medium-fill"),
+            ("sev-low-ink", "sev-low-fill"),
         ]:
             ratio = contrast(tokens["colors"][foreground][index], tokens["colors"][background][index])
             checks.append({"mode": mode, "foreground": foreground, "background": background, "contrast": round(ratio, 3)})
@@ -104,7 +108,7 @@ def audit_pages(output: Path) -> list[dict]:
                 page.wait_for_url("**/cases")
                 case_id = manifest["primary_case"]
                 page.locator(f'.case-selection-card input[value="{case_id}"]').check()
-                page.get_by_role("button", name="بدء التحقيق بالنطاق المحدد", exact=True).click()
+                page.get_by_role("button", name="بدء التحقيق", exact=True).click()
                 page.wait_for_url(f"**/cases/{case_id}")
                 sections = [
                     "dashboard",

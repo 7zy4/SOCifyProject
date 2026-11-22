@@ -453,7 +453,7 @@ def update_display_name():
     for key in ("name_ar", "name_en"):
         value = data[key]
         if not isinstance(value, str) or len(value) > 100 or any(unicodedata.category(char).startswith("C") for char in value):
-            return error_response("INVALID_DISPLAY_NAME", "اسم العرض يجب ألا يتجاوز ١٠٠ محرف دون محارف تحكم", 422)
+            return error_response("INVALID_DISPLAY_NAME", "اسم العرض يجب ألا يتجاوز 100 محرف دون محارف تحكم", 422)
         values[key] = value.strip()
     with transaction():
         get_db().execute(

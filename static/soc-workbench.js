@@ -4,26 +4,34 @@
   const t = value => SOCifyLocale.text(value);
   const sections = ["monitoring", "log-management", "endpoint-security", "threat-intel", "email-security", "sandbox", "reports"];
   const names = {
-    monitoring: [t("المراقبة"), null],
-    "log-management": [t("إدارة السجلات"), null],
-    "endpoint-security": [t("أمن الأجهزة والأصول"), null],
-    "threat-intel": [t("استخبارات التهديدات"), null],
-    "email-security": [t("أمن البريد الإلكتروني"), t("افحص رؤوس الرسالة وروابطها ومرفقاتها دون تشغيل محتواها.")],
-    sandbox: [t("تحليل الأدلة"), null],
+    monitoring: [t("التنبيهات"), null],
+    "log-management": [t("السجلات"), null],
+    "endpoint-security": [t("الأجهزة"), null],
+    "threat-intel": [t("المؤشرات"), null],
+    "email-security": [t("البريد"), null],
+    sandbox: [t("الملفات"), null],
     reports: [t("التقارير"), null]
   };
   const tabs = {"log-management":"logs", "endpoint-security":"analysis", "threat-intel":"analysis", "email-security":"analysis", sandbox:"analysis", reports:"reports"};
   Object.assign(titles, Object.fromEntries(Object.entries(names).map(([key, value]) => [key, [value[0], "SOCIFY"]])));
-  titles.cases = [t("إدارة القضايا"), "CASE MANAGEMENT"];
+  titles.cases = [t("القضايا"), "CASES"];
   let requestVersion = 0;
   const url = (path, changes = {}) => {
     const target = new URL(path, location.origin);
     for (const [key, value] of Object.entries(changes)) if (value !== "" && value !== null && value !== undefined) target.searchParams.set(key, String(value));
     return target.pathname + target.search;
   };
-  const number = value => new Intl.NumberFormat(SOCifyLocale.language === "ar" ? "ar" : "en").format(value);
+  const number = value => new Intl.NumberFormat(SOCifyLocale.locale).format(value);
   function navigation() {
     document.querySelectorAll("[data-nav-permission]").forEach(link => { link.hidden = !permission(link.dataset.navPermission); });
+    // A group label stays only while one of its links is visible.
+    document.querySelectorAll("#primary-nav .nav-group-label").forEach(label => {
+      let next = label.nextElementSibling, visible = false;
+      while (next && !next.classList.contains("nav-group-label")) { if (!next.hidden) visible = true; next = next.nextElementSibling; }
+      label.hidden = !visible;
+    });
+    const role = document.querySelector("[data-account-role]");
+    if (role && state.user) role.textContent = autopsyLabel(state.user.role);
     const group = state.section === "reports" ? "reports" : ["cases", "case"].includes(state.section) ? "cases" : "operations";
     document.querySelectorAll("[data-global-section]").forEach(link => {
       if (link.dataset.globalSection === group) link.setAttribute("aria-current", "page"); else link.removeAttribute("aria-current");
@@ -48,7 +56,7 @@
     control.dataset.quickReport = "";
     return control;
   }
-  const channels = [["main", t("القناة الرئيسية")], ["investigation", t("قناة التحقيق")], ["closed", t("التنبيهات المغلقة")]];
+  const channels = [["main", t("جديدة")], ["investigation", t("قيد التحقيق")], ["closed", t("مغلقة")]];
   async function monitoring() {
     const version = ++requestVersion;
     begin("monitoring");
@@ -58,7 +66,7 @@
     const params = new URLSearchParams(location.search);
     const data = await api("/api/soc/monitoring?" + params);
     if (version !== requestVersion) return;
-    const root = node("div", {class:"monitoring-view"}, pageHead(...names.monitoring, permission("cases.create")?[button(t("إنشاء قضية"),autopsyNewCase,"primary")]:[]));
+    const root = node("div", {class:"monitoring-view"}, pageHead(...names.monitoring));
     const change = changes => {
       const next = new URL(location.href);
       next.searchParams.set("page", "1");
@@ -69,14 +77,14 @@
       const target = new URL(location.href); target.searchParams.set("channel",value); target.searchParams.delete("page");
       return node("a", {class:"channel-tab",href:target.pathname+target.search,"aria-current":value===data.channel?"page":null}, [node("span",{text:label}),node("span",{class:"channel-count",text:number(data.counts[value])})]);
     })));
-    const search = node("input",{name:"q",type:"search",maxlength:200,value:params.get("q")||"",autocomplete:"off",placeholder:t("القاعدة أو التنبيه أو مرجع القضية…")});
+    const search = node("input",{name:"q",type:"search",maxlength:200,value:params.get("q")||"",autocomplete:"off",placeholder:t("بحث")});
     const severity = node("select",{name:"severity"}, [["",t("جميع الدرجات")],...["critical","high","medium","low"].map(value=>[value,autopsyLabel(value)])].map(([value,label])=>node("option",{value,selected:value===(params.get("severity")||""),text:label})));
     const mine = node("select",{name:"mine"}, [["0",t("جميع القضايا المصرح بها")],["1",t("المسندة إليّ")]].map(([value,label])=>node("option",{value,selected:value===(params.get("mine")||"0"),text:label})));
     const sort = node("select",{name:"sort"}, [["detected_at",t("الأحدث أولًا")],["severity",t("الأعلى خطورة")],["rule_name",t("اسم القاعدة")]].map(([value,label])=>node("option",{value,selected:value===(params.get("sort")||"detected_at"),text:label})));
-    const form = node("form",{class:"monitoring-toolbar","aria-label":t("مرشحات التنبيهات")},[field(t("بحث التنبيهات"),search),field(t("الخطورة"),severity),field(t("المسؤول"),mine),field(t("ترتيب التنبيهات"),sort),node("button",{type:"submit",class:"button primary",text:t("تطبيق")}),button(t("تحديث"),()=>monitoring().catch(handleError),"ghost")]);
+    const form = node("form",{class:"monitoring-toolbar","aria-label":t("مرشحات التنبيهات")},[field(t("بحث"),search),field(t("الخطورة"),severity),field(t("المسؤول"),mine),field(t("الترتيب"),sort),node("button",{type:"submit",class:"button",text:t("تطبيق")})]);
     form.addEventListener("submit",event=>{event.preventDefault();change({q:search.value,severity:severity.value,mine:mine.value,sort:sort.value,direction:sort.value==="rule_name"?"asc":"desc"});});
     const surface = node("section",{class:"monitoring-surface","aria-label":t("نتائج التنبيهات")},[form,node("div",{class:"monitoring-caption"},[node("p",{text:t("آخر تحديث")+": "+formatTime(data.fetched_at)})])]);
-    if (!data.items.length) surface.append(emptyState(t("لا توجد تنبيهات تطابق هذا النطاق"),null,[linkedButton(t("فتح إدارة القضايا"),"/cases")]));
+    if (!data.items.length) surface.append(emptyState(t("لا توجد تنبيهات"),null));
     else {
       const body=node("tbody");
       const head=node("thead",{},node("tr",{},[t("التفاصيل"),t("الخطورة"),t("وقت الاكتشاف"),t("اسم القاعدة"),t("معرف التنبيه"),t("القضية"),t("المسؤول"),t("الإجراء")].map(label=>node("th",{scope:"col",text:label}))));
@@ -127,7 +135,7 @@
     form.addEventListener("submit",e=>{e.preventDefault();location.assign(url(`/${section}`,{case_id:selected?.id,selector_q:search.value,choose:1}));});
     root.append(form);
     if(selected) {
-      const summary=node("div",{class:"context-summary"},[node("div",{},[node("strong",{"data-user-content":"true",text:selected.title}),node("p",{},[node("bdi",{text:selected.reference})," · ",autopsyLabel(selected.status)])]),node("div",{class:"action-row"},[linkedButton(t("فتح التحقيق"),`/cases/${selected.id}`),linkedButton(t("تغيير القضية"),url(`/${section}`,{case_id:selected.id,choose:1}))])]);
+      const summary=node("div",{class:"context-summary"},[node("div",{},[node("strong",{"data-user-content":"true",text:selected.title}),node("p",{},[node("bdi",{text:selected.reference})," | ",autopsyLabel(selected.status)])]),node("div",{class:"action-row"},[linkedButton(t("فتح التحقيق"),`/cases/${selected.id}`),linkedButton(t("تغيير القضية"),url(`/${section}`,{case_id:selected.id,choose:1}))])]);
       root.append(summary);
     }
     if(!selected||params.has("choose")||query) {
@@ -139,7 +147,7 @@
         if(permission("cases.create"))list.append(button(t("إنشاء قضية"),()=>autopsyNewCase(false,section==="log-management"?"logs":"overview"),"primary"));
       }
       root.append(list);
-      const pages=node("div",{class:"pagination"},node("p",{text:number(cases.total)+" · "+t("الصفحة")+" "+number(page)}));
+      const pages=node("div",{class:"pagination"},node("p",{text:number(cases.total)+" | "+t("الصفحة")+" "+number(page)}));
       if(page>1)pages.append(linkedButton(t("السابق"),url(`/${section}`,{case_id:selected?.id,choose:1,selector_q:query,selector_page:page-1})));
       if(page*25<cases.total)pages.append(linkedButton(t("التالي"),url(`/${section}`,{case_id:selected?.id,choose:1,selector_q:query,selector_page:page+1})));
       root.append(pages);
@@ -201,7 +209,7 @@
           scanBtn.disabled = true;
           try {
             const res = await api(`/api/cases/${caseId}/watchlist-scan`, { method: "POST", body: {} });
-            scanNotice.textContent = ` · ${t("تم فحص")} ${number(res.events_scanned)} — ${t("تنبيهات جديدة")}: ${number(res.alerts_created)}`;
+            scanNotice.textContent = ` | ${t("تم فحص")} ${number(res.events_scanned)} - ${t("تنبيهات جديدة")}: ${number(res.alerts_created)}`;
             renderEntries((await api("/api/watchlist")).items);
           } catch (error) { handleError(error); }
           finally { scanBtn.disabled = false; }
@@ -213,7 +221,7 @@
       if (items.length) entries.replaceChildren(table([
         { label: t("النوع"), value: item => item.indicator_type.toUpperCase() },
         { label: t("القيمة"), value: item => node("bdi", { dir: "ltr", "data-user-content": "true", text: item.value }) },
-        { label: t("الخطورة"), value: item => autopsyLabel(item.severity) },
+        { label: t("الخطورة"), value: item => autopsyBadge(item.severity) },
         { label: t("التطابقات"), value: item => number(item.hits_count) },
         { label: t("ملاحظة"), value: item => item.note || "—" },
         { label: t("الحالة"), value: item => item.is_active ? t("نشط") : t("متوقف") },
@@ -245,7 +253,7 @@
       return panel(t("صندوق التقارير المصعّدة لمدير مركز العمليات"), body, false);
     }
     body.append(table([
-      { label: t("القضية"), value: item => node("a", { class: "case-link", href: `/cases/${item.case_id}?tab=reports`, text: `${item.case_reference} · ${item.case_title}` }) },
+      { label: t("القضية"), value: item => node("a", { class: "case-link", href: `/cases/${item.case_id}?tab=reports`, text: `${item.case_reference} | ${item.case_title}` }) },
       { label: t("المحقق"), value: "investigator_name" },
       { label: t("التصنيف"), value: item => autopsyQuickChoiceLabel(item.incident_classification_label) },
       { label: t("حكم الفرز"), value: item => autopsyQuickChoiceLabel(item.triage_verdict_label) },
@@ -282,7 +290,7 @@
       const file=node("input",{type:"file",name:"email",accept:".eml,message/rfc822",required:true});
       const submit=node("button",{type:"submit",class:"button primary",text:t("فحص البريد ومرفقاته بضغطة زر")});
       const errors=node("p",{role:"alert",class:"notice",hidden:true});
-      const form=node("form",{class:"filter-row"},[field(t("رسالة EML · حتى 5MiB (شامل فحص المرفقات ساكنًا)"),file),submit,errors]);
+      const form=node("form",{class:"filter-row"},[field(t("رسالة EML | حتى 5MiB (شامل فحص المرفقات ساكنًا)"),file),submit,errors]);
       form.addEventListener("submit",async e=>{
         e.preventDefault();errors.hidden=true;const chosen=file.files[0];if(!chosen||chosen.size>5*1024*1024||!chosen.name.toLowerCase().endsWith(".eml")){errors.textContent=t("اختر رسالة EML لا تتجاوز 5MiB");errors.hidden=false;return;}
         submit.disabled=true;submit.textContent=t("جارٍ فحص الرسالة والمرفقات…");
@@ -343,7 +351,7 @@
       })}
     ],data.items));
     else root.append(emptyState(t("لا مؤشرات مرصودة في السجلات"),null));
-    const pages=node("div",{class:"pagination"},node("p",{text:number(data.total)+" · "+t("الصفحة")+" "+number(page)}));
+    const pages=node("div",{class:"pagination"},node("p",{text:number(data.total)+" | "+t("الصفحة")+" "+number(page)}));
     if(page>1)pages.append(linkedButton(t("السابق"),url("/threat-intel",{case_id:caseId,intel_page:page-1})));
     if(page*data.limit<data.total)pages.append(linkedButton(t("التالي"),url("/threat-intel",{case_id:caseId,intel_page:page+1})));
     root.append(pages);return panel(t("الإثراء المحلي"),root,true);
@@ -364,7 +372,7 @@
     if(!current){root.append(emptyState(t("اختر قضية لبدء العمل"),null));finish(root);return;}
     bindCase(current);
     if(current.full_case_access===false&&section!=="log-management"){
-      root.append(emptyState(t("هذه الأداة تحتاج نطاق القضية الكامل"),null,[linkedButton(t("إدارة السجلات"),url("/log-management",{case_id:current.id}))]));finish(root);return;
+      root.append(emptyState(t("هذه الأداة تحتاج نطاق القضية الكامل"),null,[linkedButton(t("السجلات"),url("/log-management",{case_id:current.id}))]));finish(root);return;
     }
     autopsy.assets=current.full_case_access===false?[]:(await api(`/api/cases/${current.id}/records?kind=asset&limit=100`)).items;
     const content=node("div",{class:"tool-results"});
@@ -376,7 +384,7 @@
       content.append(await window.SOCifyTelemetry.endpoints(current.id));
       content.append(await window.SOCifyInsights.hosts(current.id));
       content.append(await assetInventory(current.id));
-      content.append(linkedButton(t("توثيق إجراءات الاستجابة"),url(`/cases/${current.id}`,{tab:"response"})));
+      root.querySelector(".workspace-head .action-row").append(linkedButton(t("توثيق إجراءات الاستجابة"),url(`/cases/${current.id}`,{tab:"response"})));
     }else if(section==="threat-intel") {
       content.append(await autopsyRecordPanel("indicator"));
       content.append(await intelligence(current.id));
@@ -385,7 +393,8 @@
     }
     else if(section==="email-security")content.append(await email(current.id));
     else if(section==="reports") {
-      content.append(reportButton(current),await window.SOCifyAutopsy.reports(current.id));
+      root.querySelector(".workspace-head .action-row").append(reportButton(current));
+      content.append(await window.SOCifyAutopsy.reports(current.id));
       if(window.SOCifyAutopsy.capsules)content.append(await window.SOCifyAutopsy.capsules(current.id));
     }
     root.append(content);if(version===requestVersion)finish(root);

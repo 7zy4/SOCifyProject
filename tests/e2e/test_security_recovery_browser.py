@@ -5,7 +5,7 @@ from conftest import DEMO_LOGIN_VALUE
 from playwright.sync_api import expect
 
 from socify.security import totp_code
-from tests.e2e.browser_helpers import assert_accessible
+from tests.e2e.browser_helpers import account_menu, assert_accessible
 from tests.e2e.test_review_workflow import review_session
 
 
@@ -16,7 +16,7 @@ def test_new_recovery_code_works_for_login_and_account_reverification(app, langu
         j.page.goto(j.base + "/profile")
         j.settle()
         if j.page.locator("html").get_attribute("lang") != language:
-            j.page.locator("[data-language-toggle]").click()
+            account_menu(j.page).locator("[data-language-toggle]").click()
             j.settle()
         start = j.page.get_by_role("button", name=j.text("بدء إعداد MFA"), exact=True).locator("..")
         start.locator("input[name=current_password]").fill(DEMO_LOGIN_VALUE)

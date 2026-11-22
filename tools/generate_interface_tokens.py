@@ -20,7 +20,6 @@ def generate() -> str:
         css += f"{selector} {{\n  color-scheme: {mode};\n"
         css += "".join(f"  --{key}: {values[index]};\n" for key, values in tokens["colors"].items())
         css += "}\n"
-    css += 'html[lang="en"] {\n  --font-ui: var(--font-en),var(--font-ar),sans-serif;\n  --font-display: var(--font-display-en);\n  --font-comic-voice: var(--font-voice-en);\n}\n'
     css += "@media print {\n  :root[data-theme] {\n    color-scheme: light;\n"
     css += "".join(f"    --{key}: {values[0]};\n" for key, values in tokens["colors"].items())
     css += "  }\n}\n"

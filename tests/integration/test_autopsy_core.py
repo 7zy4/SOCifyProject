@@ -13,7 +13,7 @@ def test_case_first_context_membership_and_routes(autopsy_case, app, client, dat
     for path in ["/api/events", "/api/dashboard", "/dashboard", "/events"]:
         assert client.get(path).status_code == 404
     assert client.get("/health/ready").status_code == 200
-    assert "SOCify Tactical Workbench" in client.get("/cases").text
+    assert "SOCify" in client.get("/cases").text
     assert (
         client.post("/api/auth/register", json={"name": "Public User", "email": "public@example.test", "password": "Demo-Safe-Password-2026!"}).status_code
         == 403

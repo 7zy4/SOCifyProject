@@ -23,7 +23,7 @@ function securityForm(fields, action, submitLabel) {
 window.SOCifyAutopsy.profile = async () => {
   begin("profile");
   const [status, sessions] = await Promise.all([api("/api/auth/mfa/status"), api("/api/auth/sessions")]);
-  const root = node("div", {}, pageHead(SOCifyLocale.text("أمان الحساب"), `${state.user.name} · ${autopsyLabel(state.user.role)}`));
+  const root = node("div", {}, pageHead(SOCifyLocale.text("الملف الشخصي"), null));
   const names = node("form", { class: "form-grid", "data-display-name-form": true });
   for (const [key, title, direction] of [["name_ar", "الاسم بالعربية", "rtl"], ["name_en", "الاسم بالإنجليزية", "ltr"]]) {
     names.append(field(SOCifyLocale.text(title), node("input", { name: key, maxlength: 100, value: state.user[key] || "", placeholder: state.user.account_name, dir: direction, autocomplete: "off" })));
@@ -37,7 +37,7 @@ window.SOCifyAutopsy.profile = async () => {
     catch (error) { nameStatus.textContent = error.message; saveName.disabled = false; }
   });
   root.append(panel(SOCifyLocale.text("اسم العرض"), node("div", { class: "panel-body" }, names), true));
-  const mfa = node("div", { class: "panel-body" }, node("p", { text: status.enabled ? SOCifyLocale.template`المصادقة متعددة العوامل مفعّلة · رموز استرداد غير مستخدمة: ${status.recovery_codes_remaining}` : status.pending ? SOCifyLocale.text("إعداد المصادقة لم يكتمل. ابدأ إعدادًا جديدًا ثم أكد الرمز من تطبيقك المحلي.") : SOCifyLocale.text("المصادقة متعددة العوامل غير مفعّلة.") }));
+  const mfa = node("div", { class: "panel-body" }, node("p", { text: status.enabled ? SOCifyLocale.template`المصادقة متعددة العوامل مفعّلة | رموز استرداد غير مستخدمة: ${status.recovery_codes_remaining}` : status.pending ? SOCifyLocale.text("إعداد المصادقة لم يكتمل. ابدأ إعدادًا جديدًا ثم أكد الرمز من تطبيقك المحلي.") : SOCifyLocale.text("المصادقة متعددة العوامل غير مفعّلة.") }));
   if (!status.enabled) {
     mfa.append(securityForm([{ name: "current_password", label: SOCifyLocale.text("كلمة المرور الحالية لبدء الإعداد"), type: "password", autocomplete: "current-password" }], async (body) => {
       const enrollment = await api("/api/auth/mfa/enroll", { method: "POST", body });
@@ -62,6 +62,6 @@ window.SOCifyAutopsy.profile = async () => {
     await api("/api/profile/password", { method: "POST", body: { current_password: body.current_password, new_password: body.new_password } });
     await window.SOCifyAutopsy.profile();
   }, SOCifyLocale.text("حفظ كلمة المرور وإلغاء الجلسات الأخرى"))), true));
-  root.append(panel(SOCifyLocale.text("جلساتي"), table([{ label: SOCifyLocale.text("الجلسة"), value: (item) => item.is_current ? SOCifyLocale.template`${item.id} · الحالية` : item.id }, { label: SOCifyLocale.text("بدأت"), value: (item) => formatTime(item.created_at) }, { label: SOCifyLocale.text("آخر نشاط"), value: (item) => formatTime(item.last_seen_at) }, { label: SOCifyLocale.text("تنتهي"), value: (item) => formatTime(item.expires_at) }, { label: SOCifyLocale.text("الحالة"), value: (item) => item.revoked_at ? SOCifyLocale.text("ملغاة") : SOCifyLocale.text("نشطة") }, { label: SOCifyLocale.text("إدارة"), value: (item) => !item.revoked_at ? button(SOCifyLocale.text("إلغاء الجلسة"), async () => { try { await api(`/api/auth/sessions/${item.id}`, { method: "DELETE" }); if (item.is_current) window.location.assign("/login"); else await window.SOCifyAutopsy.profile(); } catch (error) { handleError(error); } }) : "—" }], sessions.items), true));
+  root.append(panel(SOCifyLocale.text("جلساتي"), table([{ label: SOCifyLocale.text("الجلسة"), value: (item) => item.is_current ? SOCifyLocale.template`${item.id} | الحالية` : item.id }, { label: SOCifyLocale.text("بدأت"), value: (item) => formatTime(item.created_at) }, { label: SOCifyLocale.text("آخر نشاط"), value: (item) => formatTime(item.last_seen_at) }, { label: SOCifyLocale.text("تنتهي"), value: (item) => formatTime(item.expires_at) }, { label: SOCifyLocale.text("الحالة"), value: (item) => item.revoked_at ? SOCifyLocale.text("ملغاة") : SOCifyLocale.text("نشطة") }, { label: SOCifyLocale.text("إدارة"), value: (item) => !item.revoked_at ? button(SOCifyLocale.text("إلغاء الجلسة"), async () => { try { await api(`/api/auth/sessions/${item.id}`, { method: "DELETE" }); if (item.is_current) window.location.assign("/login"); else await window.SOCifyAutopsy.profile(); } catch (error) { handleError(error); } }) : "—" }], sessions.items), true));
   finish(root);
 };

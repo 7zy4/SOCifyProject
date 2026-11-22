@@ -6,7 +6,7 @@ from conftest import DEMO_LOGIN_VALUE
 from playwright.sync_api import sync_playwright
 from werkzeug.serving import make_server
 
-from tests.e2e.browser_helpers import launch_browser
+from tests.e2e.browser_helpers import account_menu, launch_browser
 
 
 @pytest.mark.e2e
@@ -41,12 +41,12 @@ def test_language_toggle_persists_and_preserves_case_content(app, tmp_path):
             page.screenshot(path=str(output / "login-en-desktop.png"), full_page=True)
             page.get_by_role("button", name="Sign in", exact=True).click()
             page.wait_for_url("**/cases")
-            page.get_by_role("heading", name="Team cases", exact=True).wait_for()
+            page.get_by_role("heading", name="Cases", exact=True).wait_for()
             result = page.evaluate("""async () => await api('/api/cases', {method:'POST', body:{
                 title:'القضايا', reason:'forensic_review', objective:'Keep case evidence and authored interface translations separate'
             }})""")
             page.reload()
-            page.get_by_role("heading", name="Team cases", exact=True).wait_for()
+            page.get_by_role("heading", name="Cases", exact=True).wait_for()
             page.get_by_role("cell", name="القضايا", exact=True).wait_for()
             assert page.locator("html").get_attribute("lang") == "en"
             page.goto(root + f"/cases/{result['id']}?tab=reports")
@@ -56,7 +56,7 @@ def test_language_toggle_persists_and_preserves_case_content(app, tmp_path):
             assert sharing.evaluate("element => element.autopsyValue()") == "full"
             page.screenshot(path=str(output / "reports-en-desktop.png"), full_page=True)
             page.goto(root + "/cases")
-            page.get_by_role("heading", name="Team cases", exact=True).wait_for()
+            page.get_by_role("heading", name="Cases", exact=True).wait_for()
             page.screenshot(path=str(output / "cases-en-desktop.png"), full_page=True)
             page.set_viewport_size({"width": 390, "height": 844})
             page.screenshot(path=str(output / "cases-en-mobile.png"), full_page=True)
@@ -64,7 +64,7 @@ def test_language_toggle_persists_and_preserves_case_content(app, tmp_path):
             page.get_by_role("heading", name="القضايا", exact=True).first.wait_for()
             assert page.locator("html").get_attribute("dir") == "ltr"
             page.screenshot(path=str(output / "case-en-mobile.png"), full_page=True)
-            page.get_by_role("button", name="تغيير لغة الواجهة إلى العربية").click()
+            account_menu(page).get_by_role("button", name="تغيير لغة الواجهة إلى العربية").click()
             page.wait_for_function("() => document.documentElement.lang === 'ar'")
             page.get_by_role("heading", name="القضايا", exact=True).first.wait_for()
             assert page.locator("html").get_attribute("dir") == "rtl"

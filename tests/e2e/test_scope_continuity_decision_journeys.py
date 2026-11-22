@@ -12,7 +12,7 @@ import pytest
 from playwright.sync_api import expect
 
 import tests.e2e.test_review_workflow as review_module
-from tests.e2e.browser_helpers import assert_accessible
+from tests.e2e.browser_helpers import account_menu, assert_accessible
 from tests.e2e.test_investigation_link_journeys import note_dialog, records
 from tests.e2e.test_performance_goal_journeys import counter, number
 from tests.e2e.test_report_recovery_journeys import report, report_path
@@ -90,7 +90,7 @@ def capture(j, folder, stage):
 
 
 def save_note(j, message):
-    j.click("link", "التحقيق والخط الزمني")
+    j.click("link", "التحقيق")
     dialog = note_dialog(j)
     dialog.locator("textarea[name=body]").fill(message)
     j.click("button", "حفظ", dialog)
@@ -107,7 +107,7 @@ def personal_case(j, case_id):
 
 
 def upload(j, filename, rows, *, pretty=False):
-    j.click("link", "السجلات والأدلة")
+    j.click("link", "السجلات")
     content = json.dumps(rows, ensure_ascii=False, indent=4 if pretty else None, sort_keys=pretty).encode()
     j.page.locator("input[name=file]").set_input_files({"name": filename, "mimeType": "application/json", "buffer": content})
     j.click("button", "استيراد وفحص فوري")
@@ -175,7 +175,7 @@ def test_shared_workstation_history_cannot_resurrect_the_prior_accounts_charts(a
         expect(j.page.locator(f"#performance-cases a[href='/cases/{secret_id}']")).to_be_visible()
         saved_url = j.page.url
         capture(j, folder, "previous-account")
-        j.page.locator(".account-menu summary").click()
+        account_menu(j.page)
         j.page.locator("form[action='/logout'] button").click()
         j.page.wait_for_url("**/login")
         j.login("analyst@socify.local")

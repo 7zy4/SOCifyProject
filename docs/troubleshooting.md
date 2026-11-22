@@ -67,4 +67,4 @@ docker compose logs socify | grep csrf_rejected
 
 - يحتوي سطر التشخيص على السبب ومعرّف الطلب؛ لا تنشر بقية سجل التشغيل قبل مراجعته.
 
-[دليل التشغيل](operations.md) · [دليل الأمان](security-guide.md)
+[دليل التشغيل](operations.md) | [دليل الأمان](security-guide.md)

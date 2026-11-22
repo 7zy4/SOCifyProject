@@ -71,7 +71,7 @@ def test_restricted_response_cannot_be_inferred_from_performance_charts(app, dat
         manager.settle()
         restrict_batch(manager, "restricted-response.json")
 
-        j.nav("إدارة القضايا")
+        j.nav("القضايا")
         j.create_case()
         permitted_id = j.case_id
         upload_logs(j, "permitted-response.json", "Permitted response review record")
@@ -102,9 +102,9 @@ def test_restricted_response_cannot_be_inferred_from_performance_charts(app, dat
         # The user follows a visible permitted case and records the actual next action.
         j.page.locator(f"#performance-cases a[href='/cases/{permitted_id}']").click()
         j.settle()
-        j.click("link", "السجلات والأدلة")
+        j.click("link", "السجلات")
         expect(j.page.get_by_role("cell", name="Permitted response review record", exact=True)).to_be_visible()
-        j.click("link", "التحقيق والخط الزمني")
+        j.click("link", "التحقيق")
         dialog = note_dialog(j)
         note = "Reviewed the permitted record. Request a documented response milestone before assessing response time."
         dialog.locator("textarea[name=body]").fill(note)

@@ -29,7 +29,7 @@ def test_late_response_stays_with_its_case_and_respects_navigation_intent(app, l
         manager_case(j, manager)
         original_id, original_url = j.case_id, j.case_url
         original_objective = j.state()["context"]["objective"]
-        manager.click("link", "جميع القضايا")
+        manager.nav("القضايا")
         manager.click("button", "إنشاء قضية")
         dialog = manager.page.get_by_role("dialog")
         title = "Separate investigation with its own evidence and decision"
@@ -56,7 +56,7 @@ def test_late_response_stays_with_its_case_and_respects_navigation_intent(app, l
         if save_pending:
             section.get_by_role("button", name=manager.text("حفظ"), exact=True).click()
         else:
-            manager.page.get_by_role("button", name=manager.text("تحديث القضية"), exact=True).click()
+            manager.page.get_by_role("button", name=manager.text("تحديث"), exact=True).click()
         deadline = time.monotonic() + 5
         while not held and time.monotonic() < deadline:
             manager.page.wait_for_timeout(25)
@@ -69,7 +69,7 @@ def test_late_response_stays_with_its_case_and_respects_navigation_intent(app, l
             event.dismiss() if stay else event.accept()
 
         manager.page.on("dialog", navigation_choice)
-        manager.page.get_by_role("link", name=manager.text("جميع القضايا"), exact=True).click()
+        manager.page.locator("#primary-nav").get_by_role("link", name=manager.text("القضايا"), exact=True).click()
         if stay:
             assert manager.page.url == original_url
             held["route"].fulfill(response=held["response"])

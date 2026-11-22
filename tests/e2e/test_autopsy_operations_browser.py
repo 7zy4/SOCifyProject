@@ -29,7 +29,7 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
             page.locator("input[name=password]").fill("Demo-Safe-Password-2026!")
             page.locator("button[type=submit]").click()
             page.wait_for_url("**/cases")
-            page.get_by_role("link", name="مكتبة التحليل المحلي", exact=True).click()
+            page.get_by_role("link", name="مكتبة القواعد", exact=True).click()
             feed = page.locator("section.panel").filter(has=page.get_by_role("heading", name="استيراد إصدار محلي جديد", exact=True))
             feed.locator("input[type=file]").set_input_files(
                 {
@@ -109,8 +109,8 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
             team = page.evaluate("async () => await api('/api/team')")
             manager_name = next(member["name"] for member in team["members"] if member["role"] == "soc_manager")
             analyst_name = next(member["name"] for member in team["members"] if member["role"] == "analyst")
-            handoff.locator("input[name=from_user]").fill(manager_name + " · مدير الفريق")
-            handoff.locator("input[name=to_user]").fill(analyst_name + " · محلل")
+            handoff.locator("input[name=from_user]").fill(manager_name + " | مدير الفريق")
+            handoff.locator("input[name=to_user]").fill(analyst_name + " | محلل")
             handoff.locator("input[name=reason]").fill("Scheduled shift transfer with retained prior access")
             handoff.get_by_role("button", name="حفظ", exact=True).click()
             page.get_by_role("cell", name="المناوبة السابقة", exact=True).wait_for()
@@ -120,7 +120,7 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
             )
             page.goto(f"http://127.0.0.1:{server.server_port}/cases/{case_id}?tab=analysis&analysis=detection")
             page.get_by_role("heading", name="الإثراء والكشف ومراجعة التنبيهات", exact=True).wait_for()
-            assert page.get_by_role("cell", name="تطابق مع المصادر · مشتبه", exact=True).count() == 1
+            assert page.get_by_role("cell", name="تطابق مع المصادر | مشتبه", exact=True).count() == 1
             page.get_by_role("button", name="تفاصيل ومراجعة", exact=True).first.click()
             dialog = page.get_by_role("dialog")
             dialog.locator("input[name=verdict]").fill("إيجابي كاذب")
@@ -128,8 +128,8 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
             dialog.locator("textarea[name=reason]").fill("Authorized synthetic activity confirmed by retained fixture")
             dialog.get_by_role("button", name="حفظ", exact=True).click()
             expect(dialog).not_to_be_visible()
-            page.get_by_role("cell", name="إيجابي كاذب · فاشل أو محجوب", exact=True).wait_for()
-            page.get_by_role("link", name="التحقيق والخط الزمني", exact=True).click()
+            page.get_by_role("cell", name="إيجابي كاذب | فاشل أو محجوب", exact=True).wait_for()
+            page.locator(".case-tabs").get_by_role("link", name="التحقيق", exact=True).click()
             page.get_by_role("button", name="إضافة الأسباب الجذرية", exact=True).click()
             dialog = page.get_by_role("dialog")
             dialog.locator("input[name=category]").fill("غير معروف")
@@ -142,7 +142,7 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
             whys.nth(1).locator("select[name=why_parent]").select_option(index=1)
             dialog.get_by_role("button", name="حفظ", exact=True).click()
             page.get_by_text("Branch hypothesis to verify", exact=False).wait_for()
-            page.get_by_role("link", name="الاستجابة والتصعيد", exact=True).click()
+            page.locator(".case-tabs").get_by_role("link", name="الاستجابة", exact=True).click()
             workflow = page.locator("section.panel").filter(has=page.get_by_role("heading", name="SLA وجمع الأدلة ومراجعة ما بعد الحادثة", exact=True))
             sla = workflow.locator("form").filter(has=page.locator("input[name=minutes]"))
             sla.locator("input[name=minutes]").fill("120")
@@ -160,7 +160,7 @@ def test_local_intelligence_sigma_library_case_workflow_capsule_and_mfa_browser(
             dialog.locator("textarea[name=lessons]").fill("Retain complete logs and verify hypotheses independently")
             dialog.locator("input[name=override_reason]").fill("Synthetic manager self-review exception documented")
             dialog.get_by_role("button", name="حفظ", exact=True).click()
-            page.get_by_role("heading", name="مراجعة ما بعد الحادثة · تمت المراجعة", exact=True).wait_for()
+            page.get_by_role("heading", name="مراجعة ما بعد الحادثة | تمت المراجعة", exact=True).wait_for()
             page.get_by_role("link", name="التقارير والمراجعة", exact=True).click()
             page.get_by_role("heading", name="حزم القضية والاستعادة والأرشيف", exact=True).wait_for()
             with page.expect_download() as download:

@@ -13,6 +13,17 @@ def launch_browser(playwright):
     return playwright.chromium.launch(executable_path=executable) if executable else playwright.chromium.launch()
 
 
+def account_menu(page):
+    """Open the sidebar account menu, which holds the theme and language controls, and return the page."""
+    menu = page.locator("details.account-menu")
+    if menu.count() and not menu.evaluate("element => element.open"):
+        toggle = page.locator("#menu-toggle")
+        if toggle.is_visible() and toggle.get_attribute("aria-expanded") != "true":
+            toggle.click()
+        menu.locator("summary").click()
+    return page
+
+
 def new_page(browser, **kwargs):
     axe_path = Path("node_modules/axe-core/axe.min.js").resolve()
     if not axe_path.exists():

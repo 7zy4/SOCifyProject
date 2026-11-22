@@ -8,7 +8,7 @@ from conftest import DEMO_LOGIN_VALUE
 from playwright.sync_api import expect, sync_playwright
 from werkzeug.serving import make_server
 
-from tests.e2e.browser_helpers import assert_accessible, launch_browser
+from tests.e2e.browser_helpers import account_menu, assert_accessible, launch_browser
 
 
 @pytest.mark.e2e
@@ -33,14 +33,14 @@ def test_theme_system_persistence_languages_and_operational_surfaces(app):
             assert page.locator("html").get_attribute("data-theme") == "dark"
             page.get_by_label("البريد الإلكتروني", exact=True).fill("manager@socify.local")
             page.get_by_label("كلمة المرور", exact=True).fill(DEMO_LOGIN_VALUE)
-            page.get_by_role("button", name="دخول إلى المنصة", exact=True).click()
+            page.get_by_role("button", name="دخول", exact=True).click()
             page.wait_for_url("**/cases")
             page.wait_for_function("() => document.querySelector('#workspace').getAttribute('aria-busy') === 'false'")
             assert page.locator('[data-theme-option="dark"]').get_attribute("aria-pressed") == "true"
-            page.locator('[data-theme-option="system"]').click()
+            account_menu(page).locator('[data-theme-option="system"]').click()
             page.emulate_media(color_scheme="light")
             page.wait_for_function("() => document.documentElement.dataset.theme === 'light'")
-            page.locator('[data-theme-option="dark"]').click()
+            account_menu(page).locator('[data-theme-option="dark"]').click()
             page.reload()
             assert page.locator("html").get_attribute("data-theme") == "dark"
             case = page.evaluate("""async () => {
@@ -80,10 +80,10 @@ def test_theme_system_persistence_languages_and_operational_surfaces(app):
                         assert page.locator("html").get_attribute("data-theme") == theme
                         assert page.locator("html").get_attribute("lang") == language
                         assert page.locator("html").get_attribute("dir") == ("rtl" if language == "ar" else "ltr")
-                        font = "Cairo" if language == "ar" else "IBM Plex Sans"
-                        assert font in page.evaluate("getComputedStyle(document.body).fontFamily")
-                        assert page.evaluate('font => document.fonts.check(`600 15px "${font}"`)', font)
-                        assert page.evaluate("document.fonts.check('34px Bangers', 'SOCify')")
+                        assert "IBM Plex Sans Arabic" in page.evaluate("getComputedStyle(document.body).fontFamily")
+                        assert page.evaluate('document.fonts.check(`600 15px "IBM Plex Sans Arabic"`)')
+                        assert "Kufam" in page.evaluate("getComputedStyle(document.querySelector('h1, h2')).fontFamily")
+                        assert page.evaluate("document.fonts.check('700 20px Kufam', 'SOCify')")
                         assert_accessible(page)
                         name = route.strip("/").replace("/", "-").replace("?tab=", "-") or "landing"
                         if route in ("/", "/login", "/cases") or "tab=summary" in route:
@@ -155,11 +155,11 @@ def test_theme_control_works_when_browser_storage_is_unavailable(app):
             assert page.locator("html").get_attribute("data-theme") == "dark"
             page.get_by_label("البريد الإلكتروني", exact=True).fill("manager@socify.local")
             page.get_by_label("كلمة المرور", exact=True).fill(DEMO_LOGIN_VALUE)
-            page.get_by_role("button", name="دخول إلى المنصة", exact=True).click()
+            page.get_by_role("button", name="دخول", exact=True).click()
             page.wait_for_url("**/cases")
             page.wait_for_function("() => document.querySelector('#workspace').getAttribute('aria-busy') === 'false'")
             assert page.locator("html").get_attribute("data-theme") == "dark"
-            page.locator('[data-theme-option="light"]').click()
+            account_menu(page).locator('[data-theme-option="light"]').click()
             assert page.locator("html").get_attribute("data-theme") == "light"
             browser.close()
     finally:
@@ -215,9 +215,9 @@ def test_operational_governance_routes_render_their_authorized_content(app):
             page.goto(base + "/login")
             page.get_by_label("البريد الإلكتروني", exact=True).fill("admin@socify.local")
             page.get_by_label("كلمة المرور", exact=True).fill(DEMO_LOGIN_VALUE)
-            page.get_by_role("button", name="دخول إلى المنصة", exact=True).click()
+            page.get_by_role("button", name="دخول", exact=True).click()
             page.wait_for_url("**/cases")
-            for route, heading in (("audit", "سجل التدقيق"), ("admin", "الحوكمة والصلاحيات")):
+            for route, heading in (("audit", "التدقيق"), ("admin", "الصلاحيات")):
                 page.goto(base + "/" + route)
                 page.locator('#workspace[aria-busy="false"]').wait_for()
                 assert page.locator("#workspace .workspace-head h2").inner_text() == heading
@@ -235,9 +235,9 @@ def test_operational_governance_routes_render_their_authorized_content(app):
             page.unroute("**/api/audit?*")
             page.get_by_role("button", name="إعادة المحاولة", exact=True).click()
             page.locator("#workspace table").wait_for()
-            assert page.locator("#workspace .workspace-head h2").inner_text() == "سجل التدقيق"
+            assert page.locator("#workspace .workspace-head h2").inner_text() == "التدقيق"
             page.evaluate("localStorage.setItem('socify-interface-language', 'en')")
-            for route, heading in (("audit", "Audit log"), ("admin", "Governance and permissions")):
+            for route, heading in (("audit", "Audit"), ("admin", "Permissions")):
                 page.goto(base + "/" + route)
                 page.locator('#workspace[aria-busy="false"]').wait_for()
                 assert page.locator("#workspace .workspace-head h2").inner_text() == heading

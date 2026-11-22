@@ -19,21 +19,22 @@ def approve(j):
 
 
 def open_card(j, title):
-    j.click("link", "فتح القضية", j.page.locator(".case-selection-card").filter(has_text=title))
+    j.click("link", "فتح", j.page.locator(".case-selection-card").filter(has_text=title))
 
 
 def prepare_pair(j, manager):
     manager.login("manager@socify.local")
     open_card(manager, PRIMARY)
     approve(manager)
-    manager.nav("إدارة القضايا")
+    manager.nav("القضايا")
     manager.click("button", "إنشاء قضية")
     dialog = manager.page.get_by_role("dialog")
     dialog.locator("input[name=title]").fill(SECOND)
     manager.click("button", "حفظ", dialog)
+    manager.page.wait_for_url("**/cases/*")
     second = int(re.search(r"/cases/(\d+)", manager.page.url)[1])
     approve(manager)
-    manager.nav("إدارة القضايا")
+    manager.nav("القضايا")
     open_card(manager, PRIMARY)
     manager.click("button", "بدء التحقيق في هذه القضية")
     panel = manager.page.locator("section.panel").filter(has=manager.page.get_by_role("heading", name=manager.text("ربط قضية ذات صلة"), exact=True))
@@ -50,7 +51,7 @@ def search(j, query):
 
 
 def upload(j, name, title):
-    j.nav("إدارة السجلات")
+    j.nav("السجلات")
     j.page.locator("input[name=file]").set_input_files(
         {
             "name": name,
@@ -106,7 +107,7 @@ def test_related_scope_goal(app, language, scenario):
                 page.set_viewport_size({"width": width, "height": 1000})
                 assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), width
                 page.screenshot(path=str(ARTIFACTS / f"{scenario}-{language}-selection-{width}.png"), full_page=True)
-            peer.click("button", "بدء التحقيق بالنطاق المحدد")
+            peer.click("button", "بدء التحقيق")
             assert page.evaluate("() => api('/api/investigation-selection')")["case_ids"] == [j.case_id, second]
             upload(peer, "identity-scope.json", "Identity evidence only")
             page.get_by_role("combobox", name=peer.text("القضية النشطة")).select_option(str(second))
@@ -116,7 +117,7 @@ def test_related_scope_goal(app, language, scenario):
             expect(page.get_by_role("cell", name="Identity evidence only", exact=True)).to_have_count(0)
             page.get_by_role("combobox", name=peer.text("القضية النشطة")).select_option(str(j.case_id))
             peer.settle()
-            peer.nav("إدارة السجلات")
+            peer.nav("السجلات")
             expect(page.get_by_role("cell", name="Identity evidence only", exact=True)).to_be_visible()
             expect(page.get_by_role("cell", name="Email evidence only", exact=True)).to_have_count(0)
             for width in [390, 1440]:
@@ -151,12 +152,12 @@ def test_hidden_case_selection_recovery(app, language, scenario):
             selected = page.get_by_role("list", name=peer.text("القضايا المختارة"))
             expect(selected).to_contain_text(PRIMARY)
             expect(page.get_by_role("checkbox")).to_have_count(0)
-            expect(page.get_by_role("button", name=peer.text("بدء التحقيق بالنطاق المحدد"), exact=True)).to_be_enabled()
+            expect(page.get_by_role("button", name=peer.text("بدء التحقيق"), exact=True)).to_be_enabled()
             expected_case = j.case_id
             if scenario == "scope-remove-hidden-selection":
                 selected.get_by_role("button", name=peer.text("إلغاء الاختيار") + ": " + PRIMARY, exact=True).click()
                 expect(selected).to_be_hidden()
-                expect(page.get_by_role("button", name=peer.text("بدء التحقيق بالنطاق المحدد"), exact=True)).to_be_disabled()
+                expect(page.get_by_role("button", name=peer.text("بدء التحقيق"), exact=True)).to_be_disabled()
                 search(peer, SECOND)
                 page.get_by_role("checkbox", name=SECOND, exact=True).check()
                 expected_case = second
@@ -165,7 +166,7 @@ def test_hidden_case_selection_recovery(app, language, scenario):
                 assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), width
                 page.screenshot(path=str(ARTIFACTS / f"{scenario}-{language}-selection-{width}.png"), full_page=True)
             assert_accessible(page)
-            peer.click("button", "بدء التحقيق بالنطاق المحدد")
+            peer.click("button", "بدء التحقيق")
             assert page.evaluate("() => api('/api/investigation-selection')")["case_ids"] == [expected_case]
             upload(peer, "retained-selection.json", "Explicitly selected case evidence")
             assert page.evaluate("id => api(`/api/cases/${id}/logs`)", expected_case)["total"] == 1

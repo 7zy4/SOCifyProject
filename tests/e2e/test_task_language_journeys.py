@@ -3,6 +3,7 @@
 import pytest
 from playwright.sync_api import expect
 
+from tests.e2e.browser_helpers import account_menu
 from tests.e2e.test_case_task_backlog_journeys import search_tasks
 from tests.e2e.test_followup_handoff_journeys import evidence_images
 from tests.e2e.test_investigation_link_journeys import note_dialog, records
@@ -26,7 +27,7 @@ def test_new_analyst_finds_and_finishes_localized_task(app, language, scenario):
     with review_session(app, language, scenario) as (j, _, result):
         active = language
         if scenario == "task-language-switch-complete":
-            j.page.locator("[data-language-toggle]").click()
+            account_menu(j.page).locator("[data-language-toggle]").click()
             j.settle()
             active = "en" if language == "ar" else "ar"
         title = "التحقق من الدليل الأساسي" if active == "ar" else "Validate primary evidence"
@@ -38,7 +39,7 @@ def test_new_analyst_finds_and_finishes_localized_task(app, language, scenario):
             j.settle()
             authored_row = j.page.locator(f"#case-task-{authored['id']}")
             expect(authored_row).to_contain_text("Validate primary evidence")
-            j.page.locator("[data-language-toggle]").click()
+            account_menu(j.page).locator("[data-language-toggle]").click()
             j.settle()
             expect(authored_row).to_contain_text("Validate primary evidence")
             j.click("button", "إكمال المهمة", authored_row)
@@ -50,7 +51,7 @@ def test_new_analyst_finds_and_finishes_localized_task(app, language, scenario):
             j.page.get_by_role("link", name=title, exact=True).click()
             j.settle()
         if scenario == "task-language-reference":
-            j.click("link", "التحقيق والخط الزمني")
+            j.click("link", "التحقيق")
             dialog = note_dialog(j)
             control = dialog.locator("input[name=task_id]")
             control.fill(title)

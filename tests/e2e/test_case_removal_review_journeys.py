@@ -24,7 +24,7 @@ def test_review_new_case_data_without_retyping_access_removal_reason(app, langua
             context_form(manager, objective)
         dialog = removal_dialog(manager, person)
         dialog.locator("[name=reason]").fill(REASON)
-        j.click("button", "تحديث القضية")
+        j.click("button", "تحديث")
         section = context_form(j, "A colleague reviewed the new identity evidence during the handoff.")
         j.click("button", "حفظ", section)
         assert j.state()["context"]["objective"] == "A colleague reviewed the new identity evidence during the handoff."
@@ -63,7 +63,7 @@ def another_manager(manager, j, result):
 
 
 def change_objective(j, value):
-    j.click("button", "تحديث القضية")
+    j.click("button", "تحديث")
     form = context_form(j, value)
     j.click("button", "حفظ", form)
     assert j.state()["context"]["objective"] == value

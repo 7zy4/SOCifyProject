@@ -19,7 +19,7 @@ def upload_events(j, count=2):
         {"title": f"Retained gateway event {index + 1:02d}", "timestamp": f"2026-11-02T09:{index:02d}:00Z", "hostname": "RETAINED-GW", "severity": "medium"}
         for index in range(count)
     ]
-    j.click("link", "السجلات والأدلة")
+    j.click("link", "السجلات")
     j.page.locator("input[name=file]").set_input_files({"name": "retained-gateway.json", "mimeType": "application/json", "buffer": json.dumps(events).encode()})
     j.click("button", "استيراد وفحص فوري")
     expect(j.page.get_by_role("cell", name="Retained gateway event 01", exact=True)).to_be_visible()
@@ -30,7 +30,7 @@ def timeline(j):
 
 
 def open_timeline(j):
-    j.click("link", "التحقيق والخط الزمني")
+    j.click("link", "التحقيق")
     timeline(j).locator("select[name=timeline_scope]").select_option("logs")
     j.click("button", "تطبيق الفلاتر", timeline(j))
 
@@ -45,7 +45,7 @@ def event_row(j, title="Retained gateway event 01"):
 
 
 def bookmark(j, title="Retained gateway event 01", visibility="team"):
-    j.click("button", "تمييز السجل وإضافة ملاحظة", event_row(j, title))
+    j.click("button", "ملاحظة", event_row(j, title))
     dialog = j.page.get_by_role("dialog")
     dialog.locator("input[name=title]").fill("Gateway evidence review marker")
     dialog.locator("textarea[name=notes]").fill("Preserve the original gateway event for the incoming reviewer")
@@ -65,7 +65,7 @@ def attack_form(j, query="T1059"):
 
 
 def technique(j, form, assessment="verified", event="Retained gateway event 01"):
-    choose(j, form, "technique_id", "T1059 · Command and Scripting Interpreter")
+    choose(j, form, "technique_id", "T1059 | Command and Scripting Interpreter")
     form.locator("input[name=assessment]").fill(j.page.evaluate("v=>autopsyLabel(v)", assessment))
     form.locator("textarea[name=reason]").fill("The retained gateway record supports this scoped investigation decision")
     if event:
@@ -177,7 +177,7 @@ def test_investigator_can_reach_the_retained_event_and_publish_the_right_decisio
                 manager.page.goto(j.case_url + "?tab=investigation")
                 manager.settle()
                 expect(event_row(manager)).to_contain_text("Gateway evidence review marker")
-                manager.click("button", "تفاصيل السجل", event_row(manager))
+                manager.click("button", "التفاصيل", event_row(manager))
                 expect(manager.page.get_by_role("dialog")).to_contain_text("RETAINED-GW")
                 manager.page.keyboard.press("Escape")
                 subject = manager
@@ -198,7 +198,7 @@ def test_investigator_can_reach_the_retained_event_and_publish_the_right_decisio
                 technique(j, form)
                 search_events(j, "event 02")
                 expect(form.locator("input[name=event_id]")).to_have_value("")
-                expect(form.locator("input[name=technique_id]")).to_have_value("T1059 · Command and Scripting Interpreter")
+                expect(form.locator("input[name=technique_id]")).to_have_value("T1059 | Command and Scripting Interpreter")
                 expect(form.locator("input[name=assessment]")).to_have_value(j.page.evaluate("autopsyLabel('verified')"))
                 expect(form.locator("textarea[name=reason]")).to_have_value("The retained gateway record supports this scoped investigation decision")
                 form.locator("input[name=event_id]").press("ArrowDown")

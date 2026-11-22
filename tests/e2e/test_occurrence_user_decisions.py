@@ -87,7 +87,7 @@ def observation(**changes):
 
 
 def upload(j, filename, row, *, pretty=False):
-    j.click("link", "السجلات والأدلة")
+    j.click("link", "السجلات")
     content = json.dumps([row], ensure_ascii=False, sort_keys=pretty, indent=2 if pretty else None).encode()
     j.page.locator("input[name=file]").set_input_files({"name": filename, "mimeType": "application/json", "buffer": content})
     j.page.locator("summary").filter(has_text=j.text("خيارات الاستيراد")).click()
@@ -260,9 +260,9 @@ def test_shared_event_keeps_only_permitted_origin_through_revocation_and_restora
         assert (allowed_job["accepted"], allowed_job["skipped"]) == (0, 1), "Fixture requires one canonical event with two occurrences"
         restrict_batch(manager, "restricted-provider-receipt.json")
         restrict_batch(manager, "assigned-provider-receipt.json", analyst_name)
-        j.click("link", "السجلات والأدلة")
+        j.click("link", "السجلات")
         expect(j.page.locator("main")).not_to_contain_text("restricted-provider-receipt.json")
-        expect(j.page.get_by_role("link", name=j.text("التحقيق والخط الزمني"), exact=True)).to_have_count(0)
+        expect(j.page.get_by_role("link", name=j.text("التحقيق"), exact=True)).to_have_count(0)
         expect(j.page.get_by_role("link", name=j.text("التقارير والمراجعة"), exact=True)).to_have_count(0)
         visible = stored_logs(j)
         assert visible["total"] == 1 and visible["items"][0]["import_job_id"] == allowed_job["id"], "PRODUCT: canonical event chose a forbidden origin"
@@ -301,7 +301,7 @@ def test_shared_event_keeps_only_permitted_origin_through_revocation_and_restora
         capture(j, folder, "all-occurrences-withheld")
         result["revocation_oracle"] = {"original_status": denied_original.status, "event_status": denied_event.status, "export_count": len(empty_export.json())}
 
-        j.click("link", "جميع القضايا")
+        j.nav("القضايا")
         j.create_case()
         independent_case = j.case_id
         save_note(j, "Unrelated authorized review remains available while access to another receipt is withheld.")

@@ -37,7 +37,7 @@ def test_analyst_uses_the_current_source_after_import_recovery(app, language, sc
             j.login("analyst@socify.local")
         upload(j)
         assert observable(j)["enrichment"]["status"] == "not_configured"
-        manager.nav("مكتبة التحليل المحلي")
+        manager.nav("مكتبة القواعد")
         source(manager, "malicious", "1")
         committed = []
 
@@ -51,7 +51,7 @@ def test_analyst_uses_the_current_source_after_import_recovery(app, language, sc
         manager.click("button", "حفظ", intel_area(manager))
         expect(intel_area(manager).get_by_role("alert").filter(visible=True)).to_be_visible()
         if scenario == "intel-recovery-colleague-source":
-            j.nav("مكتبة التحليل المحلي")
+            j.nav("مكتبة القواعد")
             source(j, "benign", "2")
             assert save(j).status == 201
             listed = j.page.locator("section.panel").filter(has=j.page.get_by_role("heading", name=j.text("إصدارات مصادر TI وGeoIP"), exact=True))
@@ -63,7 +63,7 @@ def test_analyst_uses_the_current_source_after_import_recovery(app, language, sc
         items = intel_items(manager)
         active = [item for item in items if item["active"]]
         assert len(active) == 1 and active[0]["version"] == ("2" if scenario == "intel-recovery-colleague-source" else "1")
-        j.nav("استخبارات التهديدات")
+        j.nav("المؤشرات")
         if scenario == "intel-recovery-colleague-source":
             j.page.locator(".case-selector-list").get_by_role("link").filter(has_text="Authorized maintenance investigation").click()
             j.settle()

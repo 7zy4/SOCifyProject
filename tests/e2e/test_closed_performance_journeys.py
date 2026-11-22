@@ -7,6 +7,7 @@ import pytest
 from playwright.sync_api import expect
 
 from socify.timeutils import iso_now, utc_now
+from tests.e2e.browser_helpers import account_menu
 from tests.e2e.test_batch_boundary_journeys import restrict_batch, upload_logs
 from tests.e2e.test_investigation_link_journeys import capture, choose, corrective_dialog, records, root_cause
 from tests.e2e.test_performance_goal_journeys import counter, delivery, period
@@ -38,7 +39,7 @@ def test_analyst_can_follow_closed_work_from_performance(app, database, language
         j.settle()
         assert j.state()["status"] == "closed"
         if scenario.endswith("corrective-followup"):
-            j.click("link", "الاستجابة والتصعيد")
+            j.click("link", "الاستجابة")
             card = j.page.locator(".record-card").filter(has_text="Review the identity approval procedure")
             j.click("button", "تعديل", card)
             dialog = j.page.get_by_role("dialog")
@@ -106,7 +107,7 @@ def test_completed_work_keeps_its_scope_and_recovery_path(app, database, languag
         subject = j
         if scenario.endswith("member-filter"):
             manager.login("manager@socify.local")
-            manager.nav("إدارة القضايا")
+            manager.nav("القضايا")
             manager.create_case()
             close_existing_case(database, manager, result)
             subject = manager
@@ -128,9 +129,7 @@ def test_completed_work_keeps_its_scope_and_recovery_path(app, database, languag
             assert parse_qs(urlsplit(j.page.url).query)["queue"] == ["closed"]
             metrics = j.page.locator(".performance-durations")
             measured = metrics.locator(".performance-duration-row").first.locator(".performance-sample")
-            assert measured.inner_text().translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")) == (
-                "حالات قابلة للحساب 0 من 1" if language == "ar" else "Cases measured 0 of 1"
-            )
+            assert measured.inner_text().translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")) == ("0 من 1" if language == "ar" else "0 of 1")
         elif scenario.endswith("member-filter"):
             assert counter(manager, "أغلقت خلال الفترة") == 2
             analyst_name = j.page.evaluate("state.user.name")
@@ -149,7 +148,7 @@ def test_completed_work_keeps_its_scope_and_recovery_path(app, database, languag
             expect(queue.locator("tbody tr")).to_have_count(5)
             expect(queue.locator(f"a[href='/cases/{j.case_id}']")).to_be_visible()
             if scenario.endswith("language-reload"):
-                j.page.locator("[data-language-toggle]").click()
+                account_menu(j.page).locator("[data-language-toggle]").click()
                 j.settle()
                 j.page.reload()
                 j.settle()

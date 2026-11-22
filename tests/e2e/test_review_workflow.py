@@ -30,6 +30,8 @@ ANSWERS = {
     "urgency_level": "informational_p4",
 }
 ARTIFACTS = Path("artifacts/review-journeys")
+# Case page tabs; «السجلات» is also the sidebar link to log management.
+CASE_TABS = {"الملخص", "السجلات", "التحليل", "التحقيق", "الاستجابة", "النشاط"}
 
 
 class ReviewJourney:
@@ -66,6 +68,8 @@ class ReviewJourney:
 
     def click(self, role, name, within=None):
         self.steps.append({"action": "activate", "label": name})
+        if within is None and role == "link" and name in CASE_TABS and re.search(r"/cases/\d+", self.page.url):
+            within = self.page.locator(".case-tabs")
         (within or self.page).get_by_role(role, name=self.text(name), exact=True).click()
         self.settle()
 
@@ -105,8 +109,10 @@ class ReviewJourney:
         self.click("button", "اعتماد قرار المدير")
 
     def transition(self, target):
-        self.click("link", "الملخص والمسؤوليات")
+        self.click("link", "الملخص")
         section = self.page.locator("section.panel").filter(has=self.page.get_by_role("heading", name=self.text("حالة القضية"), exact=True))
+        if section.locator("details").get_attribute("open") is None:
+            section.locator("summary").click()
         label = self.page.evaluate("value => autopsyLabel(value)", target)
         section.locator("input[name=status]").fill(label)
         section.locator("[name=reason]").fill("Evidence reviewed; documented case lifecycle decision")
@@ -258,7 +264,7 @@ def test_complete_review_closes_alert_and_reopening_preserves_report(app, langua
     download_pdf = "تنزيل PDF" if language == "ar" else "Download PDF"
     scenario = "closure-native-required-procedure" if required_procedure else "complete-case-closure"
     with local_worker_services(app.config), review_session(app, language, scenario) as (analyst, manager, result):
-        analyst.click("link", "السجلات والأدلة")
+        analyst.click("link", "السجلات")
         content = [
             {
                 "title": "Scheduled maintenance",
@@ -273,7 +279,7 @@ def test_complete_review_closes_alert_and_reopening_preserves_report(app, langua
         analyst.click("button", "استيراد وفحص فوري")
         analyst.page.get_by_role("link", name=analyst.text("مراجعة التنبيهات"), exact=True).wait_for()
         analyst.assessment("Service owner confirmed approved maintenance; no compromise established.")
-        analyst.click("link", "التحقيق والخط الزمني")
+        analyst.click("link", "التحقيق")
         analyst.record(
             "root_cause",
             {
@@ -282,7 +288,7 @@ def test_complete_review_closes_alert_and_reopening_preserves_report(app, langua
                 "evidence_id": "maintenance.json",
             },
         )
-        analyst.click("link", "الاستجابة والتصعيد")
+        analyst.click("link", "الاستجابة")
         analyst.record(
             "response",
             {
@@ -300,7 +306,7 @@ def test_complete_review_closes_alert_and_reopening_preserves_report(app, langua
             manager.case_url = analyst.case_url
             publish(manager, required=True, approval=True)
             attach(manager)
-            analyst.click("link", "الاستجابة والتصعيد")
+            analyst.click("link", "الاستجابة")
             analyst.click("button", "تحديث الخطوة")
             dialog = analyst.page.get_by_role("dialog")
             set_status(analyst, dialog, "completed", "Retained maintenance evidence confirms the approved activity")
@@ -309,7 +315,7 @@ def test_complete_review_closes_alert_and_reopening_preserves_report(app, langua
             analyst.click("button", "حفظ", dialog)
             assert procedure(analyst)["payload"]["steps"][0]["status"] == "awaiting_approval"
             requirements(manager, True)
-            manager.click("link", "الاستجابة والتصعيد")
+            manager.click("link", "الاستجابة")
             manager.click("button", "تحديث الخطوة")
             dialog = manager.page.get_by_role("dialog")
             set_status(manager, dialog, "completed", "Independent reviewer confirmed the retained approval")
@@ -333,7 +339,7 @@ def test_complete_review_closes_alert_and_reopening_preserves_report(app, langua
             open_manager_review(manager)
         manager.click("button", "مراجعة واعتماد النسخة")
         manager.click("button", "حفظ", manager.page.get_by_role("dialog"))
-        expect(manager.page.locator(".report-status")).to_have_text(manager.text("معتمد") + " · " + manager.text("جاهز للتنزيل"))
+        expect(manager.page.locator(".report-status")).to_have_text(manager.text("معتمد") + " | " + manager.text("جاهز للتنزيل"))
         with manager.page.expect_download() as download:
             manager.page.get_by_role("link", name=download_pdf, exact=True).click()
         report_bytes = Path(download.value.path()).read_bytes()
@@ -347,10 +353,10 @@ def test_complete_review_closes_alert_and_reopening_preserves_report(app, langua
         analyst.settle()
         expect(analyst.page.locator("select[name=triage_verdict]")).to_be_disabled()
         assert not analyst.page.get_by_role("button", name=analyst.text("حفظ إجابات التقرير"), exact=True).count()
-        manager.nav("المراقبة")
-        manager.page.get_by_role("link").filter(has_text=manager.text("التنبيهات المغلقة")).click()
+        manager.nav("التنبيهات")
+        manager.page.get_by_role("link").filter(has_text=manager.text("مغلقة")).click()
         manager.settle()
-        manager.page.get_by_label(manager.text("بحث التنبيهات"), exact=True).fill(closed["reference"])
+        manager.page.get_by_label(manager.text("بحث"), exact=True).fill(closed["reference"])
         manager.click("button", "تطبيق")
         expect(manager.page.locator("[data-alert-row]")).to_have_count(1)
         manager.page.locator("[data-alert-toggle]").click()
@@ -358,10 +364,10 @@ def test_complete_review_closes_alert_and_reopening_preserves_report(app, langua
         expect(manager.page.locator(".dossier-view")).to_contain_text("APP-SRV01")
         capture = f"{scenario}-closed-alert-{language}" if required_procedure else f"closed-alert-{language}"
         manager.page.screenshot(path=str(ARTIFACTS / f"{capture}.png"), full_page=True)
-        manager.nav("إدارة القضايا")
+        manager.nav("القضايا")
         manager.page.get_by_label(manager.text("بحث"), exact=True).fill(closed["reference"])
         manager.click("button", "بحث")
-        manager.click("link", "فتح القضية")
+        manager.click("link", "فتح")
         manager.transition("reopened")
         assert manager.state()["status"] == "reopened" and manager.state()["closed_at"] is None
         manager.click("link", "التقارير والمراجعة")

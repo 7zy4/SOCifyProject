@@ -137,14 +137,14 @@ def test_network_bounds_fail_explicitly(autopsy_case, client, database, monkeypa
     upload(client, autopsy_case, [zeek(i) for i in range(3)])
     monkeypatch.setattr("socify.network_insights.MAX_NETWORK_EVENTS", 2)
     assert client.get(f"/api/cases/{autopsy_case}/network-insights").status_code == 422
-    with pytest.raises(ValueError, match="٢٠٠٠٠"):
+    with pytest.raises(ValueError, match="20000"):
         network_snapshot(database, autopsy_case, 1)
 
 
 def test_full_report_limits_endpoint_results(autopsy_case, client, database, monkeypatch):
     upload(client, autopsy_case, [osquery()])
     monkeypatch.setattr("socify.network_insights.network_snapshot", lambda *args: {"event_count": 1, "items": [{}] * 2001})
-    with pytest.raises(ValueError, match="٢٠٠٠"):
+    with pytest.raises(ValueError, match="2000"):
         telemetry_report(database, autopsy_case, 1)
 
 

@@ -84,7 +84,7 @@ def test_pending_evidence_handoff_keeps_reasoning_and_source_limits(app, monkeyp
         dialog.locator("textarea[name=objective]").fill("Review authentication evidence and prepare a bounded handoff without assuming compromise.")
         j.click("button", "حفظ", dialog)
         j.case_id = int(urlsplit(j.page.url).path.split("/")[-1])
-        j.click("link", "السجلات والأدلة")
+        j.click("link", "السجلات")
         j.page.locator("input[name=file]").set_input_files({"name": "vpn-auth.jsonl", "mimeType": "application/x-ndjson", "buffer": vpn_events()})
         j.click("button", "استيراد وفحص فوري")
         expect(j.page.get_by_role("cell", name="VPN authentication accepted", exact=True)).to_be_visible()
@@ -97,9 +97,9 @@ def test_pending_evidence_handoff_keeps_reasoning_and_source_limits(app, monkeyp
         j.click("button", "حفظ", dialog)
         if dialog.is_visible():
             j.click("button", "إغلاق", dialog)
-        j.click("link", "التحقيق والخط الزمني")
+        j.click("link", "التحقيق")
         row = j.page.locator("li").filter(has=j.page.get_by_role("heading", name="VPN authentication accepted", exact=True))
-        j.click("button", "تمييز السجل وإضافة ملاحظة", row)
+        j.click("button", "ملاحظة", row)
         dialog = j.page.get_by_role("dialog")
         dialog.locator("input[name=title]").fill("Accepted authentication needs validation")
         dialog.locator("textarea[name=notes]").fill(BOOKMARK)
@@ -127,8 +127,8 @@ def test_pending_evidence_handoff_keeps_reasoning_and_source_limits(app, monkeyp
             "ar": ["لم يتحدد التصنيف بعد", "غير محدد بانتظار أدلة إضافية", "لم يُنفذ احتواء بانتظار الأدلة", "جمع الأدلة والتحقق منها قبل اتخاذ قرار الاستجابة"],
             "en": [
                 "Classification Pending Evidence",
-                "Undetermined — Awaiting Evidence",
-                "No Containment Performed — Awaiting Evidence",
+                "Undetermined - Awaiting Evidence",
+                "No Containment Performed - Awaiting Evidence",
                 "Collect and Validate Evidence Before Response",
             ],
         }

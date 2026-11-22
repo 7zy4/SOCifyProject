@@ -17,7 +17,7 @@ def assign(journey, person, *, typed_case=False, instructions="Review the retain
     form = journey.page.locator("form").filter(has=journey.page.locator("[name=instructions]"))
     case = form.locator("input[name=case_id]")
     if typed_case:
-        case.fill(journey.state()["reference"] + " · " + journey.state()["title"])
+        case.fill(journey.state()["reference"] + " | " + journey.state()["title"])
         case.press("Tab")
     else:
         case.press("ArrowDown")

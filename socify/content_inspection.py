@@ -258,7 +258,7 @@ def inspection_snapshot(connection, case_id, workspace_id):
         (case_id, workspace_id, ENGINE),
     ).fetchall()
     if len(rows) > 2000:
-        raise ValidationError("تجاوز فحص المحتوى حد التقرير: ٢٠٠٠ سجل")
+        raise ValidationError("تجاوز فحص المحتوى حد التقرير: 2000 سجل")
     results = []
     size = 0
     for row in rows:

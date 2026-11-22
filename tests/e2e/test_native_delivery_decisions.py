@@ -167,7 +167,7 @@ def finish(result, blocked=None):
 
 
 def upload(j, events, filename="delivery-evidence.json"):
-    j.click("link", "السجلات والأدلة")
+    j.click("link", "السجلات")
     content = json.dumps(events).encode()
     j.page.locator("input[name=file]").set_input_files({"name": filename, "mimeType": "application/json", "buffer": content})
     j.click("button", "استيراد وفحص فوري")
@@ -196,10 +196,10 @@ def assessment(j, note, vector="ctf_or_offline_log_pack", impact_scope="no_compr
 
 def complete_investigation(j, note, *, response=True, vector="ctf_or_offline_log_pack", evidence="", impact_scope="no_compromise_blocked"):
     assessment(j, note, vector, impact_scope)
-    j.click("link", "التحقيق والخط الزمني")
+    j.click("link", "التحقيق")
     j.record("root_cause", {"category": "other", "conclusion": note, "evidence_id": evidence})
     if response:
-        j.click("link", "الاستجابة والتصعيد")
+        j.click("link", "الاستجابة")
         j.record("response", {"title": "Validate scoped retained activity", "phase": "validation", "status": "not_applicable", "details": note})
     j.transition("awaiting_review")
     while j.page.get_by_role("button", name=j.text("إكمال المهمة"), exact=True).count():
@@ -209,7 +209,7 @@ def complete_investigation(j, note, *, response=True, vector="ctf_or_offline_log
 
 
 def milestone(j, phase, at):
-    j.click("link", "الاستجابة والتصعيد")
+    j.click("link", "الاستجابة")
     dialog = record_dialog(j, "response")
     dialog.locator("input[name=title]").fill(f"Gateway {phase}")
     for field, value in (("phase", phase), ("status", "succeeded")):
@@ -389,7 +389,7 @@ def assert_report_unchanged(j, path, prior):
 
 
 def pull(j, expected_status=200):
-    j.click("link", "السجلات والأدلة")
+    j.click("link", "السجلات")
     with j.page.expect_response(lambda response: response.url.endswith("/pull") and response.request.method == "POST") as pending:
         j.click("button", "سحب السجلات الآن", source_row(j))
     response = pending.value
@@ -398,7 +398,7 @@ def pull(j, expected_status=200):
 
 
 def endpoint(j, url):
-    j.click("link", "السجلات والأدلة")
+    j.click("link", "السجلات")
     j.click("button", "تعديل المصدر", source_actions(j))
     dialog = j.page.get_by_role("dialog")
     dialog.locator("input[name=endpoint]").fill(url)
@@ -406,7 +406,7 @@ def endpoint(j, url):
 
 
 def inspect_alert(j, expected):
-    j.nav("المراقبة")
+    j.nav("التنبيهات")
     row = j.page.locator(".monitoring-table > tbody > tr").filter(has=j.page.locator(f"a.case-link[href='/cases/{j.case_id}']")).first
     row.locator("[data-alert-toggle]").click()
     j.settle()
@@ -416,7 +416,7 @@ def inspect_alert(j, expected):
 
 
 def inspect_authorization(j, record):
-    j.click("link", "السجلات والأدلة")
+    j.click("link", "السجلات")
     row = j.page.get_by_role("row").filter(has=j.page.get_by_role("cell", name=record["title"], exact=True))
     j.click("button", "تفاصيل السجل", row)
     dialog = j.page.get_by_role("dialog")
@@ -503,7 +503,7 @@ def test_export_preserves_measured_zero_and_absent_response(app, language):
         assert before["payload"]["metrics"]["containment_delay_seconds"] is None
         assert before["payload"]["imports"][0]["sha256"] == digest
         manager_context(j, manager)
-        manager.click("link", "الاستجابة والتصعيد")
+        manager.click("link", "الاستجابة")
         manager.page.locator(".response-metrics summary").click()
         expect(manager.page.locator("[data-response-duration=acknowledgement_delay_seconds]")).to_have_text(
             manager.page.evaluate("new Intl.NumberFormat(SOCifyLocale.language).format(0)")
@@ -676,7 +676,7 @@ def test_public_source_reaches_native_delivery_and_performance(app, monkeypatch,
             "scope": "Actual public read-only HTTPS fixture; no real SIEM credentials, pagination or operational vendor guarantee.",
         }
         manager_context(j, manager)
-        manager.click("link", "الاستجابة والتصعيد")
+        manager.click("link", "الاستجابة")
         form = panel(manager, "SLA وجمع الأدلة ومراجعة ما بعد الحادثة").locator("form").filter(has=manager.page.locator("input[name=minutes]"))
         form.locator("input[name=minutes]").fill("120")
         form.locator("input[name=reason]").fill("Two-hour continuous review target agreed for this isolated retained evidence case.")
