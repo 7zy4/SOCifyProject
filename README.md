@@ -8,11 +8,15 @@
 </p>
 
 <p align="center">
-  <img alt="App: Python and Flask" src="https://img.shields.io/badge/app-Python%20%7C%20Flask-2E2E31">
-  <img alt="Database: SQLite" src="https://img.shields.io/badge/database-SQLite-2E2E31">
-  <img alt="Deploy: Docker, Gunicorn and NGINX" src="https://img.shields.io/badge/deploy-Docker%20%7C%20Gunicorn%20%7C%20NGINX-2E2E31">
-  <img alt="Reports: WeasyPrint and python-docx" src="https://img.shields.io/badge/reports-WeasyPrint%20%7C%20python--docx-2E2E31">
-  <img alt="File scanning: YARA" src="https://img.shields.io/badge/file%20scanning-YARA-2E2E31">
+  <a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white"></a>
+  <a href="https://flask.palletsprojects.com/"><img alt="Flask" src="https://img.shields.io/badge/Flask-3BABC3?logo=flask&logoColor=white"></a>
+  <a href="https://www.sqlite.org/"><img alt="SQLite" src="https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white"></a>
+  <a href="https://www.docker.com/"><img alt="Docker" src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white"></a>
+  <a href="https://gunicorn.org/"><img alt="Gunicorn" src="https://img.shields.io/badge/Gunicorn-499848?logo=gunicorn&logoColor=white"></a>
+  <a href="https://nginx.org/"><img alt="NGINX" src="https://img.shields.io/badge/NGINX-009639?logo=nginx&logoColor=white"></a>
+  <a href="https://weasyprint.org/"><img alt="WeasyPrint" src="https://img.shields.io/badge/WeasyPrint-2E2E31"></a>
+  <a href="https://python-docx.readthedocs.io/"><img alt="python-docx" src="https://img.shields.io/badge/python--docx-2E2E31"></a>
+  <a href="https://virustotal.github.io/yara/"><img alt="YARA" src="https://img.shields.io/badge/YARA-2E2E31"></a>
 </p>
 
 <p align="center"><em>Case-centred incident investigation for SOC teams: from raw logs to an approved report. Arabic and English interface, self-hosted with Docker.</em></p>
@@ -139,6 +143,17 @@ docker compose exec socify python -m scripts.bootstrap_team --email you@example.
 | بيئة تجربة خاصة في GitHub | [Codespaces](docs/codespaces.md) |
 | معالجة مشكلة | [استكشاف الأعطال](docs/troubleshooting.md) |
 | الربط مع أنظمة أخرى | [مواصفات API](docs/api/openapi.yaml) |
+
+## التقنيات
+
+| التقنية | الاستخدام |
+|---|---|
+| [Python](https://www.python.org/) و[Flask](https://flask.palletsprojects.com/) | التطبيق وواجهات التكامل |
+| [SQLite](https://www.sqlite.org/) | البيانات والمعاملات والبحث النصي FTS5 |
+| [Docker](https://www.docker.com/) | عزل الخدمات والتحليل |
+| [Gunicorn](https://gunicorn.org/) و[NGINX](https://nginx.org/) | تشغيل التطبيق ومدخل النشر |
+| [WeasyPrint](https://weasyprint.org/) و[python-docx](https://python-docx.readthedocs.io/) | إخراج التقارير |
+| [YARA](https://virustotal.github.io/yara/) | مطابقة قواعد فحص الملفات محليًا |
 
 ## هيكل المشروع
 
