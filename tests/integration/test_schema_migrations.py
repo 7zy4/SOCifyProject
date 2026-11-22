@@ -3,6 +3,7 @@
 import gzip
 import multiprocessing
 import sqlite3
+import threading
 from pathlib import Path
 
 import pytest
@@ -113,6 +114,21 @@ def test_failed_step_leaves_no_partial_schema_and_no_version_change(tmp_path, mo
     connection.close()
     monkeypatch.setattr(migrations, "MIGRATIONS", MIGRATIONS)
     assert _migrate(path) == NEWEST
+
+
+def test_opening_a_new_database_waits_while_another_connection_writes(tmp_path):
+    path = tmp_path / "fresh.db"
+    writer = sqlite3.connect(path, isolation_level=None, check_same_thread=False)
+    writer.execute("BEGIN IMMEDIATE")
+    release = threading.Timer(0.3, writer.execute, ("COMMIT",))
+    release.start()
+    try:
+        connection = connect_path(str(path))
+        assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+        connection.close()
+    finally:
+        release.join()
+        writer.close()
 
 
 def _start(path, barrier, results):

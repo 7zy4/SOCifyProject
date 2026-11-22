@@ -1,4 +1,5 @@
 import sqlite3
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -19,11 +20,30 @@ def connect_path(path: str, testing: bool = False) -> sqlite3.Connection:
     connection.create_function("socify_case_title", 2, localized_case_title)
     connection.execute("PRAGMA foreign_keys = ON")
     connection.execute("PRAGMA busy_timeout = 15000")
-    connection.execute("PRAGMA journal_mode = WAL")
+    _use_write_ahead_log(connection)
     connection.execute("PRAGMA synchronous = NORMAL")
     connection.execute("PRAGMA temp_store = MEMORY")
     connection.execute("PRAGMA mmap_size = 67108864")
     return connection
+
+
+def _use_write_ahead_log(connection: sqlite3.Connection, wait: float = 15.0) -> None:
+    """Switch to WAL, waiting while another connection writes.
+
+    On a new database file the switch writes the file header from inside a read transaction, and SQLite reports
+    a busy database at once there instead of calling the busy handler, so processes starting together retry here.
+    """
+    deadline = time.monotonic() + wait
+    pause = 0.01
+    while True:
+        try:
+            connection.execute("PRAGMA journal_mode = WAL")
+            return
+        except sqlite3.OperationalError as error:
+            if not database_is_busy(error) or time.monotonic() >= deadline:
+                raise
+        time.sleep(pause)
+        pause = min(pause * 2, 0.2)
 
 
 def connect_readonly(path: str) -> sqlite3.Connection:
