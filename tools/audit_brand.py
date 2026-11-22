@@ -111,7 +111,7 @@ def audit_pages(output: Path) -> list[dict]:
                 page.get_by_role("button", name="بدء التحقيق", exact=True).click()
                 page.wait_for_url(f"**/cases/{case_id}")
                 sections = [
-                    "dashboard",
+                    "performance",
                     "monitoring",
                     "log-management",
                     "cases",
