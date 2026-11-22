@@ -28,6 +28,7 @@ def test_popup_tab_keeps_the_case_draft_and_keyboard_path(app, language):
         dialog = page.get_by_role("dialog")
         title = dialog.locator("input[name=title]")
         title.fill("Keyboard navigation investigation")
+        dialog.locator("input[name=title_en]").fill("Keyboard navigation investigation")
         reason = dialog.locator("input[name=reason]")
         original = reason.input_value()
         reason.focus()

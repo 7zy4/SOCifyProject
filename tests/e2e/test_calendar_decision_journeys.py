@@ -74,7 +74,8 @@ def context(j, case_id):
 
 def setup_case(j, database, title, created, *, existing=None, closed=None, calendar=None, budget=60, paused=None, cause=None, events=None):
     identifier = existing or j.page.evaluate("title => api('/api/cases',{method:'POST',body:{title}})", title)["id"]
-    database.execute("UPDATE incident_cases SET title=?,created_at=? WHERE id=?", (title, stamp(created), identifier))
+    # Rename both stored names: the English interface shows title_en when the case has one.
+    database.execute("UPDATE incident_cases SET title=?,title_en=?,created_at=? WHERE id=?", (title, title, stamp(created), identifier))
     if calendar:
         j.page.evaluate(
             """async ({id,calendar,budget}) => {
