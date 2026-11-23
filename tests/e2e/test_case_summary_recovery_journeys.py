@@ -1,5 +1,7 @@
 """Finish one case action while keeping another investigation draft usable."""
 
+import time
+
 import pytest
 from playwright.sync_api import expect
 
@@ -190,7 +192,11 @@ def test_independent_case_work_survives_refresh_review_and_recovery(app, languag
             section.get_by_role("button", name=manager.text("حفظ"), exact=True).click()
             expect(section.locator("[name=objective]")).to_be_disabled()
             action = member_form(manager, person)
-            assert held["response"].status == 200
+            # The route handler fetches the real response in the background; wait for it before releasing it.
+            deadline = time.monotonic() + 10
+            while "response" not in held and time.monotonic() < deadline:
+                manager.page.wait_for_timeout(25)
+            assert "response" in held and held["response"].status == 200
             held["route"].fulfill(response=held["response"])
             manager.settle()
             manager.page.unroute(f"**/api/cases/{j.case_id}/context", hold)

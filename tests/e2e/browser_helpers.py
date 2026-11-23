@@ -34,6 +34,13 @@ def new_page(browser, **kwargs):
 
 
 def assert_accessible(page) -> None:
+    # Check the settled interface: a menu still fading in reads as low contrast to axe, never to a reader.
+    # Endless animations such as spinners are left running.
+    page.evaluate(
+        """() => Promise.all(document.getAnimations()
+            .filter(animation => animation.playState === "running" && animation.effect?.getComputedTiming().endTime !== Infinity)
+            .map(animation => animation.finished.catch(() => null)))"""
+    )
     results = page.evaluate("async () => await axe.run(document, {resultTypes: ['violations']})")
     violations = [item for item in results["violations"] if item["impact"] in {"serious", "critical"}]
     assert not violations, [(item["id"], item["impact"], [node["target"] for node in item["nodes"]]) for item in violations]
