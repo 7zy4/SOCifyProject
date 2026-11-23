@@ -1,8 +1,10 @@
 import hashlib
+import os
 import secrets
 import shutil
 import sqlite3
 import sys
+import zlib
 from collections.abc import Callable, Iterator
 from datetime import timedelta
 from pathlib import Path
@@ -22,6 +24,25 @@ DEMO_LOGIN_VALUE = "Demo-Safe-Password-2026!"
 
 # The isolation, POSIX permission and native rendering contracts are verified on Linux, where the product runs.
 linux_only = pytest.mark.skipif(sys.platform != "linux", reason="requires Linux isolation, POSIX file permissions or native rendering libraries")
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """With SOCIFY_TEST_SHARD=<index>/<total>, run one share of the tests so CI can spread the browser suite.
+
+    A stable hash of each test's id picks its shard, so every test runs in exactly one shard on every machine.
+    """
+    shard = os.environ.get("SOCIFY_TEST_SHARD")
+    if not shard:
+        return
+    index, total = (int(part) for part in shard.split("/"))
+    if not 1 <= index <= total:
+        raise pytest.UsageError(f"SOCIFY_TEST_SHARD must be <index>/<total> with 1 <= index <= total, not {shard}")
+    kept, other = [], []
+    for item in items:
+        (kept if zlib.crc32(item.nodeid.encode()) % total == index - 1 else other).append(item)
+    if other:
+        config.hook.pytest_deselected(items=other)
+        items[:] = kept
 
 
 def issue_session(app: Flask, user_id: int, workspace_id: int = 1) -> str:

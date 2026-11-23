@@ -97,8 +97,14 @@ jobs:
             sbom.json
             licenses.json
   browser:
+    name: browser (${{ matrix.shard }}/8)
     # Playwright 1.55 supports this image; ubuntu-latest has moved to 26.04.
     runs-on: ubuntu-24.04
+    # The suite takes over three hours in one job; eight shards finish in about half an hour (tests/conftest.py).
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
@@ -112,15 +118,18 @@ jobs:
       - run: npm install --no-save --ignore-scripts axe-core@4.14.0
       - uses: ./.github/actions/analysis-backend
       - run: xvfb-run --auto-servernum --server-args="-screen 0 1600x1200x24" python -m pytest -m e2e tests/e2e --junitxml=artifacts/browser-junit.xml
+        env:
+          SOCIFY_TEST_SHARD: ${{ matrix.shard }}/8
       - name: Audit operational pages in both languages, editions and viewport sizes
+        if: matrix.shard == 1
         run: python -m tools.audit_brand
       - name: Publish browser failure details in the job summary
         if: always()
-        run: python -m tools.junit_summary artifacts/browser-junit.xml "Browser acceptance"
+        run: python -m tools.junit_summary artifacts/browser-junit.xml "Browser acceptance ${{ matrix.shard }}/8"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: always()
         with:
-          name: browser-results
+          name: browser-results-${{ matrix.shard }}
           path: |
             artifacts/browser-junit.xml
             artifacts/brand/
