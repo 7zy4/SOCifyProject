@@ -2,7 +2,7 @@
 
 ## Internal deployment ingress
 
-The optional container ingress uses the Debian security-maintained NGINX package under its upstream BSD-style terms. Source and license: `https://nginx.org/LICENSE`. The ingress proxies only to the fixed internal SOCify service, has no database or encryption-key mount, and does not run investigative processing. It must be deployed inside the organization with the organization's inbound TLS and outbound firewall policy.
+The container ingress, the entry point Docker Compose publishes on loopback, uses the Debian security-maintained NGINX package under its upstream BSD-style terms. Source and license: `https://nginx.org/LICENSE`. The ingress proxies only to the fixed internal SOCify service, has no database or encryption-key mount, and does not run investigative processing. It must be deployed inside the organization with the organization's inbound TLS and outbound firewall policy.
 
 ## MITRE ATT&CK
 

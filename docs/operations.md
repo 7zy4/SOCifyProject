@@ -58,9 +58,9 @@ docker compose exec socify python -m scripts.bootstrap_team --email owner@exampl
 | `SOCIFY_ANALYSIS_SOCKET` | مسار مقبس خدمة التحليل |
 | `SOCIFY_SOURCE_ALLOWLIST` | أسماء مصادر HTTPS المصرح بها |
 | `SOCIFY_MAX_UPLOAD_BYTES` و`SOCIFY_MAX_IMPORT_ROWS` | حدود الرفع والصفوف؛ الافتراضي 10 MiB و100000 صف |
-| `SOCIFY_MAX_PENDING_IMPORT_JOBS` | حد طابور الاستيراد |
-| `SOCIFY_REQUIRE_CASE_APPROVAL` | اعتماد القضية عند تفعيل سياسة المؤسسة |
-| `SOCIFY_REQUIRE_INVESTIGATION_SELECTION` | قصر مساحة العمل على اختيار تحقيق محدد |
+| `SOCIFY_MAX_PENDING_IMPORT_JOBS` | حد طابور الاستيراد؛ الافتراضي 100 مهمة منتظرة |
+| `SOCIFY_REQUIRE_CASE_APPROVAL=1` | سياسة اختيارية، معطّلة افتراضيًا: تبدأ القضية الجديدة بانتظار اعتماد المدير، وتبقى أدواتها مقفلة حتى يعتمدها |
+| `SOCIFY_REQUIRE_INVESTIGATION_SELECTION=1` | سياسة اختيارية، معطّلة افتراضيًا: لا تُفتح أدوات القضية إلا بعد اختيارها من صفحة القضايا |
 
 ## العمال المستقلون
 
