@@ -35,11 +35,15 @@ def new_page(browser, **kwargs):
 
 def assert_accessible(page) -> None:
     # Check the settled interface: a menu still fading in reads as low contrast to axe, never to a reader.
-    # Endless animations such as spinners are left running.
+    # Finish running animations at once instead of waiting: a page in a background window has its animations paused
+    # and would never get there. Endless animations such as spinners are left running.
     page.evaluate(
-        """() => Promise.all(document.getAnimations()
-            .filter(animation => animation.playState === "running" && animation.effect?.getComputedTiming().endTime !== Infinity)
-            .map(animation => animation.finished.catch(() => null)))"""
+        """() => {
+            for (const animation of document.getAnimations()) {
+                if (animation.playState !== "running" || animation.effect?.getComputedTiming().endTime === Infinity) continue;
+                try { animation.finish(); } catch (_) { /* An animation that cannot jump to its end is left as it is. */ }
+            }
+        }"""
     )
     results = page.evaluate("async () => await axe.run(document, {resultTypes: ['violations']})")
     violations = [item for item in results["violations"] if item["impact"] in {"serious", "critical"}]
