@@ -1,10 +1,13 @@
 <h1 align="center"><img src="docs/assets/brand-lockup.svg" width="308" alt="SOCify"></h1>
 
 <p align="center">
-  <a href="https://github.com/7zy4/SOCifyProject/actions/workflows/enterprise-quality.yml"><img alt="Quality gates" src="https://github.com/7zy4/SOCifyProject/actions/workflows/enterprise-quality.yml/badge.svg?branch=final"></a>
-  <a href="CHANGELOG.md"><img alt="Version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-1E3A8A"></a>
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2E2E31"></a>
-  <img alt="Interface: Arabic and English" src="https://img.shields.io/badge/interface-Arabic%20%7C%20English-2E2E31">
+  <a href="https://github.com/7zy4/SOCifyProject/actions/workflows/enterprise-quality.yml"><img alt="Quality gates" src="https://img.shields.io/github/actions/workflow/status/7zy4/SOCifyProject/enterprise-quality.yml?branch=final&label=quality%20gates&logo=githubactions&logoColor=white"></a>
+  <a href="https://github.com/7zy4/SOCifyProject/security/code-scanning"><img alt="CodeQL" src="https://img.shields.io/github/actions/workflow/status/7zy4/SOCifyProject/github-code-scanning%2Fcodeql?branch=final&label=CodeQL&logo=github&logoColor=white"></a>
+  <a href="https://github.com/7zy4/SOCifyProject/commits/final"><img alt="Last commit" src="https://img.shields.io/github/last-commit/7zy4/SOCifyProject/final?label=last%20commit&logo=git&logoColor=white"></a>
+  <a href="CHANGELOG.md"><img alt="Version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-1E3A8A?logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0iI2ZmZiIgZmlsbC1ydWxlPSJldmVub2RkIiBkPSJNMyAzaDguNkwyMSAxMi40IDEyLjQgMjEgMyAxMS42ek03LjUgOS4yYTIuMiAyLjIgMCAxIDAgMC00LjQgMi4yIDIuMiAwIDAgMCAwIDQuNHoiLz48L3N2Zz4="></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-1E3A8A?logo=opensourceinitiative&logoColor=white"></a>
+  <a href="https://docs.python.org/3.12/"><img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-1E3A8A?logo=python&logoColor=white"></a>
+  <img alt="Interface: Arabic and English" src="https://img.shields.io/badge/interface-Arabic%20%7C%20English-1E3A8A?logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjkiLz48cGF0aCBkPSJNMyAxMmgxOE0xMiAzYzIuNCAyLjUgMy42IDUuNSAzLjYgOXMtMS4yIDYuNS0zLjYgOWMtMi40LTIuNS0zLjYtNS41LTMuNi05UzkuNiA1LjUgMTIgM3oiLz48L3N2Zz4=">
 </p>
 
 <p align="center">
