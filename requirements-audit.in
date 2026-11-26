@@ -1,6 +1,6 @@
 # Supply-chain evidence tools, installed by the security job in an environment of their own.
 # They stay out of requirements-dev.txt because pip-audit needs cyclonedx-python-lib<10, while lxml 6.1, which
 # fixes CVE-2026-41066 (XXE through iterparse), needs cyclonedx-python-lib 11 or later.
-cyclonedx-bom==7.5.0
+cyclonedx-bom==9.0.0
 cyclonedx-python-lib>=11
 lxml>=6.1.0
