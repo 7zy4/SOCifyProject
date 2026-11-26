@@ -176,6 +176,16 @@ details > summary:hover { color: var(--text); }
 .panel-body { padding: 16px 20px 20px; min-width: 0; }
 /* One vertical rhythm inside panels; any rule that sets its own margin still wins (zero specificity). */
 .panel-body > :where(* + *) { margin-block-start: 12px; }
+.onboarding-panel progress { appearance: none; display: block; inline-size: 100%; block-size: 4px; border: 0; border-radius: var(--radius-tag); background: var(--line); overflow: hidden; }
+.onboarding-panel progress::-webkit-progress-bar { background: var(--line); }
+.onboarding-panel progress::-webkit-progress-value { background: var(--accent-primary); }
+.onboarding-panel progress::-moz-progress-bar { background: var(--accent-primary); }
+.onboarding-state { inline-size: 72px; justify-content: center; }
+.onboarding-steps { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.onboarding-steps li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-card); }
+.onboarding-steps li.done .onboarding-step strong { color: var(--muted); }
+.onboarding-step p { margin: 4px 0 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .onboarding-steps li { grid-template-columns: minmax(0, 1fr); } }
 /* Actions that follow a table, a list of records or an empty state never touch it. */
 :is(.table-wrap, table, .empty, .compact-empty, .record-grid) + :is(.action-row, .pagination, form, .button, button, nav) { margin-block-start: 12px; }
 :is(form, .filter-row, .action-row) + :is(.table-wrap, table, .record-grid, .empty, .compact-empty) { margin-block-start: 12px; }

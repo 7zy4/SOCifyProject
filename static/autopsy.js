@@ -418,9 +418,10 @@ async function autopsyCases(page = null, query = null) {
   begin("cases");
   document.getElementById("section-title").textContent = SOCifyLocale.text("القضايا");
   document.getElementById("section-kicker").textContent = "SOCify";
-  const [data, claimable] = await Promise.all([
+  const [data, claimable, onboarding] = await Promise.all([
     api(`/api/cases?page=${page}&page_size=25&q=${encodeURIComponent(query)}`),
-    permission("cases.update") ? api("/api/cases/claimable").catch(() => ({ items: [] })) : Promise.resolve({ items: [] })
+    permission("cases.update") ? api("/api/cases/claimable").catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
+    window.SOCifyOnboarding ? window.SOCifyOnboarding.panel() : Promise.resolve(null)
   ]);
   const search = node("input", { name: "q", type: "search", value: query, maxlength: 200, placeholder: SOCifyLocale.text("الاسم أو المرجع") });
   const filters = node("form", { class: "filter-row", "aria-label": SOCifyLocale.text("بحث القضايا") }, [field(SOCifyLocale.text("بحث"), search), node("button", { type: "submit", class: "button ghost", text: SOCifyLocale.text("بحث") })]);
@@ -431,7 +432,7 @@ async function autopsyCases(page = null, query = null) {
         button(SOCifyLocale.text("إيداع في طابور الفريق"), () => autopsyNewCase(true))
       ]
     : [];
-  const root = node("div", { class: "cases-view" }, [pageHead(SOCifyLocale.text("القضايا"), null, headActions), filters]);
+  const root = node("div", { class: "cases-view" }, [pageHead(SOCifyLocale.text("القضايا"), null, headActions), onboarding, filters]);
   if (claimable.items?.length) {
     root.append(panel(SOCifyLocale.text("قضايا متاحة لاستلام الملكية"), table([
       { label: SOCifyLocale.text("المرجع"), value: (row) => node("bdi", { class: "case-reference", text: row.reference }) },

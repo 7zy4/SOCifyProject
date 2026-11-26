@@ -894,12 +894,14 @@ def baseline_schema(connection: sqlite3.Connection) -> None:
     migrate(connection)
     from .autopsy_workspace import migrate as migrate_workspace
     from .builtin_rules import seed_builtin_rules
+    from .onboarding import migrate as migrate_onboarding
     from .quick_reports import migrate as migrate_quick_reports
     from .watchlist import migrate as migrate_watchlist
 
     migrate_workspace(connection)
     migrate_watchlist(connection)
     migrate_quick_reports(connection)
+    migrate_onboarding(connection)
     seed_builtin_rules(connection)
     protect_existing_recovery_codes(connection)
 

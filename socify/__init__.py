@@ -96,12 +96,14 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         teams_api,
     ):
         app.register_blueprint(blueprint)
+    from .onboarding import onboarding_api
     from .quick_reports import quick_reports_api
     from .sources import source_webhook_ingest
     from .watchlist import watchlist_api
 
     app.register_blueprint(watchlist_api)
     app.register_blueprint(quick_reports_api)
+    app.register_blueprint(onboarding_api)
     csrf.exempt(source_webhook_ingest)
 
     @app.before_request

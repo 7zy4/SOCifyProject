@@ -5201,6 +5201,95 @@
         "description": "Requires cases.read. Select one approved visible case or two approved visible cases with an explicit manager-created relationship. Selection is revalidated on every request; revoked membership or an invalid relationship clears the entire selection."
       }
     },
+    "/api/onboarding": {
+      "get": {
+        "operationId": "onboarding_onboarding_status_get__api_onboarding",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/onboarding/dismiss": {
+      "post": {
+        "operationId": "onboarding_dismiss_onboarding_post__api_onboarding_dismiss",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/onboarding/items/{item}": {
+      "put": {
+        "operationId": "onboarding_mark_onboarding_item_put__api_onboarding_items_item",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "item",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/profile/display-name": {
       "put": {
         "operationId": "auth_update_display_name_put__api_profile_display-name",
