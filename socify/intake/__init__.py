@@ -25,6 +25,7 @@ from ..audit import record_audit
 from ..db import get_db, inserted_id, transaction
 from ..security import current_user, decrypt_secret, encrypt_secret, error_response, has_permission, require_permission
 from ..timeutils import iso_now, parse_timestamp, utc_now
+from ..validation import ValidationError
 from . import elastic, generic, sentinel, splunk, wazuh
 from .common import SEVERITIES, text
 
@@ -259,8 +260,9 @@ def _store(integration: sqlite3.Row, item: dict[str, Any]) -> tuple[int, str]:
     window = _stamp(now - timedelta(seconds=int(current_app.config.get("INTAKE_GROUP_SECONDS", 3600))))
     existing = (
         get_db()
+        # Only an alert still waiting for triage absorbs repeats; after a dismissal or a case, a repeat is a new alert to look at.
         .execute(
-            "SELECT id FROM intake_alerts WHERE integration_id = ? AND dedup_key = ? AND last_seen >= ? ORDER BY id DESC LIMIT 1",
+            "SELECT id FROM intake_alerts WHERE integration_id = ? AND dedup_key = ? AND last_seen >= ? AND status IN ('new', 'triaging') ORDER BY id DESC LIMIT 1",
             (integration["id"], key, window),
         )
         .fetchone()
@@ -357,8 +359,23 @@ def _apply_auto_case(integration: sqlite3.Row, alert_ids: list[int]) -> None:
     for alert_id in alert_ids:
         row = get_db().execute("SELECT * FROM intake_alerts WHERE id = ?", (alert_id,)).fetchone()
         if _rank(row["severity"]) >= _rank(rules["min_severity"]):
-            with acting_as(int(actor["id"])):
-                create_case_from_alert(row, assignee=rules.get("assignee"))
+            # The alerts are already stored and acknowledged; a rule that cannot open a case leaves the alert in the queue.
+            try:
+                with acting_as(int(actor["id"])):
+                    created = create_case_from_alert(row, assignee=rules.get("assignee"))
+                failed = (created[1] if isinstance(created, tuple) else created.status_code) != 201
+            except (ValidationError, sqlite3.Error, ValueError):
+                failed = True
+            if failed:
+                record_audit(
+                    get_db(),
+                    "auto_case_failed",
+                    "intake_alert",
+                    alert_id,
+                    "failure",
+                    {"integration_id": integration["id"]},
+                    workspace=int(integration["workspace_id"]),
+                )
 
 
 class acting_as:  # noqa: N801 - used as a context manager like a function
@@ -543,8 +560,19 @@ def _attach(case_id: int, row: sqlite3.Row, *, detection: bool) -> int:
                     {"type": kind, "value": value, "classification": "observable", "source": f"intake:{row['integration_kind']}", "evidence_id": evidence_id},
                 )
             )
+        skipped = 0
         for kind, payload in records:
-            insert_record(case_id, kind, validate_record(case_id, kind, payload))
+            try:
+                validated = validate_record(case_id, kind, payload)
+            except ValidationError:
+                if kind == "response":
+                    raise
+                # One entity the case model refuses (an unusual host name, say) must not cost the analyst the whole case.
+                skipped += 1
+                continue
+            insert_record(case_id, kind, validated)
+        if skipped:
+            custody(case_id, "intake_entities_skipped", {"intake_alert_id": row["id"], "skipped": skipped})
     return evidence_id
 
 

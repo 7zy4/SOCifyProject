@@ -137,3 +137,12 @@ def test_backup_settings_defaults(monkeypatch):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("SOCIFY_DATABASE", "/data/socify.db")
     assert backup_settings() == BackupSettings(database="/data/socify.db", directory="/backups", interval_hours=24.0, keep=14, key=None)
+
+
+def test_a_staging_copy_left_by_a_killed_run_is_removed(settings, connection):
+    directory = Path(settings.directory)
+    directory.mkdir(parents=True)
+    for name in (".socify-20260101T000000Z.db.partial", ".socify-20260101T000000Z.db.partial-wal", "socify-20260101T000000Z.db.enc.partial"):
+        (directory / name).write_bytes(b"plaintext left behind")
+    assert backup_scheduler.run_once(connection, settings)
+    assert not [entry.name for entry in directory.iterdir() if "partial" in entry.name]

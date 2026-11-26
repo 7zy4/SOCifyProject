@@ -23,8 +23,8 @@ def record_audit(
     principal = getattr(g, "current_user", None) if has_request_context() else None
     via_token = getattr(g, "api_token_id", None) if has_request_context() else None
     # A bearer request has no browser session: its principal is the token's account (socify.api_tokens).
-    session_actor = principal["id"] if via_token is not None and principal else session.get("user_id") if has_request_context() else None
-    session_workspace = principal["workspace_id"] if via_token is not None and principal else session.get("workspace_id") if has_request_context() else None
+    session_actor = principal["id"] if principal else session.get("user_id") if has_request_context() else None
+    session_workspace = principal["workspace_id"] if principal else session.get("workspace_id") if has_request_context() else None
     actor_id = actor if actor is not None else session_actor
     workspace_id = workspace if workspace is not None else session_workspace
     if via_token is not None:

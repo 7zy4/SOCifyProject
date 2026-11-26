@@ -263,3 +263,45 @@ def test_outbox_views_when_delivery_is_off_and_invalid_messages(app, client, log
     app.config.update(EGRESS_ENABLED=True)
     with app.app_context(), pytest.raises(ValueError):
         enqueue(1, "webhook", "Not A Name!", {"event": "x"})
+
+
+def test_a_message_that_cannot_be_built_fails_alone_and_delivery_goes_on(app, outbox, settings, sent, monkeypatch):
+    with pytest.raises(ValueError, match="one line"):
+        validate_message("email", "a@b.example", {"subject": "Case\nBcc: x@evil.example", "text": "t"})
+    first = _queue(app)
+    second = _queue(app)
+    original = egress.send_webhook
+
+    def broken_once(settings, message, payload):
+        if message["id"] == first:
+            raise ValueError("Header values may not contain linefeed or carriage return characters")
+        return original(settings, message, payload)
+
+    monkeypatch.setattr(egress, "send_webhook", broken_once)
+    assert egress.deliver_one(outbox, settings) and egress.deliver_one(outbox, settings)
+    assert _message(outbox, first)["status"] == "failed" and "invalid message" in _message(outbox, first)["last_error"]
+    assert _message(outbox, second)["status"] == "sent"
+
+
+def test_a_resolver_outage_is_retried(app, outbox, settings, sent):
+    from socify.outbound import ResolutionError
+
+    _, answers = sent
+    answers.append(ResolutionError("تعذر حل اسم المضيف"))
+    message_id = _queue(app)
+    assert egress.deliver_one(outbox, settings)
+    row = _message(outbox, message_id)
+    assert row["status"] == "pending" and row["attempts"] == 1 and "ResolutionError" in row["last_error"]
+
+
+def test_the_relay_refuses_a_bad_content_length(settings, sent):
+    server = ThreadingHTTPServer(("127.0.0.1", 0), egress.relay_handler(settings))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        connection = socket.create_connection(("127.0.0.1", server.server_port), timeout=5)
+        connection.sendall(b"POST /relay HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer " + b"r" * 40 + b"\r\nContent-Length: abc\r\n\r\n")
+        answer = connection.recv(200)
+        connection.close()
+        assert answer.startswith(b"HTTP/1.0 413") or answer.startswith(b"HTTP/1.1 413")
+    finally:
+        server.shutdown()

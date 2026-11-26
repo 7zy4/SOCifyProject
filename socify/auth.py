@@ -6,6 +6,7 @@ import sqlite3
 import unicodedata
 from datetime import timedelta
 from typing import Any, TypeGuard
+from urllib.parse import unquote
 
 import bcrypt
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, session, url_for
@@ -379,7 +380,10 @@ def _login_response(data: dict[str, Any]):
 
 def safe_next_path(value: object) -> str:
     """A same-site page to return to after sign-in; anything else, including other sites and API paths, falls back to the case list."""
-    if not isinstance(value, str) or len(value) > 2048 or not re.fullmatch(r"/(?![/\\])[^\r\n\\]*", value):
+    # Only URL characters: browsers drop tabs and newlines, so "/<TAB>/evil.example" would turn into "//evil.example".
+    if not isinstance(value, str) or len(value) > 2048 or not re.fullmatch(r"/(?![/\\])[A-Za-z0-9\-._~!$&'()*+,;=:@%/?]*", value):
+        return "/cases"
+    if unquote(value).startswith(("//", "/\\")):
         return "/cases"
     path = value.rstrip("?")
     if path.split("?", 1)[0] in {"/login", "/logout", "/register"} or path.startswith("/api/"):

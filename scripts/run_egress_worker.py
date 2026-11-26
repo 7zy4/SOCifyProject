@@ -22,7 +22,7 @@ from email.message import EmailMessage
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from socify.config import EgressSettings, egress_settings
-from socify.outbound import send_https
+from socify.outbound import ResolutionError, send_https
 from socify.outbox import claim, connect_outbox, finish
 from socify.timeutils import iso_now
 from socify.validation import ValidationError
@@ -91,6 +91,8 @@ def send_webhook(settings: EgressSettings, message, payload: dict) -> int:
         headers["X-SOCify-Signature"] = "sha256=" + hmac.new(secret.encode(), timestamp.encode() + b"." + body, hashlib.sha256).hexdigest()
     try:
         response = send_https("POST", url, allowed_hosts=set(settings.allowlist), headers=headers, body=body, limit=64 * 1024)
+    except ResolutionError:
+        raise  # a resolver outage: retried with backoff
     except ValidationError as error:
         raise PermanentFailure(error.public_message) from error
     if 200 <= response.status < 300:
@@ -133,6 +135,11 @@ def deliver_one(connection, settings: EgressSettings) -> bool:
         status = send_webhook(settings, message, payload) if message["kind"] == "webhook" else send_email(settings, message, payload)
     except PermanentFailure as error:
         outcome = finish(connection, message, sent=False, max_attempts=int(message["attempts"]), error=str(error))
+    except ResolutionError as error:
+        outcome = finish(connection, message, sent=False, max_attempts=settings.max_attempts, error="ResolutionError: " + error.public_message)
+    except (ValueError, TypeError, KeyError) as error:
+        # A message that cannot be built (for example a header with a line break) fails alone; delivery goes on.
+        outcome = finish(connection, message, sent=False, max_attempts=int(message["attempts"]), error="invalid message: " + type(error).__name__)
     except (OSError, smtplib.SMTPException, ValidationError, ConnectionError, TimeoutError) as error:
         outcome = finish(connection, message, sent=False, max_attempts=settings.max_attempts, error=type(error).__name__ + ": " + str(error)[:200])
     else:
@@ -183,7 +190,8 @@ def relay_handler(settings: EgressSettings):
             if self.path != "/relay" or scheme.lower() != "bearer" or not hmac.compare_digest(supplied.strip().encode(), str(settings.relay_token).encode()):
                 self._answer(401, {"error": "unauthorized"})
                 return
-            length = int(self.headers.get("Content-Length") or 0)
+            declared = self.headers.get("Content-Length", "")
+            length = int(declared) if declared.isdigit() else 0
             if not 0 < length <= RELAY_BODY_LIMIT:
                 self._answer(413, {"error": "request too large"})
                 return

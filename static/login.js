@@ -34,7 +34,10 @@
   }
   function target() {
     const next = form.elements.next?.value || "";
-    return /^\/(?![/\\])[^\r\n\\]*$/.test(next) ? next : "/cases";
+    // The server already vetted this value; the browser repeats the check with the same character set.
+    let decoded = "";
+    try { decoded = decodeURIComponent(next); } catch (_) { return "/cases"; }
+    return /^\/(?![/\\])[A-Za-z0-9\-._~!$&'()*+,;=:@%/?]*$/.test(next) && !/^\/(\/|\\)/.test(decoded) ? next : "/cases";
   }
   if (mfa && remembered()) mfa.open = true;
 

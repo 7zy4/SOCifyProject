@@ -97,6 +97,8 @@ def validate_message(kind: str, target: str, payload: dict[str, Any]) -> str:
         raise ValueError("an email message needs one valid recipient address")
     if kind == "email" and not (isinstance(payload.get("subject"), str) and isinstance(payload.get("text"), str)):
         raise ValueError("an email message needs a subject and a text body")
+    if kind == "email" and (any(char in payload["subject"] for char in "\r\n") or not 1 <= len(payload["subject"]) <= 200):
+        raise ValueError("an email subject is one line of at most 200 characters")
     encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     if len(encoded.encode()) > MAX_PAYLOAD_BYTES:
         raise ValueError("outbox message is too large")

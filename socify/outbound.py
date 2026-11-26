@@ -12,6 +12,10 @@ from urllib.parse import urlparse
 from .validation import ValidationError
 
 
+class ResolutionError(ValidationError):
+    """The host name did not resolve: a network condition worth retrying, unlike a policy refusal."""
+
+
 @dataclass(frozen=True)
 class ExternalTarget:
     hostname: str
@@ -72,9 +76,9 @@ def resolve_external_target(endpoint: str, allowed_hosts: set[str]) -> ExternalT
     try:
         addresses = tuple(socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM))
     except OSError as exc:
-        raise ValidationError("تعذر حل اسم المضيف") from exc
+        raise ResolutionError("تعذر حل اسم المضيف") from exc
     if not addresses:
-        raise ValidationError("تعذر حل اسم المضيف")
+        raise ResolutionError("تعذر حل اسم المضيف")
     for family, _kind, _protocol, _name, address in addresses:
         try:
             ip = ipaddress.ip_address(address[0])

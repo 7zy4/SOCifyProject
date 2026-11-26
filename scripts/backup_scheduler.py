@@ -48,6 +48,11 @@ def prune_backups(directory: Path, keep: int) -> list[str]:
 def run_backup(database: str, directory: Path, keep: int, key: str | None) -> dict[str, object]:
     """Take one verified backup, encrypt it when a key is configured, and apply retention."""
     directory.mkdir(parents=True, exist_ok=True)
+    # A run that was killed mid-way leaves its unencrypted staging copy; never let it outlive the next run.
+    for leftover in directory.glob(".socify-*.partial*"):
+        leftover.unlink(missing_ok=True)
+    for leftover in directory.glob("socify-*.enc.partial"):
+        leftover.unlink(missing_ok=True)
     name = f"socify-{utc_now().strftime('%Y%m%dT%H%M%SZ')}.db"
     staged = directory / f".{name}.partial"
     try:

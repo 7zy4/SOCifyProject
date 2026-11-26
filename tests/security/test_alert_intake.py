@@ -265,3 +265,40 @@ def test_queue_filters(client, integration, login_as):
     for query in ("integration_id=x", "since=yesterday", "status=closed"):
         assert client.get(f"/api/intake/alerts?{query}").status_code == 422, query
     assert client.get("/api/intake/alerts/999999").status_code == 404
+
+
+def test_a_repeat_after_dismissal_is_a_new_alert(client, database, integration, login_as):
+    created = integration()
+    first = _receive(client, created, "generic")
+    login_as("analyst")
+    assert client.post(f"/api/intake/alerts/{first}/dismiss", json={"reason": "Scanner noise this morning"}).status_code == 200
+    with client.session_transaction() as state:
+        state.clear()
+    body = _fixture("generic") + b"\n"
+    repeat = _post(client, created, body, _signed(created["hmac_secret"], body))
+    assert repeat.json["items"][0]["status"] == "created" and repeat.json["items"][0]["id"] != first
+    assert database.execute("SELECT occurrence_count FROM intake_alerts WHERE id = ?", (first,)).fetchone()[0] == 1
+
+
+def test_an_auto_case_failure_keeps_the_delivery_accepted_and_is_audited(client, database, integration, monkeypatch):
+    import socify.intake as intake
+    from socify.validation import ValidationError
+
+    created = integration(kind="generic", auto_case={"min_severity": "high"})
+
+    def refuse(*_args, **_kwargs):
+        raise ValidationError("refused by the case model")
+
+    monkeypatch.setattr(intake, "create_case_from_alert", refuse)
+    body = _fixture("generic")
+    accepted = _post(client, created, body, _signed(created["hmac_secret"], body))
+    assert accepted.status_code == 202
+    assert database.execute("SELECT status FROM intake_alerts").fetchone()[0] == "new"
+    assert database.execute("SELECT COUNT(*) FROM security_audit_logs WHERE action = 'auto_case_failed'").fetchone()[0] == 1
+
+
+def test_auto_created_cases_name_the_member_the_integration_acts_for(client, database, integration, user_ids):
+    created = integration(kind="generic", auto_case={"min_severity": "high"})
+    _receive(client, created, "generic")
+    row = database.execute("SELECT actor_id FROM security_audit_logs WHERE action = 'case_from_intake'").fetchone()
+    assert row["actor_id"] == user_ids["soc_manager"]
