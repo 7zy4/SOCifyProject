@@ -250,7 +250,7 @@ function autopsyDetectionJob(caseId, initial, changed = () => {}) {
   let signature = null, timer;
   async function refresh() {
     if(!root.isConnected)return;
-    try { render(await api(`/api/cases/${caseId}/jobs/${initial.id}`)); }
+    try { render(await api(`/api/cases/${caseId}/jobs/${initial.id}`, { background: true })); }
     catch(error) { clearTimeout(timer); signature = null; root.replaceChildren(node("p", { role: "status", text: error.message }), autopsyAction(t("إعادة المحاولة"), refresh)); }
   }
   function render(job) {

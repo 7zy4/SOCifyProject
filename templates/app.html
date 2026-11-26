@@ -15,10 +15,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token }}">
   <meta name="section" content="{{ section }}">
+  <meta name="session-idle-seconds" content="{{ config.SESSION_IDLE_SECONDS }}">
   {% if case_id %}<meta name="case-id" content="{{ case_id }}">{% endif %}
   <title data-ui-copy>SOCify | مركز العمليات</title>
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
   <script src="{{ url_for('static', filename='drafts.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='session-idle.js') }}" defer></script>
   <script src="{{ url_for('static', filename='soc-workbench.js') }}" defer></script>
   <script src="{{ url_for('static', filename='soc-insights.js') }}" defer></script>
   <script src="{{ url_for('static', filename='autopsy.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_data.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_procedures.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_reports.js') }}" defer></script><script src="{{ url_for('static', filename='autopsy_analysis.js') }}" defer></script>

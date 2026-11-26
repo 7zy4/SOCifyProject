@@ -8,6 +8,7 @@
   <link rel="preload" href="{{ url_for('static', filename='fonts/IBMPlexSansArabic-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
   <script src="{{ url_for('static', filename='localization.js') }}"></script>
   <script src="{{ url_for('static', filename='theme.js') }}"></script>
+  <script src="{{ url_for('static', filename='login.js') }}" defer></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='socify.css') }}">
@@ -23,8 +24,10 @@
       <nav class="auth-tabs" aria-label="الحساب" data-ui-attributes><a href="{{ url_for('auth.login_page') }}" aria-current="page" data-ui-copy>تسجيل الدخول</a><a href="{{ url_for('auth.register_page') }}" data-ui-copy>حساب جديد</a></nav>
       <form id="auth-form" method="post" action="{{ url_for('auth.login_form') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="next" value="{{ next_path }}">
         <h1 id="auth-title" class="sr-only" data-ui-copy>تسجيل الدخول</h1>
         {% if csrf_error %}<div class="notice" role="alert">{{ csrf_error }}<p dir="ltr">CSRF: {{ csrf_reason }} | {{ csrf_correlation_id }}</p></div>{% endif %}
+        {% if session_ended_idle %}<div class="notice" role="status" data-ui-copy>انتهت جلستك لعدم النشاط. سجّل الدخول للمتابعة.</div>{% endif %}
         {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="notice {{ category }}" role="alert" data-ui-copy>{{ message }}</div>{% endfor %}{% endwith %}
         <label for="email" data-ui-copy>البريد الإلكتروني</label>
         <input id="email" name="email" type="email" autocomplete="username" required maxlength="254" spellcheck="false" dir="ltr">

@@ -512,6 +512,7 @@ CREATE TABLE IF NOT EXISTS security_audit_logs (
 
 COLUMN_MIGRATIONS: dict[str, dict[str, str]] = {
     "mfa_enrollments": {"last_totp_counter": "INTEGER"},
+    "auth_sessions": {"revoked_reason": "TEXT"},
     "case_tasks": {"system_key": "TEXT"},
     "users": {
         "name_ar": "TEXT NOT NULL DEFAULT ''",

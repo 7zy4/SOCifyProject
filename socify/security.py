@@ -147,6 +147,23 @@ def _touch_session(record, now: str) -> None:
         connection.execute(f"PRAGMA busy_timeout = {int(timeout)}")
 
 
+BACKGROUND_ACTIVITY_HEADER = "X-SOCify-Activity"
+
+
+def _end_idle_session(record) -> None:
+    """Record that the session ended for inactivity; a busy database leaves it to the next request, which refuses it the same way."""
+    connection = get_db()
+    timeout = connection.execute("PRAGMA busy_timeout").fetchone()[0]
+    try:
+        connection.execute("PRAGMA busy_timeout = 0")
+        connection.execute("UPDATE auth_sessions SET revoked_at = ?, revoked_reason = 'idle' WHERE id = ? AND revoked_at IS NULL", (iso_now(), record["id"]))
+    except sqlite3.OperationalError as exc:
+        if getattr(exc, "sqlite_errorcode", 0) & 0xFF not in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}:
+            raise
+    finally:
+        connection.execute(f"PRAGMA busy_timeout = {int(timeout)}")
+
+
 def _session_valid(user_id: int) -> bool:
     raw = session.get("session_id")
     if not isinstance(raw, str):
@@ -155,16 +172,31 @@ def _session_valid(user_id: int) -> bool:
     record = (
         get_db()
         .execute(
-            "SELECT id, expires_at, revoked_at, last_seen_at FROM auth_sessions WHERE session_hash = ? AND user_id = ?",
+            "SELECT id, expires_at, revoked_at, revoked_reason, last_seen_at FROM auth_sessions WHERE session_hash = ? AND user_id = ?",
             (digest, user_id),
         )
         .fetchone()
     )
     now = iso_now()
     if not record or record["revoked_at"] or record["expires_at"] <= now:
+        if record and record["revoked_reason"] == "idle":
+            g.session_end_reason = "idle"
         return False
-    _touch_session(record, now)
+    idle = int(current_app.config.get("SESSION_IDLE_SECONDS") or 0)
+    if idle > 0 and record["last_seen_at"] <= (utc_now() - timedelta(seconds=idle)).isoformat().replace("+00:00", "Z"):
+        _end_idle_session(record)
+        g.session_end_reason = "idle"
+        return False
+    # Polling for job status is not the person working: it is checked like any request but does not keep the session alive.
+    if request.headers.get(BACKGROUND_ACTIVITY_HEADER, "").strip().lower() != "background":
+        _touch_session(record, now)
     return True
+
+
+def authentication_required():
+    """The 401 every protected API answers when nobody is signed in; it says when the session ended for inactivity."""
+    details = {"reason": "idle"} if getattr(g, "session_end_reason", None) == "idle" else None
+    return error_response("AUTHENTICATION_REQUIRED", "يلزم تسجيل الدخول للوصول إلى هذا المورد", 401, details)
 
 
 def current_user() -> dict[str, Any] | None:
@@ -203,8 +235,11 @@ def login_required[F: Callable[..., Any]](function: F) -> F:
         if current_user() is None:
             session.clear()
             if request.path.startswith("/api/") or request.is_json:
-                return error_response("AUTHENTICATION_REQUIRED", "يلزم تسجيل الدخول للوصول إلى هذا المورد", 401)
-            return redirect(url_for("auth.login_page", next=request.full_path))
+                return authentication_required()
+            target: dict[str, Any] = {"next": request.full_path}
+            if getattr(g, "session_end_reason", None) == "idle":
+                target["reason"] = "idle"
+            return redirect(url_for("auth.login_page", **target))
         return function(*args, **kwargs)
 
     return cast(F, wrapped)
@@ -234,7 +269,7 @@ def require_permission[F: Callable[..., Any]](permission: str) -> Callable[[F], 
             user = current_user()
             if user is None:
                 session.clear()
-                return error_response("AUTHENTICATION_REQUIRED", "يلزم تسجيل الدخول للوصول إلى هذا المورد", 401)
+                return authentication_required()
             if not has_permission(user, permission):
                 return error_response("PERMISSION_DENIED", "ليست لديك الصلاحية اللازمة لهذا الإجراء", 403)
             return function(*args, **kwargs)

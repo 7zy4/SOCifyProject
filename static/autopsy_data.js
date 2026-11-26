@@ -261,7 +261,7 @@ async function autopsyLogsPanel(caseId) {
     const poll = async () => {
       if (!root.isConnected || remaining-- <= 0) return;
       try {
-        const latest = await api(`/api/cases/${caseId}/imports`);
+        const latest = await api(`/api/cases/${caseId}/imports`, { background: true });
         if (JSON.stringify(latest.items.map((job) => [job.id, job.status, job.progress])) !== JSON.stringify(imports.items.map((job) => [job.id, job.status, job.progress]))) { await autopsyCase(caseId); return; }
         window.setTimeout(poll, 1500);
       } catch (error) { handleError(error); }

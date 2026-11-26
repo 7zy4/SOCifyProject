@@ -33,6 +33,9 @@ def build_config() -> dict[str, object]:
     metrics_token = os.environ.get("SOCIFY_METRICS_TOKEN", "").strip() or None
     if metrics_token is not None and len(metrics_token) < 32:
         raise RuntimeError("SOCIFY_METRICS_TOKEN must be at least 32 characters; leave it unset to keep /health/metrics disabled")
+    session_idle = _integer("SOCIFY_SESSION_IDLE_SECONDS", 3600)
+    if session_idle != 0 and session_idle < 300:
+        raise RuntimeError("SOCIFY_SESSION_IDLE_SECONDS must be 0 (no idle limit) or at least 300 seconds")
     database = os.environ.get("SOCIFY_DATABASE", str(Path.cwd() / "socify.db"))
     trusted_hosts = [item.strip() for item in os.environ.get("SOCIFY_TRUSTED_HOSTS", "localhost,127.0.0.1").split(",") if item.strip()]
     codespace_name = os.environ.get("CODESPACE_NAME", "").strip()
@@ -61,6 +64,7 @@ def build_config() -> dict[str, object]:
         "SESSION_COOKIE_SAMESITE": "Lax",
         "SESSION_COOKIE_SECURE": _boolean("SOCIFY_HTTPS"),
         "PERMANENT_SESSION_LIFETIME": _integer("SOCIFY_SESSION_SECONDS", 28800),
+        "SESSION_IDLE_SECONDS": session_idle,
         "CREDENTIAL_KEY": credential_key or effective_secret,
         "CREDENTIAL_KEY_PREVIOUS": previous_credential_key,
         "METRICS_TOKEN": metrics_token,
@@ -68,7 +72,10 @@ def build_config() -> dict[str, object]:
         "TRUSTED_PROXY_HOPS": min(max(_integer("SOCIFY_TRUSTED_PROXIES", 0), 0), 5),
         "RATE_LIMIT_LOGIN_ATTEMPTS": _integer("SOCIFY_LOGIN_ATTEMPTS", 5),
         "RATE_LIMIT_LOGIN_IP_ATTEMPTS": _integer("SOCIFY_LOGIN_IP_ATTEMPTS", 50),
+        "RATE_LIMIT_LOGIN_ACCOUNT_ATTEMPTS": _integer("SOCIFY_LOGIN_ACCOUNT_ATTEMPTS", 20),
         "RATE_LIMIT_REGISTER_ATTEMPTS": _integer("SOCIFY_REGISTER_ATTEMPTS", 20),
         "RATE_LIMIT_SOURCE_KEY_ATTEMPTS": _integer("SOCIFY_SOURCE_KEY_ATTEMPTS", 20),
         "RATE_LIMIT_LOGIN_WINDOW_SECONDS": _integer("SOCIFY_LOGIN_WINDOW_SECONDS", 900),
+        "RATE_LIMIT_REAUTH_ATTEMPTS": _integer("SOCIFY_REAUTH_ATTEMPTS", 5),
+        "REAUTH_REVOKE_SESSION": _boolean("SOCIFY_REAUTH_REVOKE_SESSION", True),
     }

@@ -1,28 +1,32 @@
 import sqlite3
 import time
+from datetime import timedelta
 
 import pytest
 from conftest import DEMO_LOGIN_VALUE
 
 from socify import security
+from socify.timeutils import utc_now
 
 
 def test_authenticated_reads_survive_an_import_writer_without_caching_revocation(app, client, database):
     database.execute("PRAGMA journal_mode=WAL")
     assert client.post("/api/auth/login", json={"email": "analyst@socify.local", "password": DEMO_LOGIN_VALUE}).status_code == 200
     session_id = client.get("/api/auth/sessions").json["items"][0]["id"]
-    database.execute("UPDATE auth_sessions SET last_seen_at='2000-01-01T00:00:00Z' WHERE id=?", (session_id,))
+    # Old enough to be recorded again, well inside the idle limit.
+    stale = (utc_now() - timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
+    database.execute("UPDATE auth_sessions SET last_seen_at=? WHERE id=?", (stale, session_id))
     database.execute("BEGIN IMMEDIATE")
     try:
         started = time.monotonic()
         assert client.get("/api/auth/me").status_code == 200
         assert time.monotonic() - started < 1
-        assert database.execute("SELECT last_seen_at FROM auth_sessions WHERE id=?", (session_id,)).fetchone()[0] == "2000-01-01T00:00:00Z"
+        assert database.execute("SELECT last_seen_at FROM auth_sessions WHERE id=?", (session_id,)).fetchone()[0] == stale
     finally:
         database.rollback()
     assert client.get("/api/auth/me").status_code == 200
     touched = database.execute("SELECT last_seen_at FROM auth_sessions WHERE id=?", (session_id,)).fetchone()[0]
-    assert touched != "2000-01-01T00:00:00Z"
+    assert touched != stale
     assert client.get("/api/auth/me").status_code == 200
     assert database.execute("SELECT last_seen_at FROM auth_sessions WHERE id=?", (session_id,)).fetchone()[0] == touched
     database.execute("UPDATE auth_sessions SET revoked_at=? WHERE id=?", (touched, session_id))

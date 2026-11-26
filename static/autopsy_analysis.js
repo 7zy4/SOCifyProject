@@ -122,7 +122,7 @@ function autopsySampleJob(caseId, initial) {
   let timer;
   async function refresh() {
     if(!root.isConnected)return;
-    try{render(await api(`/api/cases/${caseId}/jobs/${initial.id}`));}
+    try{render(await api(`/api/cases/${caseId}/jobs/${initial.id}`,{background:true}));}
     catch(error){root.replaceChildren(node("p",{role:"status",text:error.message}),button(t("تحديث النتيجة"),refresh));}
   }
   function render(job) {

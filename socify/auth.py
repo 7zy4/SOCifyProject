@@ -1,4 +1,5 @@
 import hashlib
+import math
 import re
 import secrets
 import sqlite3
@@ -28,7 +29,7 @@ from .security import (
     require_permission,
     verify_totp,
 )
-from .timeutils import iso_now, utc_now
+from .timeutils import iso_now, parse_timestamp, utc_now
 
 auth_api = Blueprint("auth", __name__)
 
@@ -79,11 +80,32 @@ def _window_start() -> str:
 
 
 def _failures(identity: str, ip_address: str) -> int:
+    """Failures for this identity from this address inside the window and after its most recent success there.
+
+    A success closes the count, so a user who signs in correctly many times is never locked out by earlier mistakes.
+    Row ids order the attempts, so a failure recorded in the same second as a later success is not counted.
+    """
+    digest = _identifier_hash(identity)
     return int(
         get_db()
         .execute(
-            "SELECT COUNT(*) FROM login_attempts WHERE identifier_hash = ? AND ip_address = ? AND succeeded = 0 AND occurred_at >= ?",
-            (_identifier_hash(identity), ip_address, _window_start()),
+            """SELECT COUNT(*) FROM login_attempts WHERE identifier_hash = ? AND ip_address = ? AND succeeded = 0 AND occurred_at >= ?
+            AND id > COALESCE((SELECT MAX(id) FROM login_attempts WHERE identifier_hash = ? AND ip_address = ? AND succeeded = 1), 0)""",
+            (digest, ip_address, _window_start(), digest, ip_address),
+        )
+        .fetchone()[0]
+    )
+
+
+def _account_failures(identity: str) -> int:
+    """Failures for this identity from every address inside the window and after its most recent success from any address."""
+    digest = _identifier_hash(identity)
+    return int(
+        get_db()
+        .execute(
+            """SELECT COUNT(*) FROM login_attempts WHERE identifier_hash = ? AND succeeded = 0 AND occurred_at >= ?
+            AND id > COALESCE((SELECT MAX(id) FROM login_attempts WHERE identifier_hash = ? AND succeeded = 1), 0)""",
+            (digest, _window_start(), digest),
         )
         .fetchone()[0]
     )
@@ -106,6 +128,64 @@ def _address_rate_limited(ip_address: str) -> bool:
     return int(count) >= limit
 
 
+def _account_throttle_delay(failures: int) -> int:
+    """Seconds an account waits after its latest failure: 30, then doubling with each further failure, never past the window."""
+    limit = int(current_app.config.get("RATE_LIMIT_LOGIN_ACCOUNT_ATTEMPTS") or 0)
+    window = int(current_app.config["RATE_LIMIT_LOGIN_WINDOW_SECONDS"])
+    return min(30 * 2 ** min(max(failures - limit, 0), 16), window)
+
+
+def _account_throttle_seconds(identity: str, ip_address: str) -> int:
+    """How long this account must wait before another password check from this address; 0 when it may go ahead.
+
+    Failures are counted across every address since the account's last success. An address the account has signed in
+    from before is not throttled, so guessing from elsewhere slows the guesser without locking the owner out.
+    Unknown and existing accounts are treated alike, so the answer reveals nothing about which accounts exist.
+    """
+    limit = int(current_app.config.get("RATE_LIMIT_LOGIN_ACCOUNT_ATTEMPTS") or 0)
+    if limit <= 0:
+        return 0
+    failures = _account_failures(identity)
+    if failures < limit:
+        return 0
+    digest = _identifier_hash(identity)
+    if get_db().execute("SELECT 1 FROM login_attempts WHERE identifier_hash = ? AND ip_address = ? AND succeeded = 1 LIMIT 1", (digest, ip_address)).fetchone():
+        return 0
+    latest = get_db().execute("SELECT MAX(occurred_at) FROM login_attempts WHERE identifier_hash = ? AND succeeded = 0", (digest,)).fetchone()[0]
+    remaining = (parse_timestamp(latest) + timedelta(seconds=_account_throttle_delay(failures)) - utc_now()).total_seconds()
+    return max(0, math.ceil(remaining))
+
+
+def _note_account_failure(identity: str, user: sqlite3.Row | None) -> None:
+    """Once failures reach the account limit, each further one is audited for the team's managers to see."""
+    limit = int(current_app.config.get("RATE_LIMIT_LOGIN_ACCOUNT_ATTEMPTS") or 0)
+    if user is None or limit <= 0:
+        return
+    failures = _account_failures(identity)
+    if failures >= limit:
+        record_audit(
+            get_db(),
+            "login_throttled",
+            "user",
+            user["id"],
+            "denied",
+            {"failures": failures, "retry_after": _account_throttle_delay(failures)},
+            workspace=int(user["workspace_id"] or 1),
+        )
+
+
+def _failures_since_last_success(identity: str) -> int:
+    digest = _identifier_hash(identity)
+    return int(
+        get_db()
+        .execute(
+            "SELECT COUNT(*) FROM login_attempts WHERE identifier_hash = ? AND succeeded = 0 AND id > COALESCE((SELECT MAX(id) FROM login_attempts WHERE identifier_hash = ? AND succeeded = 1), 0)",
+            (digest, digest),
+        )
+        .fetchone()[0]
+    )
+
+
 def attempts_exhausted(identity: str, limit_key: str) -> bool:
     """Failure-only limiter for unauthenticated endpoints; successful requests are never counted."""
     limit = int(current_app.config.get(limit_key) or 0)
@@ -121,6 +201,48 @@ def _record_attempt(email: str, ip_address: str, succeeded: bool) -> None:
         "INSERT INTO login_attempts (identifier_hash, ip_address, succeeded, occurred_at) VALUES (?, ?, ?, ?)",
         (_identifier_hash(email), ip_address, 1 if succeeded else 0, iso_now()),
     )
+
+
+def _reauthentication_identity(user_id: int) -> str:
+    return f"reauth:{user_id}"
+
+
+def _reauthentication_blocked(user_id: int) -> bool:
+    """True once the account has used up its password re-checks; counted across addresses, since a stolen session may move."""
+    limit = int(current_app.config.get("RATE_LIMIT_REAUTH_ATTEMPTS") or 0)
+    return limit > 0 and _account_failures(_reauthentication_identity(user_id)) >= limit
+
+
+def _record_reauthentication(user_id: int, succeeded: bool) -> None:
+    _record_attempt(_reauthentication_identity(user_id), request.remote_addr or "unknown", succeeded)
+
+
+def _end_current_session(reason: str) -> None:
+    raw = session.get("session_id")
+    if isinstance(raw, str):
+        digest = hashlib.sha256(raw.encode()).hexdigest()
+        get_db().execute(
+            "UPDATE auth_sessions SET revoked_at = ?, revoked_reason = ? WHERE session_hash = ? AND revoked_at IS NULL", (iso_now(), reason, digest)
+        )
+    session.clear()
+
+
+def _reauthentication_limited(user_id: int):
+    """Refuse further guesses; by default the session that kept guessing is ended, so a stolen session cannot go on."""
+    end_session = bool(current_app.config.get("REAUTH_REVOKE_SESSION", True))
+    record_audit(get_db(), "reauthentication_limited", "auth", user_id, "denied", {"path": request.path, "session_ended": end_session}, actor=user_id)
+    if end_session:
+        _end_current_session("reauthentication_limit")
+    return error_response(
+        "REAUTH_RATE_LIMITED", "محاولات تحقق خاطئة كثيرة من هذا الحساب. سجّل الدخول من جديد أو حاول لاحقًا", 429, {"session_ended": end_session}
+    )
+
+
+def _reauthentication_failed(user_id: int, code: str, message: str, status: int):
+    _record_reauthentication(user_id, False)
+    if _reauthentication_blocked(user_id):
+        return _reauthentication_limited(user_id)
+    return error_response(code, message, status)
 
 
 def _backup_code_valid(user_id: int, code: str) -> bool:
@@ -207,6 +329,11 @@ def _login_response(data: dict[str, Any]):
     normalized_email = email.strip().lower()
     if _rate_limited(normalized_email, ip_address) or _address_rate_limited(ip_address):
         return error_response("LOGIN_RATE_LIMITED", "تجاوزت الحد المسموح لمحاولات الدخول. حاول لاحقًا", 429)
+    wait = _account_throttle_seconds(normalized_email, ip_address)
+    if wait:
+        body, status = error_response("LOGIN_RATE_LIMITED", "محاولات دخول خاطئة كثيرة لهذا الحساب. أعد المحاولة بعد قليل", 429, {"retry_after": wait})
+        body.headers["Retry-After"] = str(wait)
+        return body, status
     user = (
         get_db()
         .execute(
@@ -219,6 +346,7 @@ def _login_response(data: dict[str, Any]):
     valid_password = bool(user and user["is_active"] and matched)
     if not valid_password:
         _record_attempt(normalized_email, ip_address, False)
+        _note_account_failure(normalized_email, user)
         if user:
             record_audit(
                 get_db(),
@@ -231,26 +359,46 @@ def _login_response(data: dict[str, Any]):
                 workspace=int(user["workspace_id"] or 1),
             )
         return error_response("INVALID_CREDENTIALS", "بيانات الدخول غير صحيحة", 401)
+    enrollment = get_db().execute("SELECT enabled FROM mfa_enrollments WHERE user_id = ?", (user["id"],)).fetchone()
+    if enrollment and enrollment["enabled"] and not data.get("mfa_code"):
+        # The first step of a two-step sign-in: the password was right and no code was sent yet. This is not a failure.
+        return error_response("MFA_REQUIRED", "أدخل رمز المصادقة متعددة العوامل", 428)
     if not _mfa_valid(int(user["id"]), data.get("mfa_code"), consume=True):
         _record_attempt(normalized_email, ip_address, False)
-        enrollment = get_db().execute("SELECT enabled FROM mfa_enrollments WHERE user_id = ?", (user["id"],)).fetchone()
-        if enrollment and enrollment["enabled"] and not data.get("mfa_code"):
-            return error_response("MFA_REQUIRED", "أدخل رمز المصادقة متعددة العوامل", 428)
+        _note_account_failure(normalized_email, user)
         return error_response("INVALID_MFA_CODE", "رمز المصادقة غير صحيح", 401)
+    missed = _failures_since_last_success(normalized_email)
     _record_attempt(normalized_email, ip_address, True)
-    return jsonify({"message": "تم تسجيل الدخول", "user": _start_session(user), "correlation_id": request.environ.get("socify.correlation_id")})
+    signed_in = _start_session(user)
+    limit = int(current_app.config.get("RATE_LIMIT_LOGIN_ACCOUNT_ATTEMPTS") or 0)
+    if limit > 0 and missed >= limit:
+        # Shown once to the owner after sign-in: someone failed to sign in to this account many times.
+        session["security_notice"] = {"failed_sign_ins": missed}
+    return jsonify({"message": "تم تسجيل الدخول", "user": signed_in, "correlation_id": request.environ.get("socify.correlation_id")})
+
+
+def safe_next_path(value: object) -> str:
+    """A same-site page to return to after sign-in; anything else, including other sites and API paths, falls back to the case list."""
+    if not isinstance(value, str) or len(value) > 2048 or not re.fullmatch(r"/(?![/\\])[^\r\n\\]*", value):
+        return "/cases"
+    path = value.rstrip("?")
+    if path.split("?", 1)[0] in {"/login", "/logout", "/register"} or path.startswith("/api/"):
+        return "/cases"
+    return path
 
 
 @auth_api.get("/login")
 def login_page():
+    next_path = safe_next_path(request.args.get("next"))
     if current_user():
-        return redirect("/cases")
-    return render_template("login.html", csrf_token=generate_csrf())
+        return redirect(next_path)
+    return render_template("login.html", csrf_token=generate_csrf(), next_path=next_path, session_ended_idle=request.args.get("reason") == "idle")
 
 
 @auth_api.post("/login")
 def login_form():
-    response = _login_response(_payload())
+    data = _payload()
+    response = _login_response(data)
     if request.is_json:
         return response
     if isinstance(response, tuple):
@@ -261,10 +409,12 @@ def login_form():
         }
         body = response[0].get_json(silent=True) or {}
         flash(messages.get(body.get("error", {}).get("code"), "تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور."), "error")
+        next_path = safe_next_path(data.get("next"))
+        follow: dict[str, Any] = {"next": next_path} if next_path != "/cases" else {}
         if body.get("error", {}).get("code") in {"MFA_REQUIRED", "INVALID_MFA_CODE"}:
-            return redirect(url_for("auth.login_page", mfa=1))
-        return redirect(url_for("auth.login_page"))
-    return redirect("/cases")
+            return redirect(url_for("auth.login_page", mfa=1, **follow))
+        return redirect(url_for("auth.login_page", **follow))
+    return redirect(safe_next_path(data.get("next")))
 
 
 @auth_api.post("/api/auth/login")
@@ -405,7 +555,11 @@ def me():
 
     user = _active_user()
     permissions = effective_permissions(user)
-    return jsonify({"user": user, "permissions": sorted(permissions), "csrf_token": generate_csrf()})
+    body: dict[str, Any] = {"user": user, "permissions": sorted(permissions), "csrf_token": generate_csrf()}
+    notice = session.pop("security_notice", None)
+    if isinstance(notice, dict):
+        body["security_notice"] = notice
+    return jsonify(body)
 
 
 @auth_api.get("/api/auth/sessions")
@@ -473,10 +627,13 @@ def change_password():
     problem = password_error(new)
     if not _bounded_utf8(current, 72) or problem:
         return error_response("INVALID_PASSWORD_CHANGE", problem or "كلمة المرور الحالية مطلوبة", 422)
+    if _reauthentication_blocked(actor_id()):
+        return _reauthentication_limited(actor_id())
     user = get_db().execute("SELECT password_hash FROM users WHERE id = ? AND is_active = 1", (actor_id(),)).fetchone()
     if not _password_matches(current, user["password_hash"] if user else None):
         record_audit(get_db(), "password_change", "user", actor_id(), "denied", {"reason": "current_password_mismatch"})
-        return error_response("CURRENT_PASSWORD_INCORRECT", "كلمة المرور الحالية غير صحيحة", 403)
+        return _reauthentication_failed(actor_id(), "CURRENT_PASSWORD_INCORRECT", "كلمة المرور الحالية غير صحيحة", 403)
+    _record_reauthentication(actor_id(), True)
     replacement = bcrypt.hashpw(str(new).encode(), bcrypt.gensalt(rounds=12)).decode()
     with transaction():
         get_db().execute("UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?", (replacement, iso_now(), actor_id()))
@@ -492,10 +649,13 @@ def change_password():
 @auth_api.post("/api/auth/mfa/enroll")
 @login_required
 def mfa_enroll():
+    if _reauthentication_blocked(actor_id()):
+        return _reauthentication_limited(actor_id())
     supplied = _payload().get("current_password")
     user = get_db().execute("SELECT password_hash FROM users WHERE id = ?", (actor_id(),)).fetchone()
     if not _password_matches(supplied, user["password_hash"] if user else None):
-        return error_response("REAUTHENTICATION_FAILED", "أدخل كلمة المرور الحالية لبدء إعداد المصادقة", 403)
+        return _reauthentication_failed(actor_id(), "REAUTHENTICATION_FAILED", "أدخل كلمة المرور الحالية لبدء إعداد المصادقة", 403)
+    _record_reauthentication(actor_id(), True)
     enrollment = get_db().execute("SELECT enabled FROM mfa_enrollments WHERE user_id = ?", (actor_id(),)).fetchone()
     if enrollment and enrollment["enabled"]:
         return error_response("MFA_ALREADY_ENABLED", "ألغِ التفعيل الحالي بعد التحقق قبل إعادة التسجيل", 409)
@@ -564,12 +724,15 @@ def mfa_verify():
 @auth_api.delete("/api/auth/mfa")
 @login_required
 def mfa_disable():
+    if _reauthentication_blocked(actor_id()):
+        return _reauthentication_limited(actor_id())
     data = _payload()
     password = data.get("current_password")
     code = data.get("code")
     user = get_db().execute("SELECT password_hash FROM users WHERE id = ?", (actor_id(),)).fetchone()
     if not _password_matches(password, user["password_hash"] if user else None) or not _mfa_valid(actor_id(), code):
-        return error_response("REAUTHENTICATION_FAILED", "يلزم التحقق من كلمة المرور ورمز المصادقة", 403)
+        return _reauthentication_failed(actor_id(), "REAUTHENTICATION_FAILED", "يلزم التحقق من كلمة المرور ورمز المصادقة", 403)
+    _record_reauthentication(actor_id(), True)
     with transaction():
         get_db().execute("DELETE FROM mfa_backup_codes WHERE user_id = ?", (actor_id(),))
         get_db().execute("DELETE FROM mfa_enrollments WHERE user_id = ?", (actor_id(),))

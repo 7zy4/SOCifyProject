@@ -377,10 +377,10 @@ window.SOCifyAutopsy.reports = async (caseId) => {
       if (!body.isConnected || ++updates > 40) return;
       if (SOCifyDrafts.hasChanges(workspace) || !profiles.some(item => item.label === choice.input.value)) { autopsyReportTimer = setTimeout(poll, 2500); return; }
       try {
-        const latest = await api(`/api/cases/${caseId}`);
+        const latest = await api(`/api/cases/${caseId}`, { background: true });
         if (!body.isConnected) return;
         if (latest.full_case_access === false || latest.version !== current.version) { await autopsyCase(caseId); return; }
-        const statuses = await Promise.all(latest.reports.slice(0, 20).map((item) => api(`/api/cases/${caseId}/reports/${item.id}`)));
+        const statuses = await Promise.all(latest.reports.slice(0, 20).map((item) => api(`/api/cases/${caseId}/reports/${item.id}`, { background: true })));
         if (!body.isConnected) return;
         if (statuses.some(item => reportStates.get(item.id) !== autopsyReportSignature(item)) || !statuses.some(item => ["queued", "processing"].includes(item.job.state))) {
           if (SOCifyDrafts.hasChanges(workspace) || !profiles.some(item => item.label === choice.input.value)) { autopsyReportTimer = setTimeout(poll, 2500); return; }

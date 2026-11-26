@@ -66,15 +66,23 @@ function badge(value) {
   return node("span", { class: `badge ${String(value || "").toLowerCase()}`, text: value || "—" });
 }
 
-function showMessage(text, type = "error") {
+let messageTimer = null;
+function showMessage(text, type = "error", { persist = false } = {}) {
   messageBox.textContent = text;
   messageBox.className = `global-message ${type}`;
   messageBox.hidden = false;
-  window.setTimeout(() => { messageBox.hidden = true; }, 5500);
+  window.clearTimeout(messageTimer);
+  // A persistent message (a security notice) stays until the next message replaces it.
+  if (!persist) messageTimer = window.setTimeout(() => { messageBox.hidden = true; }, 5500);
 }
 
-function recoverSession() {
-  if (!state.user || !window.SOCifyDrafts?.hasChanges()) { window.location.assign("/login"); return; }
+// Sign in again and come back to the same page; a session ended for inactivity says so on the sign-in page.
+function signInAgainURL(idle = false) {
+  return `/login?next=${encodeURIComponent(location.pathname + location.search)}${idle ? "&reason=idle" : ""}`;
+}
+
+function recoverSession({ idle = false } = {}) {
+  if (!state.user || !window.SOCifyDrafts?.hasChanges()) { window.location.assign(signInAgainURL(idle)); return; }
   const existing = document.getElementById("session-recovery");
   if (existing) { if (!existing.open) existing.showModal(); return; }
   const principal = { id: state.user.id, workspace_id: state.user.workspace_id };
@@ -108,7 +116,9 @@ function recoverSession() {
 }
 
 async function api(path, options = {}) {
-  const config = { credentials: "same-origin", ...options, headers: { Accept: "application/json", "X-SOCify-Language": SOCifyLocale.language, ...(options.headers || {}) } };
+  // Status polling passes background: true. The server still checks the session, but polling does not keep it alive.
+  const { background = false, ...request } = options;
+  const config = { credentials: "same-origin", ...request, headers: { Accept: "application/json", "X-SOCify-Language": SOCifyLocale.language, ...(background ? { "X-SOCify-Activity": "background" } : {}), ...(request.headers || {}) } };
   if (config.body && !(config.body instanceof FormData) && typeof config.body !== "string") {
     config.headers["Content-Type"] = "application/json";
     config.body = JSON.stringify(config.body);
@@ -121,10 +131,11 @@ async function api(path, options = {}) {
     throw new Error(SOCifyLocale.text("تعذر الاتصال. أعد المحاولة."));
   }
   if (response.status === 401) {
-    recoverSession();
-    await response.text().catch(() => {});
+    const ended = await response.json().catch(() => null);
+    recoverSession({ idle: ended?.error?.details?.reason === "idle" });
     throw new Error(SOCifyLocale.text("انتهت الجلسة"));
   }
+  if (!background) window.SOCifySessionIdle?.activity();
   let payload = null;
   if (response.status !== 204) {
     const contentType = response.headers.get("content-type") || "";
@@ -135,7 +146,8 @@ async function api(path, options = {}) {
   }
   if (!response.ok) {
     const renewalRequired = ["CSRF_FAILED", "CSRF_VALIDATION_FAILED"].includes(payload?.error?.code);
-    if (renewalRequired) recoverSession();
+    // A session ended after too many failed password checks must sign in again, like an expired one.
+    if (renewalRequired || payload?.error?.details?.session_ended === true) recoverSession();
     const error = new Error(renewalRequired ? SOCifyLocale.text("تحتاج الجلسة إلى تجديد. سجّل الدخول ثم أعد محاولة الحفظ.") : SOCifyLocale.error(payload?.error?.code, payload?.error?.message) || SOCifyLocale.template`تعذر إكمال الطلب (${response.status})`);
     error.code = payload?.error?.code;
     error.status = response.status;
@@ -237,7 +249,7 @@ async function renderAudit() {
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 && requestedPage <= 1000000 ? requestedPage : 1;
   const params = new URLSearchParams({...applied, page, page_size:25});
   const data = await api(`/api/audit?${params}`);
-  const labels = {login:"تسجيل الدخول",logout:"خروج",create:"إنشاء",update:"تعديل",review:"مراجعة",selection_changed:"تحديد نطاق التحقيق",case_linked:"ربط القضايا",read:"عرض",download:"تنزيل",ingest:"استقبال السجلات",ingest_retry:"إعادة إرسال السجلات",rotate_key:"تجديد مفتاح المصدر",case:"قضية",auth:"المصادقة",source:"مصدر السجلات",rule:"قاعدة كشف",investigation:"نطاق التحقيق",user:"عضو",auth_session:"جلسة دخول",case_evidence:"دليل",case_report:"تقرير",workspace:"مساحة العمل",success:"نجاح",denied:"مرفوض",failure:"فشل",error:"خطأ"};
+  const labels = {login:"تسجيل الدخول",logout:"خروج",create:"إنشاء",update:"تعديل",review:"مراجعة",selection_changed:"تحديد نطاق التحقيق",case_linked:"ربط القضايا",read:"عرض",download:"تنزيل",ingest:"استقبال السجلات",ingest_retry:"إعادة إرسال السجلات",rotate_key:"تجديد مفتاح المصدر",login_throttled:"إبطاء الدخول لكثرة الأخطاء",reauthentication_limited:"تجاوز حد إعادة التحقق",case:"قضية",auth:"المصادقة",source:"مصدر السجلات",rule:"قاعدة كشف",investigation:"نطاق التحقيق",user:"عضو",auth_session:"جلسة دخول",case_evidence:"دليل",case_report:"تقرير",workspace:"مساحة العمل",success:"نجاح",denied:"مرفوض",failure:"فشل",error:"خطأ"};
   Object.assign(labels, {decision:"القرار",approved:"معتمد",rejected:"مرفوض",events:"السجلات",alerts:"التنبيهات",fields:"الحقول",case_ids:"القضايا",case_id:"القضية",reason:"السبب"});
   const label = value => t(labels[value] || value);
   const detailValue = (value, key = "") => {
@@ -297,6 +309,8 @@ async function initialize() {
   const me = await api("/api/auth/me");
   state.user = me.user;
   state.permissions = new Set(me.permissions);
+  const missed = Number(me.security_notice?.failed_sign_ins);
+  if (Number.isSafeInteger(missed) && missed > 0) showMessage(SOCifyLocale.template`سُجلت ${missed} محاولة دخول خاطئة لحسابك منذ آخر دخول. إن لم تكن أنت، غيّر كلمة المرور وفعّل المصادقة متعددة العوامل.`, "error", { persist: true });
   await window.SOCifyAutopsy.start();
 }
 
