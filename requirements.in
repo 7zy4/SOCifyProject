@@ -11,5 +11,5 @@ python-docx==1.2.0
 dpkt==1.9.8
 PyYAML==6.0.3
 yara-python==4.5.4
-maxminddb==3.2.0
+maxminddb==3.3.0
 tzdata==2026.6
