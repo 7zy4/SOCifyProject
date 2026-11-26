@@ -1,7 +1,6 @@
 """Follow retained-log analysis from a user action to an evidenced result."""
 
 import json
-import time
 
 import pytest
 from playwright.sync_api import expect
@@ -12,6 +11,7 @@ from tests.e2e.test_assignment_handoff_journeys import role_permission
 from tests.e2e.test_case_continuity_journeys import panel
 from tests.e2e.test_followup_handoff_journeys import evidence_images, manager_case
 from tests.e2e.test_review_workflow import ARTIFACTS, review_session
+from tests.waiting import playwright_pause, wait_until
 
 
 def upload(j, count=2, name="scan-events.json", address="192.0.2.21", prefix="Gateway retained session"):
@@ -48,13 +48,17 @@ def job(j, identifier):
 
 def finish(j, app, identifier, expected="completed"):
     with local_worker_services(app.config):
-        deadline = time.monotonic() + 50
-        while time.monotonic() < deadline:
-            result = job(j, identifier)
-            if result["state"] == expected:
-                return result
-            j.page.wait_for_timeout(250)
-        raise AssertionError(f"Analysis did not reach {expected}: {result}")
+        latest = {}
+
+        def reached():
+            latest.update(job(j, identifier))
+            return latest["state"] == expected
+
+        try:
+            wait_until(reached, 50, interval=0.25, pause=playwright_pause(j.page))
+        except TimeoutError as error:
+            raise AssertionError(f"Analysis did not reach {expected}: {latest}") from error
+        return dict(latest)
 
 
 def read_result(j):

@@ -5,7 +5,6 @@ import hashlib
 import io
 import json
 import sys
-import time
 import zipfile
 
 import pytest
@@ -16,6 +15,7 @@ from socify.autopsy_static_analysis import validate_yara
 from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_report_recovery_journeys import absent_service, screenshots
 from tests.e2e.test_review_workflow import review_session
+from tests.waiting import playwright_pause, wait_until
 
 CONTENT = b"Retained maintenance note. Scheduled work completed."
 RETRYING = "التحليل متوقف مؤقتًا. ستتم إعادة المحاولة تلقائيًا."
@@ -57,14 +57,18 @@ def read_job(j, identifier):
 
 
 def wait_failure(j, identifier, *, exhausted=False):
-    deadline = time.monotonic() + 45
     expected = "failed" if exhausted else "queued"
-    while time.monotonic() < deadline:
-        job = read_job(j, identifier)
-        if job["state"] == expected and job["error_code"] == "ANALYSIS_UNAVAILABLE":
-            return job
-        j.page.wait_for_timeout(250)
-    raise AssertionError(f"Expected actual unavailable-service failure: {job}")
+    latest = {}
+
+    def reached():
+        latest.update(read_job(j, identifier))
+        return latest["state"] == expected and latest["error_code"] == "ANALYSIS_UNAVAILABLE"
+
+    try:
+        wait_until(reached, 45, interval=0.25, pause=playwright_pause(j.page))
+    except TimeoutError as error:
+        raise AssertionError(f"Expected actual unavailable-service failure: {latest}") from error
+    return dict(latest)
 
 
 @pytest.mark.e2e

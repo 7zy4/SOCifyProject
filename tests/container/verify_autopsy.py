@@ -12,6 +12,22 @@ from scripts.bootstrap_team import create_manager
 from socify import create_app
 
 
+def wait_until(check, timeout, *, interval=0.2, message="condition not met"):
+    """Return check()'s first truthy result, or raise TimeoutError after `timeout` seconds.
+
+    A local copy of tests/waiting.py: this script runs on its own (inside the container for verify_autopsy.py),
+    where the tests package is not available.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        result = check()
+        if result:
+            return result
+        if time.monotonic() >= deadline:
+            raise TimeoutError(message)
+        time.sleep(interval)
+
+
 def main():
     if os.environ.get("SOCIFY_CONTAINER_ACCEPTANCE") != "synthetic":
         raise SystemExit("Run only against an isolated synthetic acceptance volume with SOCIFY_CONTAINER_ACCEPTANCE=synthetic")
@@ -43,15 +59,9 @@ def main():
             connection.close()
 
     def wait(path, field, pending):
-        deadline = time.monotonic() + 50
-        while True:
-            result = call(path)
-            state = result[field]
-            if state not in pending:
-                return result
-            if time.monotonic() >= deadline:
-                raise TimeoutError("Synthetic local worker did not finish within the acceptance deadline")
-            time.sleep(0.2)
+        return wait_until(
+            lambda: (result := call(path))[field] not in pending and result, 50, message="Synthetic local worker did not finish within the acceptance deadline"
+        )
 
     call("/api/auth/login", {"email": email, "password": password})
     case = call(

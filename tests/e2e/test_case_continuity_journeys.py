@@ -2,11 +2,14 @@
 
 import io
 import zipfile
+from datetime import timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from playwright.sync_api import expect
 
+from socify import autopsy_workflow
 from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_review_workflow import ARTIFACTS, review_session
 
@@ -109,8 +112,9 @@ def test_case_continuity_from_the_user_interface(app, language, scenario):
                     expect(page.locator(".sla-summary")).to_contain_text(j.text("المهلة معلقة" if state == "paused" else "المهلة جارية"))
                     if state == "paused":
                         first = workflow(j)["sla"]["elapsed_work_seconds"]
-                        page.wait_for_timeout(1100)
-                        assert abs(workflow(j)["sla"]["elapsed_work_seconds"] - first) < 0.01
+                        # An hour passes on the server's clock while the SLA is paused; no work time may accrue.
+                        with patch.object(autopsy_workflow, "utc_now", return_value=autopsy_workflow.utc_now() + timedelta(hours=1)):
+                            assert abs(workflow(j)["sla"]["elapsed_work_seconds"] - first) < 0.01
             if scenario == "sla-analyst-permissions":
                 analyst.click("link", "الاستجابة")
                 expect(analyst.page.locator("input[name=minutes]")).to_have_count(0)
@@ -187,9 +191,11 @@ def test_case_continuity_from_the_user_interface(app, language, scenario):
                             content = source.read(name)
                             target.writestr(name, content + b" " if name == "data.json" else content)
                     file.set_input_files({"name": "damaged.zip", "mimeType": "application/zip", "buffer": buffer.getvalue()})
+                    # A fake clock moves past the 5.5-second toast timeout without waiting: the error must stay.
+                    analyst.page.clock.install()
                     analyst.click("button", "استعادة كقضية جديدة")
                     expect(analyst.page.get_by_role("alert")).to_be_visible()
-                    analyst.page.wait_for_timeout(6000)
+                    analyst.page.clock.fast_forward(6000)
                     expect(analyst.page.get_by_role("alert")).to_be_visible()
                     assert "/analysis-library" in analyst.page.url
                 file.set_input_files({"name": "retained-case.zip", "mimeType": "application/zip", "buffer": capsule})

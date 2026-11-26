@@ -1,7 +1,6 @@
-import time
-
 from scripts.environment import load_environment
 from scripts.local_services import local_worker_services
+from tests.waiting import wait_until
 
 
 def test_local_worker_process_shares_case_database_and_encryption_keys(autopsy_case, app, client):
@@ -10,12 +9,15 @@ def test_local_worker_process_shares_case_database_and_encryption_keys(autopsy_c
     )
     assert created.status_code == 202
     with local_worker_services(app.config) as processes:
-        deadline = time.monotonic() + 60  # spawned workers import the whole app; the loop exits as soon as the job settles
-        while time.monotonic() < deadline:
-            status = client.get(f"/api/cases/{autopsy_case}/imports/{created.json['id']}").json
-            if status["status"] in {"completed", "completed_with_errors", "failed"}:
-                break
-            time.sleep(0.05)
+        # Spawned workers import the whole app; the wait ends as soon as the job settles.
+        status = wait_until(
+            lambda: (
+                (job := client.get(f"/api/cases/{autopsy_case}/imports/{created.json['id']}").json)["status"]
+                in {"completed", "completed_with_errors", "failed"}
+                and job
+            ),
+            60,
+        )
         assert status["status"] == "completed", status
         assert status["accepted"] == 1
         assert client.get(f"/api/cases/{autopsy_case}/logs").json["items"][0]["title"] == "Separate process evidence"

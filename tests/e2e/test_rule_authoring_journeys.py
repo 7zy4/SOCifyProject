@@ -1,7 +1,6 @@
 """Publish a reviewed detection rule and recover without stale confirmation."""
 
 import json
-import time
 
 import pytest
 from conftest import DEMO_LOGIN_VALUE
@@ -10,6 +9,7 @@ from playwright.sync_api import expect
 from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_followup_handoff_journeys import evidence_images
 from tests.e2e.test_review_workflow import ARTIFACTS, review_session
+from tests.waiting import playwright_pause, wait_until
 
 TITLE = "Gateway identity detection"
 REASON = "Reviewed gateway identity evidence and expected non-matches"
@@ -65,10 +65,7 @@ def capture(j, result):
 
 
 def wait_held(j, held):
-    deadline = time.monotonic() + 10
-    while not held and time.monotonic() < deadline:
-        j.page.wait_for_timeout(50)
-    assert held, "The actual response was not captured"
+    wait_until(lambda: held, 10, pause=playwright_pause(j.page), message="The actual response was not captured")
 
 
 def publish(j):

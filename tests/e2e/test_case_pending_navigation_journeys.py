@@ -1,7 +1,6 @@
 """Keep a late case response separate from the next investigation."""
 
 import re
-import time
 
 import pytest
 from playwright.sync_api import expect
@@ -9,6 +8,7 @@ from playwright.sync_api import expect
 from tests.e2e.test_case_summary_recovery_journeys import context_form
 from tests.e2e.test_followup_handoff_journeys import evidence_images, manager_case
 from tests.e2e.test_review_workflow import review_session
+from tests.waiting import playwright_pause, wait_until
 
 
 @pytest.mark.e2e
@@ -58,10 +58,8 @@ def test_late_response_stays_with_its_case_and_respects_navigation_intent(app, l
             section.get_by_role("button", name=manager.text("حفظ"), exact=True).click()
         else:
             manager.page.get_by_role("button", name=manager.text("تحديث"), exact=True).click()
-        deadline = time.monotonic() + 5
-        while not held and time.monotonic() < deadline:
-            manager.page.wait_for_timeout(25)
-        assert held and held["response"].status == 200
+        wait_until(lambda: held, 5, pause=playwright_pause(manager.page), message="the held request was not captured")
+        assert held["response"].status == 200
         stay = scenario.endswith("stay")
         prompts = []
 

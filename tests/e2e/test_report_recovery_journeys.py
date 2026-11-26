@@ -3,7 +3,6 @@
 import secrets
 import sys
 import tempfile
-import time
 from pathlib import Path
 
 import pytest
@@ -13,6 +12,7 @@ from scripts.local_services import local_worker_services
 from tests.e2e.browser_helpers import assert_accessible
 from tests.e2e.test_batch_boundary_journeys import upload_logs
 from tests.e2e.test_review_workflow import ARTIFACTS, review_session
+from tests.waiting import playwright_pause, wait_until
 
 RETRYING = "إعداد التقرير متوقف مؤقتًا. ستتم إعادة المحاولة تلقائيًا."
 UNAVAILABLE = "تعذر إعداد التقرير حاليًا. بيانات التحقيق محفوظة."
@@ -29,14 +29,18 @@ def report(journey, path):
 
 
 def wait_for_service_failure(journey, path, *, terminal=False):
-    deadline = time.monotonic() + 40
     expected = "failed" if terminal else "queued"
-    while time.monotonic() < deadline:
-        job = report(journey, path)["job"]
-        if job["error_code"] == "ANALYSIS_UNAVAILABLE" and job["state"] == expected:
-            return job
-        journey.page.wait_for_timeout(250)
-    raise AssertionError(f"Worker did not reach the expected {expected} failure state: {job}")
+    latest = {}
+
+    def reached():
+        latest.update(report(journey, path)["job"])
+        return latest["error_code"] == "ANALYSIS_UNAVAILABLE" and latest["state"] == expected
+
+    try:
+        wait_until(reached, 40, interval=0.25, pause=playwright_pause(journey.page))
+    except TimeoutError as error:
+        raise AssertionError(f"Worker did not reach the expected {expected} failure state: {latest}") from error
+    return dict(latest)
 
 
 def absent_service(environment):

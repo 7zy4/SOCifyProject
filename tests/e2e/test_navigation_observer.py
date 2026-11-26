@@ -5,6 +5,7 @@ from playwright.sync_api import Error, sync_playwright
 
 from tests.e2e.browser_helpers import launch_browser
 from tests.e2e.test_review_workflow import ReviewJourney
+from tests.waiting import playwright_pause, wait_until
 
 
 class MissingCancellationSession:
@@ -115,9 +116,15 @@ def test_old_document_request_started_during_navigation_is_retired():
             content_type="text/html",
         )
         page.wait_for_url("**/second", wait_until="domcontentloaded")
-        page.wait_for_timeout(100)
-        assert not any(request.url.endswith("/held-old") for request in journey.pending)
-        assert any(request.url.endswith("/held-current") for request in journey.pending)
+        wait_until(
+            lambda: (
+                any(request.url.endswith("/held-current") for request in journey.pending)
+                and not any(request.url.endswith("/held-old") for request in journey.pending)
+            ),
+            5,
+            pause=playwright_pause(page),
+            message="the new page's request was not tracked, or the old page's request was not retired",
+        )
         held["held-current"].fulfill(body="ok")
         journey.settle()
         browser.close()

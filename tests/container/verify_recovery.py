@@ -10,6 +10,22 @@ from http.cookies import SimpleCookie
 from pathlib import Path
 
 
+def wait_until(check, timeout, *, interval=0.2, message="condition not met"):
+    """Return check()'s first truthy result, or raise TimeoutError after `timeout` seconds.
+
+    A local copy of tests/waiting.py: this script runs on its own (inside the container for verify_autopsy.py),
+    where the tests package is not available.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        result = check()
+        if result:
+            return result
+        if time.monotonic() >= deadline:
+            raise TimeoutError(message)
+        time.sleep(interval)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--env-file", required=True)
@@ -58,13 +74,7 @@ def main():
             connection.close()
 
     def wait(path, field, pending):
-        deadline = time.monotonic() + 90
-        while time.monotonic() < deadline:
-            result = call(path)
-            if result[field] not in pending:
-                return result
-            time.sleep(0.2)
-        raise TimeoutError("Synthetic recovery acceptance deadline exceeded")
+        return wait_until(lambda: (result := call(path))[field] not in pending and result, 90, message="Synthetic recovery acceptance deadline exceeded")
 
     call("/api/auth/login", {"email": email, "password": password})
     identity = call("/api/auth/me")
@@ -86,15 +96,14 @@ def main():
         run(compose + ["restart", "--timeout", "60"])
     finally:
         run(compose + ["start", "import-worker", "autopsy-worker"])
-    deadline = time.monotonic() + 60
-    while True:
+
+    def signed_in_again():
         try:
-            assert call("/api/auth/me") == identity
-            break
+            return call("/api/auth/me") == identity
         except (OSError, http.client.HTTPException, AssertionError):
-            if time.monotonic() >= deadline:
-                raise
-            time.sleep(0.5)
+            return False
+
+    wait_until(signed_in_again, 60, interval=0.5, message="The session did not survive the restart")
     assert wait(base + "/imports/" + str(pending_import["id"]), "status", {"queued", "processing", "interrupted"})["status"] == "completed"
     assert wait(base + "/jobs/" + str(pending_report["job_id"]), "state", {"queued", "processing"})["state"] == "completed"
     assert call(base + "/logs")["total"] == 2
@@ -107,16 +116,9 @@ def main():
     try:
         outage_report = call(base + "/reports", {"version": call(base)["version"]})
         job_path = base + "/jobs/" + str(outage_report["job_id"])
-        deadline = time.monotonic() + 15
-        while True:
-            status = call(job_path)
-            if status["attempts"]:
-                assert status["state"] == "queued" and status["error_code"] == "ANALYSIS_UNAVAILABLE", status
-                assert status["available_at"]
-                break
-            if time.monotonic() >= deadline:
-                raise TimeoutError("Worker did not observe the isolated backend outage")
-            time.sleep(0.1)
+        status = wait_until(lambda: (job := call(job_path))["attempts"] and job, 15, interval=0.1, message="Worker did not observe the isolated backend outage")
+        assert status["state"] == "queued" and status["error_code"] == "ANALYSIS_UNAVAILABLE", status
+        assert status["available_at"]
     finally:
         run(compose + ["start", "analysis"])
     recovered_analysis = wait(job_path, "state", {"queued", "processing"})

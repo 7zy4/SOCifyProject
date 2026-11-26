@@ -117,7 +117,13 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install --yes poppler-utils
       - run: npm install --no-save --ignore-scripts axe-core@4.14.0
       - uses: ./.github/actions/analysis-backend
-      - run: xvfb-run --auto-servernum --server-args="-screen 0 1600x1200x24" python -m pytest -m e2e tests/e2e --junitxml=artifacts/browser-junit.xml
+      # The two native report suites run in the native-decisions jobs below, so the shards skip them.
+      - run: >-
+          xvfb-run --auto-servernum --server-args="-screen 0 1600x1200x24"
+          python -m pytest -m e2e tests/e2e
+          --ignore=tests/e2e/test_native_delivery_decisions.py
+          --ignore=tests/e2e/test_native_completion_decisions.py
+          --junitxml=artifacts/browser-junit.xml
         env:
           SOCIFY_TEST_SHARD: ${{ matrix.shard }}/8
       - name: Audit operational pages in both languages, editions and viewport sizes
@@ -148,8 +154,6 @@ jobs:
             artifacts/usability_campaign/scope-continuity-decisions/
             artifacts/usability_campaign/source-provider-decisions/
             artifacts/usability_campaign/followup-decisions/
-            artifacts/usability_campaign/native-delivery-decisions/
-            artifacts/usability_campaign/native-completion-decisions/
             artifacts/usability_campaign/geoip-context-decisions/
             artifacts/usability_campaign/reputation-decisions/
             artifacts/usability_campaign/evidence-interpretation-decisions/

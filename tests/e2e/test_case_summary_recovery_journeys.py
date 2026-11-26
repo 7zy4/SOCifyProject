@@ -1,7 +1,5 @@
 """Finish one case action while keeping another investigation draft usable."""
 
-import time
-
 import pytest
 from playwright.sync_api import expect
 
@@ -9,6 +7,7 @@ from tests.e2e.test_assignment_handoff_journeys import choose, role_permission
 from tests.e2e.test_case_membership_journeys import member_row, remove, transferred
 from tests.e2e.test_followup_handoff_journeys import evidence_images, manager_case
 from tests.e2e.test_review_workflow import review_session
+from tests.waiting import playwright_pause, wait_until
 
 DRAFT = "Verify the retained identity approval before deciding the investigation outcome."
 
@@ -193,10 +192,8 @@ def test_independent_case_work_survives_refresh_review_and_recovery(app, languag
             expect(section.locator("[name=objective]")).to_be_disabled()
             action = member_form(manager, person)
             # The route handler fetches the real response in the background; wait for it before releasing it.
-            deadline = time.monotonic() + 10
-            while "response" not in held and time.monotonic() < deadline:
-                manager.page.wait_for_timeout(25)
-            assert "response" in held and held["response"].status == 200
+            wait_until(lambda: "response" in held, 10, pause=playwright_pause(manager.page), message="the held save was not captured")
+            assert held["response"].status == 200
             held["route"].fulfill(response=held["response"])
             manager.settle()
             manager.page.unroute(f"**/api/cases/{j.case_id}/context", hold)

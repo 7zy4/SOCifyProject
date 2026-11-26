@@ -121,7 +121,6 @@ def test_investigator_can_recover_and_keep_the_intended_reference(app, language,
             control.fill("Validate")
             control.press("Tab")
             j.page.keyboard.press("Tab")
-            j.page.wait_for_timeout(350)
             expect(control).to_have_attribute("aria-expanded", "false")
             control.fill("Validate primary evidence")
             control.press("ArrowDown")

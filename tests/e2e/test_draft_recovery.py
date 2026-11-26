@@ -96,7 +96,9 @@ def test_user_can_recover_drafts_without_silent_loss(app, language, scenario):
             manager.click("button", "إلغاء المعالجة")
             seen = []
             page.on("dialog", lambda dialog: (seen.append(dialog.type), dialog.dismiss()))
-            page.wait_for_timeout(5500)
+            # Two cycles of the background report refresh (each re-arms autopsyReportTimer) run while the draft is open.
+            for _ in range(2):
+                page.wait_for_function("start => autopsyReportTimer !== start", arg=page.evaluate("autopsyReportTimer"))
             expect(field).to_have_value(note)
             assert seen == []
             j.click("button", "حفظ إجابات التقرير")

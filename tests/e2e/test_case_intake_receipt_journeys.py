@@ -1,7 +1,5 @@
 """Begin a first investigation despite an interrupted creation response."""
 
-import time
-
 import pytest
 from playwright.sync_api import expect
 
@@ -13,6 +11,7 @@ from tests.e2e.test_followup_handoff_journeys import evidence_images
 from tests.e2e.test_investigation_link_journeys import note_dialog, records
 from tests.e2e.test_review_workflow import review_session
 from tests.e2e.test_scope_selection_journeys import approve
+from tests.waiting import playwright_pause, wait_until
 
 TITLE = "Gateway incident requiring investigation"
 OBJECTIVE = "Establish the affected identities and document the response decision"
@@ -84,9 +83,7 @@ def test_new_investigator_recovers_the_original_case(app, language, scenario):
 
         j.page.route("**/api/cases", intercept, times=2 if scenario == "case-intake-repeated-loss" else 1)
         dialog.get_by_role("button", name=j.text("حفظ"), exact=True).click()
-        deadline = time.monotonic() + 10
-        while not committed and time.monotonic() < deadline:
-            j.page.wait_for_timeout(50)
+        wait_until(lambda: committed, 10, pause=playwright_pause(j.page), message="the case request was not intercepted")
         assert len(committed) == 1
         if scenario == "case-intake-pending-edit":
             try:

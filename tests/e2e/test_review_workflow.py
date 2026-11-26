@@ -17,6 +17,7 @@ from werkzeug.serving import make_server
 from scripts.local_services import local_worker_services
 from tests.e2e.browser_helpers import assert_accessible, launch_browser
 from tests.e2e.document_requests import DocumentRequests
+from tests.waiting import playwright_pause, wait_until
 
 ANSWERS = {
     "incident_classification": "benign_activity",
@@ -52,19 +53,25 @@ class ReviewJourney:
 
     def settle(self):
         self.page.wait_for_load_state("networkidle")
-        deadline = time.monotonic() + 25
-        while time.monotonic() < deadline:
-            self.page.wait_for_timeout(75)
-            workspace = self.page.locator("#workspace")
-            if (
+        workspace = self.page.locator("#workspace")
+
+        def quiet():
+            # No request in flight, none started in the last 0.3 s, and the workspace says it has finished.
+            return (
                 not self.pending
                 and time.monotonic() - self.network.last_request > 0.3
                 and (not workspace.count() or workspace.get_attribute("aria-busy") == "false")
-            ):
-                return
-        pending = sorted((request.method, urlsplit(request.url).path, request.resource_type) for request in self.pending)
-        busy = workspace.get_attribute("aria-busy") if workspace.count() else None
-        raise AssertionError(f"The interface did not finish loading: aria-busy={busy!r}; pending={pending!r}")
+            )
+
+        pause = playwright_pause(self.page)
+        # The action that came before settle() starts its requests asynchronously; let them begin before the first check.
+        pause(0.075)
+        try:
+            wait_until(quiet, 25, interval=0.075, pause=pause)
+        except TimeoutError:
+            pending = sorted((request.method, urlsplit(request.url).path, request.resource_type) for request in self.pending)
+            busy = workspace.get_attribute("aria-busy") if workspace.count() else None
+            raise AssertionError(f"The interface did not finish loading: aria-busy={busy!r}; pending={pending!r}") from None
 
     def click(self, role, name, within=None):
         self.steps.append({"action": "activate", "label": name})
