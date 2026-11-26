@@ -5,10 +5,27 @@ import time
 import uuid
 from pathlib import Path
 
+from flask import Flask
+
 from scripts.environment import load_environment
 from socify import create_app
 from socify.db import get_db
 from socify.import_worker import run_import_worker_once
+from socify.worker_health import Heartbeat
+
+
+def serve(application: Flask, worker_id: str, lease_seconds: int, poll_seconds: float, once: bool = False) -> None:
+    """Process import jobs until stopped, recording a heartbeat on start, after each job and every 30 seconds while idle."""
+    heartbeat = Heartbeat("import-worker", worker_id)
+    with application.app_context():
+        heartbeat.beat(get_db(), "ready", force=True)
+        while True:
+            processed = run_import_worker_once(get_db(), worker_id, lease_seconds)
+            heartbeat.beat(get_db(), "idle" if processed is None else "active", force=processed is not None)
+            if once:
+                break
+            if processed is None:
+                time.sleep(poll_seconds)
 
 
 def main() -> None:
@@ -22,14 +39,7 @@ def main() -> None:
     if os.environ.get("SOCIFY_ENV", "development") != "production":
         load_environment(Path(__file__).resolve().parent.parent)
     worker_id = f"{socket.gethostname()}-{uuid.uuid4().hex[:12]}"
-    application = create_app()
-    with application.app_context():
-        while True:
-            processed = run_import_worker_once(get_db(), worker_id, arguments.lease_seconds)
-            if arguments.once:
-                break
-            if processed is None:
-                time.sleep(arguments.poll_seconds)
+    serve(create_app(), worker_id, arguments.lease_seconds, arguments.poll_seconds, arguments.once)
 
 
 if __name__ == "__main__":

@@ -43,6 +43,24 @@ def send(stream, payload, maximum):
 AF_UNIX = getattr(socket, "AF_UNIX", 1)
 
 
+def ping(path, timeout=4.0):
+    """Ask the isolated service for its version without giving it work; None when it does not answer in time.
+
+    The service handles one request at a time, so a ping waits behind a running job and may time out while it is busy.
+    """
+    try:
+        with socket.socket(AF_UNIX, socket.SOCK_STREAM) as stream:
+            stream.settimeout(timeout)
+            stream.connect(path)
+            send(stream, {"operation": "ping", "payload": {}}, MAX_REQUEST)
+            result = receive(stream, MAX_RESPONSE)
+    except (OSError, ValueError):
+        return None
+    if isinstance(result, dict) and set(result) == {"version"} and isinstance(result["version"], str):
+        return result["version"]
+    return None
+
+
 def remote_artifacts(path, payload, operation, formats, timeout):
     try:
         for delay in (0.1, 0.2, 0.4, None):

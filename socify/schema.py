@@ -844,6 +844,32 @@ def _record_existing_attack_catalog(connection: sqlite3.Connection, version: str
     )
 
 
+# Operational bookkeeping kept apart from case data: worker heartbeats (health checks, metrics) and backup runs.
+OPERATIONS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS worker_heartbeats (
+    name TEXT PRIMARY KEY,
+    instance TEXT,
+    pid INTEGER,
+    version TEXT,
+    started_at TEXT,
+    last_beat_at TEXT,
+    state TEXT
+);
+CREATE TABLE IF NOT EXISTS backup_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at TEXT NOT NULL,
+    finished_at TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('succeeded', 'failed')),
+    file_name TEXT,
+    size_bytes INTEGER,
+    sha256 TEXT,
+    encrypted INTEGER NOT NULL DEFAULT 0,
+    error TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_backup_runs_status ON backup_runs(status, finished_at);
+"""
+
+
 def _execute_schema(connection: sqlite3.Connection, schema: str) -> None:
     statement = ""
     for line in schema.splitlines(keepends=True):
@@ -864,6 +890,7 @@ def baseline_schema(connection: sqlite3.Connection) -> None:
     seed_reference_data(connection)
     _normalize_existing_rows(connection)
     _execute_schema(connection, INDEX_SCHEMA)
+    _execute_schema(connection, OPERATIONS_SCHEMA)
     migrate(connection)
     from .autopsy_workspace import migrate as migrate_workspace
     from .builtin_rules import seed_builtin_rules

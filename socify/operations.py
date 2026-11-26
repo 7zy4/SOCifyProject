@@ -33,7 +33,8 @@ def backup_database(source: str, destination: str) -> dict[str, object]:
     destination_connection = sqlite3.connect(str(destination_path))
     try:
         source_connection.backup(destination_connection)
-        destination_connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        # A backup is one self-contained file: the copy leaves WAL mode, so no -wal or -shm file is needed beside it.
+        destination_connection.execute("PRAGMA journal_mode = DELETE")
     finally:
         destination_connection.close()
         source_connection.close()

@@ -17,6 +17,7 @@ except ImportError:  # pragma: no cover - Windows compatibility
 from socify.analysis_transport import MAX_REQUEST, MAX_RESPONSE, receive, send
 from socify.autopsy_report_render import FORMATS
 from socify.autopsy_worker import compute_artifacts
+from socify.version import VERSION
 
 
 def verify_container():
@@ -92,6 +93,12 @@ def main():
                     if not isinstance(message, dict) or set(message) != {"operation", "payload"} or not isinstance(message["operation"], str):
                         raise ValueError("Invalid analysis operation")
                     operation = message["operation"]
+                    if operation == "ping":
+                        # The health check: answer with the version and touch no file or scratch storage.
+                        if message["payload"] != {}:
+                            raise ValueError("Invalid analysis ping")
+                        send(stream, {"version": VERSION}, MAX_RESPONSE)
+                        continue
                     if operation not in {"report", "sample", "probe", "yara_validation"}:
                         raise ValueError("Unknown analysis operation")
                     formats = list(FORMATS) if operation == "report" else [{"sample": "analysis", "probe": "probe", "yara_validation": "validation"}[operation]]

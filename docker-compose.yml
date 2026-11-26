@@ -25,7 +25,7 @@ services:
   socify:
     depends_on:
       analysis:
-        condition: service_started
+        condition: service_healthy
     build:
       context: .
       target: runtime
@@ -63,7 +63,12 @@ services:
     init: true
     stop_grace_period: 60s
     healthcheck:
-      disable: true
+      test: ["CMD", "python", "-m", "scripts.healthcheck", "worker", "--name", "autopsy-worker", "--max-age", "120"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+      start_interval: 5s
     build:
       context: .
       target: runtime
@@ -93,7 +98,12 @@ services:
   analysis:
     init: true
     healthcheck:
-      disable: true
+      test: ["CMD", "python", "-m", "scripts.healthcheck", "analysis"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+      start_interval: 5s
     build:
       context: .
       target: analysis
@@ -120,7 +130,12 @@ services:
         condition: service_healthy
     init: true
     healthcheck:
-      disable: true
+      test: ["CMD", "python", "-m", "scripts.healthcheck", "worker", "--name", "import-worker", "--max-age", "120"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+      start_interval: 5s
     build:
       context: .
       target: runtime
@@ -145,9 +160,49 @@ services:
     cap_drop:
       - ALL
     restart: unless-stopped
+  backup:
+    depends_on:
+      socify:
+        condition: service_healthy
+    init: true
+    healthcheck:
+      test: ["CMD", "python", "-m", "scripts.healthcheck", "worker", "--name", "backup", "--max-age", "120"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+      start_interval: 5s
+    build:
+      context: .
+      target: runtime
+    command: ["python", "-m", "scripts.backup_scheduler"]
+    # No credential key and no network: the service copies the database file and never reads encrypted values.
+    environment:
+      SOCIFY_DATABASE: /data/socify.db
+      SOCIFY_BACKUP_DIR: /backups
+      SOCIFY_BACKUP_INTERVAL_HOURS: ${SOCIFY_BACKUP_INTERVAL_HOURS:-24}
+      SOCIFY_BACKUP_KEEP: ${SOCIFY_BACKUP_KEEP:-14}
+      SOCIFY_BACKUP_KEY: ${SOCIFY_BACKUP_KEY:-}
+    network_mode: none
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 32
+    volumes:
+      # Read-write because SQLite needs the -shm file to read a database in WAL mode.
+      - socify-data:/data
+      - socify-backups:/backups
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
 
 volumes:
   socify-data:
+  socify-backups:
   analysis-ipc:
 
 networks:

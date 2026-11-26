@@ -213,12 +213,17 @@ jobs:
                   print(f"::add-mask::{value}")
                   environment.write(f"{name}={value}\n")
           PY
-      - run: docker compose up --detach --build
+      # --wait returns once every service reports healthy, and fails if one becomes unhealthy or exits.
+      - run: docker compose up --detach --build --wait --wait-timeout 300
       - run: curl --fail --retry 20 --retry-delay 2 --retry-all-errors http://127.0.0.1:5000/health/ready
       - run: docker compose exec -T -e SOCIFY_CONTAINER_ACCEPTANCE=synthetic socify python - < tests/container/verify_autopsy.py
       - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp autopsy-worker
       - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp import-worker
       - run: docker compose ps --status running --services | grep --fixed-strings --line-regexp analysis
+      - name: Every service still reports healthy after the acceptance run
+        run: |
+          docker compose ps --format '{{.Service}} {{.Health}}'
+          test -z "$(docker compose ps --format '{{.Service}} {{.Health}}' | grep -v ' healthy$')"
       - if: always()
         run: docker compose logs
       - if: always()

@@ -8,6 +8,10 @@ from .db import get_db
 from .security import ROLE_PERMISSIONS, current_user, error_response, login_required, require_permission, workspace_id
 from .timeutils import iso_now
 from .version import VERSION
+from .worker_health import heartbeat_ages, worker_healthy
+
+# Matches the Compose health checks: a worker that has not reported for two minutes, and holds no live lease, is unhealthy.
+WORKER_MAX_AGE_SECONDS = 120
 
 platform_api = Blueprint("platform", __name__)
 
@@ -127,7 +131,21 @@ def health_metrics():
             "Signed-in sessions that are neither revoked nor expired.",
             [("", float(get_db().execute("SELECT COUNT(*) FROM auth_sessions WHERE revoked_at IS NULL AND expires_at > ?", (now,)).fetchone()[0]))],
         ),
+        (
+            "socify_worker_heartbeat_age_seconds",
+            "Seconds since each worker last reported; a worker that never reported has no sample.",
+            [(f'{{worker="{name}"}}', age) for name, age in sorted(heartbeat_ages(get_db()).items())],
+        ),
     ]
+    last_backup = get_db().execute("SELECT MAX(finished_at) FROM backup_runs WHERE status = 'succeeded'").fetchone()[0]
+    if last_backup:
+        families.append(
+            (
+                "socify_backup_last_success_age_seconds",
+                "Seconds since the last successful scheduled backup; absent until the first one succeeds.",
+                [("", _age_seconds("SELECT MAX(finished_at) FROM backup_runs WHERE status = 'succeeded'"))],
+            )
+        )
     lines = []
     for name, description, samples in families:
         lines += [f"# HELP {name} {description}", f"# TYPE {name} gauge"]
@@ -153,6 +171,11 @@ def health_api():
     )
     failed_rules = int(get_db().execute("SELECT COALESCE(SUM(failed_evaluations), 0) FROM rules WHERE workspace_id = ?", (workspace_id(),)).fetchone()[0])
     attack_version = get_db().execute("SELECT value FROM schema_meta WHERE key = 'attack_version'").fetchone()
+    states = {row["name"]: row["state"] for row in get_db().execute("SELECT name, state FROM worker_heartbeats").fetchall()}
+    workers = {
+        name: {"heartbeat_age_seconds": round(age, 1), "state": states.get(name), "healthy": worker_healthy(get_db(), name, WORKER_MAX_AGE_SECONDS)}
+        for name, age in sorted(heartbeat_ages(get_db()).items())
+    }
     return jsonify(
         {
             "status": "healthy",
@@ -166,6 +189,7 @@ def health_api():
             },
             "rule_evaluation_failures": failed_rules,
             "attack_version": attack_version["value"] if attack_version else "unknown",
+            "workers": workers,
             "time": iso_now(),
         }
     )

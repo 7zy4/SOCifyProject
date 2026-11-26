@@ -1,5 +1,6 @@
 import os
 import secrets
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -79,3 +80,38 @@ def build_config() -> dict[str, object]:
         "RATE_LIMIT_REAUTH_ATTEMPTS": _integer("SOCIFY_REAUTH_ATTEMPTS", 5),
         "REAUTH_REVOKE_SESSION": _boolean("SOCIFY_REAUTH_REVOKE_SESSION", True),
     }
+
+
+@dataclass(frozen=True)
+class BackupSettings:
+    database: str
+    directory: str
+    interval_hours: float
+    keep: int
+    key: str | None
+
+
+def backup_settings() -> BackupSettings:
+    """Settings for the backup service (scripts/backup_scheduler.py), validated when it starts.
+
+    The backup key is separate from the credential key: losing one never exposes or locks the other.
+    """
+    try:
+        interval = float(os.environ.get("SOCIFY_BACKUP_INTERVAL_HOURS", "24"))
+    except ValueError:
+        interval = -1.0
+    if not 1 <= interval <= 720:
+        raise RuntimeError("SOCIFY_BACKUP_INTERVAL_HOURS must be between 1 and 720")
+    keep = _integer("SOCIFY_BACKUP_KEEP", 14)
+    if not 1 <= keep <= 1000:
+        raise RuntimeError("SOCIFY_BACKUP_KEEP must be between 1 and 1000")
+    key = os.environ.get("SOCIFY_BACKUP_KEY", "").strip() or None
+    if key is not None and len(key) < 32:
+        raise RuntimeError("SOCIFY_BACKUP_KEY must be at least 32 characters; leave it unset to keep backups unencrypted")
+    return BackupSettings(
+        database=os.environ.get("SOCIFY_DATABASE", str(Path.cwd() / "socify.db")),
+        directory=os.environ.get("SOCIFY_BACKUP_DIR", "/backups"),
+        interval_hours=interval,
+        keep=keep,
+        key=key,
+    )

@@ -144,11 +144,12 @@ docker compose exec socify python -m scripts.bootstrap_team --email you@example.
 | تريد أن | الأمر |
 |---|---|
 | توقف المنصة مع بقاء البيانات | `docker compose down` |
-| تحدّث إلى إصدار أحدث | خذ [نسخة احتياطية](docs/operations.md#النسخ-الاحتياطي)، ثم `git pull` و`docker compose up -d --build` |
+| تحدّث إلى إصدار أحدث | تأكد من [نسخة احتياطية](docs/operations.md#النسخ-الاحتياطي) حديثة (خدمة `backup` تأخذ نسخة يومية، أو `docker compose exec backup python -m scripts.backup_scheduler --once`)، ثم `git pull` و`docker compose up -d --build` |
 | ترى حالة الخدمات | `docker compose ps` |
 
 - لا تستخدم `docker compose down -v`: الخيار يحذف حجم البيانات.
 - لتغيير المنفذ أضف `SOCIFY_HTTP_PORT` إلى `.env`، فتعمل المنصة على `127.0.0.1` بذلك المنفذ.
+- خدمة `backup` تأخذ نسخة يومية من القاعدة إلى حجم `socify-backups` وتبقي أحدث 14 نسخة؛ لتشفيرها أضف `SOCIFY_BACKUP_KEY` إلى `.env`، وانسخ الملفات خارج المضيف بانتظام.
 - النسخ الاحتياطي والاستعادة وتدوير المفاتيح والنشر خلف HTTPS في [دليل التشغيل](docs/operations.md).
 - لتجربة المنصة ببيانات جاهزة دون تثبيت شيء، افتح Codespace من المستودع واتبع [دليل Codespaces](docs/codespaces.md#عرض-ببيانات-جاهزة).
 
