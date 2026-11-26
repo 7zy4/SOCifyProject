@@ -106,7 +106,7 @@ window.SOCifyIntake = (() => {
       { label: SOCifyLocale.text("التكامل"), value: "integration_name" },
       { label: SOCifyLocale.text("آخر ظهور"), value: (item) => formatTime(item.last_seen) },
       { label: SOCifyLocale.text("التكرار"), value: (item) => String(item.occurrence_count) },
-      { label: SOCifyLocale.text("الحالة"), value: (item) => statusLabels[item.status]() },
+      { label: SOCifyLocale.text("الحالة"), value: (item) => node("span", { class: "badge", text: statusLabels[item.status]() }) },
       { label: SOCifyLocale.text("إجراء"), value: (item) => button(SOCifyLocale.text("عرض التنبيه"), () => open(item).catch(handleError)) },
     ], data.items) : emptyState(SOCifyLocale.text("لا توجد تنبيهات واردة بهذه المرشحات"), integrations.items.length ? null : SOCifyLocale.text("يضيف مدير الفريق تكاملات الاستقبال من صفحة الفريق.")), true));
     finish(root);
@@ -144,7 +144,8 @@ window.SOCifyIntake = (() => {
         { label: SOCifyLocale.text("النوع"), value: "kind" },
         { label: SOCifyLocale.text("المصادقة"), value: (item) => (item.auth_mode === "hmac" ? "HMAC" : "API token") },
         { label: SOCifyLocale.text("العنوان"), value: (item) => node("bdi", { dir: "ltr", text: item.endpoint }) },
-        { label: SOCifyLocale.text("الحالة"), value: (item) => button(item.enabled ? SOCifyLocale.text("إيقاف") : SOCifyLocale.text("تشغيل"), async () => { await api(`/api/intake/integrations/${item.id}`, { method: "PATCH", body: { enabled: !item.enabled } }); await draw(); }) },
+        { label: SOCifyLocale.text("الحالة"), value: (item) => node("span", { class: "badge", text: item.enabled ? SOCifyLocale.text("يعمل") : SOCifyLocale.text("موقوف") }) },
+        { label: SOCifyLocale.text("إجراء"), value: (item) => button(item.enabled ? SOCifyLocale.text("إيقاف") : SOCifyLocale.text("تشغيل"), async () => { await api(`/api/intake/integrations/${item.id}`, { method: "PATCH", body: { enabled: !item.enabled } }); await draw(); }) },
       ], data.items) : emptyState(SOCifyLocale.text("لا توجد تكاملات استقبال"), null);
       holder.replaceChildren(node("p", { text: SOCifyLocale.text("استقبل تنبيهات SIEM وEDR في قناة الوارد بصفحة التنبيهات، ثم حوّلها إلى قضايا.") }), form, list);
     };

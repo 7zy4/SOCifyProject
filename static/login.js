@@ -23,10 +23,10 @@
     // Only the fact that this browser signs in with a code is kept, never the code or the account.
     try { localStorage.setItem(hintKey, "1"); } catch (_) { /* Storage may be blocked; the field still opens now. */ }
   }
-  function show(text) {
+  function show(text, error = true) {
     for (const old of form.querySelectorAll(".notice")) old.remove();
     const notice = document.createElement("div");
-    notice.className = "notice error";
+    notice.className = error ? "notice error" : "notice";
     notice.setAttribute("role", "alert");
     notice.dataset.loginMessage = "";
     notice.textContent = text;
@@ -77,7 +77,7 @@
     const wait = Number(payload.error.details?.retry_after);
     show(Number.isSafeInteger(wait) && wait > 0
       ? SOCifyLocale.template`محاولات دخول خاطئة كثيرة لهذا الحساب. أعد المحاولة بعد ${wait} ثانية.`
-      : SOCifyLocale.error(errorCode, messages[errorCode] || fallback));
+      : SOCifyLocale.error(errorCode, messages[errorCode] || fallback), errorCode !== "MFA_REQUIRED");
     if (errorCode === "MFA_REQUIRED" && mfa && codeField) {
       remember();
       mfa.open = true;

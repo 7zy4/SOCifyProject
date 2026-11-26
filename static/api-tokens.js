@@ -61,7 +61,7 @@ window.SOCifyApiTokens = (() => {
       }) : "—") },
     ], data.items) : emptyState(SOCifyLocale.text("لا توجد رموز API"), null);
     holder.replaceChildren(
-      node("p", { text: SOCifyLocale.text("رموز لربط الأنظمة الأخرى بالمنصة عبر Authorization: Bearer. يعمل الرمز بصلاحيات من أنشأه ضمن النطاقات المختارة فقط.") }),
+      node("p", { text: SOCifyLocale.text("رموز تربط الأنظمة الأخرى بالمنصة دون جلسة متصفح. يعمل الرمز بصلاحيات من أنشأه وفي النطاقات المختارة فقط.") }),
       form,
       list,
     );
