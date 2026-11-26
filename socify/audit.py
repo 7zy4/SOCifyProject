@@ -2,7 +2,7 @@ import json
 import sqlite3
 from typing import Any
 
-from flask import has_request_context, request, session
+from flask import g, has_request_context, request, session
 
 from .db import inserted_id
 from .security import correlation_id, redact
@@ -20,8 +20,15 @@ def record_audit(
     workspace: int | None = None,
 ) -> int:
     """Append a security audit entry with actor, team, client address and user agent; details are redacted before they are stored."""
-    actor_id = actor if actor is not None else session.get("user_id") if has_request_context() else None
-    workspace_id = workspace if workspace is not None else session.get("workspace_id") if has_request_context() else None
+    principal = getattr(g, "current_user", None) if has_request_context() else None
+    via_token = getattr(g, "api_token_id", None) if has_request_context() else None
+    # A bearer request has no browser session: its principal is the token's account (socify.api_tokens).
+    session_actor = principal["id"] if via_token is not None and principal else session.get("user_id") if has_request_context() else None
+    session_workspace = principal["workspace_id"] if via_token is not None and principal else session.get("workspace_id") if has_request_context() else None
+    actor_id = actor if actor is not None else session_actor
+    workspace_id = workspace if workspace is not None else session_workspace
+    if via_token is not None:
+        details = {**(details or {}), "api_token_id": via_token}
     ip_address = request.remote_addr if has_request_context() else None
     user_agent = request.headers.get("User-Agent", "")[:500] if has_request_context() else None
     clean_details = redact(details or {})

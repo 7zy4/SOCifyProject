@@ -6,6 +6,7 @@ from typing import Any
 from cryptography.fernet import InvalidToken
 from flask import Blueprint, Response, g, jsonify, request
 
+from .api_tokens import accepts_token
 from .autopsy_api import case_summary, manager, record_view
 from .autopsy_domain import canonical, custody, text_value
 from .autopsy_pipeline import case_full_access
@@ -306,6 +307,7 @@ def create_report(case_id: int):
 
 
 @autopsy_reports_api.get("/api/cases/<int:case_id>/reports/<int:report_id>")
+@accepts_token("reports:read")
 @require_permission("cases.read")
 def get_report(case_id: int, report_id: int):
     if not _case_row(case_id):
@@ -332,6 +334,7 @@ def get_report(case_id: int, report_id: int):
 
 
 @autopsy_reports_api.get("/api/cases/<int:case_id>/reports/<int:report_id>/files/<report_format>")
+@accepts_token("reports:read")
 @require_permission("cases.read")
 def download_report(case_id: int, report_id: int, report_format: str):
     if not _case_row(case_id):

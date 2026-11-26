@@ -40,6 +40,9 @@ services:
       SOCIFY_TRUSTED_HOSTS: localhost,127.0.0.1
       SOCIFY_TRUSTED_PROXIES: "1"
       SOCIFY_ANALYSIS_SOCKET: /analysis-ipc/analysis.sock
+      # Outbound delivery is off until SOCIFY_EGRESS_ENABLED=1 and the egress profile runs (docs/operations.md).
+      SOCIFY_EGRESS_ENABLED: ${SOCIFY_EGRESS_ENABLED:-0}
+      SOCIFY_OUTBOX_DATABASE: /outbox/outbox.db
     networks:
       - socify-internal
     mem_limit: 1g
@@ -48,6 +51,7 @@ services:
     volumes:
       - socify-data:/data
       - analysis-ipc:/analysis-ipc:ro
+      - socify-outbox:/outbox
     read_only: true
     tmpfs:
       - /tmp:size=64m,noexec,nosuid,nodev
@@ -199,13 +203,59 @@ services:
     cap_drop:
       - ALL
     restart: unless-stopped
+  egress:
+    # Off by default: start it with `docker compose --profile egress up -d` after configuring destinations.
+    profiles: ["egress"]
+    init: true
+    healthcheck:
+      test: ["CMD", "python", "-m", "scripts.healthcheck", "worker", "--name", "egress", "--database", "/outbox/outbox.db", "--max-age", "120"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+      start_interval: 5s
+    build:
+      context: .
+      target: runtime
+    command: ["python", "-m", "scripts.run_egress_worker"]
+    # The only service with internet access: no case database, no credential key, no analysis socket.
+    environment:
+      SOCIFY_OUTBOX_DATABASE: /outbox/outbox.db
+      SOCIFY_EGRESS_ALLOWLIST: ${SOCIFY_EGRESS_ALLOWLIST:-}
+      SOCIFY_EGRESS_WEBHOOKS: ${SOCIFY_EGRESS_WEBHOOKS:-}
+      SOCIFY_EGRESS_MAX_ATTEMPTS: ${SOCIFY_EGRESS_MAX_ATTEMPTS:-8}
+      SOCIFY_EGRESS_TOKEN: ${SOCIFY_EGRESS_TOKEN:-}
+      SOCIFY_SMTP_HOST: ${SOCIFY_SMTP_HOST:-}
+      SOCIFY_SMTP_PORT: ${SOCIFY_SMTP_PORT:-}
+      SOCIFY_SMTP_TLS: ${SOCIFY_SMTP_TLS:-starttls}
+      SOCIFY_SMTP_USERNAME: ${SOCIFY_SMTP_USERNAME:-}
+      SOCIFY_SMTP_PASSWORD: ${SOCIFY_SMTP_PASSWORD:-}
+      SOCIFY_SMTP_FROM: ${SOCIFY_SMTP_FROM:-}
+    networks:
+      - socify-internal
+      - egress
+    mem_limit: 256m
+    cpus: 1
+    pids_limit: 64
+    volumes:
+      - socify-outbox:/outbox
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
 
 volumes:
   socify-data:
   socify-backups:
+  socify-outbox:
   analysis-ipc:
 
 networks:
   ingress:
+  egress:
   socify-internal:
     internal: true

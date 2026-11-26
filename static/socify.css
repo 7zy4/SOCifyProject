@@ -186,6 +186,13 @@ details > summary:hover { color: var(--text); }
 .onboarding-steps li.done .onboarding-step strong { color: var(--muted); }
 .onboarding-step p { margin: 4px 0 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 @media (max-width: 640px) { .onboarding-steps li { grid-template-columns: minmax(0, 1fr); } }
+.token-scopes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-card); }
+.token-scopes legend { padding-inline: 4px; color: var(--muted); font-size: 13px; }
+.intake-entities { display: grid; gap: 4px 0; margin: 0; }
+.intake-entities dt { color: var(--muted); font-size: 13px; }
+.intake-entities dd { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.intake-entities .badge { height: auto; min-height: 22px; white-space: normal; overflow-wrap: anywhere; }
+.intake-detail pre { max-height: 320px; overflow: auto; font-size: 12px; }
 /* Actions that follow a table, a list of records or an empty state never touch it. */
 :is(.table-wrap, table, .empty, .compact-empty, .record-grid) + :is(.action-row, .pagination, form, .button, button, nav) { margin-block-start: 12px; }
 :is(form, .filter-row, .action-row) + :is(.table-wrap, table, .record-grid, .empty, .compact-empty) { margin-block-start: 12px; }

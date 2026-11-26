@@ -94,6 +94,11 @@ ROLE_PERMISSIONS.update(
 ROLE_PERMISSIONS["soc_manager"].update({"reports.approve", "cases.assign", "intel.manage", "samples.download"})
 for _role in ("analyst", "l1_analyst", "l2_responder", "investigator", "soc_manager"):
     ROLE_PERMISSIONS[_role].update({"cases.export", "evidence.download"})
+# Alert intake (socify.intake): seeing the queue, and turning alerts into cases, links or dismissals.
+for _role in ("analyst", "l1_analyst", "l2_responder", "investigator", "soc_manager", "instructor"):
+    ROLE_PERMISSIONS[_role].update({"intake.read", "intake.triage"})
+for _role in ("auditor", "reviewer"):
+    ROLE_PERMISSIONS[_role].add("intake.read")
 
 SENSITIVE_KEYS = {"password", "current_password", "new_password", "api_key", "secret", "token", "credential", "authorization", "backup_codes"}
 

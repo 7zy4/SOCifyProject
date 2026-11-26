@@ -4,6 +4,7 @@ from typing import Any
 
 from flask import Blueprint, jsonify, request
 
+from .api_tokens import accepts_token
 from .autopsy_domain import KINDS, canonical, custody, member_has_open_work, text_value, touch_case, validate_record
 from .case_counts import cached_case_count, consistent_read
 from .case_policy import case_policy
@@ -262,12 +263,14 @@ def case_task_list(case_id: int):
 
 
 @autopsy_api.get("/api/cases")
+@accepts_token("cases:read")
 @require_permission("cases.read")
 def cases_list():
     return list_cases()
 
 
 @autopsy_api.post("/api/cases")
+@accepts_token("cases:write")
 @require_permission("cases.create")
 def cases_create():
     return create_case()
@@ -356,6 +359,7 @@ def case_claim(case_id: int):
 
 
 @autopsy_api.get("/api/cases/<int:case_id>")
+@accepts_token("cases:read")
 @case_policy(before_approval={"GET"}, batch_member={"GET"})
 @require_permission("cases.read")
 def case_get(case_id: int):

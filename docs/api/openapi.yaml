@@ -5127,6 +5127,301 @@
         }
       }
     },
+    "/api/intake/{integration_id}/alerts": {
+      "post": {
+        "operationId": "intake_receive_alerts_post__api_intake_integration_id_alerts",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "integration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/intake/alerts": {
+      "get": {
+        "operationId": "intake_list_alerts_get__api_intake_alerts",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/intake/alerts/{alert_id}": {
+      "get": {
+        "operationId": "intake_alert_detail_get__api_intake_alerts_alert_id",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "alert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/intake/alerts/{alert_id}/case": {
+      "post": {
+        "operationId": "intake_alert_to_case_post__api_intake_alerts_alert_id_case",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "alert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/intake/alerts/{alert_id}/dismiss": {
+      "post": {
+        "operationId": "intake_dismiss_alert_post__api_intake_alerts_alert_id_dismiss",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "alert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/intake/alerts/{alert_id}/link": {
+      "post": {
+        "operationId": "intake_alert_to_existing_case_post__api_intake_alerts_alert_id_link",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "alert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/intake/integrations": {
+      "get": {
+        "operationId": "intake_list_integrations_get__api_intake_integrations",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "intake_create_integration_post__api_intake_integrations",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/intake/integrations/{integration_id}": {
+      "patch": {
+        "operationId": "intake_update_integration_patch__api_intake_integrations_integration_id",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "integration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/investigation-selection": {
       "get": {
         "operationId": "autopsy_workspace_selection_get_get__api_investigation-selection",
@@ -5274,6 +5569,65 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/outbox": {
+      "get": {
+        "operationId": "outbox_outbox_list_get__api_outbox",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/outbox/{message_id}/retry": {
+      "post": {
+        "operationId": "outbox_outbox_retry_post__api_outbox_message_id_retry",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
             }
           }
         ],
@@ -6217,6 +6571,82 @@
             }
           }
         }
+      }
+    },
+    "/api/tokens": {
+      "get": {
+        "operationId": "api_tokens_list_tokens_get__api_tokens",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "api_tokens_create_token_post__api_tokens",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tokens/{token_id}": {
+      "delete": {
+        "operationId": "api_tokens_revoke_token_delete__api_tokens_token_id",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "token_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
       }
     },
     "/api/watchlist": {

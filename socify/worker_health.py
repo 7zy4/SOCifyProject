@@ -10,15 +10,19 @@ import socket
 import sqlite3
 import time
 
-from .db import database_is_busy
 from .timeutils import iso_now, parse_timestamp, utc_now
 from .version import VERSION
 
 HEARTBEAT_SECONDS = 30
-WORKER_NAMES = ("import-worker", "autopsy-worker", "backup")
+WORKER_NAMES = ("import-worker", "autopsy-worker", "backup", "egress")
 
 # The job tables a worker leases, keyed by worker name: (table, state column).
 LEASED_JOBS = {"import-worker": ("ingestion_jobs", "status"), "autopsy-worker": ("autopsy_jobs", "state")}
+
+
+def _busy(error: sqlite3.Error) -> bool:
+    # Same test as socify.db.database_is_busy, kept here so health checks import no Flask code.
+    return getattr(error, "sqlite_errorcode", 0) & 0xFF in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}
 
 
 def worker_instance() -> str:
@@ -37,7 +41,7 @@ def record_heartbeat(connection: sqlite3.Connection, name: str, instance: str, s
             (name, instance, os.getpid(), VERSION, started_at, iso_now(), state),
         )
     except sqlite3.OperationalError as error:
-        if not database_is_busy(error):
+        if not _busy(error):
             raise
         return False
     return True

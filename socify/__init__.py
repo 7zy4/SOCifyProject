@@ -1,48 +1,55 @@
+"""SOCify: create_app builds the Flask application; importing the package itself stays light.
+
+Modules are imported inside create_app, so a small tool (such as a container health check) that imports one module
+does not load Flask and every blueprint first.
+"""
+
 import logging
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from flask import Flask, g, request
-from flask_wtf.csrf import CSRFProtect
-from werkzeug.middleware.proxy_fix import ProxyFix
-
-from .auth import auth_api
-from .autopsy_api import autopsy_api
-from .autopsy_capsules import autopsy_capsules_api
-from .autopsy_chronology import autopsy_chronology_api
-from .autopsy_detection import autopsy_detection_api
-from .autopsy_email import autopsy_email_api
-from .autopsy_ingestion import autopsy_ingestion_api
-from .autopsy_intel import autopsy_intel_api
-from .autopsy_investigation import autopsy_investigation_api
-from .autopsy_procedures import autopsy_procedures_api
-from .autopsy_reports import autopsy_reports_api
-from .autopsy_samples import autopsy_samples_api
-from .autopsy_soc import autopsy_soc_api
-from .autopsy_workflow import autopsy_workflow_api
-from .autopsy_workspace import autopsy_workspace_api
-from .autopsy_yara import autopsy_yara_api
-from .cases import cases_api
-from .codespaces_proxy import CodespacesProxy
-from .config import build_config
-from .db import close_db, connect_path
-from .errors import register_error_handlers
-from .platform import platform_api
-from .request_limits import BoundedRequest
-from .responses import register_response_policy
-from .schema import ensure_schema
-from .security import correlation_id, error_response
-from .soc_insights import soc_insights_api
-from .sources import sources_api
-from .static_assets import register_static_fingerprints
-from .teams import teams_api
-from .ui import ui
-
-csrf = CSRFProtect()
+if TYPE_CHECKING:
+    from flask import Flask
 
 
-def create_app(test_config: dict[str, Any] | None = None) -> Flask:
+def create_app(test_config: dict[str, Any] | None = None) -> "Flask":
+    from flask import Flask, g, request
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    from .auth import auth_api
+    from .autopsy_api import autopsy_api
+    from .autopsy_capsules import autopsy_capsules_api
+    from .autopsy_chronology import autopsy_chronology_api
+    from .autopsy_detection import autopsy_detection_api
+    from .autopsy_email import autopsy_email_api
+    from .autopsy_ingestion import autopsy_ingestion_api
+    from .autopsy_intel import autopsy_intel_api
+    from .autopsy_investigation import autopsy_investigation_api
+    from .autopsy_procedures import autopsy_procedures_api
+    from .autopsy_reports import autopsy_reports_api
+    from .autopsy_samples import autopsy_samples_api
+    from .autopsy_soc import autopsy_soc_api
+    from .autopsy_workflow import autopsy_workflow_api
+    from .autopsy_workspace import autopsy_workspace_api
+    from .autopsy_yara import autopsy_yara_api
+    from .cases import cases_api
+    from .codespaces_proxy import CodespacesProxy
+    from .config import build_config
+    from .db import close_db, connect_path
+    from .errors import register_error_handlers
+    from .extensions import csrf
+    from .platform import platform_api
+    from .request_limits import BoundedRequest
+    from .responses import register_response_policy
+    from .schema import ensure_schema
+    from .security import correlation_id, error_response
+    from .soc_insights import soc_insights_api
+    from .sources import sources_api
+    from .static_assets import register_static_fingerprints
+    from .teams import teams_api
+    from .ui import ui
+
     root = Path(__file__).parent.parent
     app = Flask(__name__, template_folder=str(root / "templates"), static_folder=str(root / "static"))
     app.request_class = BoundedRequest
@@ -96,7 +103,11 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         teams_api,
     ):
         app.register_blueprint(blueprint)
+    from .api_tokens import api_tokens_api
+    from .api_tokens import register as register_api_tokens
+    from .intake import intake_api
     from .onboarding import onboarding_api
+    from .outbox import outbox_api
     from .quick_reports import quick_reports_api
     from .sources import source_webhook_ingest
     from .watchlist import watchlist_api
@@ -104,7 +115,12 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     app.register_blueprint(watchlist_api)
     app.register_blueprint(quick_reports_api)
     app.register_blueprint(onboarding_api)
+    app.register_blueprint(api_tokens_api)
+    app.register_blueprint(outbox_api)
+    app.register_blueprint(intake_api)
     csrf.exempt(source_webhook_ingest)
+    # Before prepare_request, so the workspace and batch guards see the token's account.
+    register_api_tokens(app)
 
     @app.before_request
     def prepare_request():

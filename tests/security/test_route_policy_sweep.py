@@ -15,7 +15,10 @@ from tests.conftest import issue_session
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 # State-changing requests accepted without a CSRF token; each authenticates with its own credential instead.
-CSRF_EXEMPT = {("POST", "/api/sources/<int:source_id>/ingest")}  # per-source ingestion key
+CSRF_EXEMPT = {
+    ("POST", "/api/sources/<int:source_id>/ingest"),  # per-source ingestion key
+    ("POST", "/api/intake/<int:integration_id>/alerts"),  # HMAC signature or an intake:write API token (socify.intake)
+}
 
 # Rules an anonymous browser may use, and the answer it gets to an empty request (status, error code or redirect path).
 PUBLIC = {
@@ -33,6 +36,7 @@ PUBLIC = {
     # Aggregate counts for operators: absent until SOCIFY_METRICS_TOKEN is set, then bearer-token only (and refused by the ingress).
     ("GET", "/health/metrics"): (404, None),
     ("POST", "/api/sources/<int:source_id>/ingest"): (401, "INVALID_SOURCE_KEY"),
+    ("POST", "/api/intake/<int:integration_id>/alerts"): (401, "INTAKE_AUTHENTICATION_FAILED"),
     ("GET", "/"): (302, "/login"),
 }
 

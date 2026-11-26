@@ -2,6 +2,7 @@
 
 const teamPermissionLabels = {
   "alerts.read": "عرض التنبيهات", "alerts.triage": "فرز التنبيهات",
+  "intake.read": "عرض التنبيهات الواردة", "intake.triage": "فرز التنبيهات الواردة",
   "audit.read": "عرض سجل التدقيق", "cases.create": "إنشاء القضايا",
   "cases.export": "تصدير القضايا", "cases.read": "عرض القضايا", "cases.update": "تعديل القضايا",
   "events.create": "استيراد السجلات", "events.read": "عرض السجلات",
@@ -129,5 +130,9 @@ window.SOCifyAutopsy.team = async () => {
     root.append(panel(SOCifyLocale.text("إسناد دفعة سجلات"), node("div", { class: "panel-body" }, form), true));
   }
   if (permission("cases.read")) root.append(await autopsyAssignmentQueue());
+  const integrations = window.SOCifyIntake ? await window.SOCifyIntake.integrationsPanel() : null;
+  if (integrations) root.append(integrations);
+  const tokens = window.SOCifyApiTokens ? await window.SOCifyApiTokens.panel() : null;
+  if (tokens) root.append(tokens);
   finish(root);
 };

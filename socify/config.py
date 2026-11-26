@@ -78,6 +78,9 @@ def build_config() -> dict[str, object]:
         "RATE_LIMIT_SOURCE_KEY_ATTEMPTS": _integer("SOCIFY_SOURCE_KEY_ATTEMPTS", 20),
         "RATE_LIMIT_LOGIN_WINDOW_SECONDS": _integer("SOCIFY_LOGIN_WINDOW_SECONDS", 900),
         "RATE_LIMIT_REAUTH_ATTEMPTS": _integer("SOCIFY_REAUTH_ATTEMPTS", 5),
+        "EGRESS_ENABLED": _boolean("SOCIFY_EGRESS_ENABLED", False),
+        "INTAKE_GROUP_SECONDS": min(max(_integer("SOCIFY_INTAKE_GROUP_SECONDS", 3600), 0), 86400),
+        "OUTBOX_DATABASE": os.environ.get("SOCIFY_OUTBOX_DATABASE", str(Path(database).with_name("outbox.db"))),
         "REAUTH_REVOKE_SESSION": _boolean("SOCIFY_REAUTH_REVOKE_SESSION", True),
     }
 
@@ -114,4 +117,59 @@ def backup_settings() -> BackupSettings:
         interval_hours=interval,
         keep=keep,
         key=key,
+    )
+
+
+@dataclass(frozen=True)
+class EgressSettings:
+    outbox: str
+    allowlist: frozenset[str]
+    webhooks: dict[str, str]
+    webhook_secrets: dict[str, str]
+    max_attempts: int
+    smtp: dict[str, object]
+    relay_token: str | None
+    relay_port: int
+
+
+def egress_settings() -> EgressSettings:
+    """Settings for the egress service only; the app never sees destination URLs, secrets or SMTP credentials."""
+    allowlist = frozenset(host.strip().lower().rstrip(".") for host in os.environ.get("SOCIFY_EGRESS_ALLOWLIST", "").split(",") if host.strip())
+    webhooks: dict[str, str] = {}
+    for item in os.environ.get("SOCIFY_EGRESS_WEBHOOKS", "").split(","):
+        if not item.strip():
+            continue
+        name, separator, url = item.strip().partition("=")
+        if not separator or not name.strip() or not url.strip().startswith("https://"):
+            raise RuntimeError("SOCIFY_EGRESS_WEBHOOKS must list name=https://... pairs separated by commas")
+        webhooks[name.strip().lower()] = url.strip()
+    secrets_by_name = {
+        name: value for name in webhooks if (value := os.environ.get(f"SOCIFY_EGRESS_WEBHOOK_SECRET_{name.upper().replace('-', '_')}", "").strip())
+    }
+    max_attempts = _integer("SOCIFY_EGRESS_MAX_ATTEMPTS", 8)
+    if not 1 <= max_attempts <= 50:
+        raise RuntimeError("SOCIFY_EGRESS_MAX_ATTEMPTS must be between 1 and 50")
+    tls = os.environ.get("SOCIFY_SMTP_TLS", "starttls").strip().lower()
+    if tls not in {"starttls", "ssl"}:
+        raise RuntimeError("SOCIFY_SMTP_TLS must be starttls or ssl; unencrypted SMTP is not supported")
+    smtp: dict[str, object] = {
+        "host": os.environ.get("SOCIFY_SMTP_HOST", "").strip().lower(),
+        "port": _integer("SOCIFY_SMTP_PORT", 465 if tls == "ssl" else 587),
+        "username": os.environ.get("SOCIFY_SMTP_USERNAME", ""),
+        "password": os.environ.get("SOCIFY_SMTP_PASSWORD", ""),
+        "sender": os.environ.get("SOCIFY_SMTP_FROM", "").strip(),
+        "tls": tls,
+    }
+    relay_token = os.environ.get("SOCIFY_EGRESS_TOKEN", "").strip() or None
+    if relay_token is not None and len(relay_token) < 32:
+        raise RuntimeError("SOCIFY_EGRESS_TOKEN must be at least 32 characters; leave it unset to keep the relay off")
+    return EgressSettings(
+        outbox=os.environ.get("SOCIFY_OUTBOX_DATABASE", "/outbox/outbox.db"),
+        allowlist=allowlist,
+        webhooks=webhooks,
+        webhook_secrets=secrets_by_name,
+        max_attempts=max_attempts,
+        smtp=smtp,
+        relay_token=relay_token,
+        relay_port=_integer("SOCIFY_EGRESS_RELAY_PORT", 8081),
     )

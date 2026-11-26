@@ -4,6 +4,7 @@ import sqlite3
 
 from flask import Blueprint, abort, current_app, jsonify, request
 
+from .api_tokens import accepts_token
 from .db import get_db
 from .security import ROLE_PERMISSIONS, current_user, error_response, login_required, require_permission, workspace_id
 from .timeutils import iso_now
@@ -196,6 +197,7 @@ def health_api():
 
 
 @platform_api.get("/api/audit")
+@accepts_token("audit:read")
 @require_permission("audit.read")
 def audit_logs():
     from .operational import case_scope

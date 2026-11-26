@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 from flask import Blueprint, jsonify, request
 
+from .api_tokens import accepts_token
 from .audit import record_audit
 from .db import get_db, inserted_id, transaction
 from .detection import SEVERITIES
@@ -283,6 +284,7 @@ def evaluate_watchlist_for_event(connection: sqlite3.Connection, event_id: int) 
 
 
 @watchlist_api.get("/api/watchlist")
+@accepts_token("search:read")
 @require_permission("cases.read")
 def list_watchlist():
     kind_filter = (request.args.get("type") or "").strip().lower()

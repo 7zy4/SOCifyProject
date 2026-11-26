@@ -65,6 +65,7 @@
       finish(emptyState(t("اختر قضية لبدء العمل"),null,[linkedButton(t("اختيار نطاق التحقيق"),"/cases")])); return;
     }
     const params = new URLSearchParams(location.search);
+    if (params.get("channel") === "intake" && window.SOCifyIntake && permission("intake.read")) { await window.SOCifyIntake.render(names.monitoring, channels); return; }
     const data = await api("/api/soc/monitoring?" + params);
     if (version !== requestVersion) return;
     const root = node("div", {class:"monitoring-view"}, pageHead(...names.monitoring));
@@ -74,10 +75,10 @@
       for (const [key,value] of Object.entries(changes)) { if (value === "") next.searchParams.delete(key); else next.searchParams.set(key,String(value)); }
       location.assign(next.pathname + next.search);
     };
-    root.append(node("nav", {class:"channel-tabs","aria-label":t("قنوات التنبيهات")}, channels.map(([value,label]) => {
+    root.append(node("nav", {class:"channel-tabs","aria-label":t("قنوات التنبيهات")}, [...channels.map(([value,label]) => {
       const target = new URL(location.href); target.searchParams.set("channel",value); target.searchParams.delete("page");
       return node("a", {class:"channel-tab",href:target.pathname+target.search,"aria-current":value===data.channel?"page":null}, [node("span",{text:label}),node("span",{class:"channel-count",text:number(data.counts[value])})]);
-    })));
+    }), permission("intake.read") ? node("a", {class:"channel-tab",href:"/monitoring?channel=intake"}, node("span",{text:t("الوارد")})) : null]));
     const search = node("input",{name:"q",type:"search",maxlength:200,value:params.get("q")||"",autocomplete:"off",placeholder:t("بحث")});
     const severity = node("select",{name:"severity"}, [["",t("جميع الدرجات")],...["critical","high","medium","low"].map(value=>[value,autopsyLabel(value)])].map(([value,label])=>node("option",{value,selected:value===(params.get("severity")||""),text:label})));
     const mine = node("select",{name:"mine"}, [["0",t("جميع القضايا المصرح بها")],["1",t("المسندة إليّ")]].map(([value,label])=>node("option",{value,selected:value===(params.get("mine")||"0"),text:label})));

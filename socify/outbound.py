@@ -169,3 +169,52 @@ def fetch_source_bytes(endpoint: str, headers: dict[str, str], allowed_hosts: se
         raise ValidationError("تعذر سحب السجلات من المصدر؛ تحقق من الاتصال والصلاحيات") from exc
     finally:
         connection.close()
+
+
+@dataclass(frozen=True)
+class OutboundResponse:
+    status: int
+    content_type: str
+    body: bytes
+
+
+def send_https(
+    method: str,
+    endpoint: str,
+    *,
+    allowed_hosts: set[str],
+    headers: dict[str, str] | None = None,
+    body: bytes | None = None,
+    limit: int = 1024 * 1024,
+    timeout: float = 10.0,
+) -> OutboundResponse:
+    """One HTTPS request with the same guarantees as source pulls, for the egress service.
+
+    The host must be allowlisted and every DNS answer public; the connection is pinned to those addresses, TLS checks
+    the certificate and host name, redirects are refused, one deadline covers the whole exchange, and the response is
+    capped at `limit` bytes. Any non-redirect status is returned for the caller to judge.
+    """
+    if method not in {"GET", "POST"}:
+        raise ValueError("unsupported outbound method")
+    target = resolve_external_target(endpoint, allowed_hosts)
+    connection = _PinnedHTTPSConnection(target, time.monotonic() + timeout)
+    try:
+        connection.request(method, target.path, body=body, headers={"Connection": "close", **(headers or {})})
+        connection.limit_read_time()
+        with connection.getresponse() as response:
+            if 300 <= response.status < 400:
+                raise ValidationError("الوجهة تعيد التوجيه؛ استخدم العنوان المباشر")
+            received = bytearray()
+            while len(received) <= limit and not response.isclosed():
+                connection.limit_read_time()
+                chunk = response.read1(min(65536, limit + 1 - len(received)))
+                if not chunk:
+                    break
+                received.extend(chunk)
+            if len(received) > limit:
+                raise ValidationError("رد الوجهة يتجاوز الحد المسموح")
+            return OutboundResponse(response.status, str(response.headers.get("Content-Type", "application/octet-stream")), bytes(received))
+    except http.client.HTTPException as exc:
+        raise ValidationError("تعذر إكمال الطلب إلى الوجهة") from exc
+    finally:
+        connection.close()

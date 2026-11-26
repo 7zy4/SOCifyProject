@@ -34,6 +34,7 @@ docker compose exec socify python -m scripts.bootstrap_team --email owner@exampl
 | autopsy-worker | التحليل والتقارير | بلا شبكة؛ قاعدة ومقبس التحليل |
 | analysis | الفحص الساكن وإخراج المستندات | بلا شبكة أو قاعدة أو مفاتيح التطبيق |
 | backup | نسخ احتياطي مجدول للقاعدة | بلا شبكة ولا مفتاح اعتماد؛ حجم البيانات وحجم `socify-backups` |
+| egress | الإرسال الخارجي (Webhooks والبريد) ووسيط الطلبات المتزامنة | معطّل افتراضيًا (ملف Compose `egress`)؛ الخدمة الوحيدة المتصلة بالإنترنت، بلا قاعدة القضايا ولا مفتاح الاعتماد ولا مقبس التحليل؛ حجم `socify-outbox` فقط |
 
 - تخزن البيانات في حجم `socify-data`؛ يتبادل التطبيق والتحليل الطلبات عبر `analysis-ipc`.
 - لكل خدمة فحص صحة يظهر في `docker compose ps`: التطبيق والمدخل يفحصان `/health/ready`، والعاملان وخدمة النسخ يقرؤون نبضهم من القاعدة (`python -m scripts.healthcheck worker --name <الاسم> --max-age 120`)، وخدمة التحليل تُسأل بطلب `ping` لا ينفذ عملًا (`python -m scripts.healthcheck analysis`). كل 30 ثانية، بمهلة 5 ثوانٍ وثلاث محاولات. لا يبدأ التطبيق قبل أن تصبح خدمة التحليل سليمة.
@@ -63,6 +64,14 @@ docker compose exec socify python -m scripts.bootstrap_team --email owner@exampl
 | `SOCIFY_REAUTH_REVOKE_SESSION` | عند بلوغ حد إعادة التحقق تُنهى الجلسة الحالية؛ الافتراضي 1، و0 يبقي الجلسة ويرفض المحاولات حتى انتهاء النافذة |
 | `SOCIFY_REGISTER_ATTEMPTS` و`SOCIFY_SOURCE_KEY_ATTEMPTS` | حد محاولات التسجيل المرفوضة ومفاتيح المصادر الخاطئة من عنوان واحد؛ الافتراضي 20 |
 | `SOCIFY_ANALYSIS_SOCKET` | مسار مقبس خدمة التحليل |
+| `SOCIFY_EGRESS_ENABLED` | للتطبيق: يسمح بوضع الرسائل في صندوق الإرسال؛ الافتراضي 0 فلا يُرسل شيء خارج المنصة |
+| `SOCIFY_OUTBOX_DATABASE` | قاعدة صندوق الإرسال المشتركة بين التطبيق وخدمة `egress`؛ في Compose `/outbox/outbox.db` على حجم `socify-outbox` |
+| `SOCIFY_EGRESS_ALLOWLIST` | لخدمة `egress`: أسماء المضيفين المسموح الاتصال بها، مفصولة بفواصل؛ فارغ افتراضيًا فلا اتصال بأي مضيف |
+| `SOCIFY_EGRESS_WEBHOOKS` | لخدمة `egress`: وجهات Webhook بصيغة `name=https://...` مفصولة بفواصل؛ الرسالة تحمل الاسم فقط. السر اختياري في `SOCIFY_EGRESS_WEBHOOK_SECRET_<NAME>` ويوقّع الطلب بـ`X-SOCify-Signature` |
+| `SOCIFY_EGRESS_MAX_ATTEMPTS` | لخدمة `egress`: عدد محاولات التسليم قبل اعتبار الرسالة فاشلة؛ الافتراضي 8، والانتظار بين المحاولات يبدأ بـ30 ثانية ويتضاعف حتى ساعة |
+| `SOCIFY_SMTP_HOST` و`SOCIFY_SMTP_PORT` و`SOCIFY_SMTP_TLS` و`SOCIFY_SMTP_USERNAME` و`SOCIFY_SMTP_PASSWORD` و`SOCIFY_SMTP_FROM` | لخدمة `egress`: خادم البريد. TLS إلزامي (`starttls` افتراضيًا على 587، أو `ssl` على 465) مع التحقق من الشهادة، والمضيف يجب أن يكون في قائمة السماح |
+| `SOCIFY_EGRESS_TOKEN` | لخدمة `egress`: رمز الوسيط الداخلي `POST /relay` على المنفذ 8081 (32 محرفًا على الأقل)؛ غير مضبوط افتراضيًا فالوسيط معطّل |
+| `SOCIFY_INTAKE_GROUP_SECONDS` | نافذة تجميع التنبيه الوارد المتكرر بالثواني؛ الافتراضي 3600، والمسموح من 0 إلى 86400 |
 | `SOCIFY_BACKUP_INTERVAL_HOURS` | لخدمة `backup`: الفاصل بين النسخ المجدولة بالساعات؛ الافتراضي 24، والمسموح من 1 إلى 720 |
 | `SOCIFY_BACKUP_KEEP` | لخدمة `backup`: عدد النسخ الأحدث التي تبقى؛ الافتراضي 14، والمسموح من 1 إلى 1000 |
 | `SOCIFY_BACKUP_KEY` | لخدمة `backup` ولـ`scripts.restore --decrypt`: مفتاح تشفير النسخ، 32 محرفًا على الأقل، منفصل عن `SOCIFY_CREDENTIAL_KEY`. غير مضبوط افتراضيًا فتُحفظ النسخ دون تشفير؛ اضبطه في `.env` لتشفيرها |
@@ -72,6 +81,67 @@ docker compose exec socify python -m scripts.bootstrap_team --email owner@exampl
 | `SOCIFY_MAX_PENDING_IMPORT_JOBS` | حد طابور الاستيراد؛ الافتراضي 100 مهمة منتظرة |
 | `SOCIFY_REQUIRE_CASE_APPROVAL=1` | سياسة اختيارية، معطّلة افتراضيًا: تبدأ القضية الجديدة بانتظار اعتماد المدير، وتبقى أدواتها مقفلة حتى يعتمدها |
 | `SOCIFY_REQUIRE_INVESTIGATION_SELECTION=1` | سياسة اختيارية، معطّلة افتراضيًا: لا تُفتح أدوات القضية إلا بعد اختيارها من صفحة القضايا |
+
+## استقبال التنبيهات من SIEM وEDR
+
+- يضيف مدير الفريق التكامل من صفحة الفريق: النوع والاسم والمصادقة (توقيع HMAC أو رمز API) وقاعدة الإنشاء التلقائي. يظهر عنوان الاستقبال، وسر التوقيع مرة واحدة.
+- الحدود: 1 MiB للطلب، و100 تنبيه للدفعة، والرد `202` بأرقام التنبيهات وحالة كل منها (`created` أو `grouped`). التوقيع الخاطئ يُعدّ بحد `SOCIFY_SOURCE_KEY_ATTEMPTS`.
+- التوقيع: `X-SOCify-Timestamp` بثواني Unix (خلال 5 دقائق)، و`X-SOCify-Signature: sha256=<hex>` لـHMAC-SHA256 بالسر على `<timestamp>.<body>`. الطلب الموقّع نفسه يُرفض إن تكرر (`409`).
+- المنصة تستقبل ولا تتصل: يجب أن يصل نظام المراقبة إلى عنوان SOCify عبر الوكيل.
+
+Wazuh (تكامل مخصص في `ossec.conf` على المدير، بمصادقة رمز API):
+
+```xml
+<integration>
+  <name>custom-socify</name>
+  <hook_url>https://socify.example.com/api/intake/1/alerts</hook_url>
+  <api_key>socify_pat_...</api_key>
+  <level>7</level>
+  <alert_format>json</alert_format>
+</integration>
+```
+
+```bash
+#!/bin/sh
+# /var/ossec/integrations/custom-socify: integratord passes the alert file, api_key and hook_url.
+curl -sS -X POST -H "Authorization: Bearer $2" -H "Content-Type: application/json" --data @"$1" "$3"
+```
+
+Elastic Security (موصل Webhook في Kibana: الطريقة POST، والعنوان عنوان الاستقبال، وترويسة `Authorization: Bearer <رمز API>`)، ونص إجراء القاعدة:
+
+```json
+{"alerts": {{#toJson}}context.alerts{{/toJson}}}
+```
+
+Microsoft Sentinel (Logic App يبدأ بمشغّل التنبيه، ثم إجراء HTTP): الطريقة POST، والعنوان عنوان الاستقبال، وترويسة `Authorization: Bearer <رمز API>`، والجسم كائن التنبيه `@{triggerBody()}`.
+
+Splunk: إجراء Webhook المدمج لا يضيف ترويسات؛ استخدم إجراء تنبيه مخصصًا أو سكربتًا يرسل الجسم `{"sid", "search_name", "result": {...}}` بترويسة `Authorization: Bearer <رمز API>`، أو بتوقيع HMAC.
+
+الصيغة العامة بتوقيع HMAC:
+
+```bash
+body='{"alerts":[{"id":"edr-1","title":"Blocked ransomware","severity":"critical","time":"2026-11-26T08:00:00Z","entities":{"hosts":["FS-02"]}}]}'
+ts=$(date +%s)
+sig=$(printf '%s.%s' "$ts" "$body" | openssl dgst -sha256 -hmac "$SOCIFY_INTAKE_SECRET" -hex | sed 's/^.* //')
+curl -sS -X POST "https://socify.example.com/api/intake/2/alerts" -H "Content-Type: application/json" \
+  -H "X-SOCify-Timestamp: $ts" -H "X-SOCify-Signature: sha256=$sig" --data "$body"
+```
+
+## الإرسال الخارجي
+
+التطبيق والعمال بلا خروج إلى الإنترنت. كل ما يخرج يمر بصندوق إرسال في قاعدة SQLite مستقلة، وتسلّمه خدمة `egress`:
+
+```text
+socify / العمال  --(socify-outbox: outbox_messages)-->  egress  --HTTPS/SMTP عبر قائمة السماح-->  الوجهة
+      (شبكة داخلية بلا خروج)                          (socify-internal + egress)
+```
+
+- الإرسال معطّل افتراضيًا. لتفعيله: اضبط في `.env` قائمة السماح `SOCIFY_EGRESS_ALLOWLIST` والوجهات `SOCIFY_EGRESS_WEBHOOKS` أو إعدادات `SOCIFY_SMTP_*`، ثم `SOCIFY_EGRESS_ENABLED=1`، وشغّل `docker compose --profile egress up -d`.
+- الرسالة تحمل اسم الوجهة أو عنوان البريد والمحتوى فقط؛ عناوين Webhook وأسرارها وبيانات SMTP في بيئة خدمة `egress` وحدها.
+- كل طلب HTTPS يمر بالعميل نفسه المستخدم لسحب المصادر: مضيف من قائمة السماح وعناوين DNS عامة فقط، واتصال مثبت على العنوان المفحوص، وتحقق TLS، ورفض إعادة التوجيه، ومهلة واحدة وحد لحجم الرد. البريد يتصل بالعنوان المفحوص نفسه مع TLS يتحقق من اسم الخادم.
+- الفشل المؤقت (انقطاع، مهلة، 5xx، 408، 429) يُعاد بانتظار متزايد حتى `SOCIFY_EGRESS_MAX_ATTEMPTS`؛ الوجهة غير المعروفة أو رد 4xx آخر يُعد فشلًا نهائيًا. يرى المدير الرسائل وحالتها في `GET /api/outbox` ويعيد إرسال الفاشلة بـ`POST /api/outbox/<id>/retry`.
+- للحاجات المتزامنة (مثل الدخول الموحد لاحقًا) يوفر الوسيط `POST /relay` على الشبكة الداخلية، بمصادقة `SOCIFY_EGRESS_TOKEN`، ونوعين فقط من الطلبات: `get_json` و`post_form` إلى مضيفات قائمة السماح.
+- خدمة `egress` تكتب نبضها في قاعدة صندوق الإرسال، ويقرؤه فحص الصحة بـ`--database /outbox/outbox.db`.
 
 ## العمال المستقلون
 

@@ -8,6 +8,7 @@ from typing import Any
 from flask import Blueprint, Response, current_app, g, jsonify, request, stream_with_context
 from werkzeug.utils import secure_filename
 
+from .api_tokens import accepts_token
 from .autopsy_domain import custody, normalize_indicator, touch_case
 from .autopsy_pipeline import activate_import, event_visible, job_visible, visibility_sql
 from .case_counts import cached_case_count, consistent_read, read_snapshot
@@ -57,6 +58,7 @@ def case_import_preview(case_id: int):
 
 
 @autopsy_ingestion_api.post("/api/cases/<int:case_id>/imports")
+@accepts_token("cases:write")
 @case_policy(batch_member=ANY_METHOD)
 @require_permission("evidence.add")
 def case_import_create(case_id: int):
@@ -66,6 +68,7 @@ def case_import_create(case_id: int):
 
 
 @autopsy_ingestion_api.get("/api/cases/<int:case_id>/imports")
+@accepts_token("cases:read")
 @case_policy(batch_member=ANY_METHOD)
 @require_permission("cases.read")
 def case_import_list(case_id: int):

@@ -20,6 +20,8 @@ ENCRYPTED_COLUMNS: tuple[tuple[str, str], ...] = (
     ("autopsy_samples", "ciphertext"),
     ("autopsy_report_files", "content"),
     ("autopsy_capsule_archives", "ciphertext"),
+    ("intake_integrations", "hmac_secret_ciphertext"),
+    ("intake_alerts", "raw_ciphertext"),
 )
 
 
