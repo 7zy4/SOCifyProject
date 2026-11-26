@@ -240,6 +240,7 @@ async function autopsyQuickDropdownReportPanel(caseId) {
         escalateBtn.disabled = false;
       }
     }, "primary");
+    escalateBtn.title = SOCifyLocale.text("يحفظ الإجابات ويرسل التقرير السريع إلى مدير مركز العمليات ليقرر: اعتماد أو استكمال أو إغلاق");
     actions.prepend(saveBtn, escalateBtn);
   }
   grid.append(actions, statusNotice);

@@ -102,6 +102,8 @@ class ReviewJourney:
         for name, value in ANSWERS.items():
             self.page.locator(f'select[name="{name}"]').select_option(value)
         self.page.locator("input[name=executive_note]").fill(note)
+        escalation = self.page.get_by_role("button", name=self.text("حفظ وتصعيد مباشر للمدير"), exact=True)
+        expect(escalation).to_have_attribute("title", self.text("يحفظ الإجابات ويرسل التقرير السريع إلى مدير مركز العمليات ليقرر: اعتماد أو استكمال أو إغلاق"))
         self.click("button", "حفظ وتصعيد مباشر للمدير" if escalate else "حفظ إجابات التقرير")
 
     def decision(self, decision, comment):

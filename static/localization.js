@@ -673,6 +673,8 @@
   "ستنتهي الجلسة قريبًا": "Your session is about to end",
   "ستنتهي جلستك بعد دقيقتين لعدم النشاط": "Your session ends in two minutes for inactivity",
   "البقاء متصلًا": "Stay signed in",
+  "ينشئ الآن نسخة محفوظة كاملة من تقرير القضية؛ للتصعيد السريع إلى المدير استخدم لوحة قرارات التحقيق": "Creates a saved full copy of the case report now; to escalate quickly to the manager, use the Investigation decisions panel",
+  "يحفظ الإجابات ويرسل التقرير السريع إلى مدير مركز العمليات ليقرر: اعتماد أو استكمال أو إغلاق": "Saves the answers and sends the quick report to the SOC manager to decide: approve, follow up or close",
   "محاولات دخول خاطئة كثيرة لهذا الحساب. أعد المحاولة بعد {0} ثانية.": "Too many failed sign-in attempts for this account. Try again in {0} seconds.",
   "سُجلت {0} محاولة دخول خاطئة لحسابك منذ آخر دخول. إن لم تكن أنت، غيّر كلمة المرور وفعّل المصادقة متعددة العوامل.": "{0} failed sign-in attempts were recorded on your account since your last sign-in. If this was not you, change your password and turn on MFA.",
   "إبطاء الدخول لكثرة الأخطاء": "Sign-in slowed after repeated failures",

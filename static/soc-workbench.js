@@ -54,6 +54,7 @@
       } catch (error) { handleError(error); control.disabled = false; control.textContent = t("تقرير فوري"); }
     }, "primary");
     control.dataset.quickReport = "";
+    control.title = t("ينشئ الآن نسخة محفوظة كاملة من تقرير القضية؛ للتصعيد السريع إلى المدير استخدم لوحة قرارات التحقيق");
     return control;
   }
   const channels = [["main", t("جديدة")], ["investigation", t("قيد التحقيق")], ["closed", t("مغلقة")]];
