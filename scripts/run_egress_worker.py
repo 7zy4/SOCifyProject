@@ -198,7 +198,7 @@ def relay_handler(settings: EgressSettings):
             try:
                 self._answer(200, relay(settings, json.loads(self.rfile.read(length))))
             except (ValueError, ValidationError) as error:
-                self._answer(422, {"error": getattr(error, "public_message", str(error))})
+                self._answer(422, {"error": getattr(error, "public_message", "invalid relay request")})
             except (OSError, TimeoutError):
                 self._answer(502, {"error": "destination unavailable"})
 

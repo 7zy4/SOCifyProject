@@ -14,7 +14,7 @@ def test_invitee_can_correct_an_email_without_reopening_the_invitation(app, lang
         invite = manager.page.locator("section.panel").filter(has=manager.page.get_by_role("heading", name=manager.text("دعوة عضو جديد"), exact=True))
         invite.locator("input[name=email]").fill("layan@example.test")
         invite.locator("input[name=role]").fill(manager.page.evaluate("() => autopsyLabel('analyst')"))
-        manager.click("button", "حفظ", invite)
+        manager.click("button", "إنشاء دعوة", invite)
         url = manager.page.get_by_label(manager.text("رابط التسجيل بالدعوة"), exact=True).input_value()
         manager.click("button", "إغلاق", manager.page.get_by_role("dialog"))
         page = manager.page.context.browser.new_page(locale="ar-SA" if language == "ar" else "en-US")

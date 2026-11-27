@@ -388,7 +388,9 @@ def safe_next_path(value: object) -> str:
     path = value.rstrip("?")
     if path.split("?", 1)[0] in {"/login", "/logout", "/register"} or path.startswith("/api/"):
         return "/cases"
-    return path
+    # Built from a fixed "/" and the remainder without leading slashes, so the result is a path on this site by
+    # construction (never "//host"), whatever the checks above let through.
+    return "/" + path[1:].lstrip("/\\")
 
 
 @auth_api.get("/login")

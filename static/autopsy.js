@@ -894,6 +894,7 @@ async function autopsyStart() {
   if (state.section === "analysis-library" && window.SOCifyAutopsy.library) return window.SOCifyAutopsy.library();
   if (state.section === "playbooks" && window.SOCifyAutopsy.procedureLibrary) return window.SOCifyAutopsy.procedureLibrary();
   if (state.section === "team") return window.SOCifyAutopsy.team();
+  if (state.section === "integrations" && window.SOCifyIntake) return window.SOCifyIntake.page();
   if (state.section === "my-tasks") {
     begin("my-tasks");
     if(window.SOCifyWorkspace?.selection.required && !window.SOCifyWorkspace.selection.case_ids.length) {

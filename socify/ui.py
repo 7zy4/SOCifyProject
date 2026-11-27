@@ -17,6 +17,7 @@ def index():
 @ui.get("/admin")
 @ui.get("/profile")
 @ui.get("/team")
+@ui.get("/integrations")
 @ui.get("/monitoring")
 @ui.get("/performance")
 @ui.get("/log-management")
@@ -54,6 +55,7 @@ def dashboard(case_id: int | None = None):
             "/cases",
             "/my-tasks",
             "/team",
+            "/integrations",
             "/profile",
             "/playbooks",
             "/analysis-library",

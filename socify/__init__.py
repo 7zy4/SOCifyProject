@@ -106,10 +106,12 @@ def create_app(test_config: dict[str, Any] | None = None) -> "Flask":
     from .api_tokens import api_tokens_api
     from .api_tokens import register as register_api_tokens
     from .intake import intake_api
+    from .notifications import notifications_api
     from .onboarding import onboarding_api
     from .outbox import outbox_api
     from .quick_reports import quick_reports_api
     from .sources import source_webhook_ingest
+    from .team_sla import team_sla_api
     from .watchlist import watchlist_api
 
     app.register_blueprint(watchlist_api)
@@ -118,6 +120,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> "Flask":
     app.register_blueprint(api_tokens_api)
     app.register_blueprint(outbox_api)
     app.register_blueprint(intake_api)
+    app.register_blueprint(team_sla_api)
+    app.register_blueprint(notifications_api)
     csrf.exempt(source_webhook_ingest)
     # Before prepare_request, so the workspace and batch guards see the token's account.
     register_api_tokens(app)

@@ -1,12 +1,14 @@
 "use strict";
 
-function securityForm(fields, action, submitLabel) {
-  const form = node("form", { class: "form-grid" });
+function securityForm(fields, action, submitLabel, { stacked = false } = {}) {
+  const form = node("form", { class: stacked ? "form-grid form-stack" : "form-grid" });
   const controls = Object.create(null);
   for (const spec of fields) {
     const input = node("input", { name: spec.name, type: spec.type || "text", required: true, maxlength: spec.max || 128, minlength: spec.min || 1, autocomplete: spec.autocomplete || "off", inputmode: spec.inputmode });
     controls[spec.name] = input;
-    form.append(field(spec.label, input));
+    const hint = spec.hint ? node("small", { class: "field-hint", id: `hint-${crypto.randomUUID()}`, text: spec.hint }) : null;
+    if (hint) input.setAttribute("aria-describedby", hint.id);
+    form.append(field(spec.label, hint ? node("span", { class: "field-control" }, [input, hint]) : input));
   }
   const status = node("p", { role: "status", class: "span-2" });
   const submit = node("button", { type: "submit", class: "button primary", text: submitLabel });
@@ -57,11 +59,11 @@ window.SOCifyAutopsy.profile = async () => {
     mfa.append(securityForm([{ name: "current_password", label: SOCifyLocale.text("كلمة المرور الحالية"), type: "password", autocomplete: "current-password" }, { name: "code", label: SOCifyLocale.text("رمز MFA أو رمز استرداد غير مستخدم"), max: 64, autocomplete: "one-time-code" }], async (body) => { await api("/api/auth/mfa", { method: "DELETE", body }); await window.SOCifyAutopsy.profile(); }, SOCifyLocale.text("إلغاء MFA بعد التحقق")));
   }
   root.append(panel(SOCifyLocale.text("المصادقة متعددة العوامل"), mfa, true));
-  root.append(panel(SOCifyLocale.text("تغيير كلمة المرور"), node("div", { class: "panel-body" }, securityForm([{ name: "current_password", label: SOCifyLocale.text("كلمة المرور الحالية"), type: "password", autocomplete: "current-password" }, { name: "new_password", label: SOCifyLocale.text("كلمة مرور جديدة من 12 إلى 128 محرفًا وبحد 72 بايت"), type: "password", min: 12, autocomplete: "new-password" }, { name: "confirmation", label: SOCifyLocale.text("تأكيد كلمة المرور الجديدة"), type: "password", min: 12, autocomplete: "new-password" }], async (body) => {
+  root.append(panel(SOCifyLocale.text("تغيير كلمة المرور"), node("div", { class: "panel-body" }, securityForm([{ name: "current_password", label: SOCifyLocale.text("كلمة المرور الحالية"), type: "password", autocomplete: "current-password" }, { name: "new_password", label: SOCifyLocale.text("كلمة المرور الجديدة"), hint: SOCifyLocale.text("12 محرفًا على الأقل"), type: "password", min: 12, autocomplete: "new-password" }, { name: "confirmation", label: SOCifyLocale.text("تأكيد كلمة المرور الجديدة"), type: "password", min: 12, autocomplete: "new-password" }], async (body) => {
     if (body.new_password !== body.confirmation) throw new Error(SOCifyLocale.text("تأكيد كلمة المرور غير مطابق"));
     await api("/api/profile/password", { method: "POST", body: { current_password: body.current_password, new_password: body.new_password } });
     await window.SOCifyAutopsy.profile();
-  }, SOCifyLocale.text("حفظ كلمة المرور وإلغاء الجلسات الأخرى"))), true));
+  }, SOCifyLocale.text("حفظ كلمة المرور وإلغاء الجلسات الأخرى"), { stacked: true })), true));
   root.append(panel(SOCifyLocale.text("جلساتي"), table([{ label: SOCifyLocale.text("الجلسة"), value: (item) => item.is_current ? SOCifyLocale.template`${item.id} | الحالية` : item.id }, { label: SOCifyLocale.text("بدأت"), value: (item) => formatTime(item.created_at) }, { label: SOCifyLocale.text("آخر نشاط"), value: (item) => formatTime(item.last_seen_at) }, { label: SOCifyLocale.text("تنتهي"), value: (item) => formatTime(item.expires_at) }, { label: SOCifyLocale.text("الحالة"), value: (item) => item.revoked_at ? SOCifyLocale.text("ملغاة") : SOCifyLocale.text("نشطة") }, { label: SOCifyLocale.text("إدارة"), value: (item) => !item.revoked_at ? button(SOCifyLocale.text("إلغاء الجلسة"), async () => { try { await api(`/api/auth/sessions/${item.id}`, { method: "DELETE" }); if (item.is_current) window.location.assign("/login"); else await window.SOCifyAutopsy.profile(); } catch (error) { handleError(error); } }) : "—" }], sessions.items), true));
   finish(root);
 };

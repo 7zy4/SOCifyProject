@@ -300,5 +300,69 @@ def test_an_auto_case_failure_keeps_the_delivery_accepted_and_is_audited(client,
 def test_auto_created_cases_name_the_member_the_integration_acts_for(client, database, integration, user_ids):
     created = integration(kind="generic", auto_case={"min_severity": "high"})
     _receive(client, created, "generic")
-    row = database.execute("SELECT actor_id FROM security_audit_logs WHERE action = 'case_from_intake'").fetchone()
+    row = database.execute("SELECT actor_id, details FROM security_audit_logs WHERE action = 'case_from_intake'").fetchone()
     assert row["actor_id"] == user_ids["soc_manager"]
+    assert json.loads(row["details"])["integration_id"] == created["item"]["id"]
+
+
+def test_claiming_an_alert_shows_who_is_triaging_it(client, database, integration, login_as, user_ids):
+    created = integration()
+    alert_id = _receive(client, created, "generic")
+    login_as("analyst")
+    claimed = client.post(f"/api/intake/alerts/{alert_id}/claim", json={})
+    assert claimed.status_code == 200 and claimed.json["status"] == "triaging" and claimed.json["claimed_by"] == user_ids["analyst"]
+    assert claimed.json["claimed_by_name"]
+    assert client.get("/api/intake/alerts?mine=1").json["total"] == 1
+    assert client.get("/api/intake/alerts?mine=2").status_code == 422
+    login_as("instructor")
+    assert client.get("/api/intake/alerts?mine=1").json["total"] == 0
+    assert client.post(f"/api/intake/alerts/{alert_id}/claim", json={}).json["error"]["code"] == "INTAKE_ALERT_CLAIMED"
+    assert client.post(f"/api/intake/alerts/{alert_id}/release", json={}).status_code == 409
+    login_as("auditor")
+    assert client.post(f"/api/intake/alerts/{alert_id}/claim", json={}).status_code == 403
+    login_as("soc_manager")
+    taken = client.post(f"/api/intake/alerts/{alert_id}/claim", json={})
+    assert taken.status_code == 200 and taken.json["claimed_by"] == user_ids["soc_manager"]
+    released = client.post(f"/api/intake/alerts/{alert_id}/release", json={})
+    assert released.json["status"] == "new" and released.json["claimed_by"] is None
+    audit = [row[0] for row in database.execute("SELECT action FROM security_audit_logs WHERE resource_type = 'intake_alert' ORDER BY id")]
+    assert audit[-3:] == ["claim", "claim", "release"]
+    assert client.post(f"/api/intake/alerts/{alert_id}/dismiss", json={"reason": "Known scanner range"}).status_code == 200
+    assert client.post(f"/api/intake/alerts/{alert_id}/claim", json={}).json["error"]["code"] == "INTAKE_ALERT_CLOSED"
+
+
+def test_an_alert_closed_meanwhile_makes_no_second_case(client, database, integration, login_as, monkeypatch):
+    from socify import intake
+
+    created = integration()
+    alert_id = _receive(client, created, "generic")
+    login_as("analyst")
+    # Both clicks read the alert while it was still open; the second must not commit a case of its own.
+    monkeypatch.setattr(intake, "_open", lambda target: (intake._alert(target), None))
+    assert client.post(f"/api/intake/alerts/{alert_id}/case", json={}).status_code == 201
+    cases = database.execute("SELECT COUNT(*) FROM incident_cases").fetchone()[0]
+    second = client.post(f"/api/intake/alerts/{alert_id}/case", json={})
+    assert second.status_code == 409 and second.json["error"]["code"] == "INTAKE_ALERT_CLOSED"
+    assert database.execute("SELECT COUNT(*) FROM incident_cases").fetchone()[0] == cases
+    assert client.post(f"/api/intake/alerts/{alert_id}/dismiss", json={"reason": "Raced with a colleague"}).status_code == 409
+
+
+def test_a_database_from_the_first_build_gains_the_claim_columns(tmp_path):
+    import sqlite3
+
+    from socify.intake import SCHEMA, migrate
+
+    connection = sqlite3.connect(tmp_path / "old.db")
+    connection.executescript(SCHEMA.replace("    claimed_by INTEGER REFERENCES users(id),\n    claimed_at TEXT,\n", ""))
+    assert "claimed_by" not in {row[1] for row in connection.execute("PRAGMA table_info(intake_alerts)")}
+    migrate(connection)
+    migrate(connection)
+    assert {"claimed_by", "claimed_at"} <= {row[1] for row in connection.execute("PRAGMA table_info(intake_alerts)")}
+    connection.close()
+
+
+def test_rule_errors_answer_with_a_public_message_only(client, login_as):
+    login_as("soc_manager")
+    refused = client.post("/api/intake/integrations", json={"kind": "generic", "name": "Lab SIEM", "auth_mode": "hmac", "auto_case": {"script": "x"}})
+    assert refused.status_code == 422
+    assert refused.json["error"]["message"] == "قواعد الإنشاء التلقائي تقبل الحد الأدنى للخطورة والمسؤول فقط"

@@ -639,6 +639,10 @@ def case_member(case_id: int):
             get_db().execute("UPDATE incident_cases SET assignee = ? WHERE id = ?", (data["user_id"], case_id))
         custody(case_id, "member_assigned", {"user_id": data["user_id"], "responsibility": data["responsibility"]})
         touch_case(case_id)
+        from .notifications import notify
+
+        kind = "case_assigned" if data["responsibility"] == "owner" else "case_member_added"
+        notify([data["user_id"]], kind, workspace=workspace_id(), case_id=case_id, actor=actor_id())
     return case_summary(case_id)
 
 

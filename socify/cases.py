@@ -3,6 +3,7 @@ import hmac
 import json
 import re
 import sqlite3
+from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 
@@ -201,7 +202,9 @@ def _case_view(row: sqlite3.Row | None) -> dict[str, Any]:
     item["title"] = localized_case_title(row["title"], row["title_en"])
     item["tags"] = json.loads(item["tags"] or "[]")
     item["mitre_ids"] = json.loads(item["mitre_ids"] or "[]")
-    item["overdue"] = bool(item["sla_due_at"] and item["status"] not in {"closed", "cancelled"} and item["sla_due_at"] < iso_now())
+    item["overdue"] = bool(
+        item["sla_due_at"] and not item["sla_paused_at"] and item["status"] not in {"closed", "cancelled"} and item["sla_due_at"] < iso_now()
+    )
     context = get_db().execute("SELECT * FROM autopsy_case_context WHERE case_id = ?", (row["id"],)).fetchone()
     item["context"] = dict(context) if context else None
     from .autopsy_workspace import approval
@@ -329,7 +332,8 @@ def _case_creation_receipt(retry: tuple[str, str]):
     return jsonify(_case_view(case)), 201, {"Location": f"/api/incidents/{case['id']}"}
 
 
-def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
+def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None, *, then: Callable[[int], None] | None = None):
+    """Create a case; `then(case_id)` runs inside the same transaction, so whatever it writes commits or rolls back with the case."""
     if retry is not None:
         recovered = _case_creation_receipt(retry)
         if recovered is not None:
@@ -441,6 +445,14 @@ def _create_case(data: dict[str, Any], retry: tuple[str, str] | None = None):
         )
         case_id = inserted_id(cursor)
         _record_case_setup(alert_ids, assignee, case_id, classification, event_ids, now, objective, reason)
+        from .team_sla import apply_to_new_case
+
+        apply_to_new_case(case_id, severity, now)
+        from .notifications import notify
+
+        notify([assignee], "case_assigned", workspace=workspace_id(), case_id=case_id, actor=actor_id())
+        if then is not None:
+            then(case_id)
         if retry is not None:
             get_db().execute(
                 "INSERT INTO case_creation_receipts(workspace_id,actor_id,request_key,request_hash,case_id,created_at) VALUES (?,?,?,?,?,?)",
@@ -561,6 +573,9 @@ def update_case(case_id: int):
             updates[field] = data[field]
     if "assigned_to" in data or "assignee" in data:
         assignee = data.get("assignee", data.get("assigned_to"))
+        if assignee != row["assignee"] and not has_permission(current_user(), "cases.assign"):
+            # Assigning grants the new analyst access to the case, the same decision as adding a case member.
+            return error_response("PERMISSION_DENIED", "إسناد القضية لعضو آخر للمدير", 403)
         if assignee is not None and not _user_valid(assignee):
             return error_response("INVALID_ASSIGNEE", "المحلل المحدد غير متاح", 422)
         updates["assignee"] = assignee
@@ -583,6 +598,20 @@ def update_case(case_id: int):
             return error_response("CASE_VERSION_CONFLICT", "تم تعديل التحقيق في جلسة أخرى", 409)
         _history(get_db(), case_id, "case_updated", {key: row[key] for key in updates}, updates, str(data.get("reason") or "")[:500] or None)
         record_audit(get_db(), "update", "case", case_id, details={"fields": list(updates)})
+        if "assignee" in updates and updates["assignee"] != row["assignee"]:
+            from .notifications import notify
+
+            if updates["assignee"] is not None:
+                get_db().execute(
+                    """INSERT INTO autopsy_case_members(case_id, user_id, responsibility, assigned_by, assigned_at) VALUES (?, ?, 'owner', ?, ?)
+                    ON CONFLICT(case_id, user_id) DO UPDATE SET responsibility = 'owner', assigned_by = excluded.assigned_by, assigned_at = excluded.assigned_at""",
+                    (case_id, updates["assignee"], actor_id(), now),
+                )
+            notify([updates["assignee"]], "case_assigned", workspace=workspace_id(), case_id=case_id, actor=actor_id())
+        if updates.get("severity", row["severity"]) != row["severity"]:
+            from .team_sla import rebase_on_severity
+
+            rebase_on_severity(case_id, updates["severity"])
     return jsonify(_case_view(_case_row(case_id)))
 
 

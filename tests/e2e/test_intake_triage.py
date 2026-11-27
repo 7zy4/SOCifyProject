@@ -1,8 +1,9 @@
-"""An analyst triages alerts that arrived from a SIEM: dismiss one with a reason and turn another into a case."""
+"""An analyst triages alerts that arrived from a SIEM in place: search, take one, dismiss noise with a reason and turn another into a case."""
 
 import hashlib
 import hmac
 import json
+import re
 import threading
 import time
 
@@ -64,28 +65,71 @@ def test_analyst_dismisses_noise_and_opens_a_case_from_an_incoming_alert(app, cl
             page.locator("button[type=submit]").click()
             page.wait_for_url("**/cases")
             page.goto(base + "/monitoring")
-            page.locator(".channel-tabs").get_by_role("link", name=text("الوارد", "Intake"), exact=True).click()
+            tab = page.locator(".channel-tabs").get_by_role("link", name=text("الوارد 2", "Intake 2"), exact=True)
+            tab.click()
             page.wait_for_url("**/monitoring?channel=intake")
-            rows = page.locator(".intake-view tbody tr")
+            surface = page.locator(".intake-view .monitoring-surface")
+            rows = surface.locator("tbody tr[data-intake-row]")
             expect(rows).to_have_count(2)
+            expect(page.locator(".intake-view h3")).to_have_count(0)
+            surface.get_by_label(text("بحث", "Search"), exact=True).fill("scanner")
+            surface.get_by_role("button", name=text("تطبيق", "Apply"), exact=True).click()
+            expect(page).to_have_url(re.compile(r"[?&]q=scanner(&|$)"))
+            expect(rows).to_have_count(1)
             for width in (390, 1440):
                 page.set_viewport_size({"width": width, "height": 1000})
                 assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
                 assert_accessible(page)
-            rows.filter(has_text="Scheduled scanner noise").get_by_role("button", name=text("عرض التنبيه", "View alert"), exact=True).click()
-            dialog = page.get_by_role("dialog")
-            dialog.get_by_label(text("سبب الاستبعاد", "Reason for dismissal"), exact=True).fill("Approved weekly vulnerability scan")
-            dialog.get_by_role("button", name=text("استبعاد التنبيه", "Dismiss alert"), exact=True).click()
-            expect(page.locator(".intake-view tbody tr")).to_have_count(1)
-            page.locator(".intake-view tbody tr").get_by_role("button", name=text("عرض التنبيه", "View alert"), exact=True).click()
-            dialog = page.get_by_role("dialog")
-            expect(dialog).to_contain_text("198.51.100.8")
-            expect(dialog).to_contain_text("T1110")
+            noise = rows.filter(has_text="Scheduled scanner noise")
+            noise.get_by_role("button", name="Scheduled scanner noise", exact=True).click()
+            detail = surface.locator(".intake-detail")
+            detail.get_by_role("button", name=text("أتولى الفرز", "Take for triage"), exact=True).click()
+            expect(rows.first).to_contain_text(text("قيد الفرز", "Being triaged"))
+            rows.first.get_by_role("button", name="Scheduled scanner noise", exact=True).click()
+            expect(detail).to_contain_text(text("يتولاه", "Taken by"))
+            detail.get_by_role("button", name=text("استبعاد", "Dismiss"), exact=True).click()
+            detail.get_by_label(text("سبب الاستبعاد", "Reason for dismissal"), exact=True).fill("Approved weekly vulnerability scan")
+            detail.get_by_role("button", name=text("استبعاد التنبيه", "Dismiss alert"), exact=True).click()
+            expect(surface.locator(".empty")).to_be_visible()
+            page.goto(base + "/monitoring?channel=intake")
+            expect(rows).to_have_count(1)
+            rows.first.get_by_role("button", name=text("تفاصيل التنبيه Brute force against VPN", "Alert details Brute force against VPN"), exact=True).click()
+            expect(detail).to_contain_text("198.51.100.8")
+            expect(detail).to_contain_text("T1110")
             assert_accessible(page)
-            dialog.get_by_role("button", name=text("إنشاء قضية من التنبيه", "Create a case from the alert"), exact=True).click()
+            detail.get_by_role("button", name=text("إنشاء قضية", "Create case"), exact=True).click()
             page.wait_for_url("**/cases/*")
             expect(page.get_by_role("heading", name="Brute force against VPN", exact=True)).to_be_visible()
             assert not errors, errors
+            browser.close()
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+@pytest.mark.e2e
+def test_the_intake_channel_opens_before_any_investigation_is_selected(app, client, login_as):
+    # The production default asks for a selected investigation on case pages; incoming alerts come before any case.
+    _receive(app, login_as, client)
+    app.config.update(WTF_CSRF_ENABLED=True, REQUIRE_INVESTIGATION_SELECTION=True)
+    server = make_server("127.0.0.1", 0, app)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as playwright:
+            browser = launch_browser(playwright)
+            page = browser.new_page(locale="en-US", viewport={"width": 1440, "height": 1000})
+            page.set_default_timeout(15000)
+            base = f"http://127.0.0.1:{server.server_port}"
+            page.goto(base + "/login")
+            page.locator("#email").fill("analyst@socify.local")
+            page.locator("#password").fill(DEMO_LOGIN_VALUE)
+            page.locator("button[type=submit]").click()
+            page.wait_for_url("**/cases")
+            page.goto(base + "/monitoring")
+            expect(page.locator(".empty")).to_contain_text("Choose a case")
+            page.locator(".channel-tabs").get_by_role("link", name="Intake 2", exact=True).click()
+            expect(page.locator(".intake-view tbody tr[data-intake-row]")).to_have_count(2)
             browser.close()
     finally:
         server.shutdown()

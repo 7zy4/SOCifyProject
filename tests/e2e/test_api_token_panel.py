@@ -1,4 +1,4 @@
-"""A manager creates an API token on the team page, sees it once, uses it, and revokes it."""
+"""A manager creates an API token on the Integrations page, sees it once, uses it, and revokes it."""
 
 import threading
 
@@ -35,12 +35,21 @@ def test_manager_creates_uses_and_revokes_a_token(app, language):
             page.locator("#password").fill(DEMO_LOGIN_VALUE)
             page.locator("button[type=submit]").click()
             page.wait_for_url("**/cases")
-            page.goto(base + "/team")
+            page.locator("#primary-nav").get_by_role("link", name=text("التكاملات", "Integrations"), exact=True).click()
+            page.wait_for_url("**/integrations")
+            team = page.locator("#primary-nav").get_by_role("link", name=text("الفريق", "Team"), exact=True)
             tokens = page.locator("section.panel").filter(has=page.get_by_role("heading", name=text("رموز API", "API tokens"), exact=True))
             expect(tokens).to_contain_text(text("لا توجد رموز API", "No API tokens"))
-            tokens.get_by_label(text("اسم الرمز", "Token name"), exact=True).fill("SIEM read access")
-            tokens.get_by_label(text("قراءة القضايا", "Read cases"), exact=True).check()
             tokens.get_by_role("button", name=text("إنشاء رمز", "Create token"), exact=True).click()
+            dialog = page.get_by_role("dialog")
+            dialog.get_by_label(text("اسم الرمز", "Token name"), exact=True).fill("SIEM read access")
+            scope = dialog.get_by_label(text("قراءة القضايا", "Read cases"), exact=True)
+            box, caption = scope.bounding_box(), scope.locator("xpath=..").locator("span").bounding_box()
+            # The box sits on the same line as its label, not above or below it.
+            assert abs((box["y"] + box["height"] / 2) - (caption["y"] + caption["height"] / 2)) < 4
+            scope.check()
+            assert_accessible(page)
+            dialog.get_by_role("button", name=text("إنشاء رمز", "Create token"), exact=True).click()
             dialog = page.get_by_role("dialog")
             value = dialog.locator("[data-api-token]").input_value()
             assert value.startswith("socify_pat_")
@@ -58,6 +67,10 @@ def test_manager_creates_uses_and_revokes_a_token(app, language):
             tokens.get_by_role("button", name=text("إلغاء الرمز", "Revoke token"), exact=True).click()
             expect(tokens.locator("tbody tr")).to_contain_text(text("ملغى", "Revoked"))
             assert page.request.get(base + "/api/cases", headers={"Authorization": f"Bearer {value}"}).status == 401
+            team.click()
+            page.wait_for_url("**/team")
+            page.locator('#workspace[aria-busy="false"]').wait_for()
+            expect(page.get_by_role("heading", name=text("رموز API", "API tokens"), exact=True)).to_have_count(0)
             assert not errors, errors
             browser.close()
     finally:

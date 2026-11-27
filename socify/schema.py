@@ -896,8 +896,10 @@ def baseline_schema(connection: sqlite3.Connection) -> None:
     from .autopsy_workspace import migrate as migrate_workspace
     from .builtin_rules import seed_builtin_rules
     from .intake import migrate as migrate_intake
+    from .notifications import migrate as migrate_notifications
     from .onboarding import migrate as migrate_onboarding
     from .quick_reports import migrate as migrate_quick_reports
+    from .team_sla import migrate as migrate_team_sla
     from .watchlist import migrate as migrate_watchlist
 
     migrate_workspace(connection)
@@ -906,6 +908,8 @@ def baseline_schema(connection: sqlite3.Connection) -> None:
     migrate_onboarding(connection)
     migrate_api_tokens(connection)
     migrate_intake(connection)
+    migrate_team_sla(connection)
+    migrate_notifications(connection)
     seed_builtin_rules(connection)
     protect_existing_recovery_codes(connection)
 

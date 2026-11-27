@@ -4,7 +4,7 @@ from .autopsy_pipeline import full_case_scope_sql
 from .case_counts import consistent_read
 from .db import get_db
 from .operational import case_scope
-from .security import current_user, error_response, require_permission, workspace_id
+from .security import current_user, error_response, has_permission, require_permission, workspace_id
 from .timeutils import iso_now
 
 autopsy_soc_api = Blueprint("autopsy_soc", __name__)
@@ -85,6 +85,11 @@ def monitoring():
         )
         .fetchall()
     )
+    if has_permission(current_user(), "intake.read"):
+        from .intake import open_count
+
+        # Alerts from SIEM and EDR still waiting for triage, shown on the Intake tab beside the case alert channels.
+        counts["intake"] = open_count(workspace_id())
     return jsonify(
         {
             "items": [dict(row) for row in rows],

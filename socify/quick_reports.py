@@ -499,6 +499,9 @@ def escalate_quick_report(case_id: int):
             touch_case(case_id)
         custody(case_id, "quick_report_escalated_to_manager", {"escalated_by": user_id, "escalated_at": now})
         record_audit(get_db(), "escalate_quick_report", "case", case_id, details={"escalated_by": user_id})
+        from .notifications import managers, notify
+
+        notify(managers(int(case["workspace_id"])), "escalated", workspace=int(case["workspace_id"]), case_id=case_id, actor=user_id)
 
     updated_row = get_db().execute("SELECT * FROM case_quick_reports WHERE case_id = ?", (case_id,)).fetchone()
     return jsonify({"report": _report_view(updated_row)}), 200
@@ -607,6 +610,9 @@ def acknowledge_escalated_report(case_id: int):
             touch_case(case_id)
         custody(case_id, "quick_report_manager_acknowledged", {"decision": decision, "manager_id": user_id})
         record_audit(get_db(), "acknowledge_quick_report", "case", case_id, details={"decision": decision})
+        from .notifications import notify
+
+        notify([existing["escalated_by"]], "escalation_decided", workspace=int(case["workspace_id"]), case_id=case_id, actor=user_id)
 
     updated = get_db().execute("SELECT * FROM case_quick_reports WHERE case_id = ?", (case_id,)).fetchone()
     return jsonify({"report": _report_view(updated)}), 200

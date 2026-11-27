@@ -16,7 +16,8 @@ const titles = {
   admin: [SOCifyLocale.text("الإدارة"), "ADMIN"],
   profile: [SOCifyLocale.text("الملف الشخصي"), "PROFILE"],
   "analysis-library": [SOCifyLocale.text("مكتبة القواعد"), "RULE LIBRARY"],
-  team: [SOCifyLocale.text("الفريق"), "TEAM"]
+  team: [SOCifyLocale.text("الفريق"), "TEAM"],
+  integrations: [SOCifyLocale.text("التكاملات"), "INTEGRATIONS"]
 };
 
 function displayText(value) {
@@ -46,6 +47,8 @@ function node(tag, attributes = {}, children = []) {
     element.addEventListener("change", follow);
     queueMicrotask(() => element.form?.addEventListener("reset", () => setTimeout(follow)));
   } else if (!element.hasAttribute("dir") && element.hasAttribute("data-user-content")) element.setAttribute("dir", "auto");
+  // Number fields follow the page language for their digits; the interface shows Western digits in both languages.
+  if (tag === "input" && attributes.type === "number" && !element.hasAttribute("lang")) element.setAttribute("lang", "en");
   return element;
 }
 
@@ -233,6 +236,8 @@ function field(label, control, wide = false) {
   const caption = node("span", { id: `field-label-${crypto.randomUUID()}`, text: label });
   const input = control.matches?.("input,select,textarea") ? control : control.querySelector?.("input,select,textarea");
   if (input && !input.hasAttribute("aria-label") && !input.hasAttribute("aria-labelledby")) input.setAttribute("aria-labelledby", caption.id);
+  // A checkbox or radio reads as one line: the box first, then its label.
+  if (control === input && ["checkbox", "radio"].includes(input.type)) return node("label", { class: `check-field${wide ? " span-2" : ""}` }, [control, caption]);
   return node("label", { class: wide ? "span-2" : "" }, [caption, control]);
 }
 

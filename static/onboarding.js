@@ -7,36 +7,32 @@ window.SOCifyOnboarding = (() => {
   const steps = {
     invite_team: {
       title: () => SOCifyLocale.text("ادعُ فريقك"),
-      text: () => SOCifyLocale.text("أرسل دعوات للمحللين من صفحة الفريق؛ تحدد الدعوة دور كل عضو."),
+      text: () => null,
       link: () => ["/team", SOCifyLocale.text("فتح الفريق")],
     },
     first_case: {
       title: () => SOCifyLocale.text("أنشئ أول قضية"),
-      text: () => SOCifyLocale.text("أنشئ قضية بزر «إنشاء قضية» أعلى الصفحة، ثم ارفع إليها عينة مثل fixtures/import/linux-auth.log من مجلد المشروع."),
+      text: () => null,
       link: () => null,
     },
     sla_calendar: {
       title: () => SOCifyLocale.text("اضبط مهلة الاستجابة وتقويمها"),
-      text: () => SOCifyLocale.text("في تبويب الاستجابة للقضية حدد المهلة وتقويم الاحتساب: طوال الوقت أو ساعات العمل والمنطقة الزمنية."),
-      link: (data) => (data.first_case_id ? [`/cases/${data.first_case_id}?tab=response`, SOCifyLocale.text("فتح الاستجابة")] : null),
+      text: () => null,
+      link: () => ["/team", SOCifyLocale.text("فتح الفريق")],
     },
     attack_catalogue: {
       title: () => SOCifyLocale.text("راجع كتالوج ATT&CK"),
-      text: (data) => (data.attack_version
-        ? SOCifyLocale.template`يعمل الربط بكتالوج محلي، الإصدار الحالي ${data.attack_version}. حدّثه بأمر التحميل في دليل التشغيل عند صدور إصدار جديد.`
-        : SOCifyLocale.text("لم يُحمّل كتالوج ATT&CK بعد. حمّله بأمر التحميل في دليل التشغيل.")),
+      text: (data) => (data.attack_version ? SOCifyLocale.template`الإصدار المحلي ${data.attack_version}` : SOCifyLocale.text("لم يُحمّل بعد؛ راجع دليل التشغيل")),
       link: () => null,
     },
     threat_intel: {
       title: () => SOCifyLocale.text("استورد استخبارات التهديدات"),
-      text: () => SOCifyLocale.text("استورد حزمة مؤشرات أو ملف STIX من مكتبة القواعد؛ تُحفظ وتُطابق محليًا."),
+      text: () => null,
       link: () => ["/analysis-library", SOCifyLocale.text("فتح مكتبة القواعد")],
     },
     backups: {
       title: () => SOCifyLocale.text("تأكد من النسخ الاحتياطي"),
-      text: (data) => (data.last_backup_at
-        ? SOCifyLocale.template`آخر نسخة احتياطية ناجحة: ${formatTime(data.last_backup_at)}. انسخ الملفات خارج الخادم بانتظام.`
-        : SOCifyLocale.text("لم تُسجَّل نسخة احتياطية بعد. خدمة backup في Compose تأخذ نسخة يومية؛ إن كنت تنسخ بطريقة أخرى فحدد الخطوة كمنجزة.")),
+      text: (data) => (data.last_backup_at ? SOCifyLocale.template`آخر نسخة ناجحة: ${formatTime(data.last_backup_at)}` : SOCifyLocale.text("لم تُسجَّل نسخة بعد")),
       link: () => null,
     },
   };
@@ -58,7 +54,7 @@ window.SOCifyOnboarding = (() => {
       }
       list.append(node("li", { class: item.done ? "done" : "" }, [
         node("span", { class: "badge onboarding-state", text: item.done ? SOCifyLocale.text("تم") : SOCifyLocale.text("لم يتم") }),
-        node("div", { class: "onboarding-step" }, [node("strong", { text: step.title() }), node("p", { text: step.text(data) })]),
+        node("div", { class: "onboarding-step" }, [node("strong", { text: step.title() }), step.text(data) ? node("p", { text: step.text(data) }) : null]),
         controls.length ? node("div", { class: "action-row" }, controls) : null,
       ]));
     }
@@ -68,8 +64,7 @@ window.SOCifyOnboarding = (() => {
     });
     const progress = node("progress", { max: data.total, value: data.completed, "aria-label": SOCifyLocale.text("تقدم خطوات البدء") });
     const body = node("div", { class: "panel-body" }, [
-      node("p", { text: SOCifyLocale.template`أنجزت ${data.completed} من ${data.total} خطوات لتجهيز الفريق.` }),
-      progress,
+      node("div", { class: "onboarding-progress" }, [progress, node("span", { text: SOCifyLocale.template`${data.completed} من ${data.total}` })]),
       list,
     ]);
     const section = panel(SOCifyLocale.text("ابدأ مع SOCify"), body, true, hide);

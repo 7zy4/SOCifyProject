@@ -157,7 +157,7 @@ def invitation(manager, email):
     form = manager.page.locator("section.panel").filter(has=manager.page.get_by_role("heading", name=manager.text("دعوة عضو جديد"), exact=True))
     form.locator("input[name=email]").fill(email)
     form.locator("input[name=role]").fill(manager.page.evaluate("autopsyLabel('analyst')"))
-    manager.click("button", "حفظ", form)
+    manager.click("button", "إنشاء دعوة", form)
     address = manager.page.get_by_label(manager.text("رابط التسجيل بالدعوة"), exact=True).input_value()
     manager.click("button", "إغلاق", manager.page.get_by_role("dialog"))
     return address

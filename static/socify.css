@@ -72,6 +72,23 @@ html[lang="ar"] .sidebar nav a { font-size: 14px; }
 .account-identity { display: grid; gap: 2px; min-width: 0; line-height: 1.45; }
 .account-identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; }
 .account-identity small { color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Notifications: the bell with its unread count, and the list it opens. */
+.notification-holder { display: flex; flex: none; }
+.topbar-notifications { margin-inline-start: auto; }
+.notification-bell { position: relative; border-color: transparent; background: transparent; color: var(--muted); }
+.notification-bell:hover, .notification-bell[aria-expanded="true"] { background: var(--panel-2); color: var(--text); }
+.notification-count { position: absolute; inset-block-start: 1px; inset-inline-end: 1px; display: grid; place-items: center; min-width: 17px; height: 17px; padding-inline: 4px; border-radius: 9px; background: var(--sev-critical-fill); color: var(--sev-critical-ink); font-size: 11px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.notification-panel { position: fixed; z-index: 140; display: grid; grid-template-rows: auto minmax(0, 1fr); inline-size: min(380px, calc(100vw - 16px)); max-block-size: min(520px, calc(100vh - 96px)); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); box-shadow: var(--shadow-float); animation: menu-in var(--motion-menu) var(--ease-out); }
+.notification-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-block-end: 1px solid var(--line-soft); }
+.notification-head h2 { margin: 0; font-size: 15px; }
+.notification-list { margin: 0; padding: 4px; overflow: auto; list-style: none; }
+.notification-list a { display: grid; gap: 2px; padding: 10px 12px; border-radius: var(--radius-control); color: var(--text); text-decoration: none; }
+.notification-list a:hover, .notification-list a:focus-visible { background: var(--panel-2); }
+.notification-list a.unread .notification-text { font-weight: 700; }
+.notification-list a.unread .notification-text::before { content: ""; display: inline-block; inline-size: 7px; block-size: 7px; margin-inline-end: 6px; border-radius: 50%; background: var(--accent-primary); vertical-align: middle; }
+.notification-subject { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notification-meta { display: flex; flex-wrap: wrap; gap: 8px; color: var(--faint); font-size: 12px; }
+.notification-empty { padding: 20px 12px; color: var(--muted); text-align: center; }
 .account-popover { position: absolute; inset-block-end: calc(100% + 8px); inset-inline: 0; z-index: 120; display: grid; gap: 2px; padding: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); box-shadow: var(--shadow-float); animation: menu-in var(--motion-menu) var(--ease-out); }
 .account-popover > strong { display: none; }
 .account-popover .button, .account-popover form .button { justify-content: flex-start; width: 100%; min-height: 34px; margin: 0; padding-inline: 8px; border: 0; background: transparent; color: var(--text); font-weight: 400; }
@@ -148,6 +165,7 @@ legend { padding-inline: 4px; color: var(--muted); font-size: 13px; }
 .form-grid > label { margin: 0; }
 /* A step mixes one-line inputs with a text box, so its fields line up by their labels. */
 fieldset.form-grid { align-items: start; }
+.form-stack { grid-template-columns: minmax(0, 480px); align-items: start; }
 .form-grid .span-2, .form-grid > .action-row, .form-grid > .notice, .form-grid > button, .form-grid > fieldset { grid-column: 1 / -1; }
 .form-grid > button { justify-self: start; }
 .form-foot { margin-block-start: 16px; color: var(--faint); font-size: 13px; }
@@ -186,13 +204,45 @@ details > summary:hover { color: var(--text); }
 .onboarding-steps li.done .onboarding-step strong { color: var(--muted); }
 .onboarding-step p { margin: 4px 0 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 @media (max-width: 640px) { .onboarding-steps li { grid-template-columns: minmax(0, 1fr); } }
-.token-scopes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-card); }
+/* Checkboxes and radios: the box first, then its label, on one line; groups of them as a compact grid. */
+.check-field { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--text); font-size: 14px; line-height: 1.4; cursor: pointer; }
+.check-field > input { flex: none; }
+.check-field > span { margin: 0; }
+.form-grid > .check-field { align-self: end; min-height: 40px; }
+.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 20px; margin: 0 0 12px; }
+.token-scopes { margin: 0; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius-card); }
 .token-scopes legend { padding-inline: 4px; color: var(--muted); font-size: 13px; }
+.field-control { display: grid; gap: 4px; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
+/* Team response-time policy: one budget per severity, then the calendar. */
+.sla-policy-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 8px; padding: 0; list-style: none; }
+.sla-policy-grid li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border: 1px solid var(--line-soft); border-radius: var(--radius-card); }
+.sla-policy-grid strong { font-variant-numeric: tabular-nums; }
+.sla-policy-hours { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius-card); }
+.sla-policy-hours legend { padding-inline: 4px; color: var(--muted); font-size: 13px; }
+.sla-policy-hours > label { margin: 0; }
+@media (max-width: 700px) { .sla-policy-grid, .sla-policy-hours { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.onboarding-progress { display: flex; align-items: center; gap: 12px; margin-block-end: 12px; color: var(--muted); font-size: 13px; }
+.onboarding-progress progress { flex: 1 1 auto; }
+/* Intake: an expanded alert shows its facts beside the triage actions. */
+.intake-detail { display: grid; grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr); gap: 24px; align-items: start; }
+.intake-facts { display: grid; gap: 12px; min-width: 0; }
+.intake-facts .alert-property-table { table-layout: fixed; }
+.intake-facts .alert-property-table td { overflow-wrap: anywhere; }
+.intake-description { margin: 0; overflow-wrap: anywhere; }
+.intake-triage { display: grid; gap: 12px; padding: 16px; background: var(--panel); border: 1px solid var(--line-soft); border-radius: var(--radius-card); }
+.intake-owner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; color: var(--muted); font-size: 13px; }
+.intake-action-form:empty { display: none; }
+.inline-action { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.inline-action > label { flex: 1 1 200px; margin: 0; }
+.intake-view .monitoring-toolbar label { flex-basis: 170px; }
+.intake-view .monitoring-toolbar > label:first-child { flex-basis: 240px; }
+@media (max-width: 1000px) { .intake-detail { grid-template-columns: minmax(0, 1fr); } }
 .intake-entities { display: grid; gap: 4px 0; margin: 0; }
 .intake-entities dt { color: var(--muted); font-size: 13px; }
 .intake-entities dd { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
 .intake-entities .badge { height: auto; min-height: 22px; white-space: normal; overflow-wrap: anywhere; }
-.intake-detail pre { max-height: 320px; overflow: auto; font-size: 12px; }
+.intake-raw pre { max-height: 320px; overflow: auto; font-size: 12px; }
 /* Actions that follow a table, a list of records or an empty state never touch it. */
 :is(.table-wrap, table, .empty, .compact-empty, .record-grid) + :is(.action-row, .pagination, form, .button, button, nav) { margin-block-start: 12px; }
 :is(form, .filter-row, .action-row) + :is(.table-wrap, table, .record-grid, .empty, .compact-empty) { margin-block-start: 12px; }

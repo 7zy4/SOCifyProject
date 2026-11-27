@@ -10,15 +10,25 @@ from scripts.environment import load_environment
 from socify import create_app
 from socify.autopsy_worker import run_autopsy_worker_once
 from socify.db import get_db
+from socify.notifications import check_sla_deadlines
 from socify.worker_health import Heartbeat
+
+SLA_CHECK_SECONDS = 60
 
 
 def serve(application: Flask, identity: str, poll_seconds: float, once: bool = False) -> None:
-    """Process case jobs until stopped, recording a heartbeat on start, after each job and every 30 seconds while idle."""
+    """Process case jobs until stopped, recording a heartbeat on start, after each job and every 30 seconds while idle.
+
+    Once a minute it also checks response deadlines and notifies the people of cases that reach 80% or run out.
+    """
     heartbeat = Heartbeat("autopsy-worker", identity)
+    checked = 0.0
     with application.app_context():
         heartbeat.beat(get_db(), "ready", force=True)
         while True:
+            if time.monotonic() - checked >= SLA_CHECK_SECONDS:
+                checked = time.monotonic()
+                check_sla_deadlines()
             job = run_autopsy_worker_once(identity)
             heartbeat.beat(get_db(), "idle" if job is None else "active", force=job is not None)
             if once:

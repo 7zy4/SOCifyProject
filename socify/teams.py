@@ -287,6 +287,9 @@ def assign_logs():
         identifier = inserted_id(assignment)
         _history(get_db(), case["id"], "logs_assigned", None, {"assignment_id": identifier, "assignee": data["assignee"], "job_id": job["id"]})
         record_audit(get_db(), "assign", "team_logs", identifier, details={"case_id": case["id"], "assignee": data["assignee"]})
+        from .notifications import notify
+
+        notify([data["assignee"]], "batch_assigned", workspace=workspace_id(), case_id=int(case["id"]), actor=actor_id())
     return jsonify({"id": identifier}), 201
 
 
@@ -527,6 +530,9 @@ def shift_handoff(case_id: int):
         touch_case(case_id)
         custody(case_id, "shift_handed_off", {"from": source, "to": target, "reason": reason, "previous_access": "retained; account remains active"})
         record_audit(get_db(), "shift_handoff", "case", case_id, details={"from": source, "to": target, "reason": reason})
+        from .notifications import notify
+
+        notify([target], "handoff", workspace=workspace_id(), case_id=case_id, actor=actor_id())
     return jsonify({"handed_off": True, "from_user": source, "to_user": target, "previous_access": "retained"})
 
 

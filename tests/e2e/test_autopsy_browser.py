@@ -181,7 +181,7 @@ def test_local_sample_manual_reputation_and_team_assignment_browser(app):
             page.locator("input[name=job_id]").fill("browser-assigned.jsonl | 1 سجل")
             page.locator("input[name=assignee]").fill("L2 Browser Responder | مستجيب L2")
             page.locator("textarea[name=instructions]").fill("Record shared team findings")
-            page.locator("form").filter(has=page.locator("textarea[name=instructions]")).get_by_role("button", name="حفظ", exact=True).click()
+            page.locator("form").filter(has=page.locator("textarea[name=instructions]")).get_by_role("button", name="إسناد الدفعة", exact=True).click()
             page.get_by_role("cell", name="Record shared team findings", exact=True).wait_for()
             page.locator(".assignment-queue").get_by_role("link", name=case["reference"], exact=True).click()
             page.locator(".case-tabs").get_by_role("link", name="التحقيق", exact=True).click()

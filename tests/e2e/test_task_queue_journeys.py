@@ -28,7 +28,7 @@ def assign(journey, person, *, typed_case=False, instructions="Review the retain
     form.locator("input[name=assignee]").press("ArrowDown")
     form.get_by_role("option").filter(has_text=person).first.click()
     form.locator("[name=instructions]").fill(instructions)
-    journey.click("button", "حفظ", form)
+    journey.click("button", "إسناد الدفعة", form)
     assert len(assignments(journey)) == expected
 
 

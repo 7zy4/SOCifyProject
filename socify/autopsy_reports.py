@@ -396,6 +396,9 @@ def approve_report(case_id: int, report_id: int):
         custody(
             case_id, "report_approved", {"report_id": report_id, "sha256": row["sha256"], "source_version": row["source_version"], "override_reason": override}
         )
+        from .notifications import case_people, notify
+
+        notify([row["created_by"], *case_people(case_id)], "report_approved", workspace=int(case["workspace_id"]), case_id=case_id, actor=actor_id())
     return jsonify({"id": report_id, "state": "approved", "sha256": row["sha256"]})
 
 
@@ -469,6 +472,9 @@ def record_case_transition(case_id, case, target, reason):
     )
     _history(get_db(), case_id, "status_changed", case["status"], target, reason)
     custody(case_id, "case_transition", {"from": case["status"], "to": target, "reason": reason, "source_version": case["version"]})
+    from .notifications import case_transition
+
+    case_transition(case, target, actor_id())
 
 
 def transition_operational(case_id, row, target, reason, data):

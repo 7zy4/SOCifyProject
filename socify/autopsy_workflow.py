@@ -306,6 +306,9 @@ def configure_sla(case_id: int):
                 "configured_at": iso_now(),
             }
             record_id = insert_record(case_id, "workflow_sla", payload)
+            from .team_sla import sync_due_date
+
+            sync_due_date(_case_row(case_id))
     except ValueError as exc:
         return error_response("INVALID_SLA_POLICY", public_error_message(exc, "تحقق من تقويم الاستجابة وحدوده الزمنية"), 422)
     return jsonify({"id": record_id, "policy": payload}), 201
@@ -328,6 +331,9 @@ def sla_action(case_id: int, action: str):
             if case["status"] == "closed" or not status["configured"] or (action == "pause") == (status["status"] == "paused"):
                 return error_response("SLA_STATE_CONFLICT", "تغيرت حالة SLA أو لا تنطبق العملية", 409)
             identifier = insert_record(case_id, "workflow_sla_action", {"action": action, "reason": reason, "at": iso_now(), "actor_id": actor_id()})
+            from .team_sla import sync_due_date
+
+            sync_due_date(_case_row(case_id))
     except ValueError as exc:
         return error_response("INVALID_SLA_ACTION", public_error_message(exc, "إجراء الاستجابة غير صالح"), 422)
     return jsonify({"id": identifier, "action": action}), 201

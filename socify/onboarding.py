@@ -56,7 +56,8 @@ def _detected(workspace: int) -> dict[str, bool]:
     members = db.execute("SELECT COUNT(*) FROM users WHERE workspace_id = ? AND is_active = 1", (workspace,)).fetchone()[0]
     invited = db.execute("SELECT 1 FROM team_invitations WHERE workspace_id = ? LIMIT 1", (workspace,)).fetchone() is not None
     sla = (
-        db.execute(
+        db.execute("SELECT 1 FROM team_sla_policies WHERE workspace_id = ?", (workspace,)).fetchone() is not None
+        or db.execute(
             "SELECT 1 FROM autopsy_records r JOIN incident_cases c ON c.id = r.case_id WHERE c.workspace_id = ? AND r.kind = 'workflow_sla' LIMIT 1",
             (workspace,),
         ).fetchone()

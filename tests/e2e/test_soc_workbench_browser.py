@@ -79,9 +79,7 @@ def test_soc_triage_case_tools_email_and_immediate_report_permissions(app, datab
             assert_accessible(page)
             page.screenshot(path=str(output / "email-en-dark.png"), full_page=True)
             page.goto(base + f"/cases/{case['id']}")
-            expect(page.locator("[data-quick-report]")).to_have_attribute(
-                "title", "Creates a saved full copy of the case report now; to escalate quickly to the manager, use the Investigation decisions panel"
-            )
+            expect(page.locator("[data-quick-report]")).to_have_attribute("title", "Creates a saved full copy of the case report")
             page.locator("[data-quick-report]").click()
             page.wait_for_url(f"**/cases/{case['id']}?tab=reports")
             expect(page.locator(".report-revision")).to_have_count(1)

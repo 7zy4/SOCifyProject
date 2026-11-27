@@ -91,7 +91,7 @@ ROLE_PERMISSIONS.update(
         "reviewer": ROLE_PERMISSIONS["auditor"] | {"reports.approve", "notes.add"},
     }
 )
-ROLE_PERMISSIONS["soc_manager"].update({"reports.approve", "cases.assign", "intel.manage", "samples.download"})
+ROLE_PERMISSIONS["soc_manager"].update({"reports.approve", "cases.assign", "intel.manage", "samples.download", "integrations.manage"})
 for _role in ("analyst", "l1_analyst", "l2_responder", "investigator", "soc_manager"):
     ROLE_PERMISSIONS[_role].update({"cases.export", "evidence.download"})
 # Alert intake (socify.intake): seeing the queue, and turning alerts into cases, links or dismissals.

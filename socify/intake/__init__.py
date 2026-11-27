@@ -25,7 +25,7 @@ from ..audit import record_audit
 from ..db import get_db, inserted_id, transaction
 from ..security import current_user, decrypt_secret, encrypt_secret, error_response, has_permission, require_permission
 from ..timeutils import iso_now, parse_timestamp, utc_now
-from ..validation import ValidationError
+from ..validation import ValidationError, public_error_message
 from . import elastic, generic, sentinel, splunk, wazuh
 from .common import SEVERITIES, text
 
@@ -70,6 +70,8 @@ CREATE TABLE IF NOT EXISTS intake_alerts (
     raw_sha256 TEXT NOT NULL,
     case_id INTEGER REFERENCES incident_cases(id),
     dismissed_reason TEXT,
+    claimed_by INTEGER REFERENCES users(id),
+    claimed_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -88,6 +90,11 @@ def migrate(connection: sqlite3.Connection) -> None:
     for statement in SCHEMA.split(";"):
         if statement.strip():
             connection.execute(statement)
+    # Added after the first 1.1 build: who claimed an alert for triage.
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(intake_alerts)")}
+    for name, definition in (("claimed_by", "INTEGER REFERENCES users(id)"), ("claimed_at", "TEXT")):
+        if name not in columns:
+            connection.execute(f"ALTER TABLE intake_alerts ADD COLUMN {name} {definition}")
 
 
 def _canonical(value: object) -> str:
@@ -116,16 +123,16 @@ def _rules(value: object, workspace: int) -> dict[str, Any]:
     if value is None:
         return {}
     if not isinstance(value, dict) or set(value) - {"min_severity", "assignee"}:
-        raise ValueError("auto_case accepts min_severity and assignee only")
+        raise ValidationError("قواعد الإنشاء التلقائي تقبل الحد الأدنى للخطورة والمسؤول فقط")
     rules: dict[str, Any] = {}
     if value.get("min_severity") is not None:
         if value["min_severity"] not in SEVERITIES:
-            raise ValueError("unknown severity")
+            raise ValidationError("درجة الخطورة غير معروفة")
         rules["min_severity"] = value["min_severity"]
     if value.get("assignee") is not None:
         member = get_db().execute("SELECT 1 FROM users WHERE id = ? AND workspace_id = ? AND is_active = 1", (value["assignee"], workspace)).fetchone()
         if type(value["assignee"]) is not int or not member:
-            raise ValueError("the assignee is not an active member of this team")
+            raise ValidationError("المسؤول ليس عضوًا نشطًا في هذا الفريق")
         rules["assignee"] = value["assignee"]
     return rules
 
@@ -166,7 +173,7 @@ def create_integration():
     try:
         rules = _rules(data.get("auto_case"), int(user["workspace_id"]))
     except ValueError as error:
-        return error_response("INVALID_INTEGRATION", str(error), 422)
+        return error_response("INVALID_INTEGRATION", public_error_message(error, "قواعد الإنشاء التلقائي غير صالحة"), 422)
     secret = secrets.token_urlsafe(32) if data["auth_mode"] == "hmac" else None
     with transaction():
         integration_id = inserted_id(
@@ -207,7 +214,7 @@ def update_integration(integration_id: int):
     try:
         rules = _rules(data["auto_case"], int(user["workspace_id"])) if "auto_case" in data else json.loads(row["auto_case_rules"])
     except ValueError as error:
-        return error_response("INVALID_INTEGRATION", str(error), 422)
+        return error_response("INVALID_INTEGRATION", public_error_message(error, "قواعد الإنشاء التلقائي غير صالحة"), 422)
     enabled = data.get("enabled", bool(row["enabled"]))
     with transaction():
         get_db().execute(
@@ -346,7 +353,32 @@ def receive_alerts(integration_id: int):
             workspace=int(integration["workspace_id"]),
         )
     _apply_auto_case(integration, [item["id"] for item in results if item["status"] == "created"])
+    _notify_severe(integration, [item["id"] for item in results if item["status"] == "created"])
     return jsonify({"accepted": len(results), "items": results}), 202
+
+
+def _notify_severe(integration: sqlite3.Row, alert_ids: list[int]) -> None:
+    """New high and critical alerts still in the queue reach everyone who triages incoming alerts, once each."""
+    from ..notifications import notify
+
+    if not alert_ids:
+        return
+    marks = ",".join("?" for _ in alert_ids)
+    severe = (
+        get_db()
+        .execute(f"SELECT id FROM intake_alerts WHERE id IN ({marks}) AND status = 'new' AND severity IN ('critical', 'high') ORDER BY id", alert_ids)
+        .fetchall()
+    )
+    with transaction():
+        for row in severe:
+            notify(
+                None,
+                "intake_alert",
+                workspace=int(integration["workspace_id"]),
+                intake_alert_id=int(row["id"]),
+                permission="intake.triage",
+                dedup_key=f"intake:{row['id']}",
+            )
 
 
 def _apply_auto_case(integration: sqlite3.Row, alert_ids: list[int]) -> None:
@@ -425,23 +457,27 @@ def _alert_view(row: sqlite3.Row, *, raw: bool = False) -> dict[str, Any]:
         "raw_sha256": row["raw_sha256"],
         "case_id": row["case_id"],
         "dismissed_reason": row["dismissed_reason"],
+        "claimed_by": row["claimed_by"],
+        "claimed_by_name": row["claimed_by_name"],
+        "claimed_at": row["claimed_at"],
     }
     if raw:
         view["raw"] = json.loads(decrypt_secret(row["raw_ciphertext"]))
     return view
 
 
+ALERT_SELECT = """SELECT a.*, i.name AS integration_name, i.kind AS integration_kind,
+    socify_user_name(u.name, u.name_ar, u.name_en) AS claimed_by_name
+    FROM intake_alerts a JOIN intake_integrations i ON i.id = a.integration_id LEFT JOIN users u ON u.id = a.claimed_by"""
+
+
 def _alert(alert_id: int) -> sqlite3.Row | None:
     user = current_user() or {}
-    return (
-        get_db()
-        .execute(
-            """SELECT a.*, i.name AS integration_name, i.kind AS integration_kind FROM intake_alerts a JOIN intake_integrations i ON i.id = a.integration_id
-            WHERE a.id = ? AND a.workspace_id = ?""",
-            (alert_id, int(user.get("workspace_id") or 0)),
-        )
-        .fetchone()
-    )
+    return get_db().execute(f"{ALERT_SELECT} WHERE a.id = ? AND a.workspace_id = ?", (alert_id, int(user.get("workspace_id") or 0))).fetchone()
+
+
+def open_count(workspace: int) -> int:
+    return int(get_db().execute("SELECT COUNT(*) FROM intake_alerts WHERE workspace_id = ? AND status IN ('new', 'triaging')", (workspace,)).fetchone()[0])
 
 
 @intake_api.get("/api/intake/alerts")
@@ -470,6 +506,20 @@ def list_alerts():
             return error_response("INVALID_INTAKE_FILTER", "مرشح التكامل غير صالح", 422)
         clauses.append("a.integration_id = ?")
         values.append(int(integration))
+    query = (request.args.get("q") or "").strip()
+    if len(query) > 200:
+        return error_response("INVALID_INTAKE_FILTER", "نص البحث أطول من 200 محرف", 422)
+    if query:
+        # Title, rule, source id and entity values, matched as plain text (LIKE wildcards in the query are escaped).
+        pattern = "%" + query.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"
+        clauses.append("(a.title LIKE ? ESCAPE '!' OR a.external_id LIKE ? ESCAPE '!' OR a.normalized LIKE ? ESCAPE '!')")
+        values.extend([pattern, pattern, pattern])
+    mine = request.args.get("mine", "0")
+    if mine not in {"0", "1"}:
+        return error_response("INVALID_INTAKE_FILTER", "مرشح المسؤول غير صالح", 422)
+    if mine == "1":
+        clauses.append("a.claimed_by = ?")
+        values.append(int(user["id"]))
     since = request.args.get("since", "")
     if since:
         try:
@@ -484,13 +534,22 @@ def list_alerts():
     rows = (
         get_db()
         .execute(
-            f"""SELECT a.*, i.name AS integration_name, i.kind AS integration_kind FROM intake_alerts a JOIN intake_integrations i ON i.id = a.integration_id
-            WHERE {where} ORDER BY a.last_seen DESC, a.id DESC LIMIT 50 OFFSET ?""",
+            f"{ALERT_SELECT} WHERE {where} ORDER BY a.last_seen DESC, a.id DESC LIMIT 50 OFFSET ?",
             (*values, (number - 1) * 50),
         )
         .fetchall()
     )
-    return jsonify({"items": [_alert_view(row) for row in rows], "total": total, "page": number, "can_triage": has_permission(user, "intake.triage")})
+    return jsonify(
+        {
+            "items": [_alert_view(row) for row in rows],
+            "total": total,
+            "page": number,
+            "page_size": 50,
+            "open": open_count(int(user["workspace_id"])),
+            "fetched_at": iso_now(),
+            "can_triage": has_permission(user, "intake.triage"),
+        }
+    )
 
 
 @intake_api.get("/api/intake/alerts/<int:alert_id>")
@@ -588,24 +647,34 @@ def create_case_from_alert(row: sqlite3.Row, *, title: str | None = None, assign
     }
     if assignee is not None:
         data["assignee"] = assignee
-    response = _create_case(data)
+    detailed = get_db().execute(f"{ALERT_SELECT} WHERE a.id = ?", (row["id"],)).fetchone()
+
+    def link(case_id: int) -> None:
+        _close_alert(row["id"], "UPDATE intake_alerts SET status = 'linked', case_id = ?, updated_at = ? WHERE id = ?", (case_id, iso_now(), row["id"]))
+        _attach(case_id, detailed, detection=True)
+        record_audit(get_db(), "case_from_intake", "case", case_id, details={"intake_alert_id": row["id"], "integration_id": row["integration_id"]})
+
+    try:
+        response = _create_case(data, then=link)
+    except AlertClosed:
+        return _closed()
     body, status = (response[0], response[1]) if isinstance(response, tuple) else (response, response.status_code)
     if status != 201:
         return response
-    case_id = int(body.get_json()["id"])
-    detailed = (
-        get_db()
-        .execute(
-            "SELECT a.*, i.name AS integration_name, i.kind AS integration_kind FROM intake_alerts a JOIN intake_integrations i ON i.id = a.integration_id WHERE a.id = ?",
-            (row["id"],),
-        )
-        .fetchone()
-    )
-    with transaction():
-        _attach(case_id, detailed, detection=True)
-        get_db().execute("UPDATE intake_alerts SET status = 'linked', case_id = ?, updated_at = ? WHERE id = ?", (case_id, iso_now(), row["id"]))
-        record_audit(get_db(), "case_from_intake", "case", case_id, details={"intake_alert_id": row["id"]})
-    return jsonify({"case_id": case_id, "alert_id": row["id"]}), 201
+    return jsonify({"case_id": int(body.get_json()["id"]), "alert_id": row["id"]}), 201
+
+
+class AlertClosed(Exception):
+    """The alert was linked or dismissed by someone else after it was read; the surrounding transaction rolls back."""
+
+
+def _close_alert(alert_id: int, statement: str, values: tuple[Any, ...]) -> None:
+    if get_db().execute(statement + " AND status IN ('new', 'triaging')", values).rowcount != 1:
+        raise AlertClosed
+
+
+def _closed():
+    return error_response("INTAKE_ALERT_CLOSED", "التنبيه مربوط بقضية أو مستبعد مسبقًا", 409)
 
 
 def _open(alert_id: int):
@@ -613,7 +682,7 @@ def _open(alert_id: int):
     if row is None:
         return None, error_response("INTAKE_ALERT_NOT_FOUND", "التنبيه الوارد غير موجود", 404)
     if row["status"] in {"linked", "dismissed"}:
-        return None, error_response("INTAKE_ALERT_CLOSED", "التنبيه مربوط بقضية أو مستبعد مسبقًا", 409)
+        return None, _closed()
     return row, None
 
 
@@ -652,10 +721,13 @@ def alert_to_existing_case(alert_id: int):
         return error_response("CASE_NOT_FOUND", "القضية غير متاحة", 404)
     if case["status"] == "closed":
         return error_response("CASE_EVIDENCE_LOCKED", "الأدلة مقفلة بعد إغلاق القضية", 409)
-    with transaction():
-        evidence_id = _attach(int(case["id"]), row, detection=False)
-        get_db().execute("UPDATE intake_alerts SET status = 'linked', case_id = ?, updated_at = ? WHERE id = ?", (case_id, iso_now(), alert_id))
-        record_audit(get_db(), "link_intake_alert", "case", case_id, details={"intake_alert_id": alert_id, "evidence_id": evidence_id})
+    try:
+        with transaction():
+            _close_alert(alert_id, "UPDATE intake_alerts SET status = 'linked', case_id = ?, updated_at = ? WHERE id = ?", (case_id, iso_now(), alert_id))
+            evidence_id = _attach(int(case["id"]), row, detection=False)
+            record_audit(get_db(), "link_intake_alert", "case", case_id, details={"intake_alert_id": alert_id, "evidence_id": evidence_id})
+    except AlertClosed:
+        return _closed()
     return jsonify({"case_id": case_id, "alert_id": alert_id, "evidence_id": evidence_id})
 
 
@@ -669,7 +741,57 @@ def dismiss_alert(alert_id: int):
     reason = text(data.get("reason"), 500) if isinstance(data, dict) else None
     if not reason or len(reason) < 5:
         return error_response("INVALID_INTAKE_ACTION", "اكتب سبب الاستبعاد (5 محارف على الأقل)", 422)
-    with transaction():
-        get_db().execute("UPDATE intake_alerts SET status = 'dismissed', dismissed_reason = ?, updated_at = ? WHERE id = ?", (reason, iso_now(), alert_id))
-        record_audit(get_db(), "dismiss", "intake_alert", alert_id, details={"reason": reason})
+    try:
+        with transaction():
+            _close_alert(
+                alert_id, "UPDATE intake_alerts SET status = 'dismissed', dismissed_reason = ?, updated_at = ? WHERE id = ?", (reason, iso_now(), alert_id)
+            )
+            record_audit(get_db(), "dismiss", "intake_alert", alert_id, details={"reason": reason})
+    except AlertClosed:
+        return _closed()
     return jsonify({"alert_id": alert_id, "status": "dismissed"})
+
+
+@intake_api.post("/api/intake/alerts/<int:alert_id>/claim")
+@require_permission("intake.triage")
+def claim_alert(alert_id: int):
+    """Take an open alert for triage so colleagues see who is on it; a manager may take it from someone else."""
+    row, refusal = _open(alert_id)
+    if refusal is not None:
+        return refusal
+    user = current_user() or {}
+    if row["claimed_by"] not in {None, user["id"]} and user.get("role") not in MANAGER_ROLES:
+        return error_response("INTAKE_ALERT_CLAIMED", "يتولى زميل فرز هذا التنبيه", 409)
+    now = iso_now()
+    try:
+        with transaction():
+            _close_alert(
+                alert_id,
+                "UPDATE intake_alerts SET status = 'triaging', claimed_by = ?, claimed_at = ?, updated_at = ? WHERE id = ?",
+                (user["id"], now, now, alert_id),
+            )
+            record_audit(get_db(), "claim", "intake_alert", alert_id, details={"previous": row["claimed_by"]})
+    except AlertClosed:
+        return _closed()
+    return jsonify(_alert_view(_alert(alert_id) or row))
+
+
+@intake_api.post("/api/intake/alerts/<int:alert_id>/release")
+@require_permission("intake.triage")
+def release_alert(alert_id: int):
+    """Hand an alert back to the queue; the member triaging it or a manager can do this."""
+    row, refusal = _open(alert_id)
+    if refusal is not None:
+        return refusal
+    user = current_user() or {}
+    if row["claimed_by"] != user["id"] and user.get("role") not in MANAGER_ROLES:
+        return error_response("INTAKE_ALERT_CLAIMED", "يتولى زميل فرز هذا التنبيه", 409)
+    try:
+        with transaction():
+            _close_alert(
+                alert_id, "UPDATE intake_alerts SET status = 'new', claimed_by = NULL, claimed_at = NULL, updated_at = ? WHERE id = ?", (iso_now(), alert_id)
+            )
+            record_audit(get_db(), "release", "intake_alert", alert_id, details={"previous": row["claimed_by"]})
+    except AlertClosed:
+        return _closed()
+    return jsonify(_alert_view(_alert(alert_id) or row))

@@ -51,7 +51,7 @@ def test_assignment_is_executable_before_it_is_created(app, language, scenario):
         if scenario == "assignment-restricted-recovery":
             restrict_batch(manager, "assigned-review.json")
             form = assignment_form(manager, person)
-            manager.click("button", "حفظ", form)
+            manager.click("button", "إسناد الدفعة", form)
             assert assignments(manager) == [], "A task must not be created for an inaccessible batch"
             expect(form.locator("[role=alert]")).to_be_visible()
             manager.page.goto(j.case_url + "?tab=logs")
@@ -73,7 +73,7 @@ def test_assignment_is_executable_before_it_is_created(app, language, scenario):
                     expect(form.get_by_role("option").filter(has_text=member["name"])).to_have_count(0)
             choose(manager, form, "assignee", person)
             form.locator("[name=instructions]").fill("Review the retained identity batch")
-            manager.click("button", "حفظ", form)
+            manager.click("button", "إسناد الدفعة", form)
             j.nav("مهامي")
             j.click("button", "بدء التحليل")
             assert assignments(j)[0]["state"] == "in_progress"
@@ -130,7 +130,7 @@ def test_shift_work_retains_ownership_access_and_completion_history(app, languag
                 other = ReviewJourney(other_page, manager.base, result["steps"])
                 other.login("manager@socify.local")
                 role_permission(other, "events.read", False)
-                manager.click("button", "حفظ", form)
+                manager.click("button", "إسناد الدفعة", form)
                 assert assignments(manager) == []
                 expect(form.locator("[role=alert]")).to_contain_text(manager.text("العضو لا يملك صلاحية تنفيذ مهام التحقيق"))
                 other.page.close()

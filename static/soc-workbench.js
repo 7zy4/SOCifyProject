@@ -45,27 +45,29 @@
     if (reports) reports.href = url("/reports", {case_id:current.id});
   }
   function reportButton(current) {
-    const control = button(t("تقرير فوري"), async () => {
+    const control = button(t("إنشاء تقرير"), async () => {
       control.disabled = true;
       control.textContent = t("جارٍ إعداد نسخة التقرير…");
       try {
         await api(`/api/cases/${current.id}/reports`, {method:"POST",body:{version:current.version,profile:permission("evidence.download")?"full":"metadata_only_v1"}});
         location.assign(autopsyCaseURL(current.id, {tab:"reports"}));
-      } catch (error) { handleError(error); control.disabled = false; control.textContent = t("تقرير فوري"); }
+      } catch (error) { handleError(error); control.disabled = false; control.textContent = t("إنشاء تقرير"); }
     }, "primary");
     control.dataset.quickReport = "";
-    control.title = t("ينشئ الآن نسخة محفوظة كاملة من تقرير القضية؛ للتصعيد السريع إلى المدير استخدم لوحة قرارات التحقيق");
+    control.title = t("ينشئ نسخة محفوظة كاملة من تقرير القضية");
     return control;
   }
   const channels = [["main", t("جديدة")], ["investigation", t("قيد التحقيق")], ["closed", t("مغلقة")]];
   async function monitoring() {
     const version = ++requestVersion;
     begin("monitoring");
-    if(window.SOCifyWorkspace?.selection.required && !window.SOCifyWorkspace.selection.case_ids.length) {
+    const params = new URLSearchParams(location.search);
+    // Incoming alerts come before any case, so the Intake channel opens without a selected investigation.
+    if (params.get("channel") === "intake" && window.SOCifyIntake && permission("intake.read")) { await window.SOCifyIntake.render(names.monitoring, channels); return; }
+    const unscoped = window.SOCifyWorkspace?.selection.required && !window.SOCifyWorkspace.selection.case_ids.length;
+    if (unscoped && !permission("intake.read")) {
       finish(emptyState(t("اختر قضية لبدء العمل"),null,[linkedButton(t("اختيار نطاق التحقيق"),"/cases")])); return;
     }
-    const params = new URLSearchParams(location.search);
-    if (params.get("channel") === "intake" && window.SOCifyIntake && permission("intake.read")) { await window.SOCifyIntake.render(names.monitoring, channels); return; }
     const data = await api("/api/soc/monitoring?" + params);
     if (version !== requestVersion) return;
     const root = node("div", {class:"monitoring-view"}, pageHead(...names.monitoring));
@@ -78,7 +80,11 @@
     root.append(node("nav", {class:"channel-tabs","aria-label":t("قنوات التنبيهات")}, [...channels.map(([value,label]) => {
       const target = new URL(location.href); target.searchParams.set("channel",value); target.searchParams.delete("page");
       return node("a", {class:"channel-tab",href:target.pathname+target.search,"aria-current":value===data.channel?"page":null}, [node("span",{text:label}),node("span",{class:"channel-count",text:number(data.counts[value])})]);
-    }), permission("intake.read") ? node("a", {class:"channel-tab",href:"/monitoring?channel=intake"}, node("span",{text:t("الوارد")})) : null]));
+    }), permission("intake.read") ? node("a", {class:"channel-tab",href:"/monitoring?channel=intake"}, [node("span",{text:t("الوارد")}),node("span",{class:"channel-count",text:number(data.counts.intake ?? 0)})]) : null]));
+    if (unscoped) {
+      root.append(emptyState(t("اختر قضية لبدء العمل"),null,[linkedButton(t("اختيار نطاق التحقيق"),"/cases")]));
+      finish(root); return;
+    }
     const search = node("input",{name:"q",type:"search",maxlength:200,value:params.get("q")||"",autocomplete:"off",placeholder:t("بحث")});
     const severity = node("select",{name:"severity"}, [["",t("جميع الدرجات")],...["critical","high","medium","low"].map(value=>[value,autopsyLabel(value)])].map(([value,label])=>node("option",{value,selected:value===(params.get("severity")||""),text:label})));
     const mine = node("select",{name:"mine"}, [["0",t("جميع القضايا المصرح بها")],["1",t("المسندة إليّ")]].map(([value,label])=>node("option",{value,selected:value===(params.get("mine")||"0"),text:label})));

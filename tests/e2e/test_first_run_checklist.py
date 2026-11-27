@@ -39,14 +39,14 @@ def test_manager_marks_a_set_up_step_and_hides_the_checklist(app, language):
             checklist = page.locator(".onboarding-panel")
             expect(checklist.get_by_role("heading", name=text("ابدأ مع SOCify", "Get started with SOCify"), exact=True)).to_be_visible()
             expect(checklist.locator(".onboarding-steps > li")).to_have_count(6)
-            summary = checklist.locator(".panel-body > p").first
+            summary = checklist.locator(".onboarding-progress")
             before = int(re.search(r"\d+", summary.inner_text())[0])
             step = checklist.locator(".onboarding-steps > li").filter(has_text="ATT&CK")
             expect(step).to_contain_text(text("لم يتم", "Not done"))
             step.get_by_role("button", name=text("تحديد كمنجز", "Mark as done"), exact=True).click()
             step = page.locator(".onboarding-panel .onboarding-steps > li").filter(has_text="ATT&CK")
             expect(step.get_by_role("button", name=text("إلغاء التحديد", "Clear mark"), exact=True)).to_be_visible()
-            expect(page.locator(".onboarding-panel .panel-body > p").first).to_contain_text(str(before + 1))
+            expect(page.locator(".onboarding-progress")).to_contain_text(str(before + 1))
             for theme in ("light", "dark"):
                 account_menu(page).locator(f'[data-theme-option="{theme}"]').click()
                 page.keyboard.press("Escape")

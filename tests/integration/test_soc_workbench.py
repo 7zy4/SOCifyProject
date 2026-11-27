@@ -30,7 +30,8 @@ def test_monitoring_filters_channels_pagination_and_membership(autopsy_case, cli
     database.execute("UPDATE incident_cases SET status='investigating' WHERE id=?", (other,))
     response = client.get("/api/soc/monitoring")
     assert response.status_code == 200, response.json
-    assert response.json["counts"] == {"main": 2, "investigation": 1, "closed": 0}
+    # Incoming alerts waiting for triage are counted beside the case channels for everyone who can read the queue.
+    assert response.json["counts"] == {"main": 2, "investigation": 1, "closed": 0, "intake": 0}
     login_as("analyst")
     response = client.get("/api/soc/monitoring?page_size=1&sort=severity")
     assert response.status_code == 200, response.json
@@ -52,6 +53,13 @@ def test_monitoring_filters_channels_pagination_and_membership(autopsy_case, cli
     assert client.get("/api/soc/monitoring").json["total"] == 0
     database.execute("DELETE FROM autopsy_case_members WHERE case_id=?", (autopsy_case,))
     assert client.get("/api/soc/monitoring?channel=closed").json["total"] == 0
+    # A role narrowed to cases without the intake queue gets no intake count.
+    login_as("auditor")
+    database.execute(
+        "INSERT INTO team_role_permissions(workspace_id, role, permissions) VALUES (1, 'auditor', ?) ON CONFLICT(workspace_id, role) DO UPDATE SET permissions = excluded.permissions",
+        ('["cases.read", "audit.read"]',),
+    )
+    assert "intake" not in client.get("/api/soc/monitoring").json["counts"]
 
 
 @pytest.mark.parametrize(
